@@ -1,0 +1,57 @@
+[project]
+name = "cyvest"
+version = "0.1.0"
+description = "Cybersecurity investigation model"
+readme = {file = "README.md", content-type = "text/markdown"}
+requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [
+    { name = "PakitoSec", email = "jeromep83@gmail.com" }
+]
+dependencies = ["logurich>=0.1", "rich>=13"]
+keywords = ["cybersecurity", "incident-response", "observability", "threat-intelligence", "reporting", "graph"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Information Technology",
+    "Topic :: Security",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+Homepage = "https://github.com/PakitoSec/cyvest"
+Repository = "https://github.com/PakitoSec/cyvest"
+Issues = "https://github.com/PakitoSec/cyvest/issues"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.2",
+    "ruff>=0.6",
+]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+ignore = []
+
+[tool.ruff.lint.isort]
+known-first-party = ["cyvest"]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[build-system]
+requires = ["setuptools>=65", "wheel"]
+build-backend = "setuptools.build_meta"

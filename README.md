@@ -4,8 +4,6 @@ Reusable investigation domain models, visitor helpers, and reporting utilities f
 a consistent data model for threat intelligence, observables, and result checks while keeping the visitor layer
 extensible for bespoke workflows.
 
-> Tip: add project badges (build, coverage, PyPI) here once CI is configured.
-
 ## Features
 
 - Composition-friendly report builder that nests containers and checks.

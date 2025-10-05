@@ -19,39 +19,20 @@ from .models import (
     ThreatIntel,
     get_level_from_score,
 )
-from .observable_registry import ObservableRegistry
+from .observable_graph import ObservableGraph
 from .report_render import markdown_summary, stdout_from_json
 from .report_serialization import reduce_report_json, report_to_json
+from .report_stats import ReportStats
 
 
 class Visitor(ABC):
     def __init__(self, *, graph: bool = False) -> None:
         super().__init__()
         self.graph = graph
-        self._stats = {}
 
     @property
     def stats(self):
-        return copy.deepcopy(self._stats)
-
-    def init_stat(self, key: str, value: int = 0) -> None:
-        self._stats[key] = value
-
-    def increment_stat(self, key: str, value: int = 1) -> None:
-        self._stats[key] += value
-
-    def decrement_stat(self, key: str, value: int = 1) -> None:
-        self._stats[key] -= value
-
-    def reduce_stats(self, stats: dict) -> dict:
-        for k, v in self._stats.items():
-            if not isinstance(v, int):
-                raise Exception("Reduce Stats can reduce only integers")
-            if stats.get(k):
-                stats[k] += v
-            else:
-                stats[k] = v
-        return stats
+        return {}
 
     @abstractmethod
     def visit_threat_intel(self, threat_intel: ThreatIntel) -> ThreatIntel:
@@ -115,21 +96,21 @@ class Report(Visitor):
         payload = copy.deepcopy(json_structure) if json_structure is not None else self.default_payload()
         self.json = payload
         self.linked_reports = linked_reports
-        self._seen_stats = {}
         self.tree = CheckTree()
-        self.observable_registry = ObservableRegistry()
-        self.observables = self.observable_registry._observables
+        self.observable_graph = ObservableGraph()
+        self.observables = self.observable_graph._observables
         self.enrichments = []
         self.global_score = 0.0
         self.global_level = get_level_from_score(self.global_score) or Level.INFO
         self.annotations: list[dict[str, str]] = []
+        self.stats_manager = ReportStats()
         # init statistics
         for type_data, key in Report.map_stats_suspicious.items():
-            self.init_stat(key)
+            self.stats_manager.init(key)
             for level in Level:
                 stat_name = self._get_stat(type_data, level)
                 if stat_name is not None:
-                    self.init_stat(stat_name)
+                    self.stats_manager.init(stat_name)
 
     @staticmethod
     def default_payload() -> dict[str, Any]:
@@ -166,49 +147,29 @@ class Report(Visitor):
         return None
 
     def get_observable_per_type(self, type: ObsType) -> list[Observable]:
-        return [obs for obs in self.observable_registry.values() if obs.obs_type == type]
+        return [obs for obs in self.observable_graph.values() if obs.obs_type == type]
+
+    @property
+    def stats(self) -> dict[str, int]:
+        return self.stats_manager.snapshot()
 
     def increment_stat(self, full_key: str, type_data: str, level: Level, model: Model) -> bool:
         stat_name = self._get_stat(type_data, level)
         default_stat_name = self._get_stat(type_data, Level.INFO)
-        if stat_name is None:
-            return False
-        if self._seen_stats.get(full_key):
-            # Update
-            old_level = self._seen_stats.get(full_key)
-            old_stat_name = self._get_stat(type_data, old_level)
-            if stat_name and old_stat_name != stat_name and level > old_level:
-                self._seen_stats[full_key] = level
-                logger.debug(
-                    "{}: update stat {} -> {} - default: {} (gen by: {})",
-                    full_key,
-                    old_stat_name,
-                    stat_name,
-                    default_stat_name,
-                    model.generated_by,
-                )
-                if old_stat_name != default_stat_name:
-                    super().decrement_stat(old_stat_name)
-                if stat_name != default_stat_name:
-                    super().increment_stat(stat_name)
-        else:
-            # New
-            logger.debug(
-                "{}: add stat {} - default: {} (gen by: {})", full_key, stat_name, default_stat_name, model.generated_by
-            )
-            if stat_name:
-                super().increment_stat(stat_name)
-            if stat_name != default_stat_name:
-                super().increment_stat(default_stat_name)
-            self._seen_stats[full_key] = level
-        return True
+        return self.stats_manager.track(
+            full_key=full_key,
+            stat_name=stat_name,
+            default_stat_name=default_stat_name,
+            level=level,
+            generated_by=model.generated_by,
+        )
 
     def get_linked_reports(self, sha256_file: str) -> Report:
         return self.linked_reports.get(sha256_file)
 
     def is_whitelisted(self, type: ObsType, value: str) -> bool:
         full_key = f"{type.name}.{value}"
-        observable = self.observable_registry.get(full_key)
+        observable = self.observable_graph.get(full_key)
         return bool(observable and observable.whitelisted)
 
     def add_annotation(self, name: str, message: str) -> list[dict[str, str]]:
@@ -241,12 +202,13 @@ class Report(Visitor):
         return integrated
 
     def visit_observable(self, observable: Observable) -> Observable:
-        full_key = f"{observable.obs_type.name}.{observable.obs_value}"
-        self.increment_stat(full_key, observable.obs_type.name, observable.level, observable)
-        ref = self.observable_registry.upsert(observable)
-        if self.is_whitelisted(ref.obs_type, ref.obs_value):
-            ref.whitelisted = True
-        return ref
+        canonical, visited_nodes, visited_intels = self.observable_graph.integrate(observable)
+        for node in visited_nodes:
+            full_key = f"{node.obs_type.name}.{node.obs_value}"
+            self.increment_stat(full_key, node.obs_type.name, node.level, node)
+        for intel in visited_intels:
+            intel.accept(self)
+        return canonical
 
     def visit_enrichment(self, enrichment: Enrichment) -> Enrichment:
         enrichment.ref_struct[enrichment.key] = enrichment.data
@@ -261,6 +223,9 @@ class Report(Visitor):
 
     def reduce_json_report(self, json_report: dict[str, Any]) -> dict[str, Any]:
         return reduce_report_json(json_report)
+
+    def reduce_stats(self, stats: dict[str, int]) -> dict[str, int]:
+        return self.stats_manager.reduce(stats)
 
     def to_markdown_summary(self, json_data: dict[str, Any], exclude_checks: list[str] | None = None) -> str:
         return markdown_summary(json_data, exclude_checks=exclude_checks)

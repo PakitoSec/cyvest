@@ -21,6 +21,8 @@ from .models import (
     get_color_score,
     get_level_from_score,
 )
+from .observable_graph import ObservableGraph
+from .report_stats import ReportStats
 from .visitors import Action, Report, Visitor
 
 __all__ = [
@@ -33,6 +35,8 @@ __all__ = [
     "Model",
     "Observable",
     "ObsType",
+    "ObservableGraph",
+    "ReportStats",
     "Report",
     "ResultCheck",
     "Scope",

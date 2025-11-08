@@ -169,7 +169,7 @@ def report_to_json(report: Report) -> dict[str, Any]:
 
     json_graph = [
         _observable_to_json(report, observable, max_deep_child=None, max_deep_parent=-1)
-        for observable in report.observable_registry.root_observables()
+        for observable in report.observable_graph.root_observables()
     ]
 
     return {

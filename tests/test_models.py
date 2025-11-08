@@ -1,6 +1,6 @@
 import pytest
 
-from cyvest import Container, Level, Observable, ObsType, Report, ResultCheck, Scope
+from cyvest import Container, Level, Observable, ObservableGraph, ObsType, Report, ResultCheck, Scope
 
 
 def build_report(*, graph: bool = False) -> Report:
@@ -136,3 +136,47 @@ def test_add_observable_chain_builds_nested_structure():
 
     assert root.obs_type is ObsType.URL
     assert "IP.198.51.100.10" in root.observables_children["DOMAIN.root.example"].observables_children
+
+
+def test_observable_graph_merges_duplicate_observables():
+    graph = ObservableGraph()
+
+    initial = Observable(ObsType.URL, "http://alpha.test")
+    initial.attach_intel(name="seed", score=2, level=Level.NOTABLE)
+
+    canonical, nodes, ints = graph.integrate(initial)
+
+    assert canonical is initial
+    assert canonical in nodes
+    assert any(ti.name == "seed" for ti in ints)
+
+    duplicate = Observable(ObsType.URL, "http://alpha.test")
+    duplicate.attach_intel(name="update", score=6, level=Level.MALICIOUS)
+
+    merged, nodes_update, ints_update = graph.integrate(duplicate)
+
+    assert merged is canonical
+    assert canonical.score == pytest.approx(6.0)
+    intel_names = {ti.name for ti in canonical.threat_intels.values()}
+    assert intel_names == {"seed", "update"}
+    assert any(ti.level is Level.MALICIOUS for ti in canonical.threat_intels.values())
+
+
+def test_observable_graph_links_parent_child_and_propagates_score():
+    graph = ObservableGraph()
+
+    parent = Observable(ObsType.DOMAIN, "alpha.test")
+    child = Observable(ObsType.URL, "http://alpha.test")
+    child.attach_intel(name="intel", score=5, level=Level.SUSPICIOUS)
+    parent.add_observable_children(child)
+
+    merged_child, nodes, _ = graph.integrate(child)
+
+    merged_parent = graph.get("DOMAIN.alpha.test")
+
+    assert merged_child is child
+    assert merged_parent is parent
+    assert merged_child.full_key in merged_parent.observables_children
+    assert merged_parent.full_key in merged_child.observables_parents
+    assert merged_parent.score == pytest.approx(5.0)
+    assert merged_parent.level is Level.MALICIOUS

@@ -344,41 +344,8 @@ class Observable(ScoredLevelModel):
         full_key = f"{self.obs_type.name}.{self.obs_value}"
         return full_key
 
-    def _accept(self, visitor: Visitor, seen: set[int]) -> Observable:
-        ref = visitor.visit_observable(self)
-        seen.add(id(ref))
-        # Visit threat intel
-        to_update = {}
-        for ti in ref.threat_intels.values():
-            ref_ti = ti.accept(visitor)
-            if ref_ti is not ti:
-                to_update[ti.full_key] = ref_ti
-        ref.threat_intels.update(to_update)
-        # Visit parent
-        to_update = {}
-        for parent in list(ref.observables_parents.values()):
-            if id(parent) not in seen:
-                seen.add(id(parent))
-                ref_parent = parent._accept(visitor, seen)
-                if ref_parent is not parent:
-                    to_update[parent.full_key] = ref_parent
-                    update_all_parents_score(ref, ref_parent, set([id(ref)]))
-        ref.observables_parents.update(to_update)
-        # Visit children
-        to_update = {}
-        for child in list(ref.observables_children.values()):
-            if id(child) not in seen:
-                seen.add(id(child))
-                ref_child = child._accept(visitor, seen)
-                if ref_child is not child:
-                    to_update[child.full_key] = ref_child
-                    ref.update_score(ref_child)
-                    update_all_parents_score(ref, ref_child, set([id(ref)]))
-        ref.observables_children.update(to_update)
-        return ref
-
     def accept(self, visitor: Visitor) -> Observable:
-        return self._accept(visitor, {id(self)})
+        return visitor.visit_observable(self)
 
     def _update(self, observable: Observable, seen: set[str]) -> None:
         # Lambda functions

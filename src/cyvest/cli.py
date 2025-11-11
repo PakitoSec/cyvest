@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 import click
+from logurich import logger
 from rich.console import Console
 
 from cyvest import __version__
@@ -31,13 +32,13 @@ def _load_investigation(input_path: Path) -> dict[str, Any]:
 def _print_stats_overview(stats: dict[str, Any]) -> None:
     """Render a lightweight overview of statistics."""
     if not stats:
-        console.print("  No statistics available.")
+        logger.info("  No statistics available.")
         return
 
     for key, value in stats.items():
         if isinstance(value, dict):
             continue
-        console.print(f"  {key}: {value}")
+        logger.info("  {}: {}", key, value)
 
 
 def _write_markdown(data: dict[str, Any], output_path: Path) -> None:
@@ -86,7 +87,7 @@ def show(input: Path, stats: bool, graph: bool) -> None:
     display_summary(cv, console, show_graph=graph)
 
     if stats:
-        console.print()
+        logger.info("")
         display_statistics(cv, console)
 
 
@@ -99,13 +100,13 @@ def stats(input: Path, detailed: bool) -> None:
     """
 
     cv = load_investigation_json(input)
-    console.print(f"[cyan]Statistics for: {input}[/cyan]\n")
-    console.print("[bold]Overview:[/bold]")
-    console.print(f"  Global Score: {cv.get_global_score()}")
-    console.print(f"  Global Level: {cv.get_global_level()}")
+    logger.info(f"[cyan]Statistics for: {input}[/cyan]\n")
+    logger.info("[bold]Overview:[/bold]")
+    logger.info("  Global Score: {}", cv.get_global_score())
+    logger.info("  Global Level: {}", cv.get_global_level())
 
     if detailed:
-        console.print()
+        logger.info("")
         display_statistics(cv, console)
     else:
         _print_stats_overview(cv.get_statistics())
@@ -122,9 +123,9 @@ def merge(inputs: tuple[Path, ...], output: Path) -> None:
     if len(inputs) < 2:
         raise click.BadParameter("Provide at least two input files.", param_hint="inputs")
 
-    console.print(f"[cyan]Merging {len(inputs)} investigation files...[/cyan]")
-    console.print("[yellow]Merge functionality not yet implemented[/yellow]")
-    console.print(f"[yellow]Requested output: {output}[/yellow]")
+    logger.info(f"[cyan]Merging {len(inputs)} investigation files...[/cyan]")
+    logger.info("[yellow]Merge functionality not yet implemented[/yellow]")
+    logger.info(f"[yellow]Requested output: {output}[/yellow]")
 
 
 @cli.command()
@@ -151,11 +152,11 @@ def export(input: Path, output: Path, export_format: str) -> None:
     if export_format.lower() == "json":
         with output_path.open("w", encoding="utf-8") as handle:
             json.dump(data, handle, indent=2, ensure_ascii=False)
-        console.print(f"[green]Exported to JSON: {output_path}[/green]")
+        logger.info(f"[green]Exported to JSON: {output_path}[/green]")
         return
 
     _write_markdown(data, output_path)
-    console.print(f"[green]Exported to Markdown: {output_path}[/green]")
+    logger.info(f"[green]Exported to Markdown: {output_path}[/green]")
 
 
 def main() -> None:

@@ -8,13 +8,16 @@ handling score propagation, and generating reports.
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from cyvest.levels import Level
 from cyvest.merge import InvestigationMerger
 from cyvest.model import Check, Container, Enrichment, Observable, ThreatIntel
 from cyvest.score import ScoreEngine
 from cyvest.stats import InvestigationStats
+
+if TYPE_CHECKING:
+    from cyvest.dsl import CheckHandler, ContainerHandler, ObservableHandler
 
 
 class Cyvest:
@@ -522,3 +525,92 @@ class Cyvest:
     def get_all_containers(self) -> dict[str, Container]:
         """Get all containers."""
         return self._containers.copy()
+
+    # DSL methods for fluent interface
+
+    def observable(
+        self,
+        obs_type: str,
+        value: str,
+        internal: bool = True,
+        whitelisted: bool = False,
+        comment: str = "",
+        extra: dict[str, Any] | None = None,
+        score: Decimal | float | None = None,
+        level: Level | None = None,
+    ) -> ObservableHandler:
+        """
+        Create an observable with fluent interface.
+
+        Args:
+            obs_type: Type of observable
+            value: Value of the observable
+            internal: Whether this is an internal asset
+            whitelisted: Whether this is whitelisted
+            comment: Optional comment
+            extra: Optional extra data
+            score: Optional explicit score
+            level: Optional explicit level
+
+        Returns:
+            Observable handler for chaining
+        """
+        from cyvest.dsl import ObservableHandler
+
+        obs = self.observable_create(obs_type, value, internal, whitelisted, comment, extra, score, level)
+        return ObservableHandler(self, obs)
+
+    def check(
+        self,
+        check_id: str,
+        scope: str,
+        description: str,
+        comment: str = "",
+        extra: dict[str, Any] | None = None,
+        score: Decimal | float | None = None,
+        level: Level | None = None,
+    ) -> CheckHandler:
+        """
+        Create a check with fluent interface.
+
+        Args:
+            check_id: Check identifier
+            scope: Check scope
+            description: Check description
+            comment: Optional comment
+            extra: Optional extra data
+            score: Optional explicit score
+            level: Optional explicit level
+
+        Returns:
+            Check handler for chaining
+        """
+        from cyvest.dsl import CheckHandler
+
+        chk = self.check_create(check_id, scope, description, comment, extra, score, level)
+        return CheckHandler(self, chk)
+
+    def container(self, path: str, description: str = "") -> ContainerHandler:
+        """
+        Create a container with fluent interface.
+
+        Args:
+            path: Container path
+            description: Container description
+
+        Returns:
+            Container handler for chaining
+        """
+        from cyvest.dsl import ContainerHandler
+
+        ctr = self.container_create(path, description)
+        return ContainerHandler(self, ctr)
+
+    def root(self) -> Observable:
+        """
+        Get the root observable.
+
+        Returns:
+            Root observable
+        """
+        return self.observable_get_root()

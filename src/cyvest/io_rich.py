@@ -6,6 +6,7 @@ Provides formatted display of investigation results using the Rich library.
 
 from typing import Any
 
+from logurich import get_console
 from rich.align import Align
 from rich.console import Console
 from rich.rule import Rule
@@ -27,7 +28,7 @@ def display_summary(cv: Cyvest, console: Console | None = None, show_graph: bool
         show_graph: Whether to display the observable graph
     """
     if console is None:
-        console = Console()
+        console = get_console()
 
     # Create main table
     table = Table(

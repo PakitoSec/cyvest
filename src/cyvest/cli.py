@@ -1,216 +1,167 @@
 """
-Command-line interface for Cyvest.
+Click-based command-line interface for Cyvest.
 
 Provides commands for managing investigations, displaying summaries,
-and generating reports.
+and generating simple reports from serialized investigations.
 """
 
-import argparse
-import sys
-from pathlib import Path
+from __future__ import annotations
 
+import json
+from pathlib import Path
+from typing import Any
+
+import click
 from rich.console import Console
 
 from cyvest import __version__
+from cyvest.io_rich import display_statistics, display_summary
+from cyvest.io_serialization import load_investigation_json
+
+CONTEXT_SETTINGS = {"help_option_names": ["-h", "--help"]}
+console = Console()
 
 
-def cmd_show(args: argparse.Namespace) -> int:
+def _load_investigation(input_path: Path) -> dict[str, Any]:
+    """Load a serialized investigation from disk."""
+    with input_path.open("r", encoding="utf-8") as handle:
+        return json.load(handle)
+
+
+def _print_stats_overview(stats: dict[str, Any]) -> None:
+    """Render a lightweight overview of statistics."""
+    if not stats:
+        console.print("  No statistics available.")
+        return
+
+    for key, value in stats.items():
+        if isinstance(value, dict):
+            continue
+        console.print(f"  {key}: {value}")
+
+
+def _write_markdown(data: dict[str, Any], output_path: Path) -> None:
+    """Write a basic Markdown report derived from serialized data."""
+    stats = data.get("stats", {})
+    lines = [
+        "# Investigation Report",
+        "",
+        f"**Score:** {data.get('score', 'N/A')}",
+        f"**Level:** {data.get('level', 'N/A')}",
+        "",
+        "## Statistics",
+        "",
+    ]
+
+    for key, value in stats.items():
+        if isinstance(value, dict):
+            continue
+        lines.append(f"- **{key}:** {value}")
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text("\n".join(lines), encoding="utf-8")
+
+
+@click.group(context_settings=CONTEXT_SETTINGS)
+@click.version_option(__version__, prog_name="Cyvest")
+def cli() -> None:
+    """Cyvest - Cybersecurity Investigation Framework."""
+
+
+@cli.command()
+@click.argument("input", type=click.Path(exists=True, dir_okay=False, path_type=Path))
+@click.option("--stats/--no-stats", default=False, help="Display statistics tables after the summary.")
+@click.option(
+    "--graph/--no-graph",
+    default=True,
+    show_default=True,
+    help="Toggle observable graph rendering.",
+)
+def show(input: Path, stats: bool, graph: bool) -> None:
     """
     Display an investigation from a JSON file.
-
-    Args:
-        args: Command arguments
-
-    Returns:
-        Exit code
     """
-    import json
 
-    # Load the JSON
-    with open(args.input, encoding="utf-8") as f:
-        data = json.load(f)
+    cv = load_investigation_json(input)
+    display_summary(cv, console, show_graph=graph)
 
-    # For now, just display the JSON structure
-    # In a real implementation, we'd reconstruct the Cyvest object
-    console = Console()
-    console.print(f"[cyan]Investigation loaded from: {args.input}[/cyan]")
-    console.print(f"[green]Global Score: {data.get('score', 'N/A')}[/green]")
-    console.print(f"[green]Global Level: {data.get('level', 'N/A')}[/green]")
-    console.print(f"[yellow]Total Observables: {len(data.get('observables', {}))}[/yellow]")
-    console.print(f"[yellow]Total Checks: {sum(len(checks) for checks in data.get('checks', {}).values())}[/yellow]")
-
-    if args.stats:
-        console.print("\n[bold]Statistics:[/bold]")
-        stats = data.get("stats", {})
-        for key, value in stats.items():
-            if not isinstance(value, dict):
-                console.print(f"  {key}: {value}")
-
-    return 0
+    if stats:
+        console.print()
+        display_statistics(cv, console)
 
 
-def cmd_merge(args: argparse.Namespace) -> int:
-    """
-    Merge multiple investigations.
-
-    Args:
-        args: Command arguments
-
-    Returns:
-        Exit code
-    """
-    console = Console()
-    console.print(f"[cyan]Merging {len(args.inputs)} investigation files...[/cyan]")
-
-    # TODO: Implement actual merging logic
-    # This would require deserializing JSON back to Cyvest objects
-    console.print("[yellow]Merge functionality not yet implemented[/yellow]")
-
-    return 0
-
-
-def cmd_stats(args: argparse.Namespace) -> int:
+@cli.command()
+@click.argument("input", type=click.Path(exists=True, dir_okay=False, path_type=Path))
+@click.option("-d", "--detailed", is_flag=True, help="Show detailed breakdowns.")
+def stats(input: Path, detailed: bool) -> None:
     """
     Display statistics for an investigation.
-
-    Args:
-        args: Command arguments
-
-    Returns:
-        Exit code
     """
-    import json
 
-    console = Console()
-
-    with open(args.input, encoding="utf-8") as f:
-        data = json.load(f)
-
-    console.print(f"[cyan]Statistics for: {args.input}[/cyan]\n")
-
-    stats = data.get("stats", {})
+    cv = load_investigation_json(input)
+    console.print(f"[cyan]Statistics for: {input}[/cyan]\n")
     console.print("[bold]Overview:[/bold]")
-    console.print(f"  Global Score: {data.get('score', 'N/A')}")
-    console.print(f"  Global Level: {data.get('level', 'N/A')}")
-    console.print(f"  Total Observables: {stats.get('total_observables', 0)}")
-    console.print(f"  Total Checks: {stats.get('total_checks', 0)}")
-    console.print(f"  Applied Checks: {stats.get('applied_checks', 0)}")
-    console.print(f"  Total Threat Intel: {stats.get('total_threat_intel', 0)}")
+    console.print(f"  Global Score: {cv.get_global_score()}")
+    console.print(f"  Global Level: {cv.get_global_level()}")
 
-    if args.detailed:
-        console.print("\n[bold]Observables by Type:[/bold]")
-        for obs_type, count in stats.get("observables_by_type", {}).items():
-            console.print(f"  {obs_type}: {count}")
-
-        console.print("\n[bold]Checks by Scope:[/bold]")
-        for scope, count in stats.get("checks_by_scope", {}).items():
-            console.print(f"  {scope}: {count}")
-
-    return 0
+    if detailed:
+        console.print()
+        display_statistics(cv, console)
+    else:
+        _print_stats_overview(cv.get_statistics())
 
 
-def cmd_export(args: argparse.Namespace) -> int:
+@cli.command()
+@click.argument("inputs", nargs=-1, type=click.Path(exists=True, dir_okay=False, path_type=Path))
+@click.option("-o", "--output", required=True, type=click.Path(dir_okay=False, path_type=Path))
+def merge(inputs: tuple[Path, ...], output: Path) -> None:
     """
-    Export an investigation to different formats.
-
-    Args:
-        args: Command arguments
-
-    Returns:
-        Exit code
+    Merge multiple investigations together (placeholder).
     """
-    import json
 
-    console = Console()
+    if len(inputs) < 2:
+        raise click.BadParameter("Provide at least two input files.", param_hint="inputs")
 
-    with open(args.input, encoding="utf-8") as f:
-        data = json.load(f)
+    console.print(f"[cyan]Merging {len(inputs)} investigation files...[/cyan]")
+    console.print("[yellow]Merge functionality not yet implemented[/yellow]")
+    console.print(f"[yellow]Requested output: {output}[/yellow]")
 
-    output_path = Path(args.output)
 
-    if args.format == "json":
-        with open(output_path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
+@cli.command()
+@click.argument("input", type=click.Path(exists=True, dir_okay=False, path_type=Path))
+@click.option("-o", "--output", required=True, type=click.Path(dir_okay=False, path_type=Path))
+@click.option(
+    "-f",
+    "--format",
+    "export_format",
+    type=click.Choice(["json", "markdown"], case_sensitive=False),
+    default="markdown",
+    show_default=True,
+    help="Output format.",
+)
+def export(input: Path, output: Path, export_format: str) -> None:
+    """
+    Export an investigation to a different format.
+    """
+
+    data = _load_investigation(input)
+    output_path = output.resolve()
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if export_format.lower() == "json":
+        with output_path.open("w", encoding="utf-8") as handle:
+            json.dump(data, handle, indent=2, ensure_ascii=False)
         console.print(f"[green]Exported to JSON: {output_path}[/green]")
+        return
 
-    elif args.format == "markdown":
-        # Generate markdown from JSON data
-        # For now, write a basic markdown
-        with open(output_path, "w", encoding="utf-8") as f:
-            f.write("# Investigation Report\n\n")
-            f.write(f"**Score:** {data.get('score', 'N/A')}\n")
-            f.write(f"**Level:** {data.get('level', 'N/A')}\n\n")
-            f.write("## Statistics\n\n")
-            stats = data.get("stats", {})
-            for key, value in stats.items():
-                if not isinstance(value, dict):
-                    f.write(f"- **{key}:** {value}\n")
-        console.print(f"[green]Exported to Markdown: {output_path}[/green]")
-
-    return 0
+    _write_markdown(data, output_path)
+    console.print(f"[green]Exported to Markdown: {output_path}[/green]")
 
 
-def main() -> int:
-    """
-    Main entry point for the CLI.
-
-    Returns:
-        Exit code
-    """
-    parser = argparse.ArgumentParser(
-        description="Cyvest - Cybersecurity Investigation Framework",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-    )
-    parser.add_argument("--version", action="version", version=f"Cyvest {__version__}")
-
-    subparsers = parser.add_subparsers(dest="command", help="Available commands")
-
-    # Show command
-    show_parser = subparsers.add_parser("show", help="Display an investigation")
-    show_parser.add_argument("input", help="Input JSON file")
-    show_parser.add_argument("--graph", action="store_true", help="Show observable graph")
-    show_parser.add_argument("--stats", action="store_true", help="Show statistics")
-
-    # Merge command
-    merge_parser = subparsers.add_parser("merge", help="Merge multiple investigations")
-    merge_parser.add_argument("inputs", nargs="+", help="Input JSON files to merge")
-    merge_parser.add_argument("-o", "--output", required=True, help="Output JSON file")
-
-    # Stats command
-    stats_parser = subparsers.add_parser("stats", help="Display investigation statistics")
-    stats_parser.add_argument("input", help="Input JSON file")
-    stats_parser.add_argument("-d", "--detailed", action="store_true", help="Show detailed statistics")
-
-    # Export command
-    export_parser = subparsers.add_parser("export", help="Export investigation to different formats")
-    export_parser.add_argument("input", help="Input JSON file")
-    export_parser.add_argument("-o", "--output", required=True, help="Output file")
-    export_parser.add_argument(
-        "-f",
-        "--format",
-        choices=["json", "markdown"],
-        default="markdown",
-        help="Output format (default: markdown)",
-    )
-
-    args = parser.parse_args()
-
-    if not args.command:
-        parser.print_help()
-        return 1
-
-    # Route to appropriate command
-    if args.command == "show":
-        return cmd_show(args)
-    elif args.command == "merge":
-        return cmd_merge(args)
-    elif args.command == "stats":
-        return cmd_stats(args)
-    elif args.command == "export":
-        return cmd_export(args)
-
-    return 0
+def main() -> None:
+    """Entry point used by the console script."""
+    cli()
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()

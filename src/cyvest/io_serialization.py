@@ -42,8 +42,7 @@ def serialize_observable(obs: Observable) -> dict[str, Any]:
         "score": float(obs.score),
         "level": obs.level.name,
         "relationships": [
-            {"target_key": rel.target_key, "relationship_type": rel.relationship_type}
-            for rel in obs.relationships
+            {"target_key": rel.target_key, "relationship_type": rel.relationship_type} for rel in obs.relationships
         ],
         "threat_intels": [ti.key for ti in obs.threat_intels],
         "generated_by_checks": obs._generated_by_checks,
@@ -346,7 +345,7 @@ def load_investigation_json(filepath: str | Path) -> Cyvest:
     from cyvest.score import ScoreEngine
     from cyvest.stats import InvestigationStats
 
-    with open(filepath, "r", encoding="utf-8") as handle:
+    with open(filepath, encoding="utf-8") as handle:
         data = json.load(handle)
 
     cv = Cyvest(data=data.get("data"))
@@ -383,7 +382,9 @@ def load_investigation_json(filepath: str | Path) -> Cyvest:
         )
         obs.key = obs_info.get("key", obs.key)
         obs.relationships = [
-            Relationship(target_key=rel.get("target_key", ""), relationship_type=rel.get("relationship_type", "related-to"))
+            Relationship(
+                target_key=rel.get("target_key", ""), relationship_type=rel.get("relationship_type", "related-to")
+            )
             for rel in obs_info.get("relationships", [])
         ]
         obs._generated_by_checks = obs_info.get("generated_by_checks", [])
@@ -433,7 +434,9 @@ def load_investigation_json(filepath: str | Path) -> Cyvest:
 
     # Enrichments
     for enr_info in data.get("enrichments", {}).values():
-        enrichment = Enrichment(name=enr_info.get("name", ""), data=enr_info.get("data", {}), context=enr_info.get("context", ""))
+        enrichment = Enrichment(
+            name=enr_info.get("name", ""), data=enr_info.get("data", {}), context=enr_info.get("context", "")
+        )
         enrichment.key = enr_info.get("key", enrichment.key)
         cv._enrichments[enrichment.key] = enrichment
 

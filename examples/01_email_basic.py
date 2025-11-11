@@ -42,7 +42,7 @@ def main() -> None:
         cv.observable_add_relationship(phishing_url.key, domain.key, "uses")
 
         # Create checks
-        sender_check = cv.create_check(
+        sender_check = cv.check_create(
             "sender_verification",
             "email_headers",
             "Verify sender authenticity",
@@ -50,7 +50,7 @@ def main() -> None:
             score=Decimal("3.5"),
         )
 
-        url_check = cv.create_check(
+        url_check = cv.check_create(
             "url_analysis",
             "email_body",
             "Analyze URLs in email body",

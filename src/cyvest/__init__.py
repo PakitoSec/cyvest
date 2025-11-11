@@ -1,51 +1,24 @@
-"""Investigation models."""
+"""
+Cyvest - Cybersecurity Investigation Framework
 
-__all__: list[str]
-__version__ = "0.2.0"
+A Python framework for building, analyzing, and structuring cybersecurity investigations
+programmatically with automatic scoring, level calculation, and rich reporting capabilities.
+"""
 
-from .builder import ReportBuilder
-from .models import (
-    MAP_LEVEL_DATA,
-    ContainableSLM,
-    Container,
-    Enrichment,
-    Level,
-    Model,
-    Observable,
-    ObsType,
-    ResultCheck,
-    Scope,
-    ScoredLevelModel,
-    ThreatIntel,
-    get_color_level,
-    get_color_score,
-    get_level_from_score,
-)
-from .observable_graph import ObservableGraph
-from .report_stats import ReportStats
-from .visitors import Action, Report, Visitor
+# Import DSL to activate monkey-patching
+import cyvest.dsl  # noqa: F401
+from cyvest.cyvest import Cyvest
+from cyvest.levels import Level
+from cyvest.model import Check, Container, Enrichment, Observable, ThreatIntel
+
+__version__ = "0.1.0"
 
 __all__ = [
-    "Action",
-    "Container",
-    "ContainableSLM",
-    "Enrichment",
+    "Cyvest",
     "Level",
-    "MAP_LEVEL_DATA",
-    "Model",
+    "Check",
     "Observable",
-    "ObsType",
-    "ObservableGraph",
-    "ReportStats",
-    "Report",
-    "ResultCheck",
-    "Scope",
-    "ScoredLevelModel",
     "ThreatIntel",
-    "Visitor",
-    "get_color_level",
-    "get_color_score",
-    "get_level_from_score",
-    "ReportBuilder",
-    "__version__",
+    "Enrichment",
+    "Container",
 ]

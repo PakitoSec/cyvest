@@ -42,7 +42,12 @@ def serialize_observable(obs: Observable) -> dict[str, Any]:
         "score": float(obs.score),
         "level": obs.level.name,
         "relationships": [
-            {"target_key": rel.target_key, "relationship_type": rel.relationship_type} for rel in obs.relationships
+            {
+                "target_key": rel.target_key,
+                "relationship_type": rel.relationship_type,
+                "direction": rel.direction if isinstance(rel.direction, str) else rel.direction.value,
+            }
+            for rel in obs.relationships
         ],
         "threat_intels": [ti.key for ti in obs.threat_intels],
         "generated_by_checks": obs._generated_by_checks,
@@ -283,7 +288,12 @@ def generate_markdown_report(cv: Cyvest) -> str:
         if obs.relationships:
             lines.append("- **Relationships:**")
             for rel in obs.relationships:
-                lines.append(f"  - {rel.relationship_type} -> {rel.target_key}")
+                direction_symbol = {
+                    "outbound": "→",
+                    "inbound": "←",
+                    "bidirectional": "↔",
+                }.get(rel.direction if isinstance(rel.direction, str) else rel.direction.value, "→")
+                lines.append(f"  - {rel.relationship_type} {direction_symbol} {rel.target_key}")
         if obs.threat_intels:
             lines.append("- **Threat Intelligence:**")
             for ti in obs.threat_intels:
@@ -383,7 +393,9 @@ def load_investigation_json(filepath: str | Path) -> Cyvest:
         obs.key = obs_info.get("key", obs.key)
         obs.relationships = [
             Relationship(
-                target_key=rel.get("target_key", ""), relationship_type=rel.get("relationship_type", "related-to")
+                target_key=rel.get("target_key", ""),
+                relationship_type=rel.get("relationship_type", "related-to"),
+                direction=rel.get("direction", "outbound"),
             )
             for rel in obs_info.get("relationships", [])
         ]

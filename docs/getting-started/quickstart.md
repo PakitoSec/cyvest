@@ -8,13 +8,13 @@ Let's analyze a suspicious email with a phishing URL:
 
 ```python
 from decimal import Decimal
-from cyvest import Cyvest, Level
+from cyvest import Cyvest, Level, ObservableType
 
 # Create an investigation
 with Cyvest(data={"type": "email_analysis"}) as cv:
-    # Create a URL observable
+    # Create a URL observable using STIX2 type
     phishing_url = cv.observable_create(
-        "url",
+        ObservableType.URL,
         "https://fake-bank-login.com",
         internal=False
     )
@@ -50,14 +50,14 @@ Cyvest provides a fluent API for more concise code:
 
 ```python
 from decimal import Decimal
-from cyvest import Cyvest, Level
+from cyvest import Cyvest, Level, ObservableType, RelationshipType
 
 with Cyvest() as cv:
     # Create and configure observable in one chain
     url = (
-        cv.observable("url", "https://malicious.com", internal=False)
+        cv.observable(ObservableType.URL, "https://malicious.com", internal=False)
         .with_ti("virustotal", score=Decimal("8.5"), level=Level.MALICIOUS)
-        .relate_to(cv.root(), "related-to")
+        .relate_to(cv.root(), RelationshipType.RELATED_TO)
     )
     
     # Create check and link observable
@@ -70,22 +70,44 @@ with Cyvest() as cv:
 
 ## Working with Relationships
 
-Track relationships between observables:
+Track relationships between observables using STIX2 relationship types:
 
 ```python
+from cyvest import ObservableType, RelationshipType, RelationshipDirection
+
 with Cyvest() as cv:
-    # Create URL and IP
-    url = cv.observable_create("url", "http://c2-server.com")
-    ip = cv.observable_create("ipv4", "192.0.2.100", internal=False)
+    # Create URL and IP with STIX2 types
+    url = cv.observable_create(ObservableType.URL, "http://c2-server.com")
+    ip = cv.observable_create(ObservableType.IPV4_ADDR, "192.0.2.100", internal=False)
     
-    # Create relationship (STIX2 convention)
-    cv.observable_add_relationship(url.key, ip.key, "resolves-to")
+    # Create relationship using STIX2 enum (default: outbound)
+    cv.observable_add_relationship(url.key, ip.key, RelationshipType.RESOLVES_TO)
     
-    # Using fluent API
+    # Using fluent API with direction
     domain = (
-        cv.observable("domain", "c2-server.com", internal=False)
-        .relate_to(ip, "resolves-to")
+        cv.observable(ObservableType.DOMAIN_NAME, "c2-server.com", internal=False)
+        .relate_to(ip, RelationshipType.RESOLVES_TO, RelationshipDirection.OUTBOUND)
     )
+    
+    # Bidirectional relationship for mutual communication
+    host1 = cv.observable_create(ObservableType.IPV4_ADDR, "10.0.1.10", internal=True)
+    host2 = cv.observable_create(ObservableType.IPV4_ADDR, "10.0.1.20", internal=True)
+    cv.observable_add_relationship(
+        host1.key,
+        host2.key,
+        RelationshipType.COMMUNICATES_WITH,
+        RelationshipDirection.BIDIRECTIONAL  # ↔ mutual
+    )
+    
+    # Inbound relationship (file downloaded FROM url)
+    malware = cv.observable_create(ObservableType.FILE, "payload.exe", internal=False)
+    cv.observable_add_relationship(
+        malware.key,
+        url.key,
+        RelationshipType.DOWNLOADED,
+        RelationshipDirection.INBOUND  # ← from
+    )
+```
 ```
 
 ## Organizing with Containers

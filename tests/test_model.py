@@ -5,7 +5,7 @@ Tests for the core model classes.
 from decimal import Decimal
 
 from cyvest.levels import Level
-from cyvest.model import Check, Container, Enrichment, Observable, ThreatIntel
+from cyvest.model import Check, Container, Enrichment, Observable, RelationshipDirection, ThreatIntel
 
 
 def test_observable_creation() -> None:
@@ -123,3 +123,43 @@ def test_explicit_level_setting() -> None:
     # unless new calculated level is higher
     obs.update_score(Decimal("6.0"))
     assert obs.level == Level.MALICIOUS  # Higher level wins
+
+
+def test_relationship_direction_default() -> None:
+    """Test relationship direction defaults to OUTBOUND."""
+    obs1 = Observable(obs_type="url", value="https://example.com")
+    obs2 = Observable(obs_type="ip", value="192.168.1.1")
+    obs1.add_relationship(obs2.key, "resolves-to")
+    assert len(obs1.relationships) == 1
+    assert obs1.relationships[0].direction == RelationshipDirection.OUTBOUND
+
+
+def test_relationship_direction_explicit() -> None:
+    """Test setting explicit relationship direction."""
+    obs1 = Observable(obs_type="url", value="https://example.com")
+    obs2 = Observable(obs_type="ip", value="192.168.1.1")
+    
+    # Test outbound
+    obs1.add_relationship(obs2.key, "resolves-to", RelationshipDirection.OUTBOUND)
+    assert obs1.relationships[0].direction == RelationshipDirection.OUTBOUND
+    
+    # Test inbound
+    obs1.add_relationship(obs2.key, "belongs-to", RelationshipDirection.INBOUND)
+    assert obs1.relationships[1].direction == RelationshipDirection.INBOUND
+    
+    # Test bidirectional
+    obs1.add_relationship(obs2.key, "communicates-with", RelationshipDirection.BIDIRECTIONAL)
+    assert obs1.relationships[2].direction == RelationshipDirection.BIDIRECTIONAL
+
+
+def test_relationship_direction_string() -> None:
+    """Test relationship direction with string values."""
+    obs1 = Observable(obs_type="url", value="https://example.com")
+    obs2 = Observable(obs_type="ip", value="192.168.1.1")
+    
+    obs1.add_relationship(obs2.key, "resolves-to", "inbound")
+    assert obs1.relationships[0].direction == RelationshipDirection.INBOUND
+    
+    obs1.add_relationship(obs2.key, "communicates-with", "bidirectional")
+    assert obs1.relationships[1].direction == RelationshipDirection.BIDIRECTIONAL
+

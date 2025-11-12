@@ -11,8 +11,9 @@ def test_cyvest_initialization() -> None:
     """Test Cyvest initialization."""
     cv = Cyvest(data={"test": "data"})
     assert cv.data == {"test": "data"}
-    assert cv._root_observable is not None
-    assert cv._root_observable.obs_type == "file"
+    root = cv.observable_get_root()
+    assert root is not None
+    assert root.obs_type == "file"
 
 
 def test_context_manager() -> None:
@@ -31,7 +32,7 @@ def test_observable_creation() -> None:
     assert obs.value == "https://example.com"
     assert obs.internal is False
     # Should be registered
-    assert obs.key in cv._observables
+    assert cv.observable_get(obs.key) is not None
 
 
 def test_observable_retrieval() -> None:
@@ -62,7 +63,7 @@ def test_check_creation() -> None:
     assert check.check_id == "test_check"
     assert check.scope == "network"
     assert check.score == Decimal("5.0")
-    assert check.key in cv._checks
+    assert cv.check_get(check.key) is not None
 
 
 def test_check_observable_linking() -> None:
@@ -79,7 +80,7 @@ def test_container_creation() -> None:
     cv = Cyvest()
     ctr = cv.container_create("network_analysis", "Network analysis container")
     assert ctr.path == "network_analysis"
-    assert ctr.key in cv._containers
+    assert cv.container_get(ctr.key) is not None
 
 
 def test_container_check_addition() -> None:
@@ -97,7 +98,7 @@ def test_enrichment_creation() -> None:
     enr = cv.enrichment_create("metadata", {"key": "value"})
     assert enr.name == "metadata"
     assert enr.data == {"key": "value"}
-    assert enr.key in cv._enrichments
+    assert cv.enrichment_get(enr.key) is not None
 
 
 def test_global_score_calculation() -> None:
@@ -134,8 +135,10 @@ def test_investigation_merge() -> None:
     cv1.merge_investigation(cv2)
 
     # Should have observables from both (plus roots)
-    assert len(cv1._observables) >= 3
-    assert len(cv1._checks) == 2
+    all_obs = cv1.get_all_observables()
+    assert len(all_obs) >= 3
+    all_checks = cv1.get_all_checks()
+    assert len(all_checks) == 2
     assert cv1.get_global_score() == Decimal("5.0")
 
 
@@ -144,7 +147,8 @@ def test_root_observable() -> None:
     cv = Cyvest()
     root = cv.observable_get_root()
     assert root is not None
-    assert root == cv._root_observable
+    # Root should be accessible through API
+    assert cv.observable_get(root.key) is root
 
 
 def test_relationship_with_direction() -> None:

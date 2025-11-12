@@ -115,17 +115,75 @@ def stats(input: Path, detailed: bool) -> None:
 @cli.command()
 @click.argument("inputs", nargs=-1, type=click.Path(exists=True, dir_okay=False, path_type=Path))
 @click.option("-o", "--output", required=True, type=click.Path(dir_okay=False, path_type=Path))
-def merge(inputs: tuple[Path, ...], output: Path) -> None:
+@click.option(
+    "-f",
+    "--format",
+    "output_format",
+    type=click.Choice(["json", "rich"], case_sensitive=False),
+    default="json",
+    show_default=True,
+    help="Output format for merged investigation.",
+)
+@click.option(
+    "--stats/--no-stats",
+    default=True,
+    show_default=True,
+    help="Display merge statistics after merging.",
+)
+def merge(inputs: tuple[Path, ...], output: Path, output_format: str, stats: bool) -> None:
     """
-    Merge multiple investigations together (placeholder).
+    Merge multiple investigation JSON files into a single investigation.
+
+    This command loads multiple investigation files and merges them together,
+    automatically handling duplicate objects and score propagation.
+    The merged investigation is saved to the specified output file.
     """
+    from cyvest.io_serialization import save_investigation_json
 
     if len(inputs) < 2:
         raise click.BadParameter("Provide at least two input files.", param_hint="inputs")
 
     logger.info(f"[cyan]Merging {len(inputs)} investigation files...[/cyan]")
-    logger.info("[yellow]Merge functionality not yet implemented[/yellow]")
-    logger.info(f"[yellow]Requested output: {output}[/yellow]")
+
+    # Load first investigation
+    logger.info(f"  Loading: {inputs[0]}")
+    main_investigation = load_investigation_json(inputs[0])
+
+    # Merge all other investigations
+    for input_path in inputs[1:]:
+        logger.info(f"  Loading: {input_path}")
+        other_investigation = load_investigation_json(input_path)
+        logger.info(f"  Merging: {input_path.name}")
+        main_investigation.merge_investigation(other_investigation)
+
+    logger.info("[green]✓ Merge complete[/green]\n")
+
+    # Display statistics if requested
+    if stats:
+        logger.info("[bold]Merged Investigation Statistics:[/bold]")
+        investigation_stats = main_investigation.get_statistics()
+        logger.info(f"  Total Observables: {investigation_stats.get('total_observables', 0)}")
+        logger.info(f"  Total Checks: {investigation_stats.get('total_checks', 0)}")
+        logger.info(f"  Total Threat Intel: {investigation_stats.get('total_threat_intel', 0)}")
+        logger.info(f"  Total Containers: {investigation_stats.get('total_containers', 0)}")
+        logger.info(f"  Global Score: {main_investigation.get_global_score()}")
+        logger.info(f"  Global Level: {main_investigation.get_global_level()}\n")
+
+    # Save merged investigation
+    output_path = output.resolve()
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if output_format == "json":
+        save_investigation_json(main_investigation, str(output_path))
+        logger.info(f"[green]✓ Saved merged investigation to: {output_path}[/green]")
+    elif output_format == "rich":
+        # Display rich summary
+        logger.info("[bold]Merged Investigation Summary:[/bold]\n")
+        main_investigation.display_summary(show_graph=True)
+        # Also save as JSON
+        json_output = output_path.with_suffix(".json")
+        save_investigation_json(main_investigation, str(json_output))
+        logger.info(f"\n[green]✓ Saved merged investigation to: {json_output}[/green]")
 
 
 @cli.command()

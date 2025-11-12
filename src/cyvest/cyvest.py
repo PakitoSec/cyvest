@@ -12,12 +12,10 @@ from typing import TYPE_CHECKING, Any, Literal
 
 from logurich import get_console
 
+from cyvest.investigation import Investigation
 from cyvest.io_rich import display_summary
 from cyvest.levels import Level
-from cyvest.merge import InvestigationMerger
-from cyvest.model import Check, Container, Enrichment, Observable, ObservableType, RelationshipType, ThreatIntel
-from cyvest.score import ScoreEngine
-from cyvest.stats import InvestigationStats
+from cyvest.model import Check, Container, Enrichment, Observable, ThreatIntel
 
 if TYPE_CHECKING:
     from cyvest.dsl import CheckHandler, ContainerHandler, ObservableHandler
@@ -40,26 +38,7 @@ class Cyvest:
             root_type: Type of root observable ("file" or "artifact")
         """
         self.data = data
-        self._score_engine = ScoreEngine()
-        self._stats = InvestigationStats()
-        self._merger = InvestigationMerger()
-
-        # Storage
-        self._observables: dict[str, Observable] = {}
-        self._checks: dict[str, Check] = {}
-        self._threat_intels: dict[str, ThreatIntel] = {}
-        self._enrichments: dict[str, Enrichment] = {}
-        self._containers: dict[str, Container] = {}
-
-        # Create root observable
-        obj_type = ObservableType.FILE
-        if root_type == "artifact":
-            obj_type = ObservableType.ARTIFACT
-        elif root_type != "file":
-            raise ValueError(f"root_type {root_type} is not allowed")
-        self._root_observable = self.observable_create(
-            root_type, obj_type, internal=False, comment="Root observable for investigation"
-        )
+        self._investigation = Investigation(root_type=root_type)
 
     def __enter__(self) -> Cyvest:
         """Context manager entry."""
@@ -108,20 +87,7 @@ class Cyvest:
             score=Decimal(str(score)) if score is not None else Decimal("0"),
             level=level or Level.INFO,
         )
-
-        # Check if already exists
-        if obs.key in self._observables:
-            return self._observables[obs.key]
-
-        # Register
-        self._observables[obs.key] = obs
-        self._score_engine.register_observable(obs)
-        self._stats.register_observable(obs)
-
-        # Auto-link to root if no relationships (will be added later if needed)
-        # This is handled in observable_finalize
-
-        return obs
+        return self._investigation.add_observable(obs)
 
     def observable_get(self, key: str) -> Observable | None:
         """
@@ -133,7 +99,7 @@ class Cyvest:
         Returns:
             Observable if found, None otherwise
         """
-        return self._observables.get(key)
+        return self._investigation.get_observable(key)
 
     def observable_get_root(self) -> Observable:
         """
@@ -142,7 +108,7 @@ class Cyvest:
         Returns:
             Root observable
         """
-        return self._root_observable
+        return self._investigation.get_root()
 
     def observable_add_relationship(
         self, source_key: str, target_key: str, relationship_type: str, direction: str | None = None
@@ -159,12 +125,7 @@ class Cyvest:
         Returns:
             The source observable if found, None otherwise
         """
-        source = self._observables.get(source_key)
-        if source:
-            source.add_relationship(target_key, relationship_type, direction)
-            # Recalculate scores after adding relationship
-            self._score_engine.recalculate_all()
-        return source
+        return self._investigation.add_relationship(source_key, target_key, relationship_type, direction)
 
     def observable_add_threat_intel(
         self,
@@ -191,7 +152,7 @@ class Cyvest:
         Returns:
             The created threat intel if observable found, None otherwise
         """
-        observable = self._observables.get(observable_key)
+        observable = self._investigation.get_observable(observable_key)
         if not observable:
             return None
 
@@ -204,18 +165,7 @@ class Cyvest:
             level=level or Level.INFO,
             taxonomies=taxonomies or [],
         )
-
-        # Register
-        self._threat_intels[ti.key] = ti
-        self._stats.register_threat_intel(ti)
-
-        # Add to observable
-        observable.add_threat_intel(ti)
-
-        # Propagate score
-        self._score_engine.propagate_threat_intel_to_observable(ti, observable)
-
-        return ti
+        return self._investigation.add_threat_intel(ti, observable)
 
     def observable_finalize_relationships(self) -> None:
         """
@@ -223,25 +173,7 @@ class Cyvest:
 
         Any observable without parent relationships is automatically linked to root.
         """
-        root_key = self._root_observable.key
-
-        # Find all observables that are targets of relationships
-        targets = set()
-        for obs in self._observables.values():
-            for rel in obs.relationships:
-                targets.add(rel.target_key)
-
-        # Link orphans to root
-        for obs in self._observables.values():
-            if obs.key == root_key:
-                continue
-
-            # Check if this observable is referenced by others
-            is_referenced = obs.key in targets
-
-            # If not referenced and has no relationships, link to root
-            if not is_referenced and not obs.relationships:
-                self._root_observable.add_relationship(obs.key, RelationshipType.RELATED_TO)
+        self._investigation.finalize_relationships()
 
     # Check methods
 
@@ -279,13 +211,7 @@ class Cyvest:
             score=Decimal(str(score)) if score is not None else Decimal("0"),
             level=level or Level.NONE,
         )
-
-        # Register
-        self._checks[check.key] = check
-        self._score_engine.register_check(check)
-        self._stats.register_check(check)
-
-        return check
+        return self._investigation.add_check(check)
 
     def check_get(self, key: str) -> Check | None:
         """
@@ -297,7 +223,7 @@ class Cyvest:
         Returns:
             Check if found, None otherwise
         """
-        return self._checks.get(key)
+        return self._investigation.get_check(key)
 
     def check_link_observable(self, check_key: str, observable_key: str) -> Check | None:
         """
@@ -310,17 +236,7 @@ class Cyvest:
         Returns:
             The check if found, None otherwise
         """
-        check = self._checks.get(check_key)
-        observable = self._observables.get(observable_key)
-
-        if check and observable:
-            check.add_observable(observable)
-            observable.mark_generated_by_check(check_key)
-            # Propagate if observable is malicious
-            if observable.level == Level.MALICIOUS:
-                self._score_engine._propagate_observable_to_checks(observable)
-
-        return check
+        return self._investigation.link_check_observable(check_key, observable_key)
 
     def check_update_score(self, check_key: str, score: Decimal | float, reason: str = "") -> Check | None:
         """
@@ -334,7 +250,7 @@ class Cyvest:
         Returns:
             The check if found, None otherwise
         """
-        check = self._checks.get(check_key)
+        check = self._investigation.get_check(check_key)
         if check:
             check.update_score(Decimal(str(score)), reason)
         return check
@@ -353,12 +269,7 @@ class Cyvest:
             The created container
         """
         container = Container(path=path, description=description)
-
-        # Register
-        self._containers[container.key] = container
-        self._stats.register_container(container)
-
-        return container
+        return self._investigation.add_container(container)
 
     def container_get(self, key: str) -> Container | None:
         """
@@ -370,7 +281,7 @@ class Cyvest:
         Returns:
             Container if found, None otherwise
         """
-        return self._containers.get(key)
+        return self._investigation.get_container(key)
 
     def container_add_check(self, container_key: str, check_key: str) -> Container | None:
         """
@@ -383,13 +294,7 @@ class Cyvest:
         Returns:
             The container if found, None otherwise
         """
-        container = self._containers.get(container_key)
-        check = self._checks.get(check_key)
-
-        if container and check:
-            container.add_check(check)
-
-        return container
+        return self._investigation.add_check_to_container(container_key, check_key)
 
     def container_add_sub_container(self, parent_key: str, child_key: str) -> Container | None:
         """
@@ -402,13 +307,7 @@ class Cyvest:
         Returns:
             The parent container if found, None otherwise
         """
-        parent = self._containers.get(parent_key)
-        child = self._containers.get(child_key)
-
-        if parent and child:
-            parent.add_sub_container(child)
-
-        return parent
+        return self._investigation.add_sub_container(parent_key, child_key)
 
     # Enrichment methods
 
@@ -425,11 +324,7 @@ class Cyvest:
             The created enrichment
         """
         enrichment = Enrichment(name=name, data=data, context=context)
-
-        # Register
-        self._enrichments[enrichment.key] = enrichment
-
-        return enrichment
+        return self._investigation.add_enrichment(enrichment)
 
     def enrichment_get(self, key: str) -> Enrichment | None:
         """
@@ -441,7 +336,7 @@ class Cyvest:
         Returns:
             Enrichment if found, None otherwise
         """
-        return self._enrichments.get(key)
+        return self._investigation.get_enrichment(key)
 
     # Score and statistics methods
 
@@ -452,7 +347,7 @@ class Cyvest:
         Returns:
             Global score
         """
-        return self._score_engine.get_global_score()
+        return self._investigation.get_global_score()
 
     def get_global_level(self) -> Level:
         """
@@ -461,7 +356,7 @@ class Cyvest:
         Returns:
             Global level
         """
-        return self._score_engine.get_global_level()
+        return self._investigation.get_global_level()
 
     def get_statistics(self) -> dict[str, Any]:
         """
@@ -470,7 +365,7 @@ class Cyvest:
         Returns:
             Statistics dictionary
         """
-        return self._stats.get_summary()
+        return self._investigation.get_statistics()
 
     # Merge methods
 
@@ -481,59 +376,27 @@ class Cyvest:
         Args:
             other: The investigation to merge
         """
-        # Merge observables
-        for obs in other._observables.values():
-            merged_obs = self._merger.add_observable(obs)
-            self._observables[merged_obs.key] = merged_obs
-            self._score_engine.register_observable(merged_obs)
-            self._stats.register_observable(merged_obs)
-
-        # Merge threat intels
-        for ti in other._threat_intels.values():
-            merged_ti = self._merger.add_threat_intel(ti)
-            self._threat_intels[merged_ti.key] = merged_ti
-            self._stats.register_threat_intel(merged_ti)
-
-        # Merge checks
-        for check in other._checks.values():
-            merged_check = self._merger.add_check(check)
-            self._checks[merged_check.key] = merged_check
-            self._score_engine.register_check(merged_check)
-            self._stats.register_check(merged_check)
-
-        # Merge enrichments
-        for enrichment in other._enrichments.values():
-            merged_enrichment = self._merger.add_enrichment(enrichment)
-            self._enrichments[merged_enrichment.key] = merged_enrichment
-
-        # Merge containers
-        for container in other._containers.values():
-            merged_container = self._merger.add_container(container)
-            self._containers[merged_container.key] = merged_container
-            self._stats.register_container(merged_container)
-
-        # Recalculate all scores
-        self._score_engine.recalculate_all()
+        self._investigation.merge_investigation(other._investigation)
 
     def get_all_observables(self) -> dict[str, Observable]:
         """Get all observables."""
-        return self._observables.copy()
+        return self._investigation.get_all_observables()
 
     def get_all_checks(self) -> dict[str, Check]:
         """Get all checks."""
-        return self._checks.copy()
+        return self._investigation.get_all_checks()
 
     def get_all_threat_intels(self) -> dict[str, ThreatIntel]:
         """Get all threat intels."""
-        return self._threat_intels.copy()
+        return self._investigation.get_all_threat_intels()
 
     def get_all_enrichments(self) -> dict[str, Enrichment]:
         """Get all enrichments."""
-        return self._enrichments.copy()
+        return self._investigation.get_all_enrichments()
 
     def get_all_containers(self) -> dict[str, Container]:
         """Get all containers."""
-        return self._containers.copy()
+        return self._investigation.get_all_containers()
 
     def display_summary(self, show_graph: bool = True) -> None:
         display_summary(self, get_console(), show_graph=show_graph)
@@ -570,7 +433,7 @@ class Cyvest:
         from cyvest.dsl import ObservableHandler
 
         obs = self.observable_create(obs_type, value, internal, whitelisted, comment, extra, score, level)
-        return ObservableHandler(self, obs)
+        return ObservableHandler(self._investigation, obs)
 
     def check(
         self,
@@ -600,7 +463,7 @@ class Cyvest:
         from cyvest.dsl import CheckHandler
 
         chk = self.check_create(check_id, scope, description, comment, extra, score, level)
-        return CheckHandler(self, chk)
+        return CheckHandler(self._investigation, chk)
 
     def container(self, path: str, description: str = "") -> ContainerHandler:
         """
@@ -616,7 +479,7 @@ class Cyvest:
         from cyvest.dsl import ContainerHandler
 
         ctr = self.container_create(path, description)
-        return ContainerHandler(self, ctr)
+        return ContainerHandler(self._investigation, ctr)
 
     def root(self) -> Observable:
         """

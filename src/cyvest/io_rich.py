@@ -154,7 +154,7 @@ def display_summary(cv: Cyvest, console: Console | None = None, show_graph: bool
 
         tree = Tree("[bold]Investigation Observables[/bold]")
 
-        def build_tree(parent_tree: Tree, obs: Observable, visited: set[str]) -> None:
+        def build_tree(parent_tree: Tree, obs: Observable, visited: set[str], rel_info: str = "") -> None:
             if obs.key in visited:
                 return
             visited.add(obs.key)
@@ -171,7 +171,7 @@ def display_summary(cv: Cyvest, console: Console | None = None, show_graph: bool
             whitelisted_str = " [green]WHITELISTED[/green]" if obs.whitelisted else ""
 
             obs_info = (
-                f"{generated_by} {obs.key} -> "
+                f"{rel_info}{generated_by} {obs.key} -> "
                 f"[{color_score}]{obs.score}[/{color_score}] "
                 f"[{color_level}]{obs.level.name}[/{color_level}]"
                 f"{whitelisted_str}"
@@ -183,7 +183,14 @@ def display_summary(cv: Cyvest, console: Console | None = None, show_graph: bool
             for rel in obs.relationships:
                 child_obs = cv.observable_get(rel.target_key)
                 if child_obs:
-                    build_tree(child_tree, child_obs, visited)
+                    # Get direction symbol
+                    direction_symbol = {
+                        "outbound": "→",
+                        "inbound": "←",
+                        "bidirectional": "↔",
+                    }.get(rel.direction if isinstance(rel.direction, str) else rel.direction.value, "→")
+                    rel_label = f"[dim]{rel.relationship_type}[/dim] {direction_symbol} "
+                    build_tree(child_tree, child_obs, visited, rel_label)
 
         # Start from root
         root = cv.observable_get_root()

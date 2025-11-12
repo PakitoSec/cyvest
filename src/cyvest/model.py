@@ -9,10 +9,99 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
+from enum import Enum
 from typing import Any
 
 from cyvest import keys
 from cyvest.levels import Level, get_level_from_score
+
+
+class ObservableType(str, Enum):
+    """STIX2 Cyber Observable types."""
+
+    # Network observables
+    IPV4_ADDR = "ipv4-addr"
+    IPV6_ADDR = "ipv6-addr"
+    DOMAIN_NAME = "domain-name"
+    URL = "url"
+    NETWORK_TRAFFIC = "network-traffic"
+    MAC_ADDR = "mac-addr"
+    
+    # File observables
+    FILE = "file"
+    DIRECTORY = "directory"
+    
+    # Email observables
+    EMAIL_ADDR = "email-addr"
+    EMAIL_MESSAGE = "email-message"
+    EMAIL_MIME_PART = "email-mime-part"
+    
+    # Identity and account
+    USER_ACCOUNT = "user-account"
+    
+    # System observables
+    PROCESS = "process"
+    SOFTWARE = "software"
+    WINDOWS_REGISTRY_KEY = "windows-registry-key"
+    
+    # Artifact observables
+    ARTIFACT = "artifact"
+    
+    # Autonomous System
+    AUTONOMOUS_SYSTEM = "autonomous-system"
+    
+    # Mutex
+    MUTEX = "mutex"
+    
+    # X509 Certificate
+    X509_CERTIFICATE = "x509-certificate"
+
+
+class RelationshipType(str, Enum):
+    """STIX2 Cyber Observable Relationship types."""
+
+    # Network relationships
+    RESOLVES_TO = "resolves-to"
+    BELONGS_TO = "belongs-to"
+    
+    # Communication relationships
+    COMMUNICATES_WITH = "communicates-with"
+    
+    # File relationships
+    CONTAINS = "contains"
+    DOWNLOADED = "downloaded"
+    DROPPED = "dropped"
+    
+    # Email relationships
+    FROM = "from"
+    SENDER = "sender"
+    TO = "to"
+    CC = "cc"
+    BCC = "bcc"
+    RAW_EMAIL = "raw-email"
+    BODY_RAW = "body-raw"
+    
+    # Process relationships
+    CREATED = "created"
+    OPENED = "opened"
+    PARENT = "parent"
+    CHILD = "child"
+    
+    # General relationships
+    RELATED_TO = "related-to"
+    DERIVED_FROM = "derived-from"
+    DUPLICATE_OF = "duplicate-of"
+    
+    # Windows Registry
+    VALUES = "values"
+
+
+class RelationshipDirection(str, Enum):
+    """Direction of a relationship between observables."""
+    
+    OUTBOUND = "outbound"      # Source → Target
+    INBOUND = "inbound"        # Source ← Target
+    BIDIRECTIONAL = "bidirectional"  # Source ↔ Target
 
 
 @dataclass
@@ -120,7 +209,24 @@ class Relationship:
     """Represents a relationship between observables following STIX2 conventions."""
 
     target_key: str  # Key of the target observable
-    relationship_type: str  # STIX2 relationship type (e.g., "resolves-to", "related-to")
+    relationship_type: RelationshipType | str  # STIX2 relationship type
+    direction: RelationshipDirection | str = RelationshipDirection.OUTBOUND  # Relationship direction
+
+    def __post_init__(self) -> None:
+        """Normalize relationship type and direction to enum if possible."""
+        if isinstance(self.relationship_type, str):
+            try:
+                self.relationship_type = RelationshipType(self.relationship_type)
+            except ValueError:
+                # Keep as string if not a standard STIX2 relationship type
+                pass
+        
+        if isinstance(self.direction, str):
+            try:
+                self.direction = RelationshipDirection(self.direction)
+            except ValueError:
+                # Default to outbound if invalid
+                self.direction = RelationshipDirection.OUTBOUND
 
 
 @dataclass
@@ -132,7 +238,7 @@ class Observable:
     through relationships.
     """
 
-    obs_type: str
+    obs_type: ObservableType | str
     value: str
     internal: bool = True
     whitelisted: bool = False
@@ -149,8 +255,18 @@ class Observable:
 
     def __post_init__(self) -> None:
         """Generate key and normalize types."""
+        # Normalize obs_type to enum if possible
+        if isinstance(self.obs_type, str):
+            try:
+                self.obs_type = ObservableType(self.obs_type)
+            except ValueError:
+                # Keep as string if not a standard STIX2 observable type
+                pass
+        
         if not self.key:
-            self.key = keys.generate_observable_key(self.obs_type, self.value)
+            # Use string value of obs_type for key generation
+            obs_type_str = self.obs_type.value if isinstance(self.obs_type, ObservableType) else self.obs_type
+            self.key = keys.generate_observable_key(obs_type_str, self.value)
         if not isinstance(self.score, Decimal):
             self.score = Decimal(str(self.score))
 
@@ -208,15 +324,21 @@ class Observable:
         if ti not in self.threat_intels:
             self.threat_intels.append(ti)
 
-    def add_relationship(self, target_key: str, relationship_type: str) -> None:
+    def add_relationship(
+        self, 
+        target_key: str, 
+        relationship_type: RelationshipType | str,
+        direction: RelationshipDirection | str = RelationshipDirection.OUTBOUND,
+    ) -> None:
         """
         Add a relationship to another observable.
 
         Args:
             target_key: Key of the target observable
             relationship_type: Type of relationship (STIX2 convention)
+            direction: Direction of the relationship (default: OUTBOUND)
         """
-        rel = Relationship(target_key=target_key, relationship_type=relationship_type)
+        rel = Relationship(target_key=target_key, relationship_type=relationship_type, direction=direction)
         if rel not in self.relationships:
             self.relationships.append(rel)
 

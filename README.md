@@ -11,6 +11,7 @@
 - 📊 **Automatic Scoring**: Dynamic score calculation and propagation through investigation hierarchy
 - 🎯 **Level Classification**: Automatic security level assignment (TRUSTED, INFO, SAFE, NOTABLE, SUSPICIOUS, MALICIOUS)
 - 🔗 **Relationship Tracking**: STIX2-compliant relationship modeling between observables
+- 🏷️ **STIX2 Type Support**: Built-in enums for STIX2 Observable and Relationship types with autocomplete
 - 📈 **Real-time Statistics**: Live metrics and aggregations throughout the investigation
 - 🔄 **Investigation Merging**: Combine investigations from multiple threads or processes
 - 💾 **Multiple Export Formats**: JSON and Markdown output for reporting and LLM consumption
@@ -46,26 +47,26 @@ pip install -e .
 
 ```python
 from decimal import Decimal
-from cyvest import Cyvest, Level
+from cyvest import Cyvest, Level, ObservableType, RelationshipType
 
 # Create an investigation
 with Cyvest(data={"type": "email"}) as cv:
-    # Create observables with fluent API
+    # Create observables with STIX2 types
     url = (
-        cv.observable("url", "https://phishing-site.com", internal=False)
+        cv.observable(ObservableType.URL, "https://phishing-site.com", internal=False)
         .with_ti("virustotal", score=Decimal("8.5"), level=Level.MALICIOUS)
-        .relate_to(cv.root(), "related-to")
+        .relate_to(cv.root(), RelationshipType.RELATED_TO)
     )
-    
+
     # Create checks
     check = cv.check("url_analysis", "email_body", "Analyze suspicious URL")
     check.link_observable(url.get())
     check.with_score(Decimal("8.5"), "Malicious URL detected")
-    
+
     # Display results
     print(f"Global Score: {cv.get_global_score()}")
     print(f"Global Level: {cv.get_global_level()}")
-    
+
     # Export
     from cyvest.io_serialization import save_investigation_json
     save_investigation_json(cv, "investigation.json")
@@ -75,11 +76,20 @@ with Cyvest(data={"type": "email"}) as cv:
 
 ### Observables
 
-Observables represent cyber artifacts (URLs, IPs, domains, hashes, files, etc.):
+Observables represent cyber artifacts (URLs, IPs, domains, hashes, files, etc.). Use STIX2-compliant types for standardization:
 
 ```python
-# Create observable
-url_obs = cv.observable_create("url", "https://malicious.com", internal=False)
+from cyvest import ObservableType, RelationshipType
+
+# Create observable with STIX2 type enum
+url_obs = cv.observable_create(
+    ObservableType.URL,
+    "https://malicious.com",
+    internal=False
+)
+
+# Or use strings (backward compatible)
+ip_obs = cv.observable_create("ipv4-addr", "192.0.2.1", internal=False)
 
 # Add threat intelligence
 cv.observable_add_threat_intel(
@@ -90,9 +100,69 @@ cv.observable_add_threat_intel(
     comment="Detected as malware distribution site"
 )
 
-# Create relationships
-cv.observable_add_relationship(url_obs.key, ip_obs.key, "resolves-to")
+# Create relationships with STIX2 relationship types
+cv.observable_add_relationship(
+    url_obs.key,
+    ip_obs.key,
+    RelationshipType.RESOLVES_TO
+)
 ```
+
+**Available STIX2 Observable Types:**
+
+- Network: `IPV4_ADDR`, `IPV6_ADDR`, `DOMAIN_NAME`, `URL`, `MAC_ADDR`, `NETWORK_TRAFFIC`
+- Email: `EMAIL_ADDR`, `EMAIL_MESSAGE`, `EMAIL_MIME_PART`
+- File: `FILE`, `DIRECTORY`, `ARTIFACT`
+- System: `PROCESS`, `SOFTWARE`, `USER_ACCOUNT`, `WINDOWS_REGISTRY_KEY`
+- Other: `AUTONOMOUS_SYSTEM`, `MUTEX`, `X509_CERTIFICATE`
+
+**Available STIX2 Relationship Types:**
+
+- Network: `RESOLVES_TO`, `BELONGS_TO`, `COMMUNICATES_WITH`
+- File: `CONTAINS`, `DOWNLOADED`, `DROPPED`
+- Email: `FROM`, `SENDER`, `TO`, `CC`, `BCC`
+- Process: `CREATED`, `OPENED`, `PARENT`, `CHILD`
+- General: `RELATED_TO`, `DERIVED_FROM`, `DUPLICATE_OF`
+
+**Relationship Direction:**
+
+Relationships support directional semantics for precise modeling:
+
+```python
+from cyvest import RelationshipDirection
+
+# Outbound: Source → Target (default)
+cv.observable_add_relationship(
+    domain.key,
+    ip.key,
+    RelationshipType.RESOLVES_TO,
+    RelationshipDirection.OUTBOUND  # domain resolves TO ip
+)
+
+# Inbound: Source ← Target
+cv.observable_add_relationship(
+    malware.key,
+    url.key,
+    RelationshipType.DOWNLOADED,
+    RelationshipDirection.INBOUND  # malware FROM url
+)
+
+# Bidirectional: Source ↔ Target
+cv.observable_add_relationship(
+    host1.key,
+    host2.key,
+    RelationshipType.COMMUNICATES_WITH,
+    RelationshipDirection.BIDIRECTIONAL  # mutual communication
+)
+```
+
+**Direction Values:**
+
+- `OUTBOUND` (→): Default, source points to target
+- `INBOUND` (←): Source receives from target
+- `BIDIRECTIONAL` (↔): Symmetric relationship
+
+Direction symbols appear in visualizations and markdown exports.
 
 ### Checks
 
@@ -146,6 +216,7 @@ Scores and levels are automatically calculated and propagated:
 - **Check → Global**: All check scores sum to global investigation score
 
 Score to Level mapping:
+
 - `< 0.0` → TRUSTED
 - `== 0.0` → INFO
 - `< 3.0` → NOTABLE
@@ -159,11 +230,15 @@ See the `examples/` directory for complete examples:
 - **01_email_basic.py**: Basic email phishing investigation
 - **02_urls_and_ips.py**: Network investigation with URLs and IPs
 - **03_merge_demo.py**: Multi-process investigation merging
+- **05_stix2_types.py**: Using STIX2 Observable and Relationship type enums
+- **06_relationship_direction.py**: Relationship direction modeling (outbound/inbound/bidirectional)
 
 Run an example:
 
 ```bash
 python examples/01_email_basic.py
+python examples/05_stix2_types.py
+python examples/06_relationship_direction.py
 ```
 
 ## CLI Usage
@@ -303,10 +378,3 @@ Cyvest is designed for:
 - Additional export formats (PDF, HTML)
 - Integration plugins for security tools
 - Graph visualization with NetworkX
-
-## Support
-
-For issues, questions, or contributions:
-
-- GitHub Issues: https://github.com/yourusername/cyvest/issues
-- Documentation: https://yourusername.github.io/cyvest/

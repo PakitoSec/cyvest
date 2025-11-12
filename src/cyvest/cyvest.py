@@ -137,7 +137,7 @@ class Cyvest:
         return self._root_observable
 
     def observable_add_relationship(
-        self, source_key: str, target_key: str, relationship_type: str
+        self, source_key: str, target_key: str, relationship_type: str, direction: str = "outbound"
     ) -> Observable | None:
         """
         Add a relationship between observables.
@@ -146,13 +146,14 @@ class Cyvest:
             source_key: Key of source observable
             target_key: Key of target observable
             relationship_type: Type of relationship (STIX2 convention)
+            direction: Direction of the relationship (outbound, inbound, or bidirectional)
 
         Returns:
             The source observable if found, None otherwise
         """
         source = self._observables.get(source_key)
         if source:
-            source.add_relationship(target_key, relationship_type)
+            source.add_relationship(target_key, relationship_type, direction)
             # Recalculate scores after adding relationship
             self._score_engine.recalculate_all()
         return source

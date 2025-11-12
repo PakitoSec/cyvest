@@ -4,7 +4,7 @@ Tests for the Cyvest facade.
 
 from decimal import Decimal
 
-from cyvest import Cyvest, Level
+from cyvest import Cyvest, Level, RelationshipDirection
 
 
 def test_cyvest_initialization() -> None:
@@ -145,3 +145,23 @@ def test_root_observable() -> None:
     root = cv.observable_get_root()
     assert root is not None
     assert root == cv._root_observable
+
+
+def test_relationship_with_direction() -> None:
+    """Test adding relationships with direction via Cyvest API."""
+    cv = Cyvest()
+    obs1 = cv.observable_create("url", "https://example.com")
+    obs2 = cv.observable_create("ip", "192.168.1.1")
+    
+    # Default direction (outbound)
+    cv.observable_add_relationship(obs1.key, obs2.key, "resolves-to")
+    assert obs1.relationships[0].direction == RelationshipDirection.OUTBOUND
+    
+    # Explicit inbound
+    cv.observable_add_relationship(obs1.key, obs2.key, "belongs-to", "inbound")
+    assert obs1.relationships[1].direction == RelationshipDirection.INBOUND
+    
+    # Explicit bidirectional
+    cv.observable_add_relationship(obs1.key, obs2.key, "communicates-with", "bidirectional")
+    assert obs1.relationships[2].direction == RelationshipDirection.BIDIRECTIONAL
+

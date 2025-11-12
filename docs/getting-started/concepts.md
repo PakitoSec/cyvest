@@ -14,13 +14,63 @@ A Cyvest investigation consists of several key components:
 - Email addresses, hostnames
 - Any entity that can be analyzed
 
+Cyvest supports **STIX2-compliant observable types** with built-in enums for type safety and IDE autocomplete.
+
 Each observable has:
-- **Type**: The kind of artifact (url, ip, hash, etc.)
+- **Type**: The kind of artifact (can use `ObservableType` enum or string)
 - **Value**: The actual value
 - **Score**: Numeric severity (auto-calculated)
 - **Level**: Classification (TRUSTED, INFO, SAFE, NOTABLE, SUSPICIOUS, MALICIOUS)
-- **Relationships**: Links to other observables
+- **Relationships**: Links to other observables (can use `RelationshipType` enum)
 - **Threat Intelligence**: Verdicts from external sources
+
+**STIX2 Observable Types:**
+
+```python
+from cyvest import ObservableType
+
+# Network observables
+ObservableType.IPV4_ADDR          # "ipv4-addr"
+ObservableType.IPV6_ADDR          # "ipv6-addr"
+ObservableType.DOMAIN_NAME        # "domain-name"
+ObservableType.URL                # "url"
+ObservableType.MAC_ADDR           # "mac-addr"
+ObservableType.NETWORK_TRAFFIC    # "network-traffic"
+
+# Email observables
+ObservableType.EMAIL_ADDR         # "email-addr"
+ObservableType.EMAIL_MESSAGE      # "email-message"
+ObservableType.EMAIL_MIME_PART    # "email-mime-part"
+
+# File observables
+ObservableType.FILE               # "file"
+ObservableType.DIRECTORY          # "directory"
+ObservableType.ARTIFACT           # "artifact"
+
+# System observables
+ObservableType.PROCESS            # "process"
+ObservableType.SOFTWARE           # "software"
+ObservableType.USER_ACCOUNT       # "user-account"
+ObservableType.WINDOWS_REGISTRY_KEY  # "windows-registry-key"
+
+# Other observables
+ObservableType.AUTONOMOUS_SYSTEM  # "autonomous-system"
+ObservableType.MUTEX              # "mutex"
+ObservableType.X509_CERTIFICATE   # "x509-certificate"
+```
+
+You can use enums or strings interchangeably:
+
+```python
+# Using enum (recommended - provides autocomplete)
+obs1 = cv.observable(ObservableType.URL, "https://example.com")
+
+# Using string (backward compatible)
+obs2 = cv.observable("url", "https://example.com")
+
+# Custom types as strings
+obs3 = cv.observable("custom-indicator", "some-value")
+```
 
 ### Checks
 
@@ -112,24 +162,138 @@ obs.update_score(Decimal("9.0"))  # Changes to MALICIOUS
 
 ## Relationships
 
-Relationships follow STIX2 conventions:
+Relationships follow **STIX2 conventions** with built-in type support:
+
+```python
+from cyvest import RelationshipType
+
+# Network relationships
+RelationshipType.RESOLVES_TO           # DNS resolution
+RelationshipType.BELONGS_TO            # Network ownership
+RelationshipType.COMMUNICATES_WITH     # Network communication
+
+# File relationships
+RelationshipType.CONTAINS              # Containment
+RelationshipType.DOWNLOADED            # Download action
+RelationshipType.DROPPED               # File dropping
+
+# Email relationships
+RelationshipType.FROM                  # Email sender
+RelationshipType.TO                    # Email recipient
+RelationshipType.CC                    # Email CC
+RelationshipType.SENDER                # Email sender field
+
+# Process relationships
+RelationshipType.CREATED               # Creation
+RelationshipType.OPENED                # File opened
+RelationshipType.PARENT                # Parent process
+RelationshipType.CHILD                 # Child process
+
+# General relationships
+RelationshipType.RELATED_TO            # General association
+RelationshipType.DERIVED_FROM          # Derivation
+RelationshipType.DUPLICATE_OF          # Duplication
+```
+
+**Common Relationship Patterns:**
 
 | Relationship Type | Meaning | Example |
 |------------------|---------|---------|
-| `related-to` | General association | Email related to URL |
-| `resolves-to` | DNS resolution | URL resolves to IP |
-| `contains` | Containment | Email contains attachment |
-| `communicates-with` | Network communication | Host communicates with IP |
-| `uses` | Usage | Process uses file |
-| `extracted-from` | Extraction | File extracted from archive |
+| `RELATED_TO` | General association | Email related to URL |
+| `RESOLVES_TO` | DNS resolution | Domain resolves to IP |
+| `CONTAINS` | Containment | Email contains attachment |
+| `COMMUNICATES_WITH` | Network communication | Host communicates with IP |
+| `DOWNLOADED` | Download action | URL downloaded file |
+| `CREATED` | Creation | Process created file |
+
+**Creating Relationships:**
 
 ```python
-# Create relationship
+# Using enum (recommended)
 cv.observable_add_relationship(
     source_key=url.key,
     target_key=ip.key,
-    relationship_type="resolves-to"
+    relationship_type=RelationshipType.RESOLVES_TO
 )
+
+# Using string (backward compatible)
+cv.observable_add_relationship(
+    source_key=email.key,
+    target_key=url.key,
+    relationship_type="related-to"
+)
+
+# Custom relationship types
+cv.observable_add_relationship(
+    source_key=obs1.key,
+    target_key=obs2.key,
+    relationship_type="custom-relationship"
+)
+```
+
+### Relationship Direction
+
+Relationships support directional semantics to precisely model how observables relate:
+
+```python
+from cyvest import RelationshipDirection
+
+# Outbound (default): Source → Target
+# Use when the source initiates or points to the target
+cv.observable_add_relationship(
+    domain.key,
+    ip.key,
+    RelationshipType.RESOLVES_TO,
+    RelationshipDirection.OUTBOUND  # domain resolves TO ip
+)
+
+# Inbound: Source ← Target  
+# Use when the source receives from or is derived from the target
+cv.observable_add_relationship(
+    malware_file.key,
+    download_url.key,
+    RelationshipType.DOWNLOADED,
+    RelationshipDirection.INBOUND  # file was downloaded FROM url
+)
+
+# Bidirectional: Source ↔ Target
+# Use for symmetric relationships where direction doesn't matter
+cv.observable_add_relationship(
+    host1.key,
+    host2.key,
+    RelationshipType.COMMUNICATES_WITH,
+    RelationshipDirection.BIDIRECTIONAL  # mutual communication
+)
+
+# Using the fluent DSL
+url.relate_to(
+    domain, 
+    RelationshipType.RELATED_TO,
+    RelationshipDirection.OUTBOUND
+)
+```
+
+**Direction Guidelines:**
+
+| Direction | Symbol | Use Case | Example |
+|-----------|--------|----------|---------|
+| `OUTBOUND` | → | Source points to/initiates with target | Domain → IP (DNS) |
+| `INBOUND` | ← | Source receives from/derived from target | File ← URL (download) |
+| `BIDIRECTIONAL` | ↔ | Symmetric/mutual relationship | Host ↔ Host (communication) |
+
+**Visualization:**
+
+Direction symbols automatically appear in:
+- Terminal output with Rich formatting
+- Markdown exports for documentation
+- Investigation graphs and trees
+
+```markdown
+# Example markdown output
+- **Relationships:**
+  - resolves-to → obs:ipv4-addr:192.0.2.1
+  - downloaded ← obs:url:http://malware.com/payload
+  - communicates-with ↔ obs:ipv4-addr:10.0.1.50
 ```
 
 ## Key Generation

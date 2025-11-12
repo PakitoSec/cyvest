@@ -89,19 +89,22 @@ class ObservableHandler:
         """
         return self.with_ti(source, score, comment, extra, level, taxonomies)
 
-    def relate_to(self, target: Observable | ObservableHandler, relationship_type: str) -> ObservableHandler:
+    def relate_to(
+        self, target: Observable | ObservableHandler, relationship_type: str, direction: str = "outbound"
+    ) -> ObservableHandler:
         """
         Create a relationship to another observable.
 
         Args:
             target: Target observable or handler
             relationship_type: Type of relationship (STIX2 convention)
+            direction: Direction of the relationship (outbound, inbound, or bidirectional)
 
         Returns:
             Self for chaining
         """
         target_obs = target._observable if isinstance(target, ObservableHandler) else target
-        self._cv.observable_add_relationship(self._observable.key, target_obs.key, relationship_type)
+        self._cv.observable_add_relationship(self._observable.key, target_obs.key, relationship_type, direction)
         return self
 
     def link_check(self, check: Check | CheckHandler) -> ObservableHandler:

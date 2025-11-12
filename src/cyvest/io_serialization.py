@@ -352,8 +352,7 @@ def load_investigation_json(filepath: str | Path) -> Cyvest:
     Returns:
         Reconstructed Cyvest investigation
     """
-    from cyvest.score import ScoreEngine
-    from cyvest.stats import InvestigationStats
+    from cyvest.investigation import Investigation
 
     with open(filepath, encoding="utf-8") as handle:
         data = json.load(handle)
@@ -361,14 +360,7 @@ def load_investigation_json(filepath: str | Path) -> Cyvest:
     cv = Cyvest(data=data.get("data"))
 
     # Reset internal state to avoid default root pollution
-    cv._score_engine = ScoreEngine()
-    cv._stats = InvestigationStats()
-    cv._observables = {}
-    cv._checks = {}
-    cv._threat_intels = {}
-    cv._enrichments = {}
-    cv._containers = {}
-    cv._merger = cv._merger.__class__()  # reset merger state
+    cv._investigation = Investigation(root_type="file")
 
     def _level_from_name(name: str | None, default: Level) -> Level:
         if not name:
@@ -400,9 +392,7 @@ def load_investigation_json(filepath: str | Path) -> Cyvest:
             for rel in obs_info.get("relationships", [])
         ]
         obs._generated_by_checks = obs_info.get("generated_by_checks", [])
-        cv._observables[obs.key] = obs
-        cv._score_engine.register_observable(obs)
-        cv._stats.register_observable(obs)
+        cv._investigation.add_observable(obs)
 
     # Threat intel
     for ti_info in data.get("threat_intels", {}).values():
@@ -416,11 +406,9 @@ def load_investigation_json(filepath: str | Path) -> Cyvest:
             taxonomies=ti_info.get("taxonomies", []),
         )
         ti.key = ti_info.get("key", ti.key)
-        cv._threat_intels[ti.key] = ti
-        cv._stats.register_threat_intel(ti)
-        observable = cv._observables.get(ti.observable_key)
+        observable = cv._investigation.get_observable(ti.observable_key)
         if observable:
-            observable.add_threat_intel(ti)
+            cv._investigation.add_threat_intel(ti, observable)
 
     # Checks
     for scope_checks in data.get("checks", {}).values():
@@ -437,12 +425,10 @@ def load_investigation_json(filepath: str | Path) -> Cyvest:
             check.key = check_info.get("key", check.key)
             observable_keys = check_info.get("observables", [])
             for obs_key in observable_keys:
-                observable = cv._observables.get(obs_key)
+                observable = cv._investigation.get_observable(obs_key)
                 if observable:
                     check.add_observable(observable)
-            cv._checks[check.key] = check
-            cv._score_engine.register_check(check)
-            cv._stats.register_check(check)
+            cv._investigation.add_check(check)
 
     # Enrichments
     for enr_info in data.get("enrichments", {}).values():
@@ -450,18 +436,17 @@ def load_investigation_json(filepath: str | Path) -> Cyvest:
             name=enr_info.get("name", ""), data=enr_info.get("data", {}), context=enr_info.get("context", "")
         )
         enrichment.key = enr_info.get("key", enrichment.key)
-        cv._enrichments[enrichment.key] = enrichment
+        cv._investigation.add_enrichment(enrichment)
 
     # Containers
     def build_container(container_info: dict[str, Any]) -> Container:
         container = Container(path=container_info.get("path", ""), description=container_info.get("description", ""))
         container.key = container_info.get("key", container.key)
 
-        cv._containers[container.key] = container
-        cv._stats.register_container(container)
+        container = cv._investigation.add_container(container)
 
         for check_key in container_info.get("checks", []):
-            check = cv._checks.get(check_key)
+            check = cv._investigation.get_check(check_key)
             if check:
                 container.add_check(check)
 
@@ -474,14 +459,6 @@ def load_investigation_json(filepath: str | Path) -> Cyvest:
     for container_info in data.get("containers", {}).values():
         build_container(container_info)
 
-    # Root observable
-    root_key = None
-    graph = data.get("graph")
-    if graph and isinstance(graph, list) and graph:
-        root_key = graph[0].get("key")
-    if root_key and root_key in cv._observables:
-        cv._root_observable = cv._observables[root_key]
-    elif cv._observables:
-        cv._root_observable = next(iter(cv._observables.values()))
+    # Note: Root observable is managed by Investigation, no need to set it here
 
     return cv

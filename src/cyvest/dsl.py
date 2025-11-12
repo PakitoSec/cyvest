@@ -12,22 +12,22 @@ from typing import TYPE_CHECKING, Any
 from cyvest.levels import Level
 
 if TYPE_CHECKING:
-    from cyvest.cyvest import Cyvest
+    from cyvest.investigation import Investigation
     from cyvest.model import Check, Container, Observable
 
 
 class ObservableHandler:
     """Fluent interface for observable operations."""
 
-    def __init__(self, cv: Cyvest, observable: Observable) -> None:
+    def __init__(self, investigation: Investigation, observable: Observable) -> None:
         """
         Initialize the observable handler.
 
         Args:
-            cv: The Cyvest instance
+            investigation: The Investigation instance
             observable: The observable being handled
         """
-        self._cv = cv
+        self._investigation = investigation
         self._observable = observable
 
     def with_ti(
@@ -53,15 +53,20 @@ class ObservableHandler:
         Returns:
             Self for chaining
         """
-        self._cv.observable_add_threat_intel(
-            self._observable.key,
+        from decimal import Decimal
+
+        from cyvest.model import ThreatIntel
+
+        ti = ThreatIntel(
             source=source,
-            score=score,
+            observable_key=self._observable.key,
             comment=comment,
-            extra=extra,
-            level=level,
-            taxonomies=taxonomies,
+            extra=extra or {},
+            score=Decimal(str(score)),
+            level=level or Level.INFO,
+            taxonomies=taxonomies or [],
         )
+        self._investigation.add_threat_intel(ti, self._observable)
         return self
 
     def add_ti(
@@ -104,7 +109,7 @@ class ObservableHandler:
             Self for chaining
         """
         target_obs = target._observable if isinstance(target, ObservableHandler) else target
-        self._cv.observable_add_relationship(self._observable.key, target_obs.key, relationship_type, direction)
+        self._investigation.add_relationship(self._observable.key, target_obs.key, relationship_type, direction)
         return self
 
     def link_check(self, check: Check | CheckHandler) -> ObservableHandler:
@@ -118,7 +123,7 @@ class ObservableHandler:
             Self for chaining
         """
         check_obj = check._check if isinstance(check, CheckHandler) else check
-        self._cv.check_link_observable(check_obj.key, self._observable.key)
+        self._investigation.link_check_observable(check_obj.key, self._observable.key)
         return self
 
     def get(self) -> Observable:
@@ -134,15 +139,15 @@ class ObservableHandler:
 class CheckHandler:
     """Fluent interface for check operations."""
 
-    def __init__(self, cv: Cyvest, check: Check) -> None:
+    def __init__(self, investigation: Investigation, check: Check) -> None:
         """
         Initialize the check handler.
 
         Args:
-            cv: The Cyvest instance
+            investigation: The Investigation instance
             check: The check being handled
         """
-        self._cv = cv
+        self._investigation = investigation
         self._check = check
 
     def in_container(self, container: Container | ContainerHandler) -> CheckHandler:
@@ -156,7 +161,7 @@ class CheckHandler:
             Self for chaining
         """
         container_obj = container._container if isinstance(container, ContainerHandler) else container
-        self._cv.container_add_check(container_obj.key, self._check.key)
+        self._investigation.add_check_to_container(container_obj.key, self._check.key)
         return self
 
     def link_observable(self, observable: Observable | ObservableHandler) -> CheckHandler:
@@ -170,7 +175,7 @@ class CheckHandler:
             Self for chaining
         """
         obs_obj = observable._observable if isinstance(observable, ObservableHandler) else observable
-        self._cv.check_link_observable(self._check.key, obs_obj.key)
+        self._investigation.link_check_observable(self._check.key, obs_obj.key)
         return self
 
     def with_score(self, score: Decimal | float, reason: str = "") -> CheckHandler:
@@ -184,7 +189,11 @@ class CheckHandler:
         Returns:
             Self for chaining
         """
-        self._cv.check_update_score(self._check.key, score, reason)
+        from decimal import Decimal
+
+        check = self._investigation.get_check(self._check.key)
+        if check:
+            check.update_score(Decimal(str(score)), reason)
         return self
 
     def get(self) -> Check:
@@ -200,15 +209,15 @@ class CheckHandler:
 class ContainerHandler:
     """Fluent interface for container operations."""
 
-    def __init__(self, cv: Cyvest, container: Container) -> None:
+    def __init__(self, investigation: Investigation, container: Container) -> None:
         """
         Initialize the container handler.
 
         Args:
-            cv: The Cyvest instance
+            investigation: The Investigation instance
             container: The container being handled
         """
-        self._cv = cv
+        self._investigation = investigation
         self._container = container
 
     def add_check(self, check: Check | CheckHandler) -> ContainerHandler:
@@ -222,7 +231,7 @@ class ContainerHandler:
             Self for chaining
         """
         check_obj = check._check if isinstance(check, CheckHandler) else check
-        self._cv.container_add_check(self._container.key, check_obj.key)
+        self._investigation.add_check_to_container(self._container.key, check_obj.key)
         return self
 
     def sub_container(self, path: str, description: str = "") -> ContainerHandler:
@@ -236,11 +245,14 @@ class ContainerHandler:
         Returns:
             Handler for the sub-container
         """
+        from cyvest.model import Container
+
         # Create sub-container with full path
         full_path = f"{self._container.path}/{path}"
-        sub = self._cv.container_create(full_path, description)
-        self._cv.container_add_sub_container(self._container.key, sub.key)
-        return ContainerHandler(self._cv, sub)
+        sub = Container(path=full_path, description=description)
+        sub = self._investigation.add_container(sub)
+        self._investigation.add_sub_container(self._container.key, sub.key)
+        return ContainerHandler(self._investigation, sub)
 
     def __enter__(self) -> ContainerHandler:
         """Context manager entry."""

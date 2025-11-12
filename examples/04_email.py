@@ -19,6 +19,8 @@ test = (
 )
 
 cy.check("azezae", "scope", "description", "> comment").in_container(cy.container("test/toto/ok/OK"))
+c = cy.check("azezae", "scope", "description", "> commento").with_score(5).get()
 
 
 cy.display_summary()
+print(cy.check_get(c.key).comment)

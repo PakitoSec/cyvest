@@ -83,25 +83,37 @@ Ready to dive in? Check out the [Installation Guide](getting-started/installatio
 
 ## Architecture Overview
 
+Cyvest uses a clean, layered architecture with automatic merge-on-create:
+
 ```
-Investigation
-├── Observables (URLs, IPs, domains, hashes, etc.)
-│   ├── Threat Intelligence (verdicts from sources)
-│   └── Relationships (STIX2-compliant links)
-├── Checks (verification steps)
-│   └── Linked observables
-├── Containers (hierarchical organization)
-│   ├── Checks
-│   └── Sub-containers
-└── Enrichments (structured metadata)
+Cyvest (API Facade)
+    ↓
+Investigation (Core State Management)
+    ├── Observables (URLs, IPs, domains, hashes, etc.)
+    │   ├── Threat Intelligence (verdicts from sources)
+    │   └── Relationships (STIX2-compliant links)
+    ├── Checks (verification steps)
+    │   └── Linked observables
+    ├── Containers (hierarchical organization)
+    │   ├── Checks
+    │   └── Sub-containers
+    ├── Enrichments (structured metadata)
+    ├── ScoreEngine (automatic score propagation)
+    └── InvestigationStats (real-time metrics)
 ```
+
+**Key architectural features:**
+- **Automatic merge-on-create**: Duplicate objects are automatically merged when added
+- **Clean separation**: `Cyvest` provides the API, `Investigation` manages state
+- **Direct DSL access**: DSL handlers work directly with `Investigation` for performance
+- **CLI support**: Merge multiple investigation JSON files from command line
 
 ## Community & Support
 
-- **GitHub**: [github.com/yourusername/cyvest](https://github.com/yourusername/cyvest)
-- **Issues**: Report bugs and request features
+- **GitHub**: [github.com/PakitoSec/cyvest](https://github.com/PakitoSec/cyvest)
+- **Issues**: [Report bugs and request features](https://github.com/PakitoSec/cyvest/issues)
 - **Discussions**: Ask questions and share use cases
 
 ## License
 
-Cyvest is licensed under the MIT License. See the [LICENSE](https://github.com/yourusername/cyvest/blob/main/LICENSE) file for details.
+Cyvest is licensed under the MIT License. See the [LICENSE](https://github.com/PakitoSec/cyvest/blob/main/LICENSE) file for details.

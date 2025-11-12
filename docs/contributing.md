@@ -6,7 +6,7 @@ Thank you for your interest in contributing to Cyvest! This document provides gu
 
 1. **Fork and Clone**
    ```bash
-   git clone https://github.com/yourusername/cyvest.git
+   git clone https://github.com/PakitoSec/cyvest.git
    cd cyvest
    ```
 
@@ -107,6 +107,41 @@ Then create a Pull Request on GitHub with:
 - Clear description of changes
 - Reference to related issues
 - Screenshots/examples if applicable
+
+## Architecture Overview
+
+### Core Components
+
+Cyvest uses a clean layered architecture:
+
+1. **`Investigation`** (`src/cyvest/investigation.py`): Core state management
+   - Owns all object collections (observables, checks, threat intels, etc.)
+   - Handles automatic merge-on-create for all object types
+   - Integrates `ScoreEngine` and `InvestigationStats` internally
+   - All merge logic is private to this class
+
+2. **`Cyvest`** (`src/cyvest/cyvest.py`): High-level API facade
+   - Delegates all operations to `Investigation`
+   - Provides user-facing API
+   - Maintains backward compatibility
+
+3. **DSL Handlers** (`src/cyvest/dsl.py`): Fluent interface
+   - Work directly with `Investigation` for performance
+   - Enable method chaining
+   - Simplify complex operations
+
+4. **Model Classes** (`src/cyvest/model.py`): Data models
+   - Observable, Check, ThreatIntel, Enrichment, Container
+   - Immutable after creation (except for merging)
+
+### Merge-on-Create System
+
+When adding any object to an investigation:
+1. Check if an object with the same key already exists
+2. If yes: merge incoming data into existing object
+3. If no: register as new object
+
+This eliminates the need for separate merge operations and ensures consistency.
 
 ## Code Style
 
@@ -224,8 +259,8 @@ mkdocs gh-deploy
 ### Reporting Bugs
 
 Include:
-- Python version
-- Cyvest version
+- Python version (>=3.10 required)
+- Cyvest version (current: 1.0.0)
 - Minimal reproduction example
 - Expected vs actual behavior
 - Error messages/stack traces

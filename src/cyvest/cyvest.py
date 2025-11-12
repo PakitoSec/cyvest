@@ -10,9 +10,12 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, Literal
 
+from logurich import get_console
+
+from cyvest.io_rich import display_summary
 from cyvest.levels import Level
 from cyvest.merge import InvestigationMerger
-from cyvest.model import Check, Container, Enrichment, Observable, ThreatIntel
+from cyvest.model import Check, Container, Enrichment, Observable, ObservableType, RelationshipType, ThreatIntel
 from cyvest.score import ScoreEngine
 from cyvest.stats import InvestigationStats
 
@@ -49,8 +52,13 @@ class Cyvest:
         self._containers: dict[str, Container] = {}
 
         # Create root observable
+        obj_type = ObservableType.FILE
+        if root_type == "artifact":
+            obj_type = ObservableType.ARTIFACT
+        elif root_type != "file":
+            raise ValueError(f"root_type {root_type} is not allowed")
         self._root_observable = self.observable_create(
-            root_type, f"root_{root_type}", internal=False, comment="Root observable for investigation"
+            root_type, obj_type, internal=False, comment="Root observable for investigation"
         )
 
     def __enter__(self) -> Cyvest:
@@ -67,7 +75,7 @@ class Cyvest:
         self,
         obs_type: str,
         value: str,
-        internal: bool = True,
+        internal: bool = False,
         whitelisted: bool = False,
         comment: str = "",
         extra: dict[str, Any] | None = None,
@@ -233,7 +241,7 @@ class Cyvest:
 
             # If not referenced and has no relationships, link to root
             if not is_referenced and not obs.relationships:
-                self._root_observable.add_relationship(obs.key, "related-to")
+                self._root_observable.add_relationship(obs.key, RelationshipType.RELATED_TO)
 
     # Check methods
 
@@ -527,13 +535,16 @@ class Cyvest:
         """Get all containers."""
         return self._containers.copy()
 
+    def display_summary(self, show_graph: bool = True) -> None:
+        display_summary(self, get_console(), show_graph=show_graph)
+
     # DSL methods for fluent interface
 
     def observable(
         self,
         obs_type: str,
         value: str,
-        internal: bool = True,
+        internal: bool = False,
         whitelisted: bool = False,
         comment: str = "",
         extra: dict[str, Any] | None = None,

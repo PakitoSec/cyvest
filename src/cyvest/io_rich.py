@@ -3,8 +3,9 @@ Rich console output for Cyvest investigations.
 
 Provides formatted display of investigation results using the Rich library.
 """
+from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from logurich import get_console
 from rich.align import Align
@@ -13,9 +14,11 @@ from rich.rule import Rule
 from rich.table import Table
 from rich.tree import Tree
 
-from cyvest.cyvest import Cyvest
 from cyvest.levels import Level, get_color_level, get_color_score
-from cyvest.model import Observable
+from cyvest.model import Observable, Relationship, RelationshipDirection
+
+if TYPE_CHECKING:
+    from cyvest.cyvest import Cyvest
 
 
 def display_summary(cv: Cyvest, console: Console | None = None, show_graph: bool = True) -> None:
@@ -56,9 +59,6 @@ def display_summary(cv: Cyvest, console: Console | None = None, show_graph: bool
         table.add_row(scope_rule, "-", "-")
 
         for check in checks:
-            if check.level == Level.NONE:
-                continue
-
             color_level = get_color_level(check.level)
             color_score = get_color_score(check.score)
             name = f"  {check.check_id}"
@@ -154,6 +154,33 @@ def display_summary(cv: Cyvest, console: Console | None = None, show_graph: bool
 
         tree = Tree("[bold]Investigation Observables[/bold]")
 
+        # Precompute reverse relationships so we can traverse observables that only
+        # appear as targets (e.g., child → parent links).
+        all_observables = cv.get_all_observables()
+        reverse_relationships: dict[str, list[tuple[Observable, Relationship]]] = {}
+        for source_obs in all_observables.values():
+            for rel in source_obs.relationships:
+                reverse_relationships.setdefault(rel.target_key, []).append((source_obs, rel))
+
+        def get_direction_symbol(rel: Relationship, reversed_edge: bool) -> str:
+            """Return an arrow indicating direction relative to traversal."""
+            direction = rel.direction
+            if isinstance(direction, str):
+                try:
+                    direction = RelationshipDirection(direction)
+                except ValueError:
+                    direction = RelationshipDirection.OUTBOUND
+
+            symbol_map = {
+                RelationshipDirection.OUTBOUND: "→",
+                RelationshipDirection.INBOUND: "←",
+                RelationshipDirection.BIDIRECTIONAL: "↔",
+            }
+            symbol = symbol_map.get(direction, "→")
+            if reversed_edge and direction != RelationshipDirection.BIDIRECTIONAL:
+                symbol = "←" if direction == RelationshipDirection.OUTBOUND else "→"
+            return symbol
+
         def build_tree(parent_tree: Tree, obs: Observable, visited: set[str], rel_info: str = "") -> None:
             if obs.key in visited:
                 return
@@ -179,18 +206,21 @@ def display_summary(cv: Cyvest, console: Console | None = None, show_graph: bool
 
             child_tree = parent_tree.add(obs_info)
 
-            # Add children
+            # Add outbound children
             for rel in obs.relationships:
-                child_obs = cv.observable_get(rel.target_key)
+                child_obs = all_observables.get(rel.target_key)
                 if child_obs:
-                    # Get direction symbol
-                    direction_symbol = {
-                        "outbound": "→",
-                        "inbound": "←",
-                        "bidirectional": "↔",
-                    }.get(rel.direction if isinstance(rel.direction, str) else rel.direction.value, "→")
+                    direction_symbol = get_direction_symbol(rel, reversed_edge=False)
                     rel_label = f"[dim]{rel.relationship_type}[/dim] {direction_symbol} "
                     build_tree(child_tree, child_obs, visited, rel_label)
+
+            # Add inbound children (observables pointing to this one)
+            for source_obs, rel in reverse_relationships.get(obs.key, []):
+                if source_obs.key == obs.key:
+                    continue
+                direction_symbol = get_direction_symbol(rel, reversed_edge=True)
+                rel_label = f"[dim]{rel.relationship_type}[/dim] {direction_symbol} "
+                build_tree(child_tree, source_obs, visited, rel_label)
 
         # Start from root
         root = cv.observable_get_root()

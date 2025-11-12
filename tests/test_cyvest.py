@@ -165,3 +165,25 @@ def test_relationship_with_direction() -> None:
     cv.observable_add_relationship(obs1.key, obs2.key, "communicates-with", "bidirectional")
     assert obs1.relationships[2].direction == RelationshipDirection.BIDIRECTIONAL
 
+
+def test_relationship_semantic_defaults_via_api() -> None:
+    """Test that Cyvest API uses semantic defaults for relationship directions."""
+    from cyvest import RelationshipType
+    
+    cv = Cyvest()
+    obs1 = cv.observable_create("url", "https://example.com")
+    obs2 = cv.observable_create("ip", "192.168.1.1")
+    
+    # No direction specified - should use OUTBOUND for RESOLVES_TO
+    cv.observable_add_relationship(obs1.key, obs2.key, RelationshipType.RESOLVES_TO)
+    assert obs1.relationships[0].direction == RelationshipDirection.OUTBOUND
+    
+    # No direction specified - should use INBOUND for DOWNLOADED
+    cv.observable_add_relationship(obs1.key, obs2.key, RelationshipType.DOWNLOADED)
+    assert obs1.relationships[1].direction == RelationshipDirection.INBOUND
+    
+    # No direction specified - should use BIDIRECTIONAL for COMMUNICATES_WITH
+    cv.observable_add_relationship(obs1.key, obs2.key, RelationshipType.COMMUNICATES_WITH)
+    assert obs1.relationships[2].direction == RelationshipDirection.BIDIRECTIONAL
+
+

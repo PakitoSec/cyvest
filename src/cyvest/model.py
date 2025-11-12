@@ -94,6 +94,72 @@ class RelationshipType(str, Enum):
     
     # Windows Registry
     VALUES = "values"
+    
+    def get_default_direction(self) -> RelationshipDirection:
+        """
+        Get the semantically appropriate default direction for this relationship type.
+        
+        Returns:
+            The default RelationshipDirection for this relationship type
+            
+        Examples:
+            >>> RelationshipType.RESOLVES_TO.get_default_direction()
+            RelationshipDirection.OUTBOUND
+            >>> RelationshipType.DOWNLOADED.get_default_direction()
+            RelationshipDirection.INBOUND
+            >>> RelationshipType.COMMUNICATES_WITH.get_default_direction()
+            RelationshipDirection.BIDIRECTIONAL
+        """
+        # Import here to avoid circular dependency
+        # Network relationships
+        if self == RelationshipType.RESOLVES_TO:
+            return RelationshipDirection.OUTBOUND  # domain → IP
+        elif self == RelationshipType.BELONGS_TO:
+            return RelationshipDirection.OUTBOUND  # IP → network/AS
+        elif self == RelationshipType.COMMUNICATES_WITH:
+            return RelationshipDirection.BIDIRECTIONAL  # mutual communication
+        
+        # File relationships
+        elif self == RelationshipType.CONTAINS:
+            return RelationshipDirection.OUTBOUND  # container → item
+        elif self == RelationshipType.DOWNLOADED:
+            return RelationshipDirection.INBOUND  # file ← source
+        elif self == RelationshipType.DROPPED:
+            return RelationshipDirection.INBOUND  # file ← dropper
+        
+        # Email relationships
+        elif self in (RelationshipType.FROM, RelationshipType.SENDER):
+            return RelationshipDirection.INBOUND  # email ← sender
+        elif self in (RelationshipType.TO, RelationshipType.CC, RelationshipType.BCC):
+            return RelationshipDirection.OUTBOUND  # email → recipient
+        elif self in (RelationshipType.RAW_EMAIL, RelationshipType.BODY_RAW):
+            return RelationshipDirection.OUTBOUND  # message → content
+        
+        # Process relationships
+        elif self == RelationshipType.CREATED:
+            return RelationshipDirection.OUTBOUND  # creator → created
+        elif self == RelationshipType.OPENED:
+            return RelationshipDirection.OUTBOUND  # opener → opened
+        elif self == RelationshipType.PARENT:
+            return RelationshipDirection.OUTBOUND  # parent → child
+        elif self == RelationshipType.CHILD:
+            return RelationshipDirection.INBOUND  # child ← parent
+        
+        # General relationships
+        elif self == RelationshipType.RELATED_TO:
+            return RelationshipDirection.BIDIRECTIONAL  # symmetric
+        elif self == RelationshipType.DERIVED_FROM:
+            return RelationshipDirection.INBOUND  # derived ← source
+        elif self == RelationshipType.DUPLICATE_OF:
+            return RelationshipDirection.BIDIRECTIONAL  # symmetric
+        
+        # Windows Registry
+        elif self == RelationshipType.VALUES:
+            return RelationshipDirection.OUTBOUND  # key → values
+        
+        # Default fallback
+        else:
+            return RelationshipDirection.OUTBOUND
 
 
 class RelationshipDirection(str, Enum):
@@ -210,10 +276,11 @@ class Relationship:
 
     target_key: str  # Key of the target observable
     relationship_type: RelationshipType | str  # STIX2 relationship type
-    direction: RelationshipDirection | str = RelationshipDirection.OUTBOUND  # Relationship direction
+    direction: RelationshipDirection | str | None = None  # Relationship direction (None = auto-detect)
 
     def __post_init__(self) -> None:
         """Normalize relationship type and direction to enum if possible."""
+        # First normalize relationship type
         if isinstance(self.relationship_type, str):
             try:
                 self.relationship_type = RelationshipType(self.relationship_type)
@@ -221,12 +288,23 @@ class Relationship:
                 # Keep as string if not a standard STIX2 relationship type
                 pass
         
-        if isinstance(self.direction, str):
+        # Then handle direction with smart defaults
+        if self.direction is None:
+            # No direction specified - use semantic default based on relationship type
+            if isinstance(self.relationship_type, RelationshipType):
+                self.direction = self.relationship_type.get_default_direction()
+            else:
+                # Custom relationship type - default to OUTBOUND
+                self.direction = RelationshipDirection.OUTBOUND
+        elif isinstance(self.direction, str):
             try:
                 self.direction = RelationshipDirection(self.direction)
             except ValueError:
-                # Default to outbound if invalid
-                self.direction = RelationshipDirection.OUTBOUND
+                # Invalid direction string - use semantic default or OUTBOUND
+                if isinstance(self.relationship_type, RelationshipType):
+                    self.direction = self.relationship_type.get_default_direction()
+                else:
+                    self.direction = RelationshipDirection.OUTBOUND
 
 
 @dataclass
@@ -328,7 +406,7 @@ class Observable:
         self, 
         target_key: str, 
         relationship_type: RelationshipType | str,
-        direction: RelationshipDirection | str = RelationshipDirection.OUTBOUND,
+        direction: RelationshipDirection | str | None = None,
     ) -> None:
         """
         Add a relationship to another observable.
@@ -336,7 +414,7 @@ class Observable:
         Args:
             target_key: Key of the target observable
             relationship_type: Type of relationship (STIX2 convention)
-            direction: Direction of the relationship (default: OUTBOUND)
+            direction: Direction of the relationship (None = use semantic default for relationship type)
         """
         rel = Relationship(target_key=target_key, relationship_type=relationship_type, direction=direction)
         if rel not in self.relationships:

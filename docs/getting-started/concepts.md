@@ -233,53 +233,53 @@ cv.observable_add_relationship(
 
 ### Relationship Direction
 
-Relationships support directional semantics to precisely model how observables relate:
+Relationships support directional semantics with **automatic semantic defaults**:
 
 ```python
-from cyvest import RelationshipDirection
+from cyvest import RelationshipType
 
-# Outbound (default): Source → Target
-# Use when the source initiates or points to the target
+# Automatically gets OUTBOUND (domain → IP)
+cv.observable_add_relationship(domain.key, ip.key, RelationshipType.RESOLVES_TO)
+
+# Automatically gets INBOUND (file ← URL)  
+cv.observable_add_relationship(malware_file.key, download_url.key, RelationshipType.DOWNLOADED)
+
+# Automatically gets BIDIRECTIONAL (host ↔ host)
+cv.observable_add_relationship(host1.key, host2.key, RelationshipType.COMMUNICATES_WITH)
+
+# Can still override semantic defaults if needed
 cv.observable_add_relationship(
-    domain.key,
-    ip.key,
+    domain.key, ip.key,
     RelationshipType.RESOLVES_TO,
-    RelationshipDirection.OUTBOUND  # domain resolves TO ip
+    RelationshipDirection.INBOUND  # explicit override
 )
 
-# Inbound: Source ← Target  
-# Use when the source receives from or is derived from the target
-cv.observable_add_relationship(
-    malware_file.key,
-    download_url.key,
-    RelationshipType.DOWNLOADED,
-    RelationshipDirection.INBOUND  # file was downloaded FROM url
-)
-
-# Bidirectional: Source ↔ Target
-# Use for symmetric relationships where direction doesn't matter
-cv.observable_add_relationship(
-    host1.key,
-    host2.key,
-    RelationshipType.COMMUNICATES_WITH,
-    RelationshipDirection.BIDIRECTIONAL  # mutual communication
-)
-
-# Using the fluent DSL
-url.relate_to(
-    domain, 
-    RelationshipType.RELATED_TO,
-    RelationshipDirection.OUTBOUND
-)
+# Using the fluent DSL (also uses semantic defaults)
+url.relate_to(domain, RelationshipType.RELATED_TO)  # auto: BIDIRECTIONAL
 ```
 
-**Direction Guidelines:**
+**Semantic Default Directions:**
 
-| Direction | Symbol | Use Case | Example |
-|-----------|--------|----------|---------|
-| `OUTBOUND` | → | Source points to/initiates with target | Domain → IP (DNS) |
-| `INBOUND` | ← | Source receives from/derived from target | File ← URL (download) |
-| `BIDIRECTIONAL` | ↔ | Symmetric/mutual relationship | Host ↔ Host (communication) |
+Each relationship type automatically gets the most appropriate direction:
+
+| Relationship Type | Default Direction | Symbol | Rationale |
+|-------------------|-------------------|--------|-----------|
+| `RESOLVES_TO` | OUTBOUND | → | Domain resolves to IP |
+| `BELONGS_TO` | OUTBOUND | → | IP belongs to network/AS |
+| `COMMUNICATES_WITH` | BIDIRECTIONAL | ↔ | Mutual communication |
+| `CONTAINS` | OUTBOUND | → | Container holds item |
+| `DOWNLOADED` | INBOUND | ← | File from source |
+| `DROPPED` | INBOUND | ← | File from dropper |
+| `FROM` | INBOUND | ← | Email from sender |
+| `SENDER` | INBOUND | ← | Email from sender |
+| `TO`, `CC`, `BCC` | OUTBOUND | → | Email to recipient |
+| `CREATED` | OUTBOUND | → | Creator to created |
+| `OPENED` | OUTBOUND | → | Opener to opened |
+| `PARENT` | OUTBOUND | → | Parent to child |
+| `CHILD` | INBOUND | ← | Child from parent |
+| `RELATED_TO` | BIDIRECTIONAL | ↔ | Symmetric association |
+| `DERIVED_FROM` | INBOUND | ← | Derived from source |
+| `DUPLICATE_OF` | BIDIRECTIONAL | ↔ | Symmetric duplication |
 
 **Visualization:**
 

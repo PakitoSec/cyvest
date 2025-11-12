@@ -126,41 +126,34 @@ cv.observable_add_relationship(
 
 **Relationship Direction:**
 
-Relationships support directional semantics for precise modeling:
+Relationships support directional semantics with **automatic semantic defaults**:
 
 ```python
-from cyvest import RelationshipDirection
+from cyvest import RelationshipType
 
-# Outbound: Source → Target (default)
+# Automatically gets OUTBOUND (domain → IP)
+cv.observable_add_relationship(domain.key, ip.key, RelationshipType.RESOLVES_TO)
+
+# Automatically gets INBOUND (file ← URL) 
+cv.observable_add_relationship(malware.key, url.key, RelationshipType.DOWNLOADED)
+
+# Automatically gets BIDIRECTIONAL (host ↔ host)
+cv.observable_add_relationship(host1.key, host2.key, RelationshipType.COMMUNICATES_WITH)
+
+# Can still override if needed
 cv.observable_add_relationship(
-    domain.key,
-    ip.key,
+    domain.key, ip.key, 
     RelationshipType.RESOLVES_TO,
-    RelationshipDirection.OUTBOUND  # domain resolves TO ip
-)
-
-# Inbound: Source ← Target
-cv.observable_add_relationship(
-    malware.key,
-    url.key,
-    RelationshipType.DOWNLOADED,
-    RelationshipDirection.INBOUND  # malware FROM url
-)
-
-# Bidirectional: Source ↔ Target
-cv.observable_add_relationship(
-    host1.key,
-    host2.key,
-    RelationshipType.COMMUNICATES_WITH,
-    RelationshipDirection.BIDIRECTIONAL  # mutual communication
+    RelationshipDirection.INBOUND  # explicit override
 )
 ```
 
-**Direction Values:**
+**Semantic Default Directions:**
 
-- `OUTBOUND` (→): Default, source points to target
-- `INBOUND` (←): Source receives from target
-- `BIDIRECTIONAL` (↔): Symmetric relationship
+Each relationship type has an intuitive default direction:
+- **OUTBOUND (→)**: `RESOLVES_TO`, `BELONGS_TO`, `CONTAINS`, `TO`, `CC`, `BCC`, `CREATED`, `OPENED`, `PARENT`, `VALUES`
+- **INBOUND (←)**: `DOWNLOADED`, `DROPPED`, `FROM`, `SENDER`, `CHILD`, `DERIVED_FROM`
+- **BIDIRECTIONAL (↔)**: `COMMUNICATES_WITH`, `RELATED_TO`, `DUPLICATE_OF`
 
 Direction symbols appear in visualizations and markdown exports.
 
@@ -231,14 +224,15 @@ See the `examples/` directory for complete examples:
 - **02_urls_and_ips.py**: Network investigation with URLs and IPs
 - **03_merge_demo.py**: Multi-process investigation merging
 - **05_stix2_types.py**: Using STIX2 Observable and Relationship type enums
-- **06_relationship_direction.py**: Relationship direction modeling (outbound/inbound/bidirectional)
+- **06_relationship_direction.py**: Explicit relationship direction modeling
+- **07_semantic_defaults.py**: Automatic semantic default directions for relationships
 
 Run an example:
 
 ```bash
 python examples/01_email_basic.py
 python examples/05_stix2_types.py
-python examples/06_relationship_direction.py
+python examples/07_semantic_defaults.py
 ```
 
 ## CLI Usage

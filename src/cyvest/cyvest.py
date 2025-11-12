@@ -137,7 +137,7 @@ class Cyvest:
         return self._root_observable
 
     def observable_add_relationship(
-        self, source_key: str, target_key: str, relationship_type: str, direction: str = "outbound"
+        self, source_key: str, target_key: str, relationship_type: str, direction: str | None = None
     ) -> Observable | None:
         """
         Add a relationship between observables.
@@ -146,7 +146,7 @@ class Cyvest:
             source_key: Key of source observable
             target_key: Key of target observable
             relationship_type: Type of relationship (STIX2 convention)
-            direction: Direction of the relationship (outbound, inbound, or bidirectional)
+            direction: Direction of the relationship (None = use semantic default for relationship type)
 
         Returns:
             The source observable if found, None otherwise

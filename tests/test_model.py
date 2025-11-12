@@ -163,3 +163,68 @@ def test_relationship_direction_string() -> None:
     obs1.add_relationship(obs2.key, "communicates-with", "bidirectional")
     assert obs1.relationships[1].direction == RelationshipDirection.BIDIRECTIONAL
 
+
+def test_relationship_semantic_defaults() -> None:
+    """Test that relationship types get correct semantic default directions."""
+    from cyvest.model import RelationshipType
+    
+    # Test network relationships
+    assert RelationshipType.RESOLVES_TO.get_default_direction() == RelationshipDirection.OUTBOUND
+    assert RelationshipType.BELONGS_TO.get_default_direction() == RelationshipDirection.OUTBOUND
+    assert RelationshipType.COMMUNICATES_WITH.get_default_direction() == RelationshipDirection.BIDIRECTIONAL
+    
+    # Test file relationships
+    assert RelationshipType.CONTAINS.get_default_direction() == RelationshipDirection.OUTBOUND
+    assert RelationshipType.DOWNLOADED.get_default_direction() == RelationshipDirection.INBOUND
+    assert RelationshipType.DROPPED.get_default_direction() == RelationshipDirection.INBOUND
+    
+    # Test email relationships
+    assert RelationshipType.FROM.get_default_direction() == RelationshipDirection.INBOUND
+    assert RelationshipType.SENDER.get_default_direction() == RelationshipDirection.INBOUND
+    assert RelationshipType.TO.get_default_direction() == RelationshipDirection.OUTBOUND
+    assert RelationshipType.CC.get_default_direction() == RelationshipDirection.OUTBOUND
+    assert RelationshipType.BCC.get_default_direction() == RelationshipDirection.OUTBOUND
+    
+    # Test process relationships
+    assert RelationshipType.CREATED.get_default_direction() == RelationshipDirection.OUTBOUND
+    assert RelationshipType.PARENT.get_default_direction() == RelationshipDirection.OUTBOUND
+    assert RelationshipType.CHILD.get_default_direction() == RelationshipDirection.INBOUND
+    
+    # Test general relationships
+    assert RelationshipType.RELATED_TO.get_default_direction() == RelationshipDirection.BIDIRECTIONAL
+    assert RelationshipType.DERIVED_FROM.get_default_direction() == RelationshipDirection.INBOUND
+    assert RelationshipType.DUPLICATE_OF.get_default_direction() == RelationshipDirection.BIDIRECTIONAL
+
+
+def test_relationship_auto_direction() -> None:
+    """Test that relationships automatically get semantic defaults when direction not specified."""
+    from cyvest.model import RelationshipType
+    
+    obs1 = Observable(obs_type="url", value="https://example.com")
+    obs2 = Observable(obs_type="ip", value="192.168.1.1")
+    
+    # No direction specified - should use semantic default (OUTBOUND for RESOLVES_TO)
+    obs1.add_relationship(obs2.key, RelationshipType.RESOLVES_TO)
+    assert obs1.relationships[0].direction == RelationshipDirection.OUTBOUND
+    
+    # No direction specified - should use semantic default (INBOUND for DOWNLOADED)
+    obs1.add_relationship(obs2.key, RelationshipType.DOWNLOADED)
+    assert obs1.relationships[1].direction == RelationshipDirection.INBOUND
+    
+    # No direction specified - should use semantic default (BIDIRECTIONAL for COMMUNICATES_WITH)
+    obs1.add_relationship(obs2.key, RelationshipType.COMMUNICATES_WITH)
+    assert obs1.relationships[2].direction == RelationshipDirection.BIDIRECTIONAL
+
+
+def test_relationship_override_default() -> None:
+    """Test that explicit direction overrides semantic default."""
+    from cyvest.model import RelationshipType
+    
+    obs1 = Observable(obs_type="url", value="https://example.com")
+    obs2 = Observable(obs_type="ip", value="192.168.1.1")
+    
+    # Override default: RESOLVES_TO normally OUTBOUND, force INBOUND
+    obs1.add_relationship(obs2.key, RelationshipType.RESOLVES_TO, RelationshipDirection.INBOUND)
+    assert obs1.relationships[0].direction == RelationshipDirection.INBOUND
+
+

@@ -90,7 +90,7 @@ class ObservableHandler:
         return self.with_ti(source, score, comment, extra, level, taxonomies)
 
     def relate_to(
-        self, target: Observable | ObservableHandler, relationship_type: str, direction: str = "outbound"
+        self, target: Observable | ObservableHandler, relationship_type: str, direction: str | None = None
     ) -> ObservableHandler:
         """
         Create a relationship to another observable.
@@ -98,7 +98,7 @@ class ObservableHandler:
         Args:
             target: Target observable or handler
             relationship_type: Type of relationship (STIX2 convention)
-            direction: Direction of the relationship (outbound, inbound, or bidirectional)
+            direction: Direction of the relationship (None = use semantic default for relationship type)
 
         Returns:
             Self for chaining

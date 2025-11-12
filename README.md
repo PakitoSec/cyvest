@@ -27,7 +27,7 @@
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # Clone the repository
-git clone https://github.com/yourusername/cyvest.git
+git clone https://github.com/PakitoSec/cyvest.git
 cd cyvest
 
 # Install dependencies
@@ -249,8 +249,14 @@ cyvest stats investigation.json --detailed
 # Export to markdown
 cyvest export investigation.json -o report.md -f markdown
 
-# Merge investigations
+# Merge investigations with automatic deduplication
 cyvest merge inv1.json inv2.json inv3.json -o merged.json
+
+# Merge with statistics display
+cyvest merge inv1.json inv2.json -o merged.json --stats
+
+# Merge and display rich summary
+cyvest merge inv1.json inv2.json -o merged.json -f rich --stats
 ```
 
 ## Development
@@ -311,17 +317,17 @@ mkdocs build
 cyvest/
 ├── src/cyvest/
 │   ├── __init__.py          # Package initialization
-│   ├── cyvest.py            # Main facade and API
+│   ├── cyvest.py            # High-level API facade
+│   ├── investigation.py     # Core state management with merge-on-create
 │   ├── dsl.py               # Fluent chaining DSL
 │   ├── levels.py            # Level enum and scoring logic
 │   ├── keys.py              # Key generation utilities
 │   ├── model.py             # Core data models
 │   ├── score.py             # Scoring and propagation engine
-│   ├── merge.py             # Investigation merging logic
 │   ├── stats.py             # Statistics and aggregations
 │   ├── io_serialization.py  # JSON and Markdown export
 │   ├── io_rich.py           # Rich console output
-│   └── main.py              # CLI interface
+│   └── cli.py               # CLI interface
 ├── examples/                # Example scripts
 ├── tests/                   # Test suite
 ├── docs/                    # Documentation

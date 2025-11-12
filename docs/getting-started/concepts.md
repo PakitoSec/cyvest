@@ -337,24 +337,72 @@ stats['checks_by_scope']
 stats['total_threat_intel']
 ```
 
-## Merging
+## Investigation Architecture
 
-Investigations can be merged:
+Cyvest uses a clean, layered architecture with automatic merge-on-create:
+
+### Core Components
+
+1. **`Investigation`**: Internal state management
+   - Owns all object collections
+   - Handles automatic merging when objects are added
+   - Integrates scoring and statistics engines
+   
+2. **`Cyvest`**: High-level API facade
+   - User-facing interface
+   - Delegates to `Investigation`
+   - Provides convenience methods
+
+3. **DSL Handlers**: Fluent interface for method chaining
+
+### Automatic Merge-on-Create
+
+When you add any object (observable, check, threat intel, etc.), Cyvest automatically:
+1. Checks if an object with the same key exists
+2. If yes: merges the new data into the existing object
+3. If no: registers it as a new object
+
+This eliminates duplicate objects and ensures consistency:
+
+```python
+cv = Cyvest()
+
+# First creation
+obs1 = cv.observable_create("url", "https://example.com", score=5.0)
+
+# Adding same observable again - automatically merges!
+obs2 = cv.observable_create("url", "https://example.com", score=7.0)
+
+# obs1 and obs2 are the same object with merged data
+assert obs1 is obs2
+assert obs1.score == 7.0  # Higher score wins
+```
+
+### Merging Investigations
+
+You can also merge entire investigations:
 
 ```python
 # Create separate investigations
 inv1 = Cyvest()
-inv2 = Cyvest()
+inv1.observable_create("url", "https://example.com")
 
-# Merge inv2 into inv1
+inv2 = Cyvest()
+inv2.observable_create("ip", "192.168.1.1")
+
+# Merge inv2 into inv1 - automatic deduplication
 inv1.merge_investigation(inv2)
+
+# CLI support for merging JSON files
+# cyvest merge inv1.json inv2.json -o merged.json
 ```
 
-Merge strategy:
-- **Observables/Checks**: Update score, level, extra; concatenate comments
-- **Threat Intel**: Update score, level; merge taxonomies
-- **Enrichments**: Replace data structure
-- **Containers**: Merge trees recursively
+**Merge strategies:**
+- **Observables**: Higher score/level wins, comments concatenate, relationships and threat intel merge
+- **Checks**: Higher score/level wins, observables merge by key (not identity)
+- **Threat Intel**: Higher score/level wins, taxonomies merge
+- **Enrichments**: Deep merge of data dictionaries
+- **Containers**: Recursive merge of checks and sub-containers
 
 ## Next Steps
 

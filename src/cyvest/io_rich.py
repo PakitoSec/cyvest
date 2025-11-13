@@ -3,13 +3,13 @@ Rich console output for Cyvest investigations.
 
 Provides formatted display of investigation results using the Rich library.
 """
+
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
-from logurich import get_console
 from rich.align import Align
-from rich.console import Console
 from rich.rule import Rule
 from rich.table import Table
 from rich.tree import Tree
@@ -21,18 +21,15 @@ if TYPE_CHECKING:
     from cyvest.cyvest import Cyvest
 
 
-def display_summary(cv: Cyvest, console: Console | None = None, show_graph: bool = True) -> None:
+def display_summary(cv: Cyvest, rich_print: Callable[[Any], None], show_graph: bool = True) -> None:
     """
     Display a comprehensive summary of the investigation using Rich.
 
     Args:
         cv: Cyvest investigation to display
-        console: Optional Rich console instance (creates new one if not provided)
+        rich_print: A rich renderable handler that is called with renderables for output
         show_graph: Whether to display the observable graph
     """
-    if console is None:
-        console = get_console()
-
     # Create main table
     table = Table(
         title="Investigation Report",
@@ -145,14 +142,14 @@ def display_summary(cv: Cyvest, console: Console | None = None, show_graph: bool
     )
 
     # Print table
-    console.print(table)
+    rich_print(table)
 
     # Observable graph (if requested)
     if show_graph and cv.get_all_observables():
-        console.print()
-        console.print("[bold cyan]Observable Graph[/bold cyan]")
+        rich_print("")
+        rich_print("[bold cyan]Observable Graph[/bold cyan]")
 
-        tree = Tree("[bold]Investigation Observables[/bold]")
+        tree = Tree("[bold]Investigation Observables[/bold]", hide_root=True)
 
         # Precompute reverse relationships so we can traverse observables that only
         # appear as targets (e.g., child → parent links).
@@ -193,12 +190,12 @@ def display_summary(cv: Cyvest, console: Console | None = None, show_graph: bool
             generated_by = ""
             if obs._generated_by_checks:
                 checks_str = "][cyan], [/cyan][cyan]".join(obs._generated_by_checks)
-                generated_by = f"[cyan][[/cyan]{checks_str}[cyan]][/cyan]"
+                generated_by = f"[cyan][[/cyan]{checks_str}[cyan]][/cyan] "
 
             whitelisted_str = " [green]WHITELISTED[/green]" if obs.whitelisted else ""
 
             obs_info = (
-                f"{rel_info}{generated_by} {obs.key} -> "
+                f"{rel_info}{generated_by}[bold]{obs.key}[/bold] "
                 f"[{color_score}]{obs.score}[/{color_score}] "
                 f"[{color_level}]{obs.level.name}[/{color_level}]"
                 f"{whitelisted_str}"
@@ -211,7 +208,7 @@ def display_summary(cv: Cyvest, console: Console | None = None, show_graph: bool
                 child_obs = all_observables.get(rel.target_key)
                 if child_obs:
                     direction_symbol = get_direction_symbol(rel, reversed_edge=False)
-                    rel_label = f"[dim]{rel.relationship_type}[/dim] {direction_symbol} "
+                    rel_label = f"[dim]{rel.relationship_type_name}[/dim] {direction_symbol} "
                     build_tree(child_tree, child_obs, visited, rel_label)
 
             # Add inbound children (observables pointing to this one)
@@ -219,7 +216,7 @@ def display_summary(cv: Cyvest, console: Console | None = None, show_graph: bool
                 if source_obs.key == obs.key:
                     continue
                 direction_symbol = get_direction_symbol(rel, reversed_edge=True)
-                rel_label = f"[dim]{rel.relationship_type}[/dim] {direction_symbol} "
+                rel_label = f"[dim]{rel.relationship_type_name}[/dim] {direction_symbol} "
                 build_tree(child_tree, source_obs, visited, rel_label)
 
         # Start from root
@@ -227,20 +224,17 @@ def display_summary(cv: Cyvest, console: Console | None = None, show_graph: bool
         if root:
             build_tree(tree, root, set())
 
-        console.print(tree)
+        rich_print(tree)
 
 
-def display_statistics(cv: Cyvest, console: Console | None = None) -> None:
+def display_statistics(cv: Cyvest, rich_print: Callable[[Any], None]) -> None:
     """
     Display detailed statistics about the investigation.
 
     Args:
         cv: Cyvest investigation
-        console: Optional Rich console instance
+        rich_print: A rich renderable handler that is called with renderables for output
     """
-    if console is None:
-        console = Console()
-
     stats = cv.get_statistics()
 
     # Observable statistics table
@@ -264,10 +258,10 @@ def display_statistics(cv: Cyvest, console: Console | None = None) -> None:
             str(levels.get("MALICIOUS", 0)),
         )
 
-    console.print(obs_table)
+    rich_print(obs_table)
 
     # Check statistics table
-    console.print()
+    rich_print("")
     check_table = Table(title="Check Statistics")
     check_table.add_column("Scope", style="cyan")
     check_table.add_column("Count", justify="right")
@@ -275,11 +269,11 @@ def display_statistics(cv: Cyvest, console: Console | None = None) -> None:
     for scope, count in stats.get("checks_by_scope", {}).items():
         check_table.add_row(scope, str(count))
 
-    console.print(check_table)
+    rich_print(check_table)
 
     # Threat intel statistics
     if stats.get("total_threat_intel", 0) > 0:
-        console.print()
+        rich_print("")
         ti_table = Table(title="Threat Intelligence Statistics")
         ti_table.add_column("Source", style="cyan")
         ti_table.add_column("Count", justify="right")
@@ -287,4 +281,4 @@ def display_statistics(cv: Cyvest, console: Console | None = None) -> None:
         for source, count in stats.get("threat_intel_by_source", {}).items():
             ti_table.add_row(source, str(count))
 
-        console.print(ti_table)
+        rich_print(ti_table)

@@ -47,9 +47,7 @@ def test_threat_intel_addition() -> None:
     """Test adding threat intel to observable."""
     cv = Cyvest()
     obs = cv.observable_create("hash", "abc123")
-    ti = cv.observable_add_threat_intel(
-        obs.key, source="virustotal", score=Decimal("8.0"), comment="Malicious"
-    )
+    ti = cv.observable_add_threat_intel(obs.key, source="virustotal", score=Decimal("8.0"), comment="Malicious")
     assert ti is not None
     assert ti.source == "virustotal"
     assert ti.score == Decimal("8.0")
@@ -156,15 +154,15 @@ def test_relationship_with_direction() -> None:
     cv = Cyvest()
     obs1 = cv.observable_create("url", "https://example.com")
     obs2 = cv.observable_create("ip", "192.168.1.1")
-    
+
     # Default direction (outbound)
     cv.observable_add_relationship(obs1.key, obs2.key, "resolves-to")
     assert obs1.relationships[0].direction == RelationshipDirection.OUTBOUND
-    
+
     # Explicit inbound
     cv.observable_add_relationship(obs1.key, obs2.key, "belongs-to", "inbound")
     assert obs1.relationships[1].direction == RelationshipDirection.INBOUND
-    
+
     # Explicit bidirectional
     cv.observable_add_relationship(obs1.key, obs2.key, "communicates-with", "bidirectional")
     assert obs1.relationships[2].direction == RelationshipDirection.BIDIRECTIONAL
@@ -173,21 +171,163 @@ def test_relationship_with_direction() -> None:
 def test_relationship_semantic_defaults_via_api() -> None:
     """Test that Cyvest API uses semantic defaults for relationship directions."""
     from cyvest import RelationshipType
-    
+
     cv = Cyvest()
     obs1 = cv.observable_create("url", "https://example.com")
     obs2 = cv.observable_create("ip", "192.168.1.1")
-    
+
     # No direction specified - should use OUTBOUND for RESOLVES_TO
     cv.observable_add_relationship(obs1.key, obs2.key, RelationshipType.RESOLVES_TO)
     assert obs1.relationships[0].direction == RelationshipDirection.OUTBOUND
-    
+
     # No direction specified - should use INBOUND for DOWNLOADED
     cv.observable_add_relationship(obs1.key, obs2.key, RelationshipType.DOWNLOADED)
     assert obs1.relationships[1].direction == RelationshipDirection.INBOUND
-    
+
     # No direction specified - should use BIDIRECTIONAL for COMMUNICATES_WITH
     cv.observable_add_relationship(obs1.key, obs2.key, RelationshipType.COMMUNICATES_WITH)
     assert obs1.relationships[2].direction == RelationshipDirection.BIDIRECTIONAL
 
 
+def test_finalize_relationships_single_orphan() -> None:
+    """Test that finalize_relationships links single orphan observables to root."""
+    from cyvest import RelationshipType
+
+    cv = Cyvest()
+    root = cv.observable_get_root()
+
+    # Create an observable with no relationships
+    orphan = cv.observable_create("ip", "192.168.1.1")
+
+    # Finalize relationships
+    cv.finalize_relationships()
+
+    # Root should now have a relationship to the orphan
+    root_targets = {rel.target_key for rel in root.relationships}
+    assert orphan.key in root_targets
+
+    # Check that the relationship type is RELATED_TO
+    orphan_rel = next(rel for rel in root.relationships if rel.target_key == orphan.key)
+    assert orphan_rel.relationship_type == RelationshipType.RELATED_TO
+
+
+def test_finalize_relationships_orphan_subgraph() -> None:
+    """Test that finalize_relationships links orphan sub-graphs to root."""
+    from cyvest import RelationshipType
+
+    cv = Cyvest()
+    root = cv.observable_get_root()
+
+    # Create a connected sub-graph: obs1 -> obs2 -> obs3
+    obs1 = cv.observable_create("ip", "10.0.0.1")
+    obs2 = cv.observable_create("domain", "example.com")
+    obs3 = cv.observable_create("url", "https://example.com/path")
+
+    cv.observable_add_relationship(obs1.key, obs2.key, RelationshipType.RESOLVES_TO)
+    cv.observable_add_relationship(obs2.key, obs3.key, RelationshipType.RELATED_TO)
+
+    # This sub-graph is not connected to root
+    # Finalize should link the starting node (obs1) to root
+    cv.finalize_relationships()
+
+    # Root should have a relationship to obs1 (the starting node)
+    root_targets = {rel.target_key for rel in root.relationships}
+    assert obs1.key in root_targets
+
+    # obs2 and obs3 should NOT be directly linked to root
+    assert obs2.key not in root_targets
+    assert obs3.key not in root_targets
+
+
+def test_finalize_relationships_multiple_orphan_subgraphs() -> None:
+    """Test that finalize_relationships handles multiple orphan sub-graphs."""
+    from cyvest import RelationshipType
+
+    cv = Cyvest()
+    root = cv.observable_get_root()
+
+    # First sub-graph: sg1_a -> sg1_b
+    sg1_a = cv.observable_create("ip", "10.0.0.1")
+    sg1_b = cv.observable_create("domain", "sub1.com")
+    cv.observable_add_relationship(sg1_a.key, sg1_b.key, RelationshipType.RESOLVES_TO)
+
+    # Second sub-graph: sg2_a -> sg2_b -> sg2_c
+    sg2_a = cv.observable_create("ip", "10.0.0.2")
+    sg2_b = cv.observable_create("domain", "sub2.com")
+    sg2_c = cv.observable_create("url", "https://sub2.com")
+    cv.observable_add_relationship(sg2_a.key, sg2_b.key, RelationshipType.RESOLVES_TO)
+    cv.observable_add_relationship(sg2_b.key, sg2_c.key, RelationshipType.RELATED_TO)
+
+    # Third isolated orphan
+    sg3_orphan = cv.observable_create("hash", "abc123")
+
+    cv.finalize_relationships()
+
+    # Root should link to the starting node of each sub-graph
+    root_targets = {rel.target_key for rel in root.relationships}
+    assert sg1_a.key in root_targets  # Starting node of sub-graph 1
+    assert sg2_a.key in root_targets  # Starting node of sub-graph 2
+    assert sg3_orphan.key in root_targets  # Isolated orphan
+
+    # Non-starting nodes should not be directly linked
+    assert sg1_b.key not in root_targets
+    assert sg2_b.key not in root_targets
+    assert sg2_c.key not in root_targets
+
+
+def test_finalize_relationships_preconnected_graph() -> None:
+    """Test that finalize_relationships doesn't modify already connected graphs."""
+    from cyvest import RelationshipType
+
+    cv = Cyvest()
+    root = cv.observable_get_root()
+
+    # Create a graph already connected to root
+    obs1 = cv.observable_create("ip", "10.0.0.1")
+    obs2 = cv.observable_create("domain", "example.com")
+
+    # Connect to root
+    cv.observable_add_relationship(root.key, obs1.key, RelationshipType.RELATED_TO)
+    cv.observable_add_relationship(obs1.key, obs2.key, RelationshipType.RESOLVES_TO)
+
+    # Count relationships before finalize
+    rel_count_before = len(root.relationships)
+
+    cv.finalize_relationships()
+
+    # Should not add any new relationships since everything is connected
+    assert len(root.relationships) == rel_count_before
+
+
+def test_finalize_relationships_complex_subgraph_selection() -> None:
+    """Test that finalize_relationships selects the best starting node in complex sub-graphs."""
+    from cyvest import RelationshipType
+
+    cv = Cyvest()
+    root = cv.observable_get_root()
+
+    # Create a sub-graph with multiple potential starting nodes
+    # Structure: source -> hub1 -> leaf1
+    #                  -> hub2 -> leaf2
+    source = cv.observable_create("ip", "10.0.0.1")
+    hub1 = cv.observable_create("domain", "hub1.com")
+    hub2 = cv.observable_create("domain", "hub2.com")
+    leaf1 = cv.observable_create("url", "https://hub1.com/page")
+    leaf2 = cv.observable_create("url", "https://hub2.com/page")
+
+    cv.observable_add_relationship(source.key, hub1.key, RelationshipType.RESOLVES_TO)
+    cv.observable_add_relationship(source.key, hub2.key, RelationshipType.RESOLVES_TO)
+    cv.observable_add_relationship(hub1.key, leaf1.key, RelationshipType.RELATED_TO)
+    cv.observable_add_relationship(hub2.key, leaf2.key, RelationshipType.RELATED_TO)
+
+    cv.finalize_relationships()
+
+    # Root should link to 'source' as it has no incoming edges and multiple outgoing
+    root_targets = {rel.target_key for rel in root.relationships}
+    assert source.key in root_targets
+
+    # Other nodes should not be directly linked to root
+    assert hub1.key not in root_targets
+    assert hub2.key not in root_targets
+    assert leaf1.key not in root_targets
+    assert leaf2.key not in root_targets

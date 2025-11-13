@@ -7,10 +7,11 @@ and relationship types.
 
 from decimal import Decimal
 
-from rich.console import Console
+from logurich import logger
 
 from cyvest import Cyvest, ObservableType, RelationshipType
-from cyvest.io_rich import display_summary
+
+logger.enable("cyvest")
 
 # Create investigation
 with Cyvest() as inv:
@@ -20,30 +21,27 @@ with Cyvest() as inv:
         .with_ti("virustotal", score=Decimal("6.5"), comment="Suspicious domain")
         .get()
     )
-    
+
     ip = (
         inv.observable(ObservableType.IPV4_ADDR, "192.0.2.1", internal=False)
         .with_ti("abuseipdb", score=Decimal("7.0"), comment="Known malicious IP")
         .get()
     )
-    
+
     url = (
         inv.observable(ObservableType.URL, "https://malicious.example.com/payload", internal=False)
         .with_ti("urlscan", score=Decimal("8.0"), comment="Malicious payload detected")
         .relate_to(inv.root(), RelationshipType.RELATED_TO)
         .get()
     )
-    
+
     file_hash = (
         inv.observable(ObservableType.FILE, "abc123...", internal=False)
         .with_ti("virustotal", score=Decimal("9.0"), comment="Known malware")
         .get()
     )
-    
-    email = (
-        inv.observable(ObservableType.EMAIL_ADDR, "attacker@example.com", internal=False)
-        .get()
-    )
+
+    email = inv.observable(ObservableType.EMAIL_ADDR, "attacker@example.com", internal=False).get()
 
     # Add relationships using STIX2 relationship types
     # Use the low-level API for relationships
@@ -68,6 +66,4 @@ with Cyvest() as inv:
     inv.check_link_observable(check.key, url.key)
 
     # Display investigation summary
-    console = Console()
-    display_summary(inv, console, show_graph=True)
-    
+    inv.display_summary()

@@ -4,11 +4,16 @@ Example 1: Basic Email Investigation
 Demonstrates basic usage of Cyvest for analyzing a suspicious email.
 """
 
+import tempfile
 from decimal import Decimal
+from pathlib import Path
+
+from logurich import logger
 
 from cyvest import Cyvest, Level
-from cyvest.io_rich import display_summary
 from cyvest.io_serialization import save_investigation_json, save_investigation_markdown
+
+logger.enable("cyvest")
 
 
 def main() -> None:
@@ -82,28 +87,17 @@ def main() -> None:
 
         # Finalize relationships (link orphan observables to root)
         cv.observable_finalize_relationships()
+        cv.display_summary(show_graph=True)
 
-        # Display summary
-        print("\n" + "=" * 80)
-        print("EXAMPLE 1: BASIC EMAIL INVESTIGATION")
-        print("=" * 80 + "\n")
+        # Export to files in a temp directory for easy cleanup
+        output_dir = Path(tempfile.mkdtemp(prefix="cyvest_example_01_"))
+        json_path = output_dir / "email_investigation.json"
+        md_path = output_dir / "email_investigation.md"
+        save_investigation_json(cv, str(json_path))
+        save_investigation_markdown(cv, str(md_path))
 
-        from rich.console import Console
-
-        console = Console()
-        display_summary(cv, console, show_graph=True)
-
-        # Print global score and level
-        print(f"\n{'=' * 80}")
-        print(f"Global Score: {cv.get_global_score()}")
-        print(f"Global Level: {cv.get_global_level()}")
-        print(f"{'=' * 80}\n")
-
-        # Export to files
-        save_investigation_json(cv, "email_investigation.json")
-        save_investigation_markdown(cv, "email_investigation.md")
-
-        print("✓ Investigation saved to email_investigation.json and email_investigation.md")
+        logger.info("✓ Investigation saved to {} and {}", json_path, md_path)
+        logger.info("Temporary output directory: {}", output_dir)
 
 
 if __name__ == "__main__":

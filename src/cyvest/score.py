@@ -6,9 +6,18 @@ observables, and checks based on relationships and hierarchies.
 """
 
 from decimal import Decimal
+from enum import Enum
 from typing import TYPE_CHECKING
 
 from cyvest.levels import Level, get_level_from_score
+
+
+class ScoreMode(Enum):
+    """Score calculation mode for observables."""
+
+    MAX = "max"  # Score = max(all TI scores, all child scores)
+    SUM = "sum"  # Score = max(TI scores) + sum(child scores)
+
 
 if TYPE_CHECKING:
     from cyvest.model import Check, Observable, ThreatIntel
@@ -24,10 +33,15 @@ class ScoreEngine:
     - Observable scores propagating to checks
     """
 
-    def __init__(self) -> None:
-        """Initialize the score engine."""
+    def __init__(self, score_mode: ScoreMode = ScoreMode.MAX) -> None:
+        """Initialize the score engine.
+
+        Args:
+            score_mode: Score calculation mode (MAX or SUM)
+        """
         self._observables: dict[str, Observable] = {}
         self._checks: dict[str, Check] = {}
+        self._score_mode = score_mode
 
     def register_observable(self, observable: "Observable") -> None:
         """
@@ -55,13 +69,8 @@ class ScoreEngine:
             ti: The threat intel providing the score
             observable: The observable to update
         """
-        # Calculate the new observable score as sum of all threat intel scores
-        total_ti_score = sum((threat.score for threat in observable.threat_intels), Decimal("0"))
-
-        # Also include scores from child observables (hierarchical relationships)
-        child_score = self._calculate_child_observable_score(observable)
-
-        new_score = total_ti_score + child_score
+        # Calculate the new observable score (includes TI scores and child scores)
+        new_score = self._calculate_observable_score(observable)
 
         if new_score != observable.score:
             observable.update_score(new_score, reason=f"Threat intel update from {ti.source}")
@@ -72,17 +81,18 @@ class ScoreEngine:
             # Propagate to linked checks
             self._propagate_observable_to_checks(observable)
 
-    def _calculate_child_observable_score(self, observable: "Observable") -> Decimal:
+    def _calculate_observable_score(self, observable: "Observable") -> Decimal:
         """
-        Calculate the total score from hierarchically inferior observables.
+        Calculate the complete observable score based on threat intel and hierarchical relationships.
 
         Args:
-            observable: The parent observable
+            observable: The observable to calculate score for
 
         Returns:
-            Total score from children
+            Calculated score based on score_mode:
+            - MAX mode: max(all TI scores, all child scores)
+            - SUM mode: max(TI scores) + sum(child scores)
         """
-        total = Decimal("0")
         hierarchical_types = {
             "resolves-to",
             "resolves-from",
@@ -91,18 +101,31 @@ class ScoreEngine:
             "downloaded-from",
             "uses",
             "communicates-with",
+            "related-to",
         }
 
+        # Get max threat intel score for this observable
+        max_ti_score = max((ti.score for ti in observable.threat_intels), default=Decimal("0"))
+
+        # Collect child observable scores recursively
+        child_scores = []
         for rel in observable.relationships:
             if rel.relationship_type in hierarchical_types:
                 child = self._observables.get(rel.target_key)
                 if child:
-                    # Recursively get child's score (includes their threat intel + their children)
-                    child_ti_score = sum((ti.score for ti in child.threat_intels), Decimal("0"))
-                    child_children_score = self._calculate_child_observable_score(child)
-                    total += child_ti_score + child_children_score
+                    # Recursively calculate child's complete score
+                    child_score = self._calculate_observable_score(child)
+                    child_scores.append(child_score)
 
-        return total
+        # Calculate final score based on mode
+        if self._score_mode == ScoreMode.MAX:
+            # MAX mode: take maximum of all scores (TI + children)
+            all_scores = [max_ti_score] + child_scores
+            return max(all_scores, default=Decimal("0"))
+        else:
+            # SUM mode: max TI score + sum of child scores
+            sum_children = sum(child_scores, Decimal("0"))
+            return max_ti_score + sum_children
 
     def _propagate_to_parent_observables(self, observable: "Observable") -> None:
         """
@@ -120,14 +143,10 @@ class ScoreEngine:
             for rel in parent_obs.relationships:
                 if rel.target_key == observable.key:
                     # Recalculate parent's score
-                    parent_ti_score = sum((ti.score for ti in parent_obs.threat_intels), Decimal("0"))
-                    parent_child_score = self._calculate_child_observable_score(parent_obs)
-                    new_parent_score = parent_ti_score + parent_child_score
+                    new_parent_score = self._calculate_observable_score(parent_obs)
 
                     if new_parent_score != parent_obs.score:
-                        parent_obs.update_score(
-                            new_parent_score, reason=f"Child observable {observable.key} updated"
-                        )
+                        parent_obs.update_score(new_parent_score, reason=f"Child observable {observable.key} updated")
                         # Recursively propagate upwards
                         self._propagate_to_parent_observables(parent_obs)
                         # Propagate to checks linked to parent
@@ -135,20 +154,29 @@ class ScoreEngine:
 
     def _propagate_observable_to_checks(self, observable: "Observable") -> None:
         """
-        Propagate observable score to linked checks if observable is MALICIOUS.
+        Propagate observable score to linked checks.
+
+        Check score is calculated as the maximum of all linked observables' scores
+        and the check's current score.
 
         Args:
             observable: The observable to check
         """
-        # If observable level is MALICIOUS (score >= 5.0), propagate to checks
-        if observable.level == Level.MALICIOUS:
-            for check in self._checks.values():
-                # Check if this observable is linked to the check (directly or through relationships)
-                if self._is_observable_linked_to_check(observable, check):
-                    # Update check score and level to match observable
-                    if check.score != observable.score or check.level != Level.MALICIOUS:
-                        check.update_score(observable.score, reason=f"Observable {observable.key} is MALICIOUS")
-                        check.set_level(Level.MALICIOUS)
+        for check in self._checks.values():
+            # Check if this observable is linked to the check (directly or through relationships)
+            if self._is_observable_linked_to_check(observable, check):
+                # Collect all linked observable scores
+                linked_scores = []
+                for obs in self._observables.values():
+                    if self._is_observable_linked_to_check(obs, check):
+                        linked_scores.append(obs.score)
+
+                # Calculate new check score as max of all linked observables and current check score
+                if linked_scores:
+                    new_check_score = max(linked_scores + [check.score])
+
+                    if new_check_score != check.score:
+                        check.update_score(new_check_score, reason=f"Linked observable {observable.key} updated")
 
     def _is_observable_linked_to_check(self, observable: "Observable", check: "Check") -> bool:
         """
@@ -212,18 +240,15 @@ class ScoreEngine:
 
         Useful after merging investigations or bulk updates.
         """
-        # First, recalculate all observables from their threat intel
+        # First, recalculate all observables from their threat intel and relationships
         for obs in self._observables.values():
-            ti_score = sum((ti.score for ti in obs.threat_intels), Decimal("0"))
-            child_score = self._calculate_child_observable_score(obs)
-            new_score = ti_score + child_score
+            new_score = self._calculate_observable_score(obs)
             if new_score != obs.score:
                 obs.update_score(new_score, reason="Recalculation")
 
-        # Then propagate to checks
+        # Then propagate to all checks (not just MALICIOUS observables)
         for obs in self._observables.values():
-            if obs.level == Level.MALICIOUS:
-                self._propagate_observable_to_checks(obs)
+            self._propagate_observable_to_checks(obs)
 
     def get_global_score(self) -> Decimal:
         """

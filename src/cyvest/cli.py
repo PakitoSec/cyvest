@@ -12,11 +12,10 @@ from pathlib import Path
 from typing import Any
 
 import click
-from logurich import logger
+from logurich import init_logger, logger
 from rich.console import Console
 
 from cyvest import __version__
-from cyvest.io_rich import display_statistics, display_summary
 from cyvest.io_serialization import load_investigation_json
 
 CONTEXT_SETTINGS = {"help_option_names": ["-h", "--help"]}
@@ -67,6 +66,9 @@ def _write_markdown(data: dict[str, Any], output_path: Path) -> None:
 @click.version_option(__version__, prog_name="Cyvest")
 def cli() -> None:
     """Cyvest - Cybersecurity Investigation Framework."""
+    init_logger("INFO")
+    logger.enable("cyvest")
+    logger.info("> [green bold]CYVEST[/green bold]")
 
 
 @cli.command()
@@ -84,11 +86,11 @@ def show(input: Path, stats: bool, graph: bool) -> None:
     """
 
     cv = load_investigation_json(input)
-    display_summary(cv, console, show_graph=graph)
+    cv.display_summary(show_graph=graph)
 
     if stats:
         logger.info("")
-        display_statistics(cv, console)
+        cv.display_statistics()
 
 
 @cli.command()
@@ -107,7 +109,7 @@ def stats(input: Path, detailed: bool) -> None:
 
     if detailed:
         logger.info("")
-        display_statistics(cv, console)
+        cv.display_statistics()
     else:
         _print_stats_overview(cv.get_statistics())
 

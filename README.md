@@ -134,7 +134,7 @@ from cyvest import RelationshipType
 # Automatically gets OUTBOUND (domain → IP)
 cv.observable_add_relationship(domain.key, ip.key, RelationshipType.RESOLVES_TO)
 
-# Automatically gets INBOUND (file ← URL) 
+# Automatically gets INBOUND (file ← URL)
 cv.observable_add_relationship(malware.key, url.key, RelationshipType.DOWNLOADED)
 
 # Automatically gets BIDIRECTIONAL (host ↔ host)
@@ -142,7 +142,7 @@ cv.observable_add_relationship(host1.key, host2.key, RelationshipType.COMMUNICAT
 
 # Can still override if needed
 cv.observable_add_relationship(
-    domain.key, ip.key, 
+    domain.key, ip.key,
     RelationshipType.RESOLVES_TO,
     RelationshipDirection.INBOUND  # explicit override
 )
@@ -204,8 +204,9 @@ with cv.container("network_analysis") as network:
 
 Scores and levels are automatically calculated and propagated:
 
-- **Threat Intel → Observable**: TI scores aggregate to observable scores
-- **Observable → Check**: MALICIOUS observables propagate to linked checks
+- **Threat Intel → Observable**: Observable score = **max** of all threat intel scores (not sum)
+- **Observable Hierarchy**: Parent observable scores include child observable scores via hierarchical relationships
+- **Observable → Check**: Check score = **max** of all linked observables' scores and check's current score
 - **Check → Global**: All check scores sum to global investigation score
 
 Score to Level mapping:

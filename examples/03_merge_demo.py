@@ -6,11 +6,16 @@ and merge them together.
 """
 
 import multiprocessing as mp
+import tempfile
 from decimal import Decimal
+from pathlib import Path
+
+from logurich import logger
 
 from cyvest import Cyvest, Level
-from cyvest.io_rich import display_summary
 from cyvest.io_serialization import save_investigation_json
+
+logger.enable("cyvest")
 
 
 def analyze_network_traffic() -> Cyvest:
@@ -76,7 +81,11 @@ def analyze_email_gateway() -> Cyvest:
     # Create email observable
     phishing_email = cv.observable_create("email", "attacker@evil.com", internal=False)
     cv.observable_add_threat_intel(
-        phishing_email.key, "email_reputation", score=Decimal("6.0"), level=Level.SUSPICIOUS, comment="Known spam source"
+        phishing_email.key,
+        "email_reputation",
+        score=Decimal("6.0"),
+        level=Level.SUSPICIOUS,
+        comment="Known spam source",
     )
 
     # Create URL from email
@@ -102,11 +111,7 @@ def analyze_email_gateway() -> Cyvest:
 
 def main() -> None:
     """Run multi-process investigation merge example."""
-    print("\n" + "=" * 80)
-    print("EXAMPLE 3: MULTI-PROCESS INVESTIGATION MERGING")
-    print("=" * 80 + "\n")
-
-    print("Step 1: Analyzing different data sources in parallel...")
+    logger.info("Step 1: Analyzing different data sources in parallel...")
 
     # In a real scenario, these would run in separate processes
     # For simplicity, we'll call them sequentially but treat them as independent
@@ -114,12 +119,13 @@ def main() -> None:
     endpoint_investigation = analyze_endpoint_logs()
     email_investigation = analyze_email_gateway()
 
-    print("✓ Network analysis complete")
-    print("✓ Endpoint analysis complete")
-    print("✓ Email analysis complete\n")
+    logger.info("✓ Network analysis complete")
+    logger.info("✓ Endpoint analysis complete")
+    logger.info("✓ Email analysis complete")
+    logger.info("")
 
     # Create main investigation and merge all sub-investigations
-    print("Step 2: Merging all investigations...")
+    logger.info("Step 2: Merging all investigations...")
     main_investigation = Cyvest(data={"type": "incident_response", "incident_id": "INC-2025-001"})
 
     main_investigation.merge_investigation(network_investigation)
@@ -138,37 +144,18 @@ def main() -> None:
     # Finalize relationships
     main_investigation.observable_finalize_relationships()
 
-    print("✓ Investigations merged successfully\n")
+    logger.info("✓ Investigations merged successfully")
+    logger.info("")
 
     # Display comprehensive summary
-    from rich.console import Console
-
-    console = Console()
-    display_summary(main_investigation, console, show_graph=True)
-
-    # Display detailed statistics
-    stats = main_investigation.get_statistics()
-    print(f"\n{'=' * 80}")
-    print("MERGED INVESTIGATION STATISTICS:")
-    print(f"{'=' * 80}")
-    print(f"  Total Observables: {stats['total_observables']}")
-    print(f"  - Internal: {stats['internal_observables']}")
-    print(f"  - External: {stats['external_observables']}")
-    print(f"  Total Checks: {stats['total_checks']}")
-    print(f"  - Applied: {stats['applied_checks']}")
-    print(f"  Total Threat Intel Queries: {stats['total_threat_intel']}")
-    print()
-    print("  Observable Types:")
-    for obs_type, count in stats.get("observables_by_type", {}).items():
-        print(f"    - {obs_type}: {count}")
-    print()
-    print(f"  Global Score: {main_investigation.get_global_score()}")
-    print(f"  Global Level: {main_investigation.get_global_level()}")
-    print(f"{'=' * 80}\n")
+    main_investigation.display_summary(show_graph=True)
 
     # Export merged investigation
-    save_investigation_json(main_investigation, "merged_investigation.json")
-    print("✓ Merged investigation saved to merged_investigation.json")
+    output_dir = Path(tempfile.mkdtemp(prefix="cyvest_example_03_"))
+    json_path = output_dir / "merged_investigation.json"
+    save_investigation_json(main_investigation, str(json_path))
+    logger.info("✓ Merged investigation saved to {}", json_path)
+    logger.info("Temporary output directory: {}", output_dir)
 
 
 if __name__ == "__main__":

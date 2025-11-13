@@ -14,7 +14,7 @@ Thank you for your interest in contributing to Cyvest! This document provides gu
    ```bash
    # Using uv (recommended)
    uv sync --all-extras
-   
+
    # Or using pip
    pip install -e ".[dev]"
    ```
@@ -165,13 +165,13 @@ def observable_create(
 ) -> Observable:
     """
     Create a new observable.
-    
+
     Args:
         obs_type: Type of observable (ip, url, domain, etc.)
         value: Value of the observable
         internal: Whether this is an internal asset
         score: Optional explicit score
-        
+
     Returns:
         The created observable
     """
@@ -195,10 +195,10 @@ def test_feature_description() -> None:
     """Test that feature behaves correctly."""
     # Arrange
     cv = Cyvest()
-    
+
     # Act
     result = cv.some_method()
-    
+
     # Assert
     assert result.expected_value == expected
 ```

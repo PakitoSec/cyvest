@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Any
 
 from cyvest.levels import Level, get_level_from_score
 from cyvest.model import Check, Container, Enrichment, Observable, ObservableType, ThreatIntel
-from cyvest.score import ScoreEngine
+from cyvest.score import ScoreEngine, ScoreMode
 from cyvest.stats import InvestigationStats
 
 if TYPE_CHECKING:
@@ -27,12 +27,13 @@ class Investigation:
     handles automatic merging on creation, score propagation, and statistics tracking.
     """
 
-    def __init__(self, root_type: str = "file") -> None:
+    def __init__(self, data: Any, root_type: str = "file", score_mode: ScoreMode = ScoreMode.MAX) -> None:
         """
         Initialize a new investigation.
 
         Args:
             root_type: Type of root observable ("file" or "artifact")
+            score_mode: Score calculation mode (MAX or SUM)
         """
         # Object collections
         self._observables: dict[str, Observable] = {}
@@ -42,7 +43,7 @@ class Investigation:
         self._containers: dict[str, Container] = {}
 
         # Internal components
-        self._score_engine = ScoreEngine()
+        self._score_engine = ScoreEngine(score_mode=score_mode)
         self._stats = InvestigationStats()
 
         # Create root observable
@@ -53,12 +54,12 @@ class Investigation:
             raise ValueError(f"root_type {root_type} is not allowed")
 
         self._root_observable = Observable(
-            obs_type=root_type,
-            value=obj_type,
+            obs_type=obj_type,
+            value="input-data",
             internal=False,
             whitelisted=False,
             comment="Root observable for investigation",
-            extra={},
+            extra=data,
             score=Decimal("0"),
             level=Level.INFO,
         )
@@ -452,9 +453,7 @@ class Investigation:
         if check and observable:
             check.add_observable(observable)
             observable.mark_generated_by_check(check_key)
-            # Propagate if observable is malicious
-            if observable.level == Level.MALICIOUS:
-                self._score_engine._propagate_observable_to_checks(observable)
+            self._score_engine._propagate_observable_to_checks(observable)
 
         return check
 
@@ -560,29 +559,76 @@ class Investigation:
         """
         Finalize observable relationships by linking orphans to root.
 
-        Any observable without parent relationships is automatically linked to root.
+        Detects orphan sub-graphs (connected components not linked to root) and links
+        the most appropriate starting node of each sub-graph to root.
         """
         from cyvest.model import RelationshipType
 
         root_key = self._root_observable.key
 
-        # Find all observables that are targets of relationships
-        targets = set()
-        for obs in self._observables.values():
+        # Build adjacency lists for graph traversal
+        graph = {key: set() for key in self._observables.keys()}
+        incoming = {key: set() for key in self._observables.keys()}
+
+        for obs_key, obs in self._observables.items():
             for rel in obs.relationships:
-                targets.add(rel.target_key)
+                if rel.target_key in self._observables:
+                    graph[obs_key].add(rel.target_key)
+                    incoming[rel.target_key].add(obs_key)
 
-        # Link orphans to root
-        for obs in self._observables.values():
-            if obs.key == root_key:
-                continue
+        # Find all connected components using BFS
+        visited = set()
+        components = []
 
-            # Check if this observable is referenced by others
-            is_referenced = obs.key in targets
+        def bfs(start_key: str) -> set[str]:
+            """Breadth-first search to find connected component."""
+            component = set()
+            queue = [start_key]
+            component.add(start_key)
 
-            # If not referenced and has no relationships, link to root
-            if not is_referenced and not obs.relationships:
-                self._root_observable.add_relationship(obs.key, RelationshipType.RELATED_TO)
+            while queue:
+                current = queue.pop(0)
+                # Check both outgoing and incoming edges for connectivity
+                neighbors = graph[current] | incoming[current]
+                for neighbor in neighbors:
+                    if neighbor not in component:
+                        component.add(neighbor)
+                        queue.append(neighbor)
+
+            return component
+
+        # Find all connected components
+        for obs_key in self._observables.keys():
+            if obs_key not in visited:
+                component = bfs(obs_key)
+                visited.update(component)
+                components.append(component)
+
+        # Process each component that doesn't include root
+        for component in components:
+            if root_key in component:
+                continue  # This component is already connected to root
+
+            # Find the best starting node in this orphan sub-graph
+            # Prioritize nodes with:
+            # 1. No incoming edges (true source nodes)
+            # 2. Most outgoing edges (central nodes)
+            best_node = None
+            best_score = (-1, -1)  # (negative incoming count, outgoing count)
+
+            for node_key in component:
+                incoming_count = len(incoming[node_key] & component)
+                outgoing_count = len(graph[node_key] & component)
+                score = (-incoming_count, outgoing_count)
+
+                if score > best_score:
+                    best_score = score
+                    best_node = node_key
+
+            # Link the best starting node to root
+            if best_node:
+                self._root_observable.add_relationship(best_node, RelationshipType.RELATED_TO)
+                self._score_engine.recalculate_all()
 
     # Investigation merging
 

@@ -1,4 +1,9 @@
+from logurich import logger
+
 from cyvest import Cyvest, ObservableType, RelationshipType
+
+logger.enable("cyvest")
+
 
 cy = Cyvest({"structured_email": {}}, root_type="artifact")
 
@@ -23,4 +28,4 @@ c = cy.check("azezae", "scope", "description", "> commento").with_score(5).get()
 
 
 cy.display_summary()
-print(cy.check_get(c.key).comment)
+logger.info(cy.check_get(c.key).comment)

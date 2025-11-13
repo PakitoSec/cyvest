@@ -10,12 +10,13 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, Literal
 
-from logurich import get_console
+from logurich import logger
 
 from cyvest.investigation import Investigation
-from cyvest.io_rich import display_summary
+from cyvest.io_rich import display_statistics, display_summary
 from cyvest.levels import Level
 from cyvest.model import Check, Container, Enrichment, Observable, ThreatIntel
+from cyvest.score import ScoreMode
 
 if TYPE_CHECKING:
     from cyvest.dsl import CheckHandler, ContainerHandler, ObservableHandler
@@ -29,16 +30,22 @@ class Cyvest:
     and containers, with automatic score propagation and statistics tracking.
     """
 
-    def __init__(self, data: Any = None, root_type: Literal["file", "artifact"] = "file") -> None:
+    def __init__(
+        self,
+        data: Any = None,
+        root_type: Literal["file", "artifact"] = "file",
+        score_mode: ScoreMode = ScoreMode.MAX,
+    ) -> None:
         """
         Initialize a new investigation.
 
         Args:
             data: The data being investigated (optional)
             root_type: Type of root observable ("file" or "artifact")
+            score_mode: Score calculation mode (MAX or SUM)
         """
         self.data = data
-        self._investigation = Investigation(root_type=root_type)
+        self._investigation = Investigation(data, root_type=root_type, score_mode=score_mode)
 
     def __enter__(self) -> Cyvest:
         """Context manager entry."""
@@ -378,6 +385,15 @@ class Cyvest:
         """
         self._investigation.merge_investigation(other._investigation)
 
+    def finalize_relationships(self) -> None:
+        """
+        Finalize observable relationships by linking orphan sub-graphs to root.
+
+        Any observable or sub-graph not connected to the root will be automatically
+        linked by finding the best starting node of each disconnected component.
+        """
+        self._investigation.finalize_relationships()
+
     def get_all_observables(self) -> dict[str, Observable]:
         """Get all observables."""
         return self._investigation.get_all_observables()
@@ -399,7 +415,10 @@ class Cyvest:
         return self._investigation.get_all_containers()
 
     def display_summary(self, show_graph: bool = True) -> None:
-        display_summary(self, get_console(), show_graph=show_graph)
+        display_summary(self, lambda renderables: logger.rich("INFO", renderables), show_graph=show_graph)
+
+    def display_statistics(self, show_graph: bool = True) -> None:
+        display_statistics(self, lambda renderables: logger.rich("INFO", renderables))
 
     # DSL methods for fluent interface
 

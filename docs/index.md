@@ -22,10 +22,15 @@ Model complete security investigations with observables (URLs, IPs, domains, has
 ### 📊 Automatic Score Propagation
 
 Scores automatically propagate through the investigation:
-- Threat intelligence → Observables
-- Observable relationships → Parent observables
-- MALICIOUS observables → Linked checks
+- Threat intelligence → Observables (using **max** of TI scores)
+- Observable relationships → Parent observables (configurable MAX or SUM mode)
+- Observables → Linked checks (check score = max of all linked observables)
 - All checks → Global investigation score
+
+**Flexible Scoring Modes:**
+- **MAX mode** (default): Conservative scoring taking the highest severity
+- **SUM mode**: Accumulative scoring for cumulative risk scenarios
+- **Score history**: Complete audit trail of all score changes with timestamps and reasons
 
 ### 🎯 Flexible Architecture
 
@@ -54,14 +59,14 @@ with Cyvest() as cv:
         .with_ti("virustotal", score=Decimal("8.5"), level=Level.MALICIOUS)
         .relate_to(cv.root(), "related-to")
     )
-    
+
     # Create check
     check = (
         cv.check("phishing_check", "email", "Analyze phishing URL")
         .link_observable(url.get())
         .with_score(Decimal("8.5"))
     )
-    
+
     print(f"Investigation Score: {cv.get_global_score()}")
     print(f"Investigation Level: {cv.get_global_level()}")
 ```

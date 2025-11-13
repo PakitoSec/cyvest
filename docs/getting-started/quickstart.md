@@ -18,7 +18,7 @@ with Cyvest(data={"type": "email_analysis"}) as cv:
         "https://fake-bank-login.com",
         internal=False
     )
-    
+
     # Add threat intelligence
     cv.observable_add_threat_intel(
         phishing_url.key,
@@ -27,7 +27,7 @@ with Cyvest(data={"type": "email_analysis"}) as cv:
         level=Level.MALICIOUS,
         comment="Known phishing site"
     )
-    
+
     # Create a check
     url_check = cv.check_create(
         "url_analysis",
@@ -35,10 +35,10 @@ with Cyvest(data={"type": "email_analysis"}) as cv:
         "Analyze URLs in email",
         score=Decimal("8.5")
     )
-    
+
     # Link observable to check
     cv.check_link_observable(url_check.key, phishing_url.key)
-    
+
     # View results
     print(f"Global Score: {cv.get_global_score()}")
     print(f"Global Level: {cv.get_global_level()}")
@@ -59,7 +59,7 @@ with Cyvest() as cv:
         .with_ti("virustotal", score=Decimal("8.5"), level=Level.MALICIOUS)
         .relate_to(cv.root(), RelationshipType.RELATED_TO)
     )
-    
+
     # Create check and link observable
     check = (
         cv.check("url_check", "analysis", "Check suspicious URL")
@@ -79,16 +79,16 @@ with Cyvest() as cv:
     # Create URL and IP with STIX2 types
     url = cv.observable_create(ObservableType.URL, "http://c2-server.com")
     ip = cv.observable_create(ObservableType.IPV4_ADDR, "192.0.2.100", internal=False)
-    
+
     # Automatically gets OUTBOUND direction (domain → IP)
     cv.observable_add_relationship(url.key, ip.key, RelationshipType.RESOLVES_TO)
-    
+
     # Using fluent API (also uses semantic defaults)
     domain = (
         cv.observable(ObservableType.DOMAIN_NAME, "c2-server.com", internal=False)
         .relate_to(ip, RelationshipType.RESOLVES_TO)  # auto: OUTBOUND
     )
-    
+
     # Automatically gets BIDIRECTIONAL for mutual communication
     host1 = cv.observable_create(ObservableType.IPV4_ADDR, "10.0.1.10", internal=True)
     host2 = cv.observable_create(ObservableType.IPV4_ADDR, "10.0.1.20", internal=True)
@@ -97,7 +97,7 @@ with Cyvest() as cv:
         host2.key,
         RelationshipType.COMMUNICATES_WITH  # auto: BIDIRECTIONAL ↔
     )
-    
+
     # Automatically gets INBOUND (file ← source)
     malware = cv.observable_create(ObservableType.FILE, "payload.exe", internal=False)
     cv.observable_add_relationship(
@@ -105,11 +105,11 @@ with Cyvest() as cv:
         url.key,
         RelationshipType.DOWNLOADED  # auto: INBOUND ←
     )
-    
+
     # Can still override defaults if needed
     from cyvest import RelationshipDirection
     cv.observable_add_relationship(
-        url.key, ip.key, 
+        url.key, ip.key,
         RelationshipType.RESOLVES_TO,
         RelationshipDirection.INBOUND  # explicit override
     )
@@ -145,11 +145,11 @@ from rich.console import Console
 
 with Cyvest() as cv:
     # ... build investigation ...
-    
+
     # Display in terminal
     console = Console()
     display_summary(cv, console)
-    
+
     # Save to files
     save_investigation_json(cv, "investigation.json")
     save_investigation_markdown(cv, "report.md")

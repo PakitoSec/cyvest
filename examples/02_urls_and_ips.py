@@ -5,11 +5,16 @@ Demonstrates investigating multiple URLs and their associated IP addresses
 with relationship tracking.
 """
 
+import tempfile
 from decimal import Decimal
+from pathlib import Path
+
+from logurich import logger
 
 from cyvest import Cyvest, Level
-from cyvest.io_rich import display_summary
 from cyvest.io_serialization import save_investigation_json
+
+logger.enable("cyvest")
 
 
 def main() -> None:
@@ -22,6 +27,7 @@ def main() -> None:
                 cv.observable("url", "http://malicious-c2.com/beacon", internal=False)
                 .with_ti("virustotal", score=Decimal("9.0"), level=Level.MALICIOUS, comment="C2 server detected")
                 .with_ti("alienvault", score=Decimal("8.5"), level=Level.MALICIOUS, comment="Known APT infrastructure")
+                .get()
             )
 
             # IP address for URL1
@@ -32,7 +38,7 @@ def main() -> None:
             )
 
             # Link URL to IP
-            url1.relate_to(ip1, "resolves-to")
+            cv.observable_add_relationship(url1.key, ip1.key, "resolves-to")
 
             # Suspicious URL 2
             url2 = (
@@ -60,19 +66,19 @@ def main() -> None:
             )
 
             # Link internal host to external URLs
-            cv.observable_add_relationship(internal_host.key, url1.get().key, "communicates-with")
+            cv.observable_add_relationship(internal_host.key, url1.key, "communicates-with")
             cv.observable_add_relationship(internal_host.key, url2.key, "communicates-with")
 
             # Create checks
             _ = (
-                cv.check("c2_detection", "network", "Detect C2 communication", score=Decimal("9.0"))
-                .link_observable(url1.get())
+                cv.check("c2_detection", "network", "Detect C2 communication")
+                .link_observable(url1)
                 .link_observable(ip1)
                 .in_container(network_ctr)
             )
 
             _ = (
-                cv.check("malware_download", "network", "Detect malware download", score=Decimal("8.0"))
+                cv.check("malware_download", "network", "Detect malware download")
                 .link_observable(url2)
                 .link_observable(ip2)
                 .in_container(network_ctr)
@@ -80,7 +86,10 @@ def main() -> None:
 
             _ = (
                 cv.check(
-                    "compromised_host", "endpoint", "Identify compromised endpoint", comment="Host made connections to known malicious infrastructure", score=Decimal("7.0")
+                    "compromised_host",
+                    "endpoint",
+                    "Identify compromised endpoint",
+                    comment="Host made connections to known malicious infrastructure",
                 )
                 .link_observable(internal_host)
                 .in_container(network_ctr)
@@ -88,32 +97,14 @@ def main() -> None:
 
         # Finalize
         cv.observable_finalize_relationships()
-
-        # Display summary
-        print("\n" + "=" * 80)
-        print("EXAMPLE 2: URLS AND IP INVESTIGATION")
-        print("=" * 80 + "\n")
-
-        from rich.console import Console
-
-        console = Console()
-        display_summary(cv, console, show_graph=True)
-
-        # Statistics
-        stats = cv.get_statistics()
-        print(f"\n{'=' * 80}")
-        print("STATISTICS:")
-        print(f"  Total Observables: {stats['total_observables']}")
-        print(f"  Internal: {stats['internal_observables']}")
-        print(f"  External: {stats['external_observables']}")
-        print(f"  Total Threat Intel Queries: {stats['total_threat_intel']}")
-        print(f"\n  Global Score: {cv.get_global_score()}")
-        print(f"  Global Level: {cv.get_global_level()}")
-        print(f"{'=' * 80}\n")
+        cv.display_summary(show_graph=True)
 
         # Export
-        save_investigation_json(cv, "urls_and_ips_investigation.json")
-        print("✓ Investigation saved to urls_and_ips_investigation.json")
+        output_dir = Path(tempfile.mkdtemp(prefix="cyvest_example_02_"))
+        json_path = output_dir / "urls_and_ips_investigation.json"
+        save_investigation_json(cv, str(json_path))
+        logger.info("✓ Investigation saved to {}", json_path)
+        logger.info("Temporary output directory: {}", output_dir)
 
 
 if __name__ == "__main__":

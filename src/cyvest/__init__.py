@@ -5,8 +5,8 @@ A Python framework for building, analyzing, and structuring cybersecurity invest
 programmatically with automatic scoring, level calculation, and rich reporting capabilities.
 """
 
-# Import DSL to activate monkey-patching
-import cyvest.dsl  # noqa: F401
+from logurich import logger
+
 from cyvest.cyvest import Cyvest
 from cyvest.levels import Level
 from cyvest.model import (
@@ -21,7 +21,9 @@ from cyvest.model import (
     ThreatIntel,
 )
 
-__version__ = "0.1.0"
+__version__ = "1.0.0"
+
+logger.disable("cyvest")
 
 __all__ = [
     "Cyvest",

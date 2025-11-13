@@ -26,33 +26,33 @@ class ObservableType(str, Enum):
     URL = "url"
     NETWORK_TRAFFIC = "network-traffic"
     MAC_ADDR = "mac-addr"
-    
+
     # File observables
     FILE = "file"
     DIRECTORY = "directory"
-    
+
     # Email observables
     EMAIL_ADDR = "email-addr"
     EMAIL_MESSAGE = "email-message"
     EMAIL_MIME_PART = "email-mime-part"
-    
+
     # Identity and account
     USER_ACCOUNT = "user-account"
-    
+
     # System observables
     PROCESS = "process"
     SOFTWARE = "software"
     WINDOWS_REGISTRY_KEY = "windows-registry-key"
-    
+
     # Artifact observables
     ARTIFACT = "artifact"
-    
+
     # Autonomous System
     AUTONOMOUS_SYSTEM = "autonomous-system"
-    
+
     # Mutex
     MUTEX = "mutex"
-    
+
     # X509 Certificate
     X509_CERTIFICATE = "x509-certificate"
 
@@ -63,15 +63,15 @@ class RelationshipType(str, Enum):
     # Network relationships
     RESOLVES_TO = "resolves-to"
     BELONGS_TO = "belongs-to"
-    
+
     # Communication relationships
     COMMUNICATES_WITH = "communicates-with"
-    
+
     # File relationships
     CONTAINS = "contains"
     DOWNLOADED = "downloaded"
     DROPPED = "dropped"
-    
+
     # Email relationships
     FROM = "from"
     SENDER = "sender"
@@ -80,28 +80,28 @@ class RelationshipType(str, Enum):
     BCC = "bcc"
     RAW_EMAIL = "raw-email"
     BODY_RAW = "body-raw"
-    
+
     # Process relationships
     CREATED = "created"
     OPENED = "opened"
     PARENT = "parent"
     CHILD = "child"
-    
+
     # General relationships
     RELATED_TO = "related-to"
     DERIVED_FROM = "derived-from"
     DUPLICATE_OF = "duplicate-of"
-    
+
     # Windows Registry
     VALUES = "values"
-    
+
     def get_default_direction(self) -> RelationshipDirection:
         """
         Get the semantically appropriate default direction for this relationship type.
-        
+
         Returns:
             The default RelationshipDirection for this relationship type
-            
+
         Examples:
             >>> RelationshipType.RESOLVES_TO.get_default_direction()
             RelationshipDirection.OUTBOUND
@@ -118,7 +118,7 @@ class RelationshipType(str, Enum):
             return RelationshipDirection.OUTBOUND  # IP → network/AS
         elif self == RelationshipType.COMMUNICATES_WITH:
             return RelationshipDirection.BIDIRECTIONAL  # mutual communication
-        
+
         # File relationships
         elif self == RelationshipType.CONTAINS:
             return RelationshipDirection.OUTBOUND  # container → item
@@ -126,7 +126,7 @@ class RelationshipType(str, Enum):
             return RelationshipDirection.INBOUND  # file ← source
         elif self == RelationshipType.DROPPED:
             return RelationshipDirection.INBOUND  # file ← dropper
-        
+
         # Email relationships
         elif self in (RelationshipType.FROM, RelationshipType.SENDER):
             return RelationshipDirection.INBOUND  # email ← sender
@@ -134,7 +134,7 @@ class RelationshipType(str, Enum):
             return RelationshipDirection.OUTBOUND  # email → recipient
         elif self in (RelationshipType.RAW_EMAIL, RelationshipType.BODY_RAW):
             return RelationshipDirection.OUTBOUND  # message → content
-        
+
         # Process relationships
         elif self == RelationshipType.CREATED:
             return RelationshipDirection.OUTBOUND  # creator → created
@@ -144,7 +144,7 @@ class RelationshipType(str, Enum):
             return RelationshipDirection.OUTBOUND  # parent → child
         elif self == RelationshipType.CHILD:
             return RelationshipDirection.INBOUND  # child ← parent
-        
+
         # General relationships
         elif self == RelationshipType.RELATED_TO:
             return RelationshipDirection.BIDIRECTIONAL  # symmetric
@@ -152,11 +152,11 @@ class RelationshipType(str, Enum):
             return RelationshipDirection.INBOUND  # derived ← source
         elif self == RelationshipType.DUPLICATE_OF:
             return RelationshipDirection.BIDIRECTIONAL  # symmetric
-        
+
         # Windows Registry
         elif self == RelationshipType.VALUES:
             return RelationshipDirection.OUTBOUND  # key → values
-        
+
         # Default fallback
         else:
             return RelationshipDirection.OUTBOUND
@@ -164,9 +164,9 @@ class RelationshipType(str, Enum):
 
 class RelationshipDirection(str, Enum):
     """Direction of a relationship between observables."""
-    
-    OUTBOUND = "outbound"      # Source → Target
-    INBOUND = "inbound"        # Source ← Target
+
+    OUTBOUND = "outbound"  # Source → Target
+    INBOUND = "inbound"  # Source ← Target
     BIDIRECTIONAL = "bidirectional"  # Source ↔ Target
 
 
@@ -269,6 +269,15 @@ class Check:
         if observable not in self.observables:
             self.observables.append(observable)
 
+    def get_score_history(self) -> list[ScoreChange]:
+        """
+        Get the score history for this check.
+
+        Returns:
+            List of score changes with timestamps, old/new scores and levels, and reasons
+        """
+        return self._score_history
+
 
 @dataclass
 class Relationship:
@@ -287,7 +296,7 @@ class Relationship:
             except ValueError:
                 # Keep as string if not a standard STIX2 relationship type
                 pass
-        
+
         # Then handle direction with smart defaults
         if self.direction is None:
             # No direction specified - use semantic default based on relationship type
@@ -305,6 +314,14 @@ class Relationship:
                     self.direction = self.relationship_type.get_default_direction()
                 else:
                     self.direction = RelationshipDirection.OUTBOUND
+
+    @property
+    def relationship_type_name(self):
+        return (
+            self.relationship_type.value
+            if isinstance(self.relationship_type, RelationshipType)
+            else self.relationship_type
+        )
 
 
 @dataclass
@@ -340,7 +357,7 @@ class Observable:
             except ValueError:
                 # Keep as string if not a standard STIX2 observable type
                 pass
-        
+
         if not self.key:
             # Use string value of obs_type for key generation
             obs_type_str = self.obs_type.value if isinstance(self.obs_type, ObservableType) else self.obs_type
@@ -403,8 +420,8 @@ class Observable:
             self.threat_intels.append(ti)
 
     def add_relationship(
-        self, 
-        target_key: str, 
+        self,
+        target_key: str,
         relationship_type: RelationshipType | str,
         direction: RelationshipDirection | str | None = None,
     ) -> None:
@@ -429,6 +446,15 @@ class Observable:
         """
         if check_key not in self._generated_by_checks:
             self._generated_by_checks.append(check_key)
+
+    def get_score_history(self) -> list[ScoreChange]:
+        """
+        Get the score history for this observable.
+
+        Returns:
+            List of score changes with timestamps, old/new scores and levels, and reasons
+        """
+        return self._score_history
 
 
 @dataclass

@@ -124,10 +124,66 @@ Each threat intel entry has:
 
 Scores are **Decimal** values with automatic propagation:
 
-1. **Threat Intel → Observable**: TI scores sum to observable score
-2. **Child Observable → Parent**: Child scores aggregate to parents
-3. **MALICIOUS Observable → Check**: Sets check to MALICIOUS
+1. **Threat Intel → Observable**: Observable score = **max** of all threat intel scores (not sum)
+2. **Child Observable → Parent**: Child scores aggregate to parents based on scoring mode
+3. **Observable → Check**: Check score = **max** of all linked observables' scores and check's current score
 4. **All Checks → Global**: Check scores sum to global score
+
+### Scoring Modes
+
+Cyvest supports two scoring modes for observable score calculation:
+
+**MAX Mode (Default):**
+- Observable score = max(all threat intel scores, all child observable scores)
+- Conservative approach - takes the highest severity indicator
+- Prevents score inflation from multiple threat intel sources
+- Best for most investigation scenarios
+
+**SUM Mode:**
+- Observable score = max(threat intel scores) + sum(child observable scores)
+- Accumulative approach - child scores add up
+- Useful when child relationships represent cumulative risk
+- Can lead to higher scores with many children
+
+```python
+from cyvest import Cyvest
+from cyvest.score import ScoreMode
+
+# Use MAX mode (default)
+cv = Cyvest(score_mode=ScoreMode.MAX)
+
+# Use SUM mode for accumulative scoring
+cv = Cyvest(score_mode=ScoreMode.SUM)
+```
+
+### Score History
+
+Every score change is automatically tracked for debugging and audit purposes:
+
+```python
+# Observable score history
+obs = cv.observable_create("ip", "10.0.0.1")
+cv.observable_add_threat_intel(obs.key, "source1", score=Decimal("5.0"))
+cv.observable_add_threat_intel(obs.key, "source2", score=Decimal("8.0"))
+
+# Get complete history
+history = obs.get_score_history()
+for change in history:
+    print(f"{change.timestamp}: {change.old_score} → {change.new_score}")
+    print(f"  Level: {change.old_level} → {change.new_level}")
+    print(f"  Reason: {change.reason}")
+
+# Check score history works the same way
+check_history = check.get_score_history()
+```
+
+**Score Change Record:**
+
+Each `ScoreChange` entry includes:
+- `timestamp`: When the change occurred
+- `old_score` / `new_score`: Score values before/after
+- `old_level` / `new_level`: Level classifications before/after
+- `reason`: Explanation of why the score changed
 
 ### Level Classification
 
@@ -241,7 +297,7 @@ from cyvest import RelationshipType
 # Automatically gets OUTBOUND (domain → IP)
 cv.observable_add_relationship(domain.key, ip.key, RelationshipType.RESOLVES_TO)
 
-# Automatically gets INBOUND (file ← URL)  
+# Automatically gets INBOUND (file ← URL)
 cv.observable_add_relationship(malware_file.key, download_url.key, RelationshipType.DOWNLOADED)
 
 # Automatically gets BIDIRECTIONAL (host ↔ host)
@@ -347,7 +403,7 @@ Cyvest uses a clean, layered architecture with automatic merge-on-create:
    - Owns all object collections
    - Handles automatic merging when objects are added
    - Integrates scoring and statistics engines
-   
+
 2. **`Cyvest`**: High-level API facade
    - User-facing interface
    - Delegates to `Investigation`

@@ -10,6 +10,7 @@ from enum import Enum
 from typing import TYPE_CHECKING
 
 from cyvest.levels import Level, get_level_from_score
+from cyvest.model import RelationshipDirection
 
 
 class ScoreMode(Enum):
@@ -29,8 +30,13 @@ class ScoreEngine:
 
     Handles:
     - Threat intel scores propagating to observables
-    - Observable scores propagating through relationships
+    - Observable scores propagating through relationships based on direction
     - Observable scores propagating to checks
+
+    Hierarchical relationships:
+    - OUTBOUND (→): source → target, target is a child of source
+    - INBOUND (←): source ← target, target is a parent of source
+    - BIDIRECTIONAL (↔): excluded from hierarchical propagation
     """
 
     def __init__(self, score_mode: ScoreMode = ScoreMode.MAX) -> None:
@@ -81,40 +87,64 @@ class ScoreEngine:
             # Propagate to linked checks
             self._propagate_observable_to_checks(observable)
 
-    def _calculate_observable_score(self, observable: "Observable") -> Decimal:
+    def _calculate_observable_score(self, observable: "Observable", visited: set[str] | None = None) -> Decimal:
         """
         Calculate the complete observable score based on threat intel and hierarchical relationships.
 
+        Hierarchical relationships are determined by direction:
+        - OUTBOUND relationships: target is a hierarchical child
+        - INBOUND relationships: not considered for child score calculation
+        - BIDIRECTIONAL relationships: excluded from hierarchy
+
         Args:
             observable: The observable to calculate score for
+            visited: Set of visited observable keys to prevent cycles
 
         Returns:
             Calculated score based on score_mode:
             - MAX mode: max(all TI scores, all child scores)
             - SUM mode: max(TI scores) + sum(child scores)
         """
-        hierarchical_types = {
-            "resolves-to",
-            "resolves-from",
-            "contains",
-            "extracted-from",
-            "downloaded-from",
-            "uses",
-            "communicates-with",
-            "related-to",
-        }
+        # Initialize visited set for cycle detection
+        if visited is None:
+            visited = set()
+
+        # Prevent infinite recursion
+        if observable.key in visited:
+            # Return only the observable's own TI score (don't recurse)
+            return max((ti.score for ti in observable.threat_intels), default=Decimal("0"))
+
+        # Mark this observable as visited
+        visited.add(observable.key)
 
         # Get max threat intel score for this observable
         max_ti_score = max((ti.score for ti in observable.threat_intels), default=Decimal("0"))
 
         # Collect child observable scores recursively
+        # Children are defined two ways:
+        # 1. Targets of this observable's OUTBOUND relationships (source → target)
+        # 2. Sources of INBOUND relationships where this observable is the target (child ← this)
         child_scores = []
+
+        # Method 1: OUTBOUND relationships from this observable
         for rel in observable.relationships:
-            if rel.relationship_type in hierarchical_types:
+            # Only OUTBOUND relationships define hierarchical children
+            if rel.direction == RelationshipDirection.OUTBOUND:
                 child = self._observables.get(rel.target_key)
                 if child:
                     # Recursively calculate child's complete score
-                    child_score = self._calculate_observable_score(child)
+                    child_score = self._calculate_observable_score(child, visited)
+                    child_scores.append(child_score)
+
+        # Method 2: Other observables with INBOUND relationships pointing to this observable
+        # If obs_x has INBOUND to this observable, then obs_x is a child
+        for other_key, other_obs in self._observables.items():
+            if other_key == observable.key:
+                continue
+            for rel in other_obs.relationships:
+                if rel.direction == RelationshipDirection.INBOUND and rel.target_key == observable.key:
+                    # other_obs has INBOUND to this observable, so other_obs is a child
+                    child_score = self._calculate_observable_score(other_obs, visited)
                     child_scores.append(child_score)
 
         # Calculate final score based on mode
@@ -131,17 +161,38 @@ class ScoreEngine:
         """
         Propagate score changes up to parent observables.
 
+        Parents are found through two mechanisms:
+        1. INBOUND relationships: source ← target (target is parent)
+        2. Other observables with OUTBOUND relationships to this observable (they are parents)
+
         Args:
             observable: The observable whose score changed
         """
-        # Find all observables that have this one as a child
+        # Method 1: Find parents through INBOUND relationships
+        # For INBOUND: source ← target, target is the parent
+        for rel in observable.relationships:
+            if rel.direction == RelationshipDirection.INBOUND:
+                parent_obs = self._observables.get(rel.target_key)
+                if parent_obs and parent_obs.key != observable.key:
+                    # Recalculate parent's score
+                    new_parent_score = self._calculate_observable_score(parent_obs)
+
+                    if new_parent_score != parent_obs.score:
+                        parent_obs.update_score(new_parent_score, reason=f"Child observable {observable.key} updated")
+                        # Recursively propagate upwards
+                        self._propagate_to_parent_observables(parent_obs)
+                        # Propagate to checks linked to parent
+                        self._propagate_observable_to_checks(parent_obs)
+
+        # Method 2: Find observables that have OUTBOUND relationships TO this observable
+        # Those observables are parents (they point to this observable as their child)
         for parent_key, parent_obs in self._observables.items():
             if parent_key == observable.key:
                 continue
 
-            # Check if parent has a relationship to this observable
+            # Check if parent has an OUTBOUND relationship to this observable
             for rel in parent_obs.relationships:
-                if rel.target_key == observable.key:
+                if rel.direction == RelationshipDirection.OUTBOUND and rel.target_key == observable.key:
                     # Recalculate parent's score
                     new_parent_score = self._calculate_observable_score(parent_obs)
 

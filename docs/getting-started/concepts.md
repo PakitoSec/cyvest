@@ -179,6 +179,144 @@ check_history = check.get_score_history()
 
 **Score Change Record:**
 
+- Timestamp
+- Old/new score values
+- Old/new level values
+- Reason for change (which TI source, which child updated, etc.)
+
+### Hierarchical Score Propagation
+
+Cyvest uses **relationship directions** to determine parent-child hierarchies for score propagation. The direction of a relationship defines whether scores flow upward (to parents) or not.
+
+**Direction-Based Hierarchy:**
+
+- **OUTBOUND (→)**: `source → target` — Target is a **child** of source
+  - Source observable's score includes child's score
+  - Scores propagate **upward** from child to parent
+  
+- **INBOUND (←)**: `source ← target` — Target is a **parent** of source
+  - Target observable's score includes source's score  
+  - Scores propagate **upward** from source to target
+
+- **BIDIRECTIONAL (↔)**: `source ↔ target` — **No hierarchy**
+  - Symmetric relationship
+  - Scores do **NOT** propagate hierarchically
+  - Each observable maintains independent score
+
+**Score Formula:**
+
+For any observable, the score is calculated as:
+
+```
+score = max(max(threat-intel-scores), max(child-observable-scores))
+```
+
+Or in SUM mode:
+
+```
+score = max(threat-intel-scores) + sum(child-observable-scores)
+```
+
+**Children** are determined by OUTBOUND relationships only. BIDIRECTIONAL relationships are excluded from hierarchy.
+
+**Examples:**
+
+```python
+from cyvest import Cyvest, RelationshipDirection, RelationshipType
+from decimal import Decimal
+
+cv = Cyvest()
+
+# Example 1: OUTBOUND - Domain → IP (IP is child)
+domain = cv.observable_create("domain", "malware.com")
+cv.observable_add_threat_intel(domain.key, "virustotal", score=Decimal("2.0"))
+
+ip = cv.observable_create("ip", "198.51.100.42")
+cv.observable_add_threat_intel(ip.key, "abuseipdb", score=Decimal("8.0"))
+
+# Domain resolves to IP (OUTBOUND by default)
+cv.observable_add_relationship(domain.key, ip.key, RelationshipType.RESOLVES_TO)
+
+# Result: domain score = max(2.0, 8.0) = 8.0 (includes child IP score)
+print(f"Domain score: {domain.score}")  # 8.0
+print(f"IP score: {ip.score}")          # 8.0
+
+
+# Example 2: INBOUND - File ← URL (URL is parent)
+malware = cv.observable_create("file", "trojan.exe")
+cv.observable_add_threat_intel(malware.key, "av", score=Decimal("9.0"))
+
+url = cv.observable_create("url", "http://evil.com/payload")
+cv.observable_add_threat_intel(url.key, "urlscan", score=Decimal("3.0"))
+
+# File downloaded from URL (INBOUND by default for DOWNLOADED)
+cv.observable_add_relationship(malware.key, url.key, RelationshipType.DOWNLOADED)
+
+# Result: URL is parent, gets file's score
+print(f"File score: {malware.score}")  # 9.0
+print(f"URL score: {url.score}")        # 9.0 (includes child file score)
+
+
+# Example 3: BIDIRECTIONAL - No hierarchy
+host1 = cv.observable_create("ip", "10.0.1.10")
+cv.observable_add_threat_intel(host1.key, "ids", score=Decimal("7.0"))
+
+host2 = cv.observable_create("ip", "10.0.1.20") 
+cv.observable_add_threat_intel(host2.key, "ids", score=Decimal("2.0"))
+
+# Hosts communicate (BIDIRECTIONAL by default)
+cv.observable_add_relationship(host1.key, host2.key, RelationshipType.COMMUNICATES_WITH)
+
+# Result: No hierarchical propagation, each keeps own score
+print(f"Host1 score: {host1.score}")  # 7.0
+print(f"Host2 score: {host2.score}")  # 2.0
+
+
+# Example 4: Override semantic defaults
+domain2 = cv.observable_create("domain", "example.com")
+cv.observable_add_threat_intel(domain2.key, "source", score=Decimal("1.0"))
+
+ip2 = cv.observable_create("ip", "192.0.2.1")
+cv.observable_add_threat_intel(ip2.key, "source", score=Decimal("5.0"))
+
+# Override RESOLVES_TO to BIDIRECTIONAL (no hierarchy)
+cv.observable_add_relationship(
+    domain2.key, ip2.key, 
+    RelationshipType.RESOLVES_TO,
+    RelationshipDirection.BIDIRECTIONAL
+)
+
+# Result: No propagation due to override
+print(f"Domain score: {domain2.score}")  # 1.0
+print(f"IP score: {ip2.score}")          # 5.0
+```
+
+**Multi-Level Hierarchy:**
+
+Score propagation works recursively through multiple levels:
+
+```python
+# Grandparent → Parent → Child hierarchy
+grandparent = cv.observable_create("domain", "root.com")
+cv.observable_add_threat_intel(grandparent.key, "source1", score=Decimal("1.0"))
+
+parent = cv.observable_create("domain", "sub.root.com")
+cv.observable_add_threat_intel(parent.key, "source2", score=Decimal("2.0"))
+
+child = cv.observable_create("ip", "203.0.113.10")
+cv.observable_add_threat_intel(child.key, "source3", score=Decimal("9.0"))
+
+cv.observable_add_relationship(grandparent.key, parent.key, "resolves-to")
+cv.observable_add_relationship(parent.key, child.key, "resolves-to")
+
+# Scores propagate all the way up:
+# child = 9.0
+# parent = max(2.0, 9.0) = 9.0
+# grandparent = max(1.0, 9.0) = 9.0
+```
+
+**Score Change Record:**
+
 Each `ScoreChange` entry includes:
 - `timestamp`: When the change occurred
 - `old_score` / `new_score`: Score values before/after

@@ -1,10 +1,13 @@
 """
-Example demonstrating relationship direction feature.
+Example demonstrating relationship direction feature and score propagation.
 
 This example shows how to use the new direction parameter for relationships:
-- OUTBOUND: Source → Target (default)
-- INBOUND: Source ← Target
-- BIDIRECTIONAL: Source ↔ Target
+- OUTBOUND: Source → Target (child relationship, scores propagate up)
+- INBOUND: Source ← Target (parent relationship, scores propagate up)
+- BIDIRECTIONAL: Source ↔ Target (no hierarchical propagation)
+
+It also demonstrates how relationship directions affect score propagation
+in the hierarchical scoring model.
 """
 
 import tempfile
@@ -96,6 +99,43 @@ with Cyvest() as inv:
     logger.info(f"• Domain → IP: [green]{RelationshipDirection.OUTBOUND.value}[/green] (DNS resolution)")
     logger.info(f"• Host1 ↔ Host2: [yellow]{RelationshipDirection.BIDIRECTIONAL.value}[/yellow] (Mutual communication)")
     logger.info(f"• Malware ← Domain: [red]{RelationshipDirection.INBOUND.value}[/red] (Downloaded from)")
+
+    # Show score propagation based on directions
+    logger.info("[bold]Score Propagation Analysis:[/bold]")
+
+    logger.info("[bold green]OUTBOUND Example (Domain → IP):[/bold green]")
+    logger.info("  • Domain TI score: 7.5")
+    logger.info("  • IP TI score: 8.0")
+    logger.info("  • Domain has OUTBOUND to IP (IP is child)")
+    logger.info(f"  • Domain score = max(7.5, 8.0) = [bold]{domain.score}[/bold] ✓")
+    logger.info("  • Score flows UP from child (IP) to parent (Domain)")
+
+    logger.info("[bold red]INBOUND Example (Malware ← Domain):[/bold red]")
+    logger.info("  • Malware TI score: 9.5")
+    logger.info("  • Domain (original) TI score: 7.5")
+    logger.info("  • Malware has INBOUND to Domain (Domain is parent)")
+    logger.info(f"  • Domain score includes malware = max(7.5, 9.5, 8.0) = [bold]{domain.score}[/bold] ✓")
+    logger.info("  • Score flows UP from source (Malware) to target (Domain)")
+
+    logger.info("[bold yellow]BIDIRECTIONAL Example (Host1 ↔ Host2):[/bold yellow]")
+    logger.info("  • Host1 TI score: 0")
+    logger.info("  • Host2 TI score: 0")
+    logger.info("  • BIDIRECTIONAL relationship (no hierarchy)")
+    logger.info(f"  • Host1 score = {host1.score} (no propagation) ✓")
+    logger.info(f"  • Host2 score = {host2.score} (no propagation) ✓")
+    logger.info("  • Scores do NOT propagate hierarchically")
+
+    logger.info("[bold magenta]Complex Chain (URL → Domain, URL → Malware):[/bold magenta]")
+    logger.info("  • URL has OUTBOUND to Domain and Malware (both are children)")
+    logger.info("  • URL TI score: 8.5")
+    logger.info(f"  • URL score = max(8.5, domain=9.5, malware=9.5) = [bold]{url.score}[/bold] ✓")
+    logger.info("  • Multi-level propagation: IP → Domain → URL")
+
+    logger.info("[bold]Key Takeaways:[/bold]")
+    logger.info("  1. OUTBOUND (→): Target is child, scores propagate to source")
+    logger.info("  2. INBOUND (←): Target is parent, scores propagate to target")
+    logger.info("  3. BIDIRECTIONAL (↔): No hierarchical propagation")
+    logger.info("  4. Scores cascade through multiple levels automatically")
 
     # Save investigation
     output_dir = Path(tempfile.mkdtemp(prefix="cyvest_example_06_"))

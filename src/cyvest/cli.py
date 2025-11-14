@@ -218,6 +218,100 @@ def export(input: Path, output: Path, export_format: str) -> None:
     logger.info(f"[green]Exported to Markdown: {output_path}[/green]")
 
 
+@cli.command()
+@click.argument("input", type=click.Path(exists=True, dir_okay=False, path_type=Path))
+@click.option(
+    "--output-dir",
+    type=click.Path(file_okay=False, path_type=Path),
+    help="Directory to save HTML file (defaults to temporary directory).",
+)
+@click.option(
+    "--no-browser",
+    is_flag=True,
+    help="Do not automatically open the visualization in a browser.",
+)
+@click.option(
+    "--min-level",
+    type=click.Choice(["TRUSTED", "INFO", "SAFE", "NOTABLE", "SUSPICIOUS", "MALICIOUS"], case_sensitive=False),
+    help="Minimum security level to include in the visualization.",
+)
+@click.option(
+    "--types",
+    help="Comma-separated list of observable types to include (e.g., 'ipv4-addr,domain-name').",
+)
+@click.option(
+    "--title",
+    default="Cyvest Investigation Network",
+    show_default=True,
+    help="Title for the network graph.",
+)
+@click.option(
+    "--physics",
+    is_flag=True,
+    help="Enable physics simulation for organic layout (default: static layout).",
+)
+@click.option(
+    "--group-by-type",
+    is_flag=True,
+    help="Group observables by type using hierarchical layout.",
+)
+def visualize(
+    input: Path,
+    output_dir: Path | None,
+    no_browser: bool,
+    min_level: str | None,
+    types: str | None,
+    title: str,
+    physics: bool,
+    group_by_type: bool,
+) -> None:
+    """
+    Generate an interactive network graph visualization of an investigation.
+
+    This command creates an HTML file with a pyvis network graph showing
+    observables as nodes (colored by level, sized by score, shaped by type)
+    and relationships as edges (colored by direction, labeled by type).
+
+    The visualization is saved to a temporary directory by default, or to
+    the specified output directory. The HTML file automatically opens in
+    your default browser unless --no-browser is specified.
+    """
+    from cyvest.levels import Level
+
+    cv = load_investigation_json(input)
+
+    # Parse min_level if provided
+    min_level_enum = None
+    if min_level is not None:
+        min_level_enum = Level[min_level.upper()]
+
+    # Parse observable types if provided
+    observable_types = None
+    if types is not None:
+        observable_types = [t.strip() for t in types.split(",")]
+
+    # Convert output_dir to string if provided
+    output_dir_str = str(output_dir.resolve()) if output_dir is not None else None
+
+    # Generate visualization
+    logger.info(f"[cyan]Generating network visualization for: {input}[/cyan]")
+
+    html_path = cv.display_network(
+        output_dir=output_dir_str,
+        open_browser=not no_browser,
+        min_level=min_level_enum,
+        observable_types=observable_types,
+        title=title,
+        physics=physics,
+        group_by_type=group_by_type,
+    )
+
+    logger.info(f"[green]✓ Visualization saved to: {html_path}[/green]")
+
+    if not no_browser:
+        logger.info("[cyan]Opening visualization in browser...[/cyan]")
+
+
 def main() -> None:
     """Entry point used by the console script."""
     cli()

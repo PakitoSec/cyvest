@@ -8,6 +8,8 @@ loguru==0.7.3
     # via logurich
 markdown-it-py==4.0.0
     # via rich
+pyvis>=0.3.2
+    # via cyvest (pyproject.toml)
 mdurl==0.1.2
     # via markdown-it-py
 pygments==2.19.2

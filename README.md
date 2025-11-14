@@ -126,27 +126,47 @@ cv.observable_add_relationship(
 
 **Relationship Direction:**
 
-Relationships support directional semantics with **automatic semantic defaults**:
+Relationships support directional semantics with **automatic semantic defaults** that determine **hierarchical score propagation**:
 
 ```python
-from cyvest import RelationshipType
+from cyvest import RelationshipType, RelationshipDirection
 
 # Automatically gets OUTBOUND (domain → IP)
+# IP is a child of domain, IP's score propagates UP to domain
 cv.observable_add_relationship(domain.key, ip.key, RelationshipType.RESOLVES_TO)
 
-# Automatically gets INBOUND (file ← URL)
+# Automatically gets INBOUND (file ← URL)  
+# URL is parent of file, file's score propagates UP to URL
 cv.observable_add_relationship(malware.key, url.key, RelationshipType.DOWNLOADED)
 
 # Automatically gets BIDIRECTIONAL (host ↔ host)
+# No hierarchical propagation - scores remain independent
 cv.observable_add_relationship(host1.key, host2.key, RelationshipType.COMMUNICATES_WITH)
 
-# Can still override if needed
+# Can override semantic defaults if needed
 cv.observable_add_relationship(
     domain.key, ip.key,
     RelationshipType.RESOLVES_TO,
     RelationshipDirection.INBOUND  # explicit override
 )
 ```
+
+**Direction-Based Hierarchical Scoring:**
+
+Relationship directions define parent-child hierarchies for score propagation:
+
+- **OUTBOUND (→)**: `source → target` — Target is a **child** of source
+  - Source's score includes child's score: `score = max(TI_scores, child_scores)`
+  - Example: `domain → IP` means IP score flows up to domain
+  
+- **INBOUND (←)**: `source ← target` — Target is a **parent** of source
+  - Target's score includes source's score
+  - Example: `file ← URL` means file score flows up to URL
+  
+- **BIDIRECTIONAL (↔)**: `source ↔ target` — **No hierarchy**
+  - Scores do NOT propagate between observables
+  - Each maintains independent score from its own threat intel
+  - Example: `host1 ↔ host2` keeps separate scores
 
 **Semantic Default Directions:**
 
@@ -155,7 +175,7 @@ Each relationship type has an intuitive default direction:
 - **INBOUND (←)**: `DOWNLOADED`, `DROPPED`, `FROM`, `SENDER`, `CHILD`, `DERIVED_FROM`
 - **BIDIRECTIONAL (↔)**: `COMMUNICATES_WITH`, `RELATED_TO`, `DUPLICATE_OF`
 
-Direction symbols appear in visualizations and markdown exports.
+Direction symbols appear in visualizations, markdown exports, and determine score flow.
 
 ### Checks
 
@@ -205,7 +225,10 @@ with cv.container("network_analysis") as network:
 Scores and levels are automatically calculated and propagated:
 
 - **Threat Intel → Observable**: Observable score = **max** of all threat intel scores (not sum)
-- **Observable Hierarchy**: Parent observable scores include child observable scores via hierarchical relationships
+- **Observable Hierarchy**: Parent observable scores include child observable scores based on relationship direction:
+  - **OUTBOUND relationships**: target scores propagate to source (source is parent)
+  - **INBOUND relationships**: source scores propagate to target (target is parent)
+  - **BIDIRECTIONAL relationships**: no hierarchical propagation
 - **Observable → Check**: Check score = **max** of all linked observables' scores and check's current score
 - **Check → Global**: All check scores sum to global investigation score
 
@@ -372,10 +395,5 @@ Cyvest is designed for:
 
 ## Future Enhancements
 
-- Deserialization from JSON back to Cyvest objects
 - Database persistence layer
-- REST API server
-- Web UI for investigation visualization
 - Additional export formats (PDF, HTML)
-- Integration plugins for security tools
-- Graph visualization with NetworkX

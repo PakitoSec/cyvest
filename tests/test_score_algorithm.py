@@ -334,3 +334,172 @@ def test_score_propagation_updates_parent() -> None:
     assert child.score == Decimal("8.0")
     assert parent.score == Decimal("8.0")
     assert parent.level == Level.MALICIOUS
+
+
+def test_inbound_relationship_propagation() -> None:
+    """Test that INBOUND relationships correctly identify parents for score propagation."""
+    from cyvest import RelationshipDirection
+    
+    cv = Cyvest(score_mode=ScoreMode.MAX)
+    
+    # Create file with INBOUND relationship to URL (file ← URL means URL is parent)
+    malware_file = cv.observable_create("file", "malware.exe")
+    cv.observable_add_threat_intel(malware_file.key, source="av", score=Decimal("9.0"))
+    
+    download_url = cv.observable_create("url", "http://evil.com/malware.exe")
+    cv.observable_add_threat_intel(download_url.key, source="urlscan", score=Decimal("2.0"))
+    
+    # Add INBOUND relationship: file ← URL (URL downloaded the file, URL is parent)
+    cv.observable_add_relationship(malware_file.key, download_url.key, "downloaded", RelationshipDirection.INBOUND)
+    
+    # File has INBOUND to URL, so URL is parent and should get file's score
+    # URL score = max(2.0, 9.0) = 9.0
+    assert malware_file.score == Decimal("9.0")
+    assert download_url.score == Decimal("9.0")
+    assert download_url.level == Level.MALICIOUS
+
+
+def test_bidirectional_relationship_no_propagation() -> None:
+    """Test that BIDIRECTIONAL relationships do not participate in hierarchical score propagation."""
+    from cyvest import RelationshipDirection
+    
+    cv = Cyvest(score_mode=ScoreMode.MAX)
+    
+    # Create two hosts with bidirectional communication
+    host1 = cv.observable_create("ip", "10.0.1.10")
+    cv.observable_add_threat_intel(host1.key, source="ids", score=Decimal("8.0"))
+    
+    host2 = cv.observable_create("ip", "10.0.1.20")
+    cv.observable_add_threat_intel(host2.key, source="ids", score=Decimal("1.0"))
+    
+    # Add BIDIRECTIONAL relationship (symmetric, no hierarchy)
+    cv.observable_add_relationship(host1.key, host2.key, "communicates-with", RelationshipDirection.BIDIRECTIONAL)
+    
+    # Bidirectional relationships should NOT propagate scores hierarchically
+    # Each host keeps only its own TI score
+    assert host1.score == Decimal("8.0")
+    assert host2.score == Decimal("1.0")
+
+
+def test_outbound_vs_inbound_direction_semantics() -> None:
+    """Test that OUTBOUND and INBOUND create opposite parent-child relationships."""
+    from cyvest import RelationshipDirection
+    
+    cv = Cyvest(score_mode=ScoreMode.MAX)
+    
+    # Scenario 1: OUTBOUND - domain → IP (IP is child of domain)
+    domain1 = cv.observable_create("domain", "example1.com")
+    cv.observable_add_threat_intel(domain1.key, source="source1", score=Decimal("1.0"))
+    
+    ip1 = cv.observable_create("ip", "1.1.1.1")
+    cv.observable_add_threat_intel(ip1.key, source="source2", score=Decimal("7.0"))
+    
+    cv.observable_add_relationship(domain1.key, ip1.key, "resolves-to", RelationshipDirection.OUTBOUND)
+    
+    # Domain has OUTBOUND to IP, so IP is child, domain gets child's score
+    # domain1 score = max(1.0, 7.0) = 7.0
+    assert domain1.score == Decimal("7.0")
+    assert ip1.score == Decimal("7.0")
+    
+    # Scenario 2: INBOUND - domain ← IP (IP is parent of domain)
+    domain2 = cv.observable_create("domain", "example2.com")
+    cv.observable_add_threat_intel(domain2.key, source="source3", score=Decimal("8.0"))
+    
+    ip2 = cv.observable_create("ip", "2.2.2.2")
+    cv.observable_add_threat_intel(ip2.key, source="source4", score=Decimal("2.0"))
+    
+    cv.observable_add_relationship(domain2.key, ip2.key, "resolves-to", RelationshipDirection.INBOUND)
+    
+    # Domain has INBOUND to IP, so IP is parent, IP gets domain's score
+    # ip2 score = max(2.0, 8.0) = 8.0
+    assert domain2.score == Decimal("8.0")
+    assert ip2.score == Decimal("8.0")
+
+
+def test_mixed_directions_in_hierarchy() -> None:
+    """Test score propagation with mixed OUTBOUND and INBOUND relationships."""
+    from cyvest import RelationshipDirection
+    
+    cv = Cyvest(score_mode=ScoreMode.MAX)
+    
+    # Create a chain: A → B ← C
+    # A has OUTBOUND to B (B is child of A)
+    # C has INBOUND to B (B is parent of C)
+    
+    obs_a = cv.observable_create("domain", "a.com")
+    cv.observable_add_threat_intel(obs_a.key, source="source1", score=Decimal("2.0"))
+    
+    obs_b = cv.observable_create("ip", "1.1.1.1")
+    cv.observable_add_threat_intel(obs_b.key, source="source2", score=Decimal("3.0"))
+    
+    obs_c = cv.observable_create("url", "http://c.com")
+    cv.observable_add_threat_intel(obs_c.key, source="source3", score=Decimal("9.0"))
+    
+    # A → B (B is child of A)
+    cv.observable_add_relationship(obs_a.key, obs_b.key, "resolves-to", RelationshipDirection.OUTBOUND)
+    
+    # C has INBOUND to B (B is parent of C)
+    cv.observable_add_relationship(obs_c.key, obs_b.key, "related-to", RelationshipDirection.INBOUND)
+    
+    # obs_c score = 9.0 (its own TI)
+    # obs_b is parent of obs_c, so gets max(3.0, 9.0) = 9.0
+    # obs_a has obs_b as child, so gets max(2.0, 9.0) = 9.0
+    assert obs_c.score == Decimal("9.0")
+    assert obs_b.score == Decimal("9.0")
+    assert obs_a.score == Decimal("9.0")
+
+
+def test_explicit_direction_override() -> None:
+    """Test that explicitly setting direction overrides semantic defaults."""
+    from cyvest import RelationshipDirection, RelationshipType
+    
+    cv = Cyvest(score_mode=ScoreMode.MAX)
+    
+    # RESOLVES_TO normally defaults to OUTBOUND, but we can override
+    domain = cv.observable_create("domain", "override.com")
+    cv.observable_add_threat_intel(domain.key, source="source1", score=Decimal("1.0"))
+    
+    ip = cv.observable_create("ip", "3.3.3.3")
+    cv.observable_add_threat_intel(ip.key, source="source2", score=Decimal("8.0"))
+    
+    # Override RESOLVES_TO to be BIDIRECTIONAL (no hierarchy)
+    cv.observable_add_relationship(domain.key, ip.key, RelationshipType.RESOLVES_TO, RelationshipDirection.BIDIRECTIONAL)
+    
+    # Bidirectional means no hierarchical propagation
+    # Each keeps only its own score
+    assert domain.score == Decimal("1.0")
+    assert ip.score == Decimal("8.0")
+    
+    # Verify the relationship has BIDIRECTIONAL direction
+    assert domain.relationships[0].direction == RelationshipDirection.BIDIRECTIONAL
+
+
+def test_sum_mode_with_direction_based_children() -> None:
+    """Test SUM mode score calculation with direction-based child detection."""
+    from cyvest import RelationshipDirection
+    
+    cv = Cyvest(score_mode=ScoreMode.SUM)
+    
+    # Parent with multiple children via OUTBOUND relationships
+    parent = cv.observable_create("domain", "parent.com")
+    cv.observable_add_threat_intel(parent.key, source="source1", score=Decimal("1.0"))
+    
+    child1 = cv.observable_create("ip", "1.1.1.1")
+    cv.observable_add_threat_intel(child1.key, source="source2", score=Decimal("3.0"))
+    
+    child2 = cv.observable_create("ip", "2.2.2.2")
+    cv.observable_add_threat_intel(child2.key, source="source3", score=Decimal("5.0"))
+    
+    # Add OUTBOUND relationships
+    cv.observable_add_relationship(parent.key, child1.key, "resolves-to", RelationshipDirection.OUTBOUND)
+    cv.observable_add_relationship(parent.key, child2.key, "resolves-to", RelationshipDirection.OUTBOUND)
+    
+    # Also add one BIDIRECTIONAL that should be ignored
+    noise_obs = cv.observable_create("ip", "9.9.9.9")
+    cv.observable_add_threat_intel(noise_obs.key, source="source4", score=Decimal("100.0"))
+    cv.observable_add_relationship(parent.key, noise_obs.key, "related-to", RelationshipDirection.BIDIRECTIONAL)
+    
+    # In SUM mode: parent score = max(parent TI=1.0) + sum(OUTBOUND children = 3.0 + 5.0) = 9.0
+    # BIDIRECTIONAL relationship should NOT contribute
+    assert parent.score == Decimal("9.0")
+    assert noise_obs.score == Decimal("100.0")  # Keeps its own score

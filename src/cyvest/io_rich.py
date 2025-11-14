@@ -146,10 +146,7 @@ def display_summary(cv: Cyvest, rich_print: Callable[[Any], None], show_graph: b
 
     # Observable graph (if requested)
     if show_graph and cv.get_all_observables():
-        rich_print("")
-        rich_print("[bold cyan]Observable Graph[/bold cyan]")
-
-        tree = Tree("[bold]Investigation Observables[/bold]", hide_root=True)
+        tree = Tree("Observables", hide_root=True)
 
         # Precompute reverse relationships so we can traverse observables that only
         # appear as targets (e.g., child → parent links).

@@ -420,6 +420,57 @@ class Cyvest:
     def display_statistics(self, show_graph: bool = True) -> None:
         display_statistics(self, lambda renderables: logger.rich("INFO", renderables))
 
+    def display_network(
+        self,
+        output_dir: str | None = None,
+        open_browser: bool = True,
+        min_level: Level | None = None,
+        observable_types: list[str] | None = None,
+        physics: bool = False,
+        group_by_type: bool = False,
+    ) -> str:
+        """
+        Generate and display an interactive network graph visualization.
+
+        Creates an HTML file with a pyvis network graph showing observables as nodes
+        (colored by level, sized by score, shaped by type) and relationships as edges
+        (colored by direction, labeled by type).
+
+        Args:
+            output_dir: Directory to save HTML file (defaults to temp directory)
+            open_browser: Whether to automatically open the HTML file in a browser
+            min_level: Minimum security level to include (filters out lower levels)
+            observable_types: List of observable types to include (filters out others)
+            physics: Enable physics simulation for organic layout (default: False for static layout)
+            group_by_type: Group observables by type using hierarchical layout (default: False)
+
+        Returns:
+            Path to the generated HTML file
+
+        Examples:
+            >>> with Cyvest() as cv:
+            ...     # Create investigation with observables
+            ...     cv.display_network()
+            '/tmp/cyvest_12345/cyvest_network.html'
+        """
+        from cyvest.io_visualization import generate_network_graph
+        from cyvest.model import ObservableType
+
+        # Convert string types to ObservableType enums if provided
+        obs_types_enum = None
+        if observable_types is not None:
+            obs_types_enum = [ObservableType(t) for t in observable_types]
+
+        return generate_network_graph(
+            self,
+            output_dir=output_dir,
+            open_browser=open_browser,
+            min_level=min_level,
+            observable_types=obs_types_enum,
+            physics=physics,
+            group_by_type=group_by_type,
+        )
+
     # DSL methods for fluent interface
 
     def observable(

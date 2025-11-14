@@ -84,7 +84,6 @@ def show(input: Path, stats: bool, graph: bool) -> None:
     """
     Display an investigation from a JSON file.
     """
-
     cv = load_investigation_json(input)
     cv.display_summary(show_graph=graph)
 
@@ -102,7 +101,7 @@ def stats(input: Path, detailed: bool) -> None:
     """
 
     cv = load_investigation_json(input)
-    logger.info(f"[cyan]Statistics for: {input}[/cyan]\n")
+    logger.info(f"[cyan]Statistics for: {input}[/cyan]")
     logger.info("[bold]Overview:[/bold]")
     logger.info("  Global Score: {}", cv.get_global_score())
     logger.info("  Global Level: {}", cv.get_global_level())

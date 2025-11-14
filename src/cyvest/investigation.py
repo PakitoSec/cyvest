@@ -98,7 +98,10 @@ class Investigation:
             existing.set_level(incoming.level)
 
         # Update extra (merge dictionaries)
-        existing.extra.update(incoming.extra)
+        if existing.extra:
+            existing.extra.update(incoming.extra)
+        elif incoming.extra:
+            existing.extra = dict().update(incoming.extra)
 
         # Concatenate comments
         if incoming.comment:

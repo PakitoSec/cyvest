@@ -360,7 +360,7 @@ def load_investigation_json(filepath: str | Path) -> Cyvest:
     cv = Cyvest(data=data.get("data"))
 
     # Reset internal state to avoid default root pollution
-    cv._investigation = Investigation(root_type="file")
+    cv._investigation = Investigation(data.get("data"), root_type="file")
 
     def _level_from_name(name: str | None, default: Level) -> Level:
         if not name:

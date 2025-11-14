@@ -13,6 +13,7 @@ from typing import Any
 
 import click
 from logurich import init_logger, logger
+from logurich.opt_click import click_logger_params
 from rich.console import Console
 
 from cyvest import __version__
@@ -63,6 +64,7 @@ def _write_markdown(data: dict[str, Any], output_path: Path) -> None:
 
 
 @click.group(context_settings=CONTEXT_SETTINGS)
+@click_logger_params
 @click.version_option(__version__, prog_name="Cyvest")
 def cli() -> None:
     """Cyvest - Cybersecurity Investigation Framework."""

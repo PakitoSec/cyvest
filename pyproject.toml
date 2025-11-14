@@ -8,7 +8,12 @@ license = { text = "MIT" }
 authors = [
     { name = "PakitoSec", email = "jeromep83@gmail.com" }
 ]
-dependencies = ["click>=8", "logurich>=0.1", "pyvis>=0.3.2", "rich>=13"]
+dependencies = [
+    "click>=8",
+    "logurich[click]>=0.1",
+    "pyvis>=0.3.2",
+    "rich>=13",
+]
 keywords = ["cybersecurity", "investigation", "threat-intel", "security-analysis"]
 classifiers = [
     "Development Status :: 4 - Beta",

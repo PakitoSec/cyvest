@@ -4,9 +4,7 @@ repos:
     hooks:
       - id: check-yaml
       - id: end-of-file-fixer
-        exclude: "^(spam_assassin|email_samples)"
       - id: trailing-whitespace
-        exclude: "^(spam_assassin|email_samples)"
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.13.0
     hooks:

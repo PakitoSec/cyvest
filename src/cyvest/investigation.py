@@ -71,7 +71,7 @@ class Investigation:
 
     # Private merge methods
 
-    def _merge_observable(self, existing: Observable, incoming: Observable) -> Observable:
+    def _merge_observable(self, existing: Observable, incoming: Observable) -> tuple[Observable, list]:
         """
         Merge an incoming observable into an existing observable.
 
@@ -81,7 +81,7 @@ class Investigation:
         - Update extra (merge dicts)
         - Concatenate comments
         - Merge threat intels
-        - Merge relationships
+        - Merge relationships (defer if target missing)
         - Merge generated_by_checks
 
         Args:
@@ -89,7 +89,7 @@ class Investigation:
             incoming: The incoming observable to merge
 
         Returns:
-            The merged observable (existing is modified in place)
+            Tuple of (merged observable, deferred relationships)
         """
         # Take the higher score
         if incoming.score > existing.score:
@@ -124,17 +124,15 @@ class Investigation:
             if ti.key not in existing_ti_keys:
                 existing.add_threat_intel(ti)
 
-        # Merge relationships (copy all - targets should exist after merge_investigation completes)
+        # Merge relationships (defer if target not yet available)
+        deferred_relationships = []
         for rel in incoming.relationships:
-            # Safety check: target should exist if merge_investigation() is working correctly
             if rel.target_key in self._observables:
+                # Target exists - add relationship immediately
                 existing._add_relationship_internal(rel.target_key, rel.relationship_type, rel.direction)
             else:
-                # This should not happen during normal merge_investigation() flow
-                # Log error to catch potential bugs in merge logic
-                logger.critical(
-                    "Relationship target '{}' not found during merge of observable '{}'. ", rel.target_key, existing.key
-                )
+                # Target doesn't exist yet - defer for Pass 2 of merge_investigation()
+                deferred_relationships.append((existing.key, rel))
 
         # Merge generated_by_checks
         for check_key in incoming._generated_by_checks:
@@ -144,7 +142,7 @@ class Investigation:
         # Recalculate scores after merge
         self._score_engine.recalculate_all()
 
-        return existing
+        return existing, deferred_relationships
 
     def _merge_check(self, existing: Check, incoming: Check) -> Check:
         """
@@ -320,7 +318,7 @@ class Investigation:
 
     # Public add methods with merge-on-create
 
-    def add_observable(self, obs: Observable) -> Observable:
+    def add_observable(self, obs: Observable) -> tuple[Observable, list]:
         """
         Add or merge an observable.
 
@@ -328,7 +326,7 @@ class Investigation:
             obs: Observable to add or merge
 
         Returns:
-            The resulting observable (either new or merged)
+            Tuple of (resulting observable, deferred relationships)
         """
         if obs.key in self._observables:
             return self._merge_observable(self._observables[obs.key], obs)
@@ -337,7 +335,7 @@ class Investigation:
         self._observables[obs.key] = obs
         self._score_engine.register_observable(obs)
         self._stats.register_observable(obs)
-        return obs
+        return obs, []
 
     def add_check(self, check: Check) -> Check:
         """
@@ -671,14 +669,33 @@ class Investigation:
         """
         Merge another investigation into this one.
 
-        Uses the unified add methods which automatically handle merging.
+        Uses a two-pass approach to handle relationship dependencies:
+        - Pass 1: Merge all observables, collecting deferred relationships
+        - Pass 2: Add deferred relationships now that all observables exist
 
         Args:
             other: The investigation to merge
         """
-        # Merge observables
+        # PASS 1: Merge observables and collect deferred relationships
+        all_deferred_relationships = []
         for obs in other._observables.values():
-            self.add_observable(obs)
+            _, deferred = self.add_observable(obs)
+            all_deferred_relationships.extend(deferred)
+
+        # PASS 2: Process deferred relationships now that all observables exist
+        for source_key, rel in all_deferred_relationships:
+            source_obs = self._observables.get(source_key)
+            if source_obs and rel.target_key in self._observables:
+                # Both source and target exist - add relationship
+                source_obs._add_relationship_internal(rel.target_key, rel.relationship_type, rel.direction)
+            else:
+                # Genuine error - target still doesn't exist after Pass 2
+                logger.critical(
+                    "Relationship target '{}' not found after merge completion for observable '{}'. "
+                    "This indicates corrupted data or a bug in the merge logic.",
+                    rel.target_key,
+                    source_key,
+                )
 
         # Merge threat intels (need to link to observables)
         for ti in other._threat_intels.values():

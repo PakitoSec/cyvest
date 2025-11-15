@@ -229,7 +229,7 @@ class ScoreEngine:
                     if new_check_score != check.score:
                         check.update_score(new_check_score, reason=f"Linked observable {observable.key} updated")
 
-    def _is_observable_linked_to_check(self, observable: "Observable", check: "Check") -> bool:
+    def _is_observable_linked_to_check(self, observable: "Observable", check: "Check", indirect: bool = False) -> bool:
         """
         Check if an observable is linked to a check (directly or indirectly).
 
@@ -243,6 +243,9 @@ class ScoreEngine:
         # Direct linkage
         if observable in check.observables:
             return True
+        
+        if indirect is False:
+            return False
 
         # Indirect linkage through relationships
         for obs in check.observables:

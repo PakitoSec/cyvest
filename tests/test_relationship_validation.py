@@ -116,12 +116,13 @@ def test_merge_filters_invalid_relationships() -> None:
     
     # Add it to investigation - the relationship should be filtered during merge
     cv.observable_create("domain", "example.com")
-    merged = cv._investigation.add_observable(obs)
-    
-    # The relationship should not have been merged
+    merged, deferred = cv._investigation.add_observable(obs)
+
+    # The relationship should not have been merged (deferred because target doesn't exist)
     assert len(merged.relationships) == 0
-
-
+    # The relationship should be in deferred list
+    assert len(deferred) == 1
+    assert deferred[0][1].target_key == "obs:ip:nonexistent"
 def test_merge_keeps_valid_relationships() -> None:
     """Test that merging keeps relationships to existing targets."""
     cv = Cyvest()
@@ -134,13 +135,13 @@ def test_merge_keeps_valid_relationships() -> None:
     obs._add_relationship_internal(target.key, "resolves-to")
     
     # Add it to investigation - the relationship should be kept
-    merged = cv._investigation.add_observable(obs)
-    
-    # The relationship should have been merged
+    merged, deferred = cv._investigation.add_observable(obs)
+
+    # The relationship should have been merged (no deferral because target exists)
     assert len(merged.relationships) == 1
     assert merged.relationships[0].target_key == target.key
-
-
+    # No deferred relationships
+    assert len(deferred) == 0
 def test_investigation_add_relationship_with_observables() -> None:
     """Test Investigation.add_relationship with Observable objects."""
     cv = Cyvest()

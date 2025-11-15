@@ -10,6 +10,8 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
+from logurich import logger
+
 from cyvest.levels import Level, get_level_from_score
 from cyvest.model import Check, Container, Enrichment, Observable, ObservableType, ThreatIntel
 from cyvest.score import ScoreEngine, ScoreMode
@@ -122,12 +124,17 @@ class Investigation:
             if ti.key not in existing_ti_keys:
                 existing.add_threat_intel(ti)
 
-        # Merge relationships (avoid duplicates by target_key, relationship_type, and direction)
-        existing_rels = {(r.target_key, r.relationship_type, r.direction) for r in existing.relationships}
+        # Merge relationships (copy all - targets should exist after merge_investigation completes)
         for rel in incoming.relationships:
-            rel_tuple = (rel.target_key, rel.relationship_type, rel.direction)
-            if rel_tuple not in existing_rels:
-                existing.add_relationship(rel.target_key, rel.relationship_type, rel.direction)
+            # Safety check: target should exist if merge_investigation() is working correctly
+            if rel.target_key in self._observables:
+                existing._add_relationship_internal(rel.target_key, rel.relationship_type, rel.direction)
+            else:
+                # This should not happen during normal merge_investigation() flow
+                # Log error to catch potential bugs in merge logic
+                logger.critical(
+                    "Relationship target '{}' not found during merge of observable '{}'. ", rel.target_key, existing.key
+                )
 
         # Merge generated_by_checks
         for check_key in incoming._generated_by_checks:
@@ -418,26 +425,51 @@ class Investigation:
     # Relationship and linking methods
 
     def add_relationship(
-        self, source_key: str, target_key: str, relationship_type: str, direction: str | None = None
+        self,
+        source: Observable | str,
+        target: Observable | str,
+        relationship_type: str,
+        direction: str | None = None,
     ) -> Observable | None:
         """
         Add a relationship between observables.
 
         Args:
-            source_key: Key of source observable
-            target_key: Key of target observable
+            source: Source observable or its key
+            target: Target observable or its key
             relationship_type: Type of relationship (STIX2 convention)
-            direction: Direction of the relationship
+            direction: Direction of the relationship (None = use semantic default)
 
         Returns:
-            The source observable if found, None otherwise
+            The source observable if both source and target exist, None otherwise
         """
-        source = self._observables.get(source_key)
-        if source:
-            source.add_relationship(target_key, relationship_type, direction)
-            # Recalculate scores after adding relationship
-            self._score_engine.recalculate_all()
-        return source
+
+        # Extract keys from Observable objects if needed
+        source_key = source.key if isinstance(source, Observable) else source
+        target_key = target.key if isinstance(target, Observable) else target
+
+        # Validate both source and target exist
+        source_obs = self._observables.get(source_key)
+        target_obs = self._observables.get(target_key)
+
+        if not source_obs:
+            logger.warning(f"Cannot add relationship: source observable '{source_key}' does not exist")
+            return None
+
+        if not target_obs:
+            logger.warning(
+                f"Cannot add relationship: target observable '{target_key}' does not exist. "
+                f"Relationship from '{source_key}' to '{target_key}' was not created."
+            )
+            return None
+
+        # Add relationship using internal method
+        source_obs._add_relationship_internal(target_key, relationship_type, direction)
+
+        # Recalculate scores after adding relationship
+        self._score_engine.recalculate_all()
+
+        return source_obs
 
     def link_check_observable(self, check_key: str, observable_key: str) -> Check | None:
         """
@@ -630,7 +662,7 @@ class Investigation:
 
             # Link the best starting node to root
             if best_node:
-                self._root_observable.add_relationship(best_node, RelationshipType.RELATED_TO)
+                self._root_observable._add_relationship_internal(best_node, RelationshipType.RELATED_TO)
                 self._score_engine.recalculate_all()
 
     # Investigation merging

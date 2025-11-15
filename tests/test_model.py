@@ -35,7 +35,7 @@ def test_observable_relationships() -> None:
     """Test observable relationships."""
     obs1 = Observable(obs_type="url", value="https://example.com")
     obs2 = Observable(obs_type="ip", value="192.168.1.1")
-    obs1.add_relationship(obs2.key, "resolves-to")
+    obs1._add_relationship_internal(obs2.key, "resolves-to")
     assert len(obs1.relationships) == 1
     assert obs1.relationships[0].target_key == obs2.key
     assert obs1.relationships[0].relationship_type == "resolves-to"
@@ -129,7 +129,7 @@ def test_relationship_direction_default() -> None:
     """Test relationship direction defaults to OUTBOUND."""
     obs1 = Observable(obs_type="url", value="https://example.com")
     obs2 = Observable(obs_type="ip", value="192.168.1.1")
-    obs1.add_relationship(obs2.key, "resolves-to")
+    obs1._add_relationship_internal(obs2.key, "resolves-to")
     assert len(obs1.relationships) == 1
     assert obs1.relationships[0].direction == RelationshipDirection.OUTBOUND
 
@@ -140,15 +140,15 @@ def test_relationship_direction_explicit() -> None:
     obs2 = Observable(obs_type="ip", value="192.168.1.1")
 
     # Test outbound
-    obs1.add_relationship(obs2.key, "resolves-to", RelationshipDirection.OUTBOUND)
+    obs1._add_relationship_internal(obs2.key, "resolves-to", RelationshipDirection.OUTBOUND)
     assert obs1.relationships[0].direction == RelationshipDirection.OUTBOUND
 
     # Test inbound
-    obs1.add_relationship(obs2.key, "belongs-to", RelationshipDirection.INBOUND)
+    obs1._add_relationship_internal(obs2.key, "belongs-to", RelationshipDirection.INBOUND)
     assert obs1.relationships[1].direction == RelationshipDirection.INBOUND
 
     # Test bidirectional
-    obs1.add_relationship(obs2.key, "communicates-with", RelationshipDirection.BIDIRECTIONAL)
+    obs1._add_relationship_internal(obs2.key, "communicates-with", RelationshipDirection.BIDIRECTIONAL)
     assert obs1.relationships[2].direction == RelationshipDirection.BIDIRECTIONAL
 
 
@@ -157,10 +157,10 @@ def test_relationship_direction_string() -> None:
     obs1 = Observable(obs_type="url", value="https://example.com")
     obs2 = Observable(obs_type="ip", value="192.168.1.1")
 
-    obs1.add_relationship(obs2.key, "resolves-to", "inbound")
+    obs1._add_relationship_internal(obs2.key, "resolves-to", "inbound")
     assert obs1.relationships[0].direction == RelationshipDirection.INBOUND
 
-    obs1.add_relationship(obs2.key, "communicates-with", "bidirectional")
+    obs1._add_relationship_internal(obs2.key, "communicates-with", "bidirectional")
     assert obs1.relationships[1].direction == RelationshipDirection.BIDIRECTIONAL
 
 
@@ -204,15 +204,15 @@ def test_relationship_auto_direction() -> None:
     obs2 = Observable(obs_type="ip", value="192.168.1.1")
 
     # No direction specified - should use semantic default (OUTBOUND for RESOLVES_TO)
-    obs1.add_relationship(obs2.key, RelationshipType.RESOLVES_TO)
+    obs1._add_relationship_internal(obs2.key, RelationshipType.RESOLVES_TO)
     assert obs1.relationships[0].direction == RelationshipDirection.OUTBOUND
 
     # No direction specified - should use semantic default (INBOUND for DOWNLOADED)
-    obs1.add_relationship(obs2.key, RelationshipType.DOWNLOADED)
+    obs1._add_relationship_internal(obs2.key, RelationshipType.DOWNLOADED)
     assert obs1.relationships[1].direction == RelationshipDirection.INBOUND
 
     # No direction specified - should use semantic default (BIDIRECTIONAL for COMMUNICATES_WITH)
-    obs1.add_relationship(obs2.key, RelationshipType.COMMUNICATES_WITH)
+    obs1._add_relationship_internal(obs2.key, RelationshipType.COMMUNICATES_WITH)
     assert obs1.relationships[2].direction == RelationshipDirection.BIDIRECTIONAL
 
 
@@ -224,5 +224,5 @@ def test_relationship_override_default() -> None:
     obs2 = Observable(obs_type="ip", value="192.168.1.1")
 
     # Override default: RESOLVES_TO normally OUTBOUND, force INBOUND
-    obs1.add_relationship(obs2.key, RelationshipType.RESOLVES_TO, RelationshipDirection.INBOUND)
+    obs1._add_relationship_internal(obs2.key, RelationshipType.RESOLVES_TO, RelationshipDirection.INBOUND)
     assert obs1.relationships[0].direction == RelationshipDirection.INBOUND

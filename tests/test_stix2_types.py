@@ -150,7 +150,7 @@ def test_observable_add_relationship_with_enum() -> None:
         value="https://example.com",
     )
 
-    obs.add_relationship(
+    obs._add_relationship_internal(
         target_key="obs:ipv4-addr:192.0.2.1",
         relationship_type=RelationshipType.RESOLVES_TO,
     )

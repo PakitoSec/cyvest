@@ -44,7 +44,6 @@ class Cyvest:
             root_type: Type of root observable ("file" or "artifact")
             score_mode: Score calculation mode (MAX or SUM)
         """
-        self.data = data
         self._investigation = Investigation(data, root_type=root_type, score_mode=score_mode)
 
     def __enter__(self) -> Cyvest:
@@ -118,21 +117,25 @@ class Cyvest:
         return self._investigation.get_root()
 
     def observable_add_relationship(
-        self, source_key: str, target_key: str, relationship_type: str, direction: str | None = None
+        self,
+        source: Observable | str,
+        target: Observable | str,
+        relationship_type: str,
+        direction: str | None = None,
     ) -> Observable | None:
         """
         Add a relationship between observables.
 
         Args:
-            source_key: Key of source observable
-            target_key: Key of target observable
+            source: Source observable or its key
+            target: Target observable or its key
             relationship_type: Type of relationship (STIX2 convention)
             direction: Direction of the relationship (None = use semantic default for relationship type)
 
         Returns:
-            The source observable if found, None otherwise
+            The source observable if both source and target exist, None otherwise
         """
-        return self._investigation.add_relationship(source_key, target_key, relationship_type, direction)
+        return self._investigation.add_relationship(source, target, relationship_type, direction)
 
     def observable_add_threat_intel(
         self,

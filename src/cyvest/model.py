@@ -419,14 +419,17 @@ class Observable:
         if ti not in self.threat_intels:
             self.threat_intels.append(ti)
 
-    def add_relationship(
+    def _add_relationship_internal(
         self,
         target_key: str,
         relationship_type: RelationshipType | str,
         direction: RelationshipDirection | str | None = None,
     ) -> None:
         """
-        Add a relationship to another observable.
+        Internal method to add a relationship without validation.
+
+        This should only be called by the Investigation layer after validating
+        that the target observable exists.
 
         Args:
             target_key: Key of the target observable
@@ -434,7 +437,10 @@ class Observable:
             direction: Direction of the relationship (None = use semantic default for relationship type)
         """
         rel = Relationship(target_key=target_key, relationship_type=relationship_type, direction=direction)
-        if rel not in self.relationships:
+        # Check for duplicates using target_key, relationship_type, and direction
+        rel_tuple = (rel.target_key, rel.relationship_type, rel.direction)
+        existing_rels = {(r.target_key, r.relationship_type, r.direction) for r in self.relationships}
+        if rel_tuple not in existing_rels:
             self.relationships.append(rel)
 
     def mark_generated_by_check(self, check_key: str) -> None:

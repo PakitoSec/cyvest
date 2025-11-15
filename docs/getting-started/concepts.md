@@ -193,9 +193,9 @@ Cyvest uses **relationship directions** to determine parent-child hierarchies fo
 - **OUTBOUND (→)**: `source → target` — Target is a **child** of source
   - Source observable's score includes child's score
   - Scores propagate **upward** from child to parent
-  
+
 - **INBOUND (←)**: `source ← target` — Target is a **parent** of source
-  - Target observable's score includes source's score  
+  - Target observable's score includes source's score
   - Scores propagate **upward** from source to target
 
 - **BIDIRECTIONAL (↔)**: `source ↔ target` — **No hierarchy**
@@ -261,7 +261,7 @@ print(f"URL score: {url.score}")        # 9.0 (includes child file score)
 host1 = cv.observable_create("ip", "10.0.1.10")
 cv.observable_add_threat_intel(host1.key, "ids", score=Decimal("7.0"))
 
-host2 = cv.observable_create("ip", "10.0.1.20") 
+host2 = cv.observable_create("ip", "10.0.1.20")
 cv.observable_add_threat_intel(host2.key, "ids", score=Decimal("2.0"))
 
 # Hosts communicate (BIDIRECTIONAL by default)

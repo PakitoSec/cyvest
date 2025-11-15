@@ -7,6 +7,8 @@ Provides automatic merge-on-create for all object types.
 
 from __future__ import annotations
 
+import threading
+from copy import deepcopy
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
@@ -18,7 +20,276 @@ from cyvest.score import ScoreEngine, ScoreMode
 from cyvest.stats import InvestigationStats
 
 if TYPE_CHECKING:
-    pass
+    from cyvest import Cyvest
+
+
+class SharedInvestigationContext:
+    """
+    Thread-safe shared context for cross-task observable and check sharing.
+
+    Allows multiple investigation tasks running in parallel to:
+    - Register observables/checks they create for others to reference
+    - Look up observables/checks created by previously-completed tasks
+    - Incrementally merge task results into a central investigation
+
+    Thread-safety is achieved using a reentrant lock (RLock) for all operations.
+
+    Example (manual reconcile):
+        >>> shared = SharedInvestigationContext(main_inv)
+        >>> cy = shared.create_cyvest()
+        >>> # ... do work ...
+        >>> shared.reconcile(cy)
+
+    Example (auto-reconcile):
+        >>> shared = SharedInvestigationContext(main_inv)
+        >>> with shared.create_cyvest() as cy:
+        >>>     # ... do work ...
+        >>>     # Auto-reconciles on exit!
+    """
+
+    def __init__(self, root_investigation: Investigation):
+        """
+        Initialize shared context with a root investigation.
+
+        Args:
+            root_investigation: The main investigation that will receive merged results
+        """
+        self._lock = threading.RLock()  # Reentrant lock for nested calls
+        self._main_investigation = root_investigation
+
+        # Store main investigation configuration for task creation
+        self._root_type = (
+            "artifact" if root_investigation._root_observable.obs_type == ObservableType.ARTIFACT else "file"
+        )
+        self._score_mode = root_investigation._score_engine._score_mode
+
+        # Thread-safe registries (copies of objects for lookup)
+        self._observable_registry: dict[str, Observable] = {}
+        self._check_registry: dict[str, Check] = {}
+
+    def create_cyvest(self, data: Any | None = None):
+        """
+        Create a new Cyvest instance with the same configuration as the main investigation.
+
+        Returns a context manager that auto-reconciles on exit for clean usage in tasks.
+
+        Args:
+            data: Task-specific data. If None, reuses the main investigation's data.
+
+        Returns:
+            A Cyvest context manager that auto-reconciles on exit
+
+        Example:
+            >>> # Auto-reconcile pattern (recommended)
+            >>> with shared.create_cyvest() as cy:
+            >>>     cy.observable(...)
+            >>>     # Automatically reconciles on exit
+            >>>
+            >>> # Manual pattern (if you need the instance outside the context)
+            >>> cy = shared.create_cyvest().__enter__()
+            >>> # ... work ...
+            >>> shared.reconcile(cy)
+        """
+        from cyvest import Cyvest
+
+        # Use main investigation's data if not provided
+        if data is None:
+            with self._lock:
+                data = self._main_investigation._root_observable.extra
+
+        cy = Cyvest(data, root_type=self._root_type, score_mode=self._score_mode)
+
+        # Return context manager wrapper
+        return self._CyvestContextManager(cy, self)
+
+    class _CyvestContextManager:
+        """Context manager wrapper for auto-reconcile on exit."""
+
+        def __init__(self, cyvest, shared_context):
+            self._cyvest = cyvest
+            self._shared_context = shared_context
+
+        def __enter__(self):
+            return self._cyvest
+
+        def __exit__(self, exc_type, exc_val, exc_tb):
+            if exc_type is None:  # Only reconcile on success
+                self._shared_context.reconcile(self._cyvest)
+            return False
+
+    def reconcile(self, source: Cyvest | Investigation) -> None:
+        """
+        Reconcile (merge) a completed task's investigation into the shared context.
+
+        Thread-safe: Uses lock to ensure atomic merge operation.
+        Also registers all observables and checks for future task lookups.
+
+        Args:
+            source: Either a Cyvest instance or Investigation instance to reconcile
+
+        Example:
+            >>> cy = shared.create_cyvest().__enter__()
+            >>> # ... do work ...
+            >>> shared.reconcile(cy)  # Accepts Cyvest
+            >>>
+            >>> # Or directly with Investigation
+            >>> shared.reconcile(investigation)
+        """
+        # Extract Investigation from Cyvest if needed
+        from cyvest import Cyvest
+
+        if isinstance(source, Cyvest):
+            task_investigation = source._investigation
+        else:
+            task_investigation = source
+
+        with self._lock:
+            logger.info("Reconciling task investigation into shared context")
+
+            # Register all observables and checks for cross-task sharing
+            for obs in task_investigation.get_all_observables().values():
+                # Update registry (latest version wins)
+                self._observable_registry[obs.key] = deepcopy(obs)
+
+            for check in task_investigation.get_all_checks().values():
+                self._check_registry[check.key] = deepcopy(check)
+
+            # Merge into main investigation
+            self._main_investigation.merge_investigation(task_investigation)
+
+            logger.debug(
+                f"Reconciliation complete. Registry: {len(self._observable_registry)} observables, "
+                f"{len(self._check_registry)} checks"
+            )
+
+    def get_observable(self, key: str) -> Observable | None:
+        """
+        Look up a shared observable by key.
+
+        Thread-safe: Returns a deep copy to prevent concurrent modification.
+
+        Args:
+            key: Observable key to look up
+
+        Returns:
+            Copy of the observable if found, None otherwise
+        """
+        with self._lock:
+            obs = self._observable_registry.get(key)
+            if obs:
+                return deepcopy(obs)
+            return None
+
+    def get_check(self, key: str) -> Check | None:
+        """
+        Look up a shared check by key.
+
+        Thread-safe: Returns a deep copy to prevent concurrent modification.
+
+        Args:
+            key: Check key to look up
+
+        Returns:
+            Copy of the check if found, None otherwise
+        """
+        with self._lock:
+            check = self._check_registry.get(key)
+            if check:
+                return deepcopy(check)
+            return None
+
+    def get_investigation(self) -> Investigation:
+        """
+        Get the main investigation (thread-safe read-only access).
+
+        Returns:
+            The main investigation instance
+        """
+        with self._lock:
+            return self._main_investigation
+
+    def list_observables(self) -> list[str]:
+        """
+        List all observable keys available for cross-task reference.
+
+        Returns:
+            List of observable keys
+        """
+        with self._lock:
+            return list(self._observable_registry.keys())
+
+    def list_checks(self) -> list[str]:
+        """
+        List all check keys available for cross-task reference.
+
+        Returns:
+            List of check keys
+        """
+        with self._lock:
+            return list(self._check_registry.keys())
+
+    def find_observables_by_type(self, obs_type: ObservableType) -> list[Observable]:
+        """
+        Find all observables of a specific type.
+
+        Useful for tasks that need to reference observables by type
+        (e.g., all EMAIL_ADDR observables).
+
+        Args:
+            obs_type: Observable type to filter by
+
+        Returns:
+            List of matching observables (deep copies)
+        """
+        with self._lock:
+            matches = []
+            for obs in self._observable_registry.values():
+                if obs.obs_type == obs_type:
+                    matches.append(deepcopy(obs))
+            return matches
+
+    def find_observables_by_value(self, value: str) -> list[Observable]:
+        """
+        Find observables by exact value match.
+
+        Args:
+            value: Observable value to search for
+
+        Returns:
+            List of matching observables (deep copies)
+        """
+        with self._lock:
+            matches = []
+            for obs in self._observable_registry.values():
+                if obs.value == value:
+                    matches.append(deepcopy(obs))
+            return matches
+
+    def has_observable(self, key: str) -> bool:
+        """
+        Check if an observable exists in the shared context.
+
+        Args:
+            key: Observable key to check
+
+        Returns:
+            True if observable exists, False otherwise
+        """
+        with self._lock:
+            return key in self._observable_registry
+
+    def has_check(self, key: str) -> bool:
+        """
+        Check if a check exists in the shared context.
+
+        Args:
+            key: Check key to check
+
+        Returns:
+            True if check exists, False otherwise
+        """
+        with self._lock:
+            return key in self._check_registry
 
 
 class Investigation:

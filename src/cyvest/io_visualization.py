@@ -144,7 +144,7 @@ def generate_network_graph(
 
     # Configure physics and interaction options
     physics_enabled = "true" if physics else "false"
-    
+
     # Build layout configuration
     if group_by_type:
         layout_config = """
@@ -160,7 +160,7 @@ def generate_network_graph(
             },"""
     else:
         layout_config = ""
-    
+
     net.set_options(
         f"""
     {{
@@ -248,7 +248,7 @@ def generate_network_graph(
             "shape": shape,
             "font": {"size": 10, "color": "#FFFFFF"},
         }
-        
+
         # Add group attribute for type-based grouping
         if group_by_type:
             node_options["group"] = obs.obs_type.value

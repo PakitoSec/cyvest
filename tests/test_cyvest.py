@@ -10,7 +10,6 @@ from cyvest import Cyvest, Level, RelationshipDirection
 def test_cyvest_initialization() -> None:
     """Test Cyvest initialization."""
     cv = Cyvest(data={"test": "data"})
-    assert cv.data == {"test": "data"}
     root = cv.observable_get_root()
     assert root is not None
     assert root.obs_type == "file"

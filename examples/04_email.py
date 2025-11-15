@@ -105,7 +105,7 @@ class TaskExecutor:
 # ============================================================================
 
 
-class EmailHeaderTask(InvestigationTask):
+class EmailFrom(InvestigationTask):
     """
     Analyzes email headers (FROM, SENDER, TO, CC, BCC).
 
@@ -144,9 +144,9 @@ class EmailHeaderTask(InvestigationTask):
 
         # Create check for header analysis
         (
-            cy.check("from-test", "header", "test email vt 10", "> ok boys")
+            cy.check("from", "header", "test email vt 10", "> ok boys")
             .link_observable(obs)
-            .in_container(cy.container("test").sub_container("email"))
+            .in_container(cy.container("emails"))
             .get()
         )
 
@@ -155,7 +155,7 @@ class EmailHeaderTask(InvestigationTask):
         return cy
 
 
-class EmailBodyTask(InvestigationTask):
+class EmailReciever(InvestigationTask):
     """
     Analyzes email body content.
 
@@ -169,13 +169,16 @@ class EmailBodyTask(InvestigationTask):
         """Analyze email body and build investigation fragment."""
         cy = Cyvest(data, root_type="artifact")
 
-        logger.info("Analyzing email body")
+        logger.info("Analyzing email receiver")
 
-        # Create body checks
-        cy.check("body-html", "body", "description", "> comment")
-        cy.check("body-html", "body", "description", "> commento").with_score(5)
+        cy.enrichment_create("receiver", {"receiver": ["ok"]}, context="from splunk")
+        cy.check("receiver", "header", "description", "> receiver").with_score(0.1).link_observable(
+            cy.observable(ObservableType.EMAIL_ADDR, "user@company.com").relate_to(
+                cy.root(), RelationshipType.TO, direction="inbound"
+            )
+        ).in_container(cy.container("emails"))
 
-        logger.info("Email body analysis complete")
+        logger.info("Email receiver analysis complete")
 
         return cy
 
@@ -197,13 +200,7 @@ class BodiesUrlTask(InvestigationTask):
         cy = Cyvest(data, root_type="artifact")
 
         # Extract URLs from data
-        urls_with_scores = data.get(
-            "body_urls",
-            [
-                {"url": "https://toto.domain.malicious.com", "score": 3, "link_malicious": True},
-                {"url": "https://domain.com/ok/toto", "score": -1, "link_malicious": False},
-            ],
-        )
+        urls_with_scores = data.get("body_urls")
 
         logger.info(f"Checking BODIES URLs: {len(urls_with_scores)}")
 
@@ -269,32 +266,7 @@ class AttachmentTask(InvestigationTask):
         cy = Cyvest(data, root_type="artifact")
 
         # Extract attachments from data
-        attachments = data.get(
-            "attachments",
-            [
-                {
-                    "filename": "invoice.pdf",
-                    "md5": "d41d8cd98f00b204e9800998ecf8427e",
-                    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-                    "score": 0,
-                    "size": 1024,
-                },
-                {
-                    "filename": "document.docx",
-                    "md5": "098f6bcd4621d373cade4e832627b4f6",
-                    "sha256": "a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3",
-                    "score": 6,
-                    "size": 2048,
-                },
-                {
-                    "filename": "malware.exe",
-                    "md5": "5d41402abc4b2a76b9719d911017c592",
-                    "sha256": "7d865e959b2466918c9863afca942d0fb89d7c9ac0c99bafc3749504ded97730",
-                    "score": 10,
-                    "size": 4096,
-                },
-            ],
-        )
+        attachments = data.get("attachments", [])
 
         logger.info(f"Checking ATTACHMENTS: {len(attachments)}")
 
@@ -316,14 +288,7 @@ class AttachmentTask(InvestigationTask):
                 cy.observable(ObservableType.FILE, filename)
                 .relate_to(cy.root(), RelationshipType.CONTAINS, direction="inbound")
                 .relate_to(
-                    cy.observable(ObservableType.FILE, f"MD5:{md5_hash}")
-                    .add_ti("VT", score, "MD5 hash analysis")
-                    .relate_to(
-                        cy.observable(ObservableType.FILE, f"SHA256:{sha256_hash}").add_ti(
-                            "VT", score, "SHA256 hash analysis"
-                        ),
-                        RelationshipType.RELATED_TO,
-                    ),
+                    cy.observable(ObservableType.FILE, f"MD5:{md5_hash}").add_ti("VT", score, "MD5 hash analysis"),
                     RelationshipType.RELATED_TO,
                 )
             )
@@ -369,28 +334,14 @@ def main():
                 "filename": "invoice.pdf",
                 "md5": "d41d8cd98f00b204e9800998ecf8427e",
                 "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-                "score": 0,
-                "size": 1024,
-            },
-            {
-                "filename": "document.docx",
-                "md5": "098f6bcd4621d373cade4e832627b4f6",
-                "sha256": "a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3",
-                "score": 6,
-                "size": 2048,
-            },
-            {
-                "filename": "malware.exe",
-                "md5": "5d41402abc4b2a76b9719d911017c592",
-                "sha256": "7d865e959b2466918c9863afca942d0fb89d7c9ac0c99bafc3749504ded97730",
                 "score": 10,
-                "size": 4096,
+                "size": 1024,
             },
         ],
     }
 
     # Create tasks
-    tasks = [EmailHeaderTask(), EmailBodyTask(), BodiesUrlTask(), AttachmentTask()]
+    tasks = [EmailFrom(), EmailReciever(), BodiesUrlTask(), AttachmentTask()]
 
     # Execute tasks in parallel
     executor = TaskExecutor(max_workers=4)
@@ -400,12 +351,10 @@ def main():
     cy.observable_finalize_relationships()
 
     # Display results
-    logger.info("=" * 80)
     logger.info("Investigation complete - displaying summary")
-    logger.info("=" * 80)
 
     cy.display_summary()
-    cy.display_network()
+    # cy.display_network()
 
 
 if __name__ == "__main__":

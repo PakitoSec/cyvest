@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Any, Literal
 
 from logurich import logger
 
-from cyvest.investigation import Investigation
+from cyvest.investigation import Investigation, SharedInvestigationContext
 from cyvest.io_rich import display_statistics, display_summary
 from cyvest.levels import Level
 from cyvest.model import Check, Container, Enrichment, Observable, ThreatIntel
@@ -35,6 +35,7 @@ class Cyvest:
         data: Any = None,
         root_type: Literal["file", "artifact"] = "file",
         score_mode: ScoreMode = ScoreMode.MAX,
+        shared_context: SharedInvestigationContext | None = None,
     ) -> None:
         """
         Initialize a new investigation.
@@ -43,8 +44,10 @@ class Cyvest:
             data: The data being investigated (optional)
             root_type: Type of root observable ("file" or "artifact")
             score_mode: Score calculation mode (MAX or SUM)
+            shared_context: Optional shared context for cross-task sharing (backward compatible)
         """
         self._investigation = Investigation(data, root_type=root_type, score_mode=score_mode)
+        self._shared_context = shared_context
 
     def __enter__(self) -> Cyvest:
         """Context manager entry."""
@@ -117,6 +120,38 @@ class Cyvest:
             Root observable
         """
         return self._investigation.get_root()
+
+    def get_shared_observable(self, key: str) -> Observable | None:
+        """
+        Look up an observable from the shared context (if available).
+
+        Falls back to local investigation if no shared context exists.
+
+        Args:
+            key: Observable key to look up
+
+        Returns:
+            Copy of the observable if found, None otherwise
+        """
+        if not self._shared_context:
+            return self._investigation.get_observable(key)
+        return self._shared_context.get_observable(key)
+
+    def get_shared_check(self, key: str) -> Check | None:
+        """
+        Look up a check from the shared context (if available).
+
+        Falls back to local investigation if no shared context exists.
+
+        Args:
+            key: Check key to look up
+
+        Returns:
+            Copy of the check if found, None otherwise
+        """
+        if not self._shared_context:
+            return self._investigation.get_check(key)
+        return self._shared_context.get_check(key)
 
     def observable_add_relationship(
         self,

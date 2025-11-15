@@ -14,6 +14,7 @@
 - 🏷️ **STIX2 Type Support**: Built-in enums for STIX2 Observable and Relationship types with autocomplete
 - 📈 **Real-time Statistics**: Live metrics and aggregations throughout the investigation
 - 🔄 **Investigation Merging**: Combine investigations from multiple threads or processes
+- 🧵 **Multi-Threading Support**: Thread-safe shared context for parallel task execution with cross-task observable sharing
 - 💾 **Multiple Export Formats**: JSON and Markdown output for reporting and LLM consumption
 - 🎨 **Rich Console Output**: Beautiful terminal displays with the Rich library
 - 🧩 **Fluent DSL**: Convenient API with method chaining for rapid development
@@ -137,7 +138,7 @@ from cyvest import RelationshipType, RelationshipDirection
 # Accepts Observable objects directly
 cv.observable_add_relationship(domain, ip, RelationshipType.RESOLVES_TO)
 
-# Automatically gets INBOUND (file ← URL)  
+# Automatically gets INBOUND (file ← URL)
 # URL is parent of file, file's score propagates UP to URL
 cv.observable_add_relationship(malware, url, RelationshipType.DOWNLOADED)
 
@@ -160,11 +161,11 @@ Relationship directions define parent-child hierarchies for score propagation:
 - **OUTBOUND (→)**: `source → target` — Target is a **child** of source
   - Source's score includes child's score: `score = max(TI_scores, child_scores)`
   - Example: `domain → IP` means IP score flows up to domain
-  
+
 - **INBOUND (←)**: `source ← target` — Target is a **parent** of source
   - Target's score includes source's score
   - Example: `file ← URL` means file score flows up to URL
-  
+
 - **BIDIRECTIONAL (↔)**: `source ↔ target` — **No hierarchy**
   - Scores do NOT propagate between observables
   - Each maintains independent score from its own threat intel
@@ -222,6 +223,42 @@ with cv.container("network_analysis") as network:
         c2.add_check(check.get())
 ```
 
+### Multi-Threaded Investigations
+
+Use `SharedInvestigationContext` for thread-safe parallel task execution with automatic observable sharing:
+
+```python
+from cyvest.investigation import SharedInvestigationContext, InvestigationTask
+from concurrent.futures import ThreadPoolExecutor
+
+class EmailAnalysisTask(InvestigationTask):
+    def run(self, shared_context):
+        with shared_context.create_cyvest() as cy:
+            # Access data from root observable
+            data = cy.root().extra
+
+            # Build investigation fragment
+            domain = cy.observable(ObservableType.DOMAIN_NAME, data.get("domain"))
+
+            # Auto-reconciles on exit
+            return cy
+
+# Create shared context
+main_inv = Investigation(email_data, root_type="artifact")
+shared = SharedInvestigationContext(main_inv)
+
+# Run tasks in parallel - they can reference each other's observables
+with ThreadPoolExecutor(max_workers=4) as executor:
+    futures = [executor.submit(task.run, shared) for task in tasks]
+    for future in as_completed(futures):
+        future.result()  # Auto-reconciled
+
+# Get merged investigation
+final_investigation = shared.get_investigation()
+```
+
+See `examples/04_email.py` for a complete multi-threaded investigation example.
+
 ### Scoring & Levels
 
 Scores and levels are automatically calculated and propagated:
@@ -249,6 +286,7 @@ See the `examples/` directory for complete examples:
 - **01_email_basic.py**: Basic email phishing investigation
 - **02_urls_and_ips.py**: Network investigation with URLs and IPs
 - **03_merge_demo.py**: Multi-process investigation merging
+- **04_email.py**: Multi-threaded investigation with SharedInvestigationContext
 - **05_stix2_types.py**: Using STIX2 Observable and Relationship type enums
 - **06_relationship_direction.py**: Explicit relationship direction modeling
 - **07_semantic_defaults.py**: Automatic semantic default directions for relationships
@@ -388,7 +426,7 @@ Cyvest is designed for:
 
 ## Architecture Highlights
 
-- **Thread-Safe**: Designed for concurrent investigation building
+- **Thread-Safe**: SharedInvestigationContext provides thread-safe parallel task execution with cross-task observable sharing
 - **Deterministic Keys**: Same objects always generate same keys for merging
 - **Score Propagation**: Automatic hierarchical score calculation
 - **Flexible Export**: JSON for storage, Markdown for LLM analysis

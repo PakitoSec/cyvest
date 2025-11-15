@@ -243,7 +243,7 @@ class ScoreEngine:
         # Direct linkage
         if observable in check.observables:
             return True
-        
+
         if indirect is False:
             return False
 

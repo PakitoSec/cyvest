@@ -114,7 +114,7 @@ class ObservableHandler:
         # Extract Observable from ObservableHandler if needed
         if isinstance(target, ObservableHandler):
             target = target._observable
-        
+
         # Pass to Investigation - it handles Observable | str
         self._investigation.add_relationship(self._observable, target, relationship_type, direction)
         return self

@@ -93,7 +93,9 @@ class Cyvest:
             score=Decimal(str(score)) if score is not None else Decimal("0"),
             level=level or Level.INFO,
         )
-        return self._investigation.add_observable(obs)
+        # Unwrap tuple - facade returns only Observable, discards deferred relationships
+        obs_result, _ = self._investigation.add_observable(obs)
+        return obs_result
 
     def observable_get(self, key: str) -> Observable | None:
         """

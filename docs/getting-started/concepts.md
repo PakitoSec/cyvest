@@ -235,7 +235,7 @@ ip = cv.observable_create("ip", "198.51.100.42")
 cv.observable_add_threat_intel(ip.key, "abuseipdb", score=Decimal("8.0"))
 
 # Domain resolves to IP (OUTBOUND by default)
-cv.observable_add_relationship(domain.key, ip.key, RelationshipType.RESOLVES_TO)
+cv.observable_add_relationship(domain, ip, RelationshipType.RESOLVES_TO)
 
 # Result: domain score = max(2.0, 8.0) = 8.0 (includes child IP score)
 print(f"Domain score: {domain.score}")  # 8.0
@@ -250,7 +250,7 @@ url = cv.observable_create("url", "http://evil.com/payload")
 cv.observable_add_threat_intel(url.key, "urlscan", score=Decimal("3.0"))
 
 # File downloaded from URL (INBOUND by default for DOWNLOADED)
-cv.observable_add_relationship(malware.key, url.key, RelationshipType.DOWNLOADED)
+cv.observable_add_relationship(malware, url, RelationshipType.DOWNLOADED)
 
 # Result: URL is parent, gets file's score
 print(f"File score: {malware.score}")  # 9.0
@@ -265,7 +265,7 @@ host2 = cv.observable_create("ip", "10.0.1.20")
 cv.observable_add_threat_intel(host2.key, "ids", score=Decimal("2.0"))
 
 # Hosts communicate (BIDIRECTIONAL by default)
-cv.observable_add_relationship(host1.key, host2.key, RelationshipType.COMMUNICATES_WITH)
+cv.observable_add_relationship(host1, host2, RelationshipType.COMMUNICATES_WITH)
 
 # Result: No hierarchical propagation, each keeps own score
 print(f"Host1 score: {host1.score}")  # 7.0
@@ -281,7 +281,7 @@ cv.observable_add_threat_intel(ip2.key, "source", score=Decimal("5.0"))
 
 # Override RESOLVES_TO to BIDIRECTIONAL (no hierarchy)
 cv.observable_add_relationship(
-    domain2.key, ip2.key, 
+    domain2, ip2,  # Observable objects
     RelationshipType.RESOLVES_TO,
     RelationshipDirection.BIDIRECTIONAL
 )
@@ -356,7 +356,12 @@ obs.update_score(Decimal("9.0"))  # Changes to MALICIOUS
 
 ## Relationships
 
-Relationships follow **STIX2 conventions** with built-in type support:
+Relationships follow **STIX2 conventions** with built-in type support.
+
+**Important:** Relationships must be added through the Investigation or Cyvest layer using methods like `cv.observable_add_relationship()`. Observable objects do not have a public `add_relationship()` method. This design ensures:
+- **Validation**: Both source and target observables must exist in the investigation
+- **Centralized management**: All relationships are tracked in one place
+- **Data integrity**: No dangling references to non-existent observables
 
 ```python
 from cyvest import RelationshipType
@@ -403,24 +408,31 @@ RelationshipType.DUPLICATE_OF          # Duplication
 **Creating Relationships:**
 
 ```python
-# Using enum (recommended)
+# Using Observable objects (recommended)
 cv.observable_add_relationship(
-    source_key=url.key,
-    target_key=ip.key,
+    source=url,  # Observable object
+    target=ip,   # Observable object
     relationship_type=RelationshipType.RESOLVES_TO
 )
 
-# Using string (backward compatible)
+# Using string keys (backward compatible)
 cv.observable_add_relationship(
-    source_key=email.key,
-    target_key=url.key,
+    source=url.key,
+    target=ip.key,
+    relationship_type=RelationshipType.RESOLVES_TO
+)
+
+# Mix Observable objects and keys
+cv.observable_add_relationship(
+    source=email,      # Observable object
+    target=url.key,    # String key
     relationship_type="related-to"
 )
 
 # Custom relationship types
 cv.observable_add_relationship(
-    source_key=obs1.key,
-    target_key=obs2.key,
+    source=obs1,
+    target=obs2,
     relationship_type="custom-relationship"
 )
 ```
@@ -433,22 +445,24 @@ Relationships support directional semantics with **automatic semantic defaults**
 from cyvest import RelationshipType
 
 # Automatically gets OUTBOUND (domain → IP)
-cv.observable_add_relationship(domain.key, ip.key, RelationshipType.RESOLVES_TO)
+# Accepts Observable objects directly
+cv.observable_add_relationship(domain, ip, RelationshipType.RESOLVES_TO)
 
 # Automatically gets INBOUND (file ← URL)
-cv.observable_add_relationship(malware_file.key, download_url.key, RelationshipType.DOWNLOADED)
+cv.observable_add_relationship(malware_file, download_url, RelationshipType.DOWNLOADED)
 
 # Automatically gets BIDIRECTIONAL (host ↔ host)
-cv.observable_add_relationship(host1.key, host2.key, RelationshipType.COMMUNICATES_WITH)
+cv.observable_add_relationship(host1, host2, RelationshipType.COMMUNICATES_WITH)
 
 # Can still override semantic defaults if needed
 cv.observable_add_relationship(
-    domain.key, ip.key,
+    domain, ip,  # Observable objects
     RelationshipType.RESOLVES_TO,
     RelationshipDirection.INBOUND  # explicit override
 )
 
 # Using the fluent DSL (also uses semantic defaults)
+# Accepts Observable objects, ObservableHandler, or string keys
 url.relate_to(domain, RelationshipType.RELATED_TO)  # auto: BIDIRECTIONAL
 ```
 

@@ -81,9 +81,11 @@ with Cyvest() as cv:
     ip = cv.observable_create(ObservableType.IPV4_ADDR, "192.0.2.100", internal=False)
 
     # Automatically gets OUTBOUND direction (domain → IP)
-    cv.observable_add_relationship(url.key, ip.key, RelationshipType.RESOLVES_TO)
+    # Accepts Observable objects directly
+    cv.observable_add_relationship(url, ip, RelationshipType.RESOLVES_TO)
 
     # Using fluent API (also uses semantic defaults)
+    # Accepts Observable objects, ObservableHandler, or string keys
     domain = (
         cv.observable(ObservableType.DOMAIN_NAME, "c2-server.com", internal=False)
         .relate_to(ip, RelationshipType.RESOLVES_TO)  # auto: OUTBOUND
@@ -93,8 +95,8 @@ with Cyvest() as cv:
     host1 = cv.observable_create(ObservableType.IPV4_ADDR, "10.0.1.10", internal=True)
     host2 = cv.observable_create(ObservableType.IPV4_ADDR, "10.0.1.20", internal=True)
     cv.observable_add_relationship(
-        host1.key,
-        host2.key,
+        host1,  # Observable object
+        host2,  # Observable object
         RelationshipType.COMMUNICATES_WITH  # auto: BIDIRECTIONAL ↔
     )
 

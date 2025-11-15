@@ -101,9 +101,10 @@ cv.observable_add_threat_intel(
 )
 
 # Create relationships with STIX2 relationship types
+# Accepts Observable objects or string keys
 cv.observable_add_relationship(
-    url_obs.key,
-    ip_obs.key,
+    url_obs,  # Can pass Observable object directly
+    ip_obs,   # Or use .key for string keys
     RelationshipType.RESOLVES_TO
 )
 ```
@@ -133,19 +134,20 @@ from cyvest import RelationshipType, RelationshipDirection
 
 # Automatically gets OUTBOUND (domain → IP)
 # IP is a child of domain, IP's score propagates UP to domain
-cv.observable_add_relationship(domain.key, ip.key, RelationshipType.RESOLVES_TO)
+# Accepts Observable objects directly
+cv.observable_add_relationship(domain, ip, RelationshipType.RESOLVES_TO)
 
 # Automatically gets INBOUND (file ← URL)  
 # URL is parent of file, file's score propagates UP to URL
-cv.observable_add_relationship(malware.key, url.key, RelationshipType.DOWNLOADED)
+cv.observable_add_relationship(malware, url, RelationshipType.DOWNLOADED)
 
 # Automatically gets BIDIRECTIONAL (host ↔ host)
 # No hierarchical propagation - scores remain independent
-cv.observable_add_relationship(host1.key, host2.key, RelationshipType.COMMUNICATES_WITH)
+cv.observable_add_relationship(host1, host2, RelationshipType.COMMUNICATES_WITH)
 
 # Can override semantic defaults if needed
 cv.observable_add_relationship(
-    domain.key, ip.key,
+    domain, ip,  # Accepts Observable objects
     RelationshipType.RESOLVES_TO,
     RelationshipDirection.INBOUND  # explicit override
 )

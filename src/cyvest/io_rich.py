@@ -21,7 +21,9 @@ if TYPE_CHECKING:
     from cyvest.cyvest import Cyvest
 
 
-def display_summary(cv: Cyvest, rich_print: Callable[[Any], None], show_graph: bool = True) -> None:
+def display_summary(
+    cv: Cyvest, rich_print: Callable[[Any], None], show_graph: bool = True, min_level: Level = Level.NONE
+) -> None:
     """
     Display a comprehensive summary of the investigation using Rich.
 
@@ -29,12 +31,21 @@ def display_summary(cv: Cyvest, rich_print: Callable[[Any], None], show_graph: b
         cv: Cyvest investigation to display
         rich_print: A rich renderable handler that is called with renderables for output
         show_graph: Whether to display the observable graph
+        min_level: Minimum level threshold for displaying checks (default: Level.NONE)
     """
     # Create main table
+    all_checks = cv.get_all_checks().values()
+    filtered_checks = [c for c in all_checks if c.level >= min_level]
+    applied_checks = sum(1 for c in filtered_checks if c.level != Level.NONE)
+
+    caption_parts = [f"Total Checks: {len(cv.get_all_checks())}"]
+    if min_level != Level.NONE:
+        caption_parts.append(f"Displayed: {len(filtered_checks)} (min level: {min_level.name})")
+    caption_parts.append(f"Applied: {applied_checks}")
+
     table = Table(
         title="Investigation Report",
-        caption=f"Total Checks: {len(cv.get_all_checks())} | "
-        f"Applied: {sum(1 for c in cv.get_all_checks().values() if c.level != Level.NONE)}",
+        caption=" | ".join(caption_parts),
     )
     table.add_column("Name")
     table.add_column("Score", justify="right")
@@ -47,6 +58,8 @@ def display_summary(cv: Cyvest, rich_print: Callable[[Any], None], show_graph: b
     # Organize checks by scope
     checks_by_scope: dict[str, list[Any]] = {}
     for check in cv.get_all_checks().values():
+        if check.level < min_level:
+            continue
         if check.scope not in checks_by_scope:
             checks_by_scope[check.scope] = []
         checks_by_scope[check.scope].append(check)
@@ -86,7 +99,7 @@ def display_summary(cv: Cyvest, rich_print: Callable[[Any], None], show_graph: b
     table.add_row(rule, "-", "-")
 
     for level_enum in [Level.MALICIOUS, Level.SUSPICIOUS, Level.NOTABLE, Level.SAFE, Level.INFO, Level.TRUSTED]:
-        checks = [c for c in cv.get_all_checks().values() if c.level == level_enum]
+        checks = [c for c in cv.get_all_checks().values() if c.level == level_enum and c.level >= min_level]
         if checks:
             color_level = get_color_level(level_enum)
             level_rule = Align(

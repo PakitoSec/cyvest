@@ -419,8 +419,10 @@ class Cyvest:
         """Get all containers."""
         return self._investigation.get_all_containers()
 
-    def display_summary(self, show_graph: bool = True) -> None:
-        display_summary(self, lambda renderables: logger.rich("INFO", renderables), show_graph=show_graph)
+    def display_summary(self, show_graph: bool = True, min_level: Level = Level.INFO) -> None:
+        display_summary(
+            self, lambda renderables: logger.rich("INFO", renderables), show_graph=show_graph, min_level=min_level
+        )
 
     def display_statistics(self, show_graph: bool = True) -> None:
         display_statistics(self, lambda renderables: logger.rich("INFO", renderables))

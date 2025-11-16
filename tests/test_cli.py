@@ -88,3 +88,80 @@ def test_cli_merge_requires_multiple_inputs(tmp_path: Path) -> None:
         ],
     )
     assert result_ok.exit_code == 0
+
+
+def test_display_summary_min_level_filtering() -> None:
+    """Test that display_summary filters checks by minimum level."""
+    from decimal import Decimal
+    from io import StringIO
+
+    from rich.console import Console
+
+    from cyvest.io_rich import display_summary
+
+    cv = Cyvest()
+
+    # Create observables and checks at different levels
+    # Score ranges: MALICIOUS >= 5.0, SUSPICIOUS 3.0-5.0, NOTABLE < 3.0, INFO = 0.0, NONE = unscored
+    obs_malicious = cv.observable("url", "https://malicious.com", internal=False)
+    obs_suspicious = cv.observable("url", "https://suspicious.com", internal=False)
+    obs_info = cv.observable("url", "https://info.com", internal=False)
+
+    cv.check("malicious_check", "network", "Malicious URL").link_observable(obs_malicious.get()).with_score(
+        Decimal("6.0")
+    )  # MALICIOUS
+    cv.check("suspicious_check", "network", "Suspicious URL").link_observable(obs_suspicious.get()).with_score(
+        Decimal("4.0")
+    )  # SUSPICIOUS
+    cv.check("info_check", "network", "Info URL").link_observable(obs_info.get()).with_score(Decimal("0.0"))  # INFO
+    # Create a check without score (Level.NONE)
+    cv.check("none_check", "network", "None URL").link_observable(obs_info.get())
+
+    # Test with default (Level.NONE) - should show all checks
+    output = StringIO()
+    console = Console(file=output, width=120)
+    display_summary(cv, console.print, show_graph=False, min_level=Level.NONE)
+    output_default = output.getvalue()
+
+    # Should contain all 4 checks
+    assert "malicious_check" in output_default
+    assert "suspicious_check" in output_default
+    assert "info_check" in output_default
+    assert "none_check" in output_default
+
+    # Test with Level.INFO - should exclude NONE
+    output = StringIO()
+    console = Console(file=output, width=120)
+    display_summary(cv, console.print, show_graph=False, min_level=Level.INFO)
+    output_info = output.getvalue()
+
+    assert "malicious_check" in output_info
+    assert "suspicious_check" in output_info
+    assert "info_check" in output_info
+    assert "none_check" not in output_info
+    assert "INFO" in output_info  # Level name should appear in caption
+
+    # Test with Level.SUSPICIOUS - should show only SUSPICIOUS and MALICIOUS
+    output = StringIO()
+    console = Console(file=output, width=120)
+    display_summary(cv, console.print, show_graph=False, min_level=Level.SUSPICIOUS)
+    output_suspicious = output.getvalue()
+
+    assert "malicious_check" in output_suspicious
+    assert "suspicious_check" in output_suspicious
+    assert "info_check" not in output_suspicious
+    assert "none_check" not in output_suspicious
+    assert "SUSPICIOUS" in output_suspicious  # Level name should appear in caption
+
+    # Test with Level.MALICIOUS - should show only MALICIOUS
+    output = StringIO()
+    console = Console(file=output, width=120)
+    display_summary(cv, console.print, show_graph=False, min_level=Level.MALICIOUS)
+    output_malicious = output.getvalue()
+
+    assert "malicious_check" in output_malicious
+    assert "suspicious_check" not in output_malicious
+    assert "info_check" not in output_malicious
+    assert "none_check" not in output_malicious
+    # Check that filtering info is displayed
+    assert "Displayed: 1" in output_malicious or "1 (min level" in output_malicious

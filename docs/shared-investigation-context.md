@@ -1,8 +1,15 @@
 # SharedInvestigationContext
 
+> **Note**: This is an advanced feature that requires direct import from `cyvest.investigation`. It is not part of the main `Cyvest` facade API.
+
 ## Overview
 
 The `SharedInvestigationContext` enables thread-safe sharing of observables and checks across multiple tasks in a multi-threaded investigation. This allows tasks to reuse and reference observables created by other tasks, preventing duplication and enabling aggregated checks.
+
+**Usage**: Import directly from the investigation module:
+```python
+from cyvest.investigation import SharedInvestigationContext, InvestigationTask
+```
 
 ## Features
 
@@ -189,7 +196,7 @@ Checks if an observable exists in the shared context.
 # Parameter-based check (recommended)
 if shared_context.has_observable(ObservableType.EMAIL_ADDR, "sender@domain.com"):
     # Observable exists
-    
+
 # Key-based check
 if shared_context.has_observable("obs:email-addr:sender@domain.com"):
     # Observable exists
@@ -209,7 +216,7 @@ Checks if a check exists in the shared context.
 if shared_context.has_check("malware_scan", "attachment"):
     # Check exists
 
-# Key-based check  
+# Key-based check
 if shared_context.has_check("chk:malware_scan:attachment"):
     # Check exists
 ```

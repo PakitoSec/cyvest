@@ -14,7 +14,7 @@
 - 🏷️ **STIX2 Type Support**: Built-in enums for STIX2 Observable and Relationship types with autocomplete
 - 📈 **Real-time Statistics**: Live metrics and aggregations throughout the investigation
 - 🔄 **Investigation Merging**: Combine investigations from multiple threads or processes
-- 🧵 **Multi-Threading Support**: Thread-safe shared context for parallel task execution with cross-task observable sharing
+- 🧵 **Multi-Threading Support**: Advanced thread-safe shared context available via `cyvest.investigation` module
 - 💾 **Multiple Export Formats**: JSON and Markdown output for reporting and LLM consumption
 - 🎨 **Rich Console Output**: Beautiful terminal displays with the Rich library
 - 🧩 **Fluent DSL**: Convenient API with method chaining for rapid development
@@ -225,14 +225,17 @@ with cv.container("network_analysis") as network:
 
 ### Multi-Threaded Investigations
 
-Use `SharedInvestigationContext` for thread-safe parallel task execution with automatic observable sharing:
+**Advanced Feature**: Use `SharedInvestigationContext` (imported directly from `cyvest.investigation`) for thread-safe parallel task execution with automatic observable sharing:
 
 ```python
-from cyvest.investigation import SharedInvestigationContext, InvestigationTask
+from cyvest import Cyvest
+from cyvest.investigation import SharedInvestigationContext, InvestigationTask, Investigation
 from concurrent.futures import ThreadPoolExecutor
 
 class EmailAnalysisTask(InvestigationTask):
     def run(self, shared_context):
+        # SharedInvestigationContext.create_cyvest() creates a Cyvest instance
+        # that auto-merges results when the context exits
         with shared_context.create_cyvest() as cy:
             # Access data from root observable
             data = cy.root().extra
@@ -287,16 +290,14 @@ See the `examples/` directory for complete examples:
 - **02_urls_and_ips.py**: Network investigation with URLs and IPs
 - **03_merge_demo.py**: Multi-process investigation merging
 - **04_email.py**: Multi-threaded investigation with SharedInvestigationContext
-- **05_stix2_types.py**: Using STIX2 Observable and Relationship type enums
-- **06_relationship_direction.py**: Explicit relationship direction modeling
-- **07_semantic_defaults.py**: Automatic semantic default directions for relationships
+- **05_visualization.py**: Interactive HTML visualization showcasing scores, levels, and relationship flows
 
 Run an example:
 
 ```bash
 python examples/01_email_basic.py
-python examples/05_stix2_types.py
-python examples/07_semantic_defaults.py
+python examples/04_email.py
+python examples/05_visualization.py
 ```
 
 ## CLI Usage
@@ -426,7 +427,7 @@ Cyvest is designed for:
 
 ## Architecture Highlights
 
-- **Thread-Safe**: SharedInvestigationContext provides thread-safe parallel task execution with cross-task observable sharing
+- **Thread-Safe**: Advanced `SharedInvestigationContext` (via `cyvest.investigation`) provides thread-safe parallel task execution
 - **Deterministic Keys**: Same objects always generate same keys for merging
 - **Score Propagation**: Automatic hierarchical score calculation
 - **Flexible Export**: JSON for storage, Markdown for LLM analysis

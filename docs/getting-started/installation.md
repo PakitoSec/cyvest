@@ -1,90 +1,89 @@
 # Installation
 
-## Requirements
+The fastest way to evaluate Cyvest is to install it in editable mode so the CLI, DSL, and docs stay in sync with your workspace.
 
-- Python 3.10 or higher
-- pip or uv package manager
+---
 
-## Using uv (Recommended)
+## Requirements Checklist
 
-[uv](https://github.com/astral-sh/uv) is a fast Python package installer and resolver.
+| Component | Minimum |
+| --- | --- |
+| Python | `>= 3.10` (3.11+ recommended for perf) |
+| Package manager | [uv](https://github.com/astral-sh/uv) **or** pip |
+| Tooling (dev profile) | `pytest`, `pytest-cov`, `ruff`, `mypy`, `mkdocs-material` |
 
-### Install uv
+!!! tip "Using the repository CLI?"
+    Run `uv pip install -e .` after syncing dependencies so local changes are immediately reflected in the `cyvest` command.
+
+---
+
+## Option 1 · uv (recommended)
 
 ```bash
-# On macOS and Linux
+# Install uv (macOS/Linux)
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# On Windows
+# Install uv (Windows PowerShell)
 powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
 ```
 
-### Install Cyvest
-
 ```bash
-# Clone the repository
-git clone https://github.com/yourusername/cyvest.git
+# Clone and bootstrap
+git clone https://github.com/PAKITOSEC/cyvest.git
 cd cyvest
 
-# Install dependencies
-uv sync
+# Sync runtime + dev extras defined in pyproject/uv.lock
+uv sync --all-extras
 
-# Install in development mode
+# Editable install to expose the CLI + module
 uv pip install -e .
 ```
 
-## Using pip
+---
+
+## Option 2 · pip
 
 ```bash
-# Clone the repository
-git clone https://github.com/yourusername/cyvest.git
+git clone https://github.com/PAKITOSEC/cyvest.git
 cd cyvest
 
-# Create virtual environment (recommended)
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+# (Recommended) create an isolated environment
+python -m venv .venv
+source .venv/bin/activate       # Windows: .venv\Scripts\activate
 
-# Install dependencies
+# Install runtime
 pip install -e .
-```
 
-## Verify Installation
-
-```bash
-# Check version
-python -c "import cyvest; print(cyvest.__version__)"
-
-# Run CLI
-cyvest --version
-```
-
-## Development Installation
-
-To install with development dependencies (testing, linting, documentation):
-
-```bash
-# Using uv
-uv sync --all-extras
-
-# Using pip
+# Install development profile
 pip install -e ".[dev]"
 ```
 
-This includes:
-- `pytest` for testing
-- `pytest-cov` for coverage reports
-- `ruff` for linting and formatting
-- `mypy` for type checking
-- `mkdocs` and `mkdocs-material` for documentation
+---
 
-## Optional Dependencies
+## Post-Install Validation
 
-Cyvest has minimal required dependencies by design:
-- `logurich` - Logging with Rich integration
-- `rich` - Beautiful terminal output
+```bash
+# Confirm the module resolves
+python -c "import cyvest; print(cyvest.__version__)"
 
-All other tools are optional development dependencies.
+# Confirm the CLI entrypoint
+cyvest --help
+```
+
+When dependencies change upstream, re-run `uv sync --all-extras` (or `pip install -e ".[dev]"`) to stay aligned with CI.
+
+---
+
+## Optional Integrations
+
+- `logurich` + `rich` for live terminal reporting
+- `mkdocs` + `mkdocs-material` for local docs previews (`mkdocs serve`)
+- Any asyncio, queue, or orchestration library—Cyvest stays synchronous but interoperates through shared context managers
+
+---
 
 ## Next Steps
 
-After installation, proceed to the [Quick Start Guide](quickstart.md) to begin using Cyvest.
+- Build your first investigation in [Quick Start](quickstart.md)
+- Deep dive into [Core Concepts](concepts.md)
+- Preview the docs site with `mkdocs serve`

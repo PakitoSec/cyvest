@@ -614,6 +614,6 @@ inv1.merge_investigation(inv2)
 
 ## Next Steps
 
-- Learn about [Observables](../guide/observables.md) in detail
-- Understand [Scoring & Levels](../guide/scoring.md)
-- Explore [DSL & Fluent API](../guide/dsl.md)
+- Learn about [Observables](#observables) in detail
+- Understand [Scoring & Levels](#scoring-system)
+- Explore the [Fluent DSL](quickstart.md#2-use-the-fluent-dsl-for-expressiveness) in practice

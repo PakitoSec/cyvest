@@ -1,146 +1,139 @@
 # Quick Start
 
-This guide will help you create your first cybersecurity investigation with Cyvest.
+Model a complete investigation, link observables, and produce a shareable report in minutes.
 
-## Basic Investigation
+---
 
-Let's analyze a suspicious email with a phishing URL:
+## 1. Create your first investigation
 
 ```python
 from decimal import Decimal
 from cyvest import Cyvest, Level, ObservableType
 
-# Create an investigation
 with Cyvest(data={"type": "email_analysis"}) as cv:
-    # Create a URL observable using STIX2 type
     phishing_url = cv.observable_create(
         ObservableType.URL,
         "https://fake-bank-login.com",
-        internal=False
+        internal=False,
     )
 
-    # Add threat intelligence
     cv.observable_add_threat_intel(
         phishing_url.key,
         source="virustotal",
         score=Decimal("8.5"),
         level=Level.MALICIOUS,
-        comment="Known phishing site"
+        comment="Known phishing site",
     )
 
-    # Create a check
     url_check = cv.check_create(
         "url_analysis",
         "email_body",
         "Analyze URLs in email",
-        score=Decimal("8.5")
+        score=Decimal("8.5"),
     )
-
-    # Link observable to check
     cv.check_link_observable(url_check.key, phishing_url.key)
 
-    # View results
-    print(f"Global Score: {cv.get_global_score()}")
-    print(f"Global Level: {cv.get_global_level()}")
+    print(cv.get_global_score(), cv.get_global_level())
 ```
 
-## Using the Fluent DSL
+!!! tip "Context-first mindset"
+    Pass incident metadata through `Cyvest(data={...})`. Every container, check, and export inherits it so you never lose analyst intent.
 
-Cyvest provides a fluent API for more concise code:
+---
+
+## 2. Use the fluent DSL for expressiveness
 
 ```python
 from decimal import Decimal
 from cyvest import Cyvest, Level, ObservableType, RelationshipType
 
 with Cyvest() as cv:
-    # Create and configure observable in one chain
     url = (
         cv.observable(ObservableType.URL, "https://malicious.com", internal=False)
         .with_ti("virustotal", score=Decimal("8.5"), level=Level.MALICIOUS)
         .relate_to(cv.root(), RelationshipType.RELATED_TO)
     )
 
-    # Create check and link observable
-    check = (
+    (
         cv.check("url_check", "analysis", "Check suspicious URL")
         .link_observable(url.get())
         .with_score(Decimal("8.5"))
     )
 ```
 
-## Working with Relationships
+**Why the DSL?**
 
-Track relationships between observables with automatic semantic defaults:
+- Deterministic keys let you merge multiple builders without collisions.
+- Relationships infer default directions from STIX2 semantics.
+- Handlers expose `.get()` so you can pivot back to immutable models when needed.
+
+---
+
+## 3. Capture relationships with intent
 
 ```python
-from cyvest import ObservableType, RelationshipType
+from cyvest import ObservableType, RelationshipDirection, RelationshipType
 
 with Cyvest() as cv:
-    # Create URL and IP with STIX2 types
     url = cv.observable_create(ObservableType.URL, "http://c2-server.com")
     ip = cv.observable_create(ObservableType.IPV4_ADDR, "192.0.2.100", internal=False)
+    cv.observable_add_relationship(url, ip, RelationshipType.RESOLVES_TO)  # OUTBOUND
 
-    # Automatically gets OUTBOUND direction (domain → IP)
-    # Accepts Observable objects directly
-    cv.observable_add_relationship(url, ip, RelationshipType.RESOLVES_TO)
-
-    # Using fluent API (also uses semantic defaults)
-    # Accepts Observable objects, ObservableHandler, or string keys
     domain = (
         cv.observable(ObservableType.DOMAIN_NAME, "c2-server.com", internal=False)
-        .relate_to(ip, RelationshipType.RESOLVES_TO)  # auto: OUTBOUND
+        .relate_to(ip, RelationshipType.RESOLVES_TO)
     )
 
-    # Automatically gets BIDIRECTIONAL for mutual communication
     host1 = cv.observable_create(ObservableType.IPV4_ADDR, "10.0.1.10", internal=True)
     host2 = cv.observable_create(ObservableType.IPV4_ADDR, "10.0.1.20", internal=True)
-    cv.observable_add_relationship(
-        host1,  # Observable object
-        host2,  # Observable object
-        RelationshipType.COMMUNICATES_WITH  # auto: BIDIRECTIONAL ↔
-    )
+    cv.observable_add_relationship(host1, host2, RelationshipType.COMMUNICATES_WITH)  # BIDIRECTIONAL
 
-    # Automatically gets INBOUND (file ← source)
     malware = cv.observable_create(ObservableType.FILE, "payload.exe", internal=False)
+    cv.observable_add_relationship(malware.key, url.key, RelationshipType.DOWNLOADED)  # INBOUND
+
     cv.observable_add_relationship(
-        malware.key,
         url.key,
-        RelationshipType.DOWNLOADED  # auto: INBOUND ←
-    )
-
-    # Can still override defaults if needed
-    from cyvest import RelationshipDirection
-    cv.observable_add_relationship(
-        url.key, ip.key,
+        ip.key,
         RelationshipType.RESOLVES_TO,
-        RelationshipDirection.INBOUND  # explicit override
+        RelationshipDirection.INBOUND,  # explicit override
     )
 ```
-```
 
-## Organizing with Containers
+!!! info "Default directions"
+    - `RESOLVES_TO`: domain → IP (`OUTBOUND`)
+    - `DOWNLOADED`: file ← source (`INBOUND`)
+    - `COMMUNICATES_WITH`: symmetric (`BIDIRECTIONAL`)
 
-Structure your investigation with containers:
+---
+
+## 4. Organize workstreams with containers
 
 ```python
 with Cyvest() as cv:
-    # Create container
-    with cv.container("network_analysis") as network:
-        # Create checks in container
-        check = (
+    with cv.container("network_analysis", "Network telemetry") as network:
+        (
             cv.check("c2_detection", "network", "Detect C2 communication")
             .in_container(network)
         )
+
+        # Nesting is encouraged for larger stories
+        with network.sub_container("east_dc", "East datacenter") as east:
+            (
+                cv.check("ids_east", "network", "IDS signals from east DC")
+                .in_container(east)
+            )
 ```
 
-## Exporting Results
+Containers keep checks, sub-containers, and metrics scoped. They also enable reporting sections inside Markdown exports.
 
-Save your investigation:
+---
+
+## 5. Export and share
 
 ```python
 from cyvest.io_serialization import (
     save_investigation_json,
-    save_investigation_markdown
+    save_investigation_markdown,
 )
 from cyvest.io_rich import display_summary
 from rich.console import Console
@@ -148,18 +141,20 @@ from rich.console import Console
 with Cyvest() as cv:
     # ... build investigation ...
 
-    # Display in terminal
     console = Console()
     display_summary(cv, console)
 
-    # Save to files
     save_investigation_json(cv, "investigation.json")
     save_investigation_markdown(cv, "report.md")
 ```
 
+!!! question "Where do exports live?"
+    The docs assume you write to the project root, but automation pipelines typically point to `dist/` (JSON) and `reports/` (Markdown/PDF). Adjust paths to match your workflow.
+
+---
+
 ## Next Steps
 
-- Learn about [Core Concepts](concepts.md)
-- Explore the [User Guide](../guide/observables.md)
-- Check out [Examples](../examples/email.md)
-- Read the [API Reference](../api/cyvest.md)
+- Deep dive into the [Core Concepts](concepts.md) for scoring and levels
+- Explore concurrency via [Shared Investigation Context](../shared-investigation-context.md)
+- Browse the `examples/` directory for end-to-end scenarios

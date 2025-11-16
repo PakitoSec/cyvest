@@ -448,6 +448,45 @@ print(f"Score: {uncertain.score}, Level: {uncertain.level}")
 
 The SAFE protection **only applies to the SAFE level itself**. Other explicit levels (set via `set_level()`) don't have the same protection and can be overridden by higher calculated levels according to the normal rules.
 
+**SAFE Propagation to Checks:**
+
+Checks automatically inherit the SAFE level from their linked observables under specific conditions:
+
+1. **At least one** linked observable has `Level.SAFE`
+2. **All** other linked observables have levels ≤ SAFE (NONE, TRUSTED, INFO, or SAFE)
+3. The check's current level is < SAFE
+
+When these conditions are met, the check is automatically set to SAFE level, overriding any previous level assignment.
+
+```python
+from cyvest import Cyvest, Level
+
+cv = Cyvest()
+
+# Create a check
+check = cv.check_create("domain_check", "network", "Analyze domain reputation")
+
+# Link a SAFE observable
+safe_domain = cv.observable_create("domain", "trusted.example.com", level=Level.SAFE)
+cv.check_link_observable(check.key, safe_domain.key)
+
+# Check inherits SAFE level from the observable
+print(f"Check level: {check.level}")  # Output: Check level: SAFE
+
+# Add INFO-level observables - check remains SAFE
+info_ip = cv.observable_create("ipv4-addr", "192.0.2.1")
+cv.check_link_observable(check.key, info_ip.key)
+print(f"Check level: {check.level}")  # Output: Check level: SAFE
+
+# Add MALICIOUS observable - check upgrades to MALICIOUS
+malicious_url = cv.observable_create("url", "http://malware.example")
+cv.observable_add_threat_intel(malicious_url.key, "virustotal", score=Decimal("8.0"))
+cv.check_link_observable(check.key, malicious_url.key)
+print(f"Check level: {check.level}")  # Output: Check level: MALICIOUS
+```
+
+This propagation ensures that checks analyzing whitelisted/trusted assets are properly marked as SAFE, while still allowing upgrades when actual threats are discovered.
+
 ## Relationships
 
 Relationships follow **STIX2 conventions** with built-in type support.

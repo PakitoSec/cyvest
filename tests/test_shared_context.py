@@ -236,10 +236,7 @@ def test_cross_task_observable_sharing():
 
         # Create URL and link to domain (correct pattern: use cy.observable())
         url = cy2.observable(ObservableType.URL, data["url"])
-        url.relate_to(
-            cy2.observable(ObservableType.DOMAIN_NAME, "malicious.com"),
-            RelationshipType.RESOLVES_TO
-        )
+        url.relate_to(cy2.observable(ObservableType.DOMAIN_NAME, "malicious.com"), RelationshipType.RESOLVES_TO)
 
     # Verify final investigation has both observables
     final_inv = shared.get_investigation()

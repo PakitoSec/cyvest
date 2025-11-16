@@ -293,13 +293,9 @@ class SharedInvestigationContext:
             try:
                 key = keys.generate_check_key(check_id, scope)
             except Exception as e:
-                raise ValueError(
-                    f"Failed to generate check key for check_id='{check_id}', scope='{scope}': {e}"
-                ) from e
+                raise ValueError(f"Failed to generate check key for check_id='{check_id}', scope='{scope}': {e}") from e
         else:
-            raise ValueError(
-                "get_check() accepts either (key: str) or (check_id: str, scope: str)"
-            )
+            raise ValueError("get_check() accepts either (key: str) or (check_id: str, scope: str)")
 
         with self._lock:
             check = self._check_registry.get(key)
@@ -453,13 +449,9 @@ class SharedInvestigationContext:
             try:
                 key = keys.generate_check_key(check_id, scope)
             except Exception as e:
-                raise ValueError(
-                    f"Failed to generate check key for check_id='{check_id}', scope='{scope}': {e}"
-                ) from e
+                raise ValueError(f"Failed to generate check key for check_id='{check_id}', scope='{scope}': {e}") from e
         else:
-            raise ValueError(
-                "has_check() accepts either (key: str) or (check_id: str, scope: str)"
-            )
+            raise ValueError("has_check() accepts either (key: str) or (check_id: str, scope: str)")
 
         with self._lock:
             return key in self._check_registry
@@ -891,11 +883,11 @@ class Investigation:
         target_key = target.key if isinstance(target, Observable) else target
 
         # Check if target is a copy from shared context (anti-pattern)
-        if isinstance(target, Observable) and getattr(target, '_from_shared_context', False):
+        if isinstance(target, Observable) and getattr(target, "_from_shared_context", False):
             obs_type_name = (
                 target.obs_type.name
-                if hasattr(target.obs_type, 'name')
-                else str(target.obs_type).upper().replace('-', '_')
+                if hasattr(target.obs_type, "name")
+                else str(target.obs_type).upper().replace("-", "_")
             )
             raise ValueError(
                 f"Cannot use observable from shared_context.get_observable() directly in relationships.\n"
@@ -1077,13 +1069,9 @@ class Investigation:
             try:
                 key = keys.generate_check_key(check_id, scope)
             except Exception as e:
-                raise ValueError(
-                    f"Failed to generate check key for check_id='{check_id}', scope='{scope}': {e}"
-                ) from e
+                raise ValueError(f"Failed to generate check key for check_id='{check_id}', scope='{scope}': {e}") from e
         else:
-            raise ValueError(
-                "get_check() accepts either (key: str) or (check_id: str, scope: str)"
-            )
+            raise ValueError("get_check() accepts either (key: str) or (check_id: str, scope: str)")
         return self._checks.get(key)
 
     def get_container(self, key: str) -> Container | None:

@@ -1,304 +1,122 @@
 # Contributing to Cyvest
 
-Thank you for your interest in contributing to Cyvest! This document provides guidelines and instructions for contributing.
-
-## Development Setup
-
-1. **Fork and Clone**
-   ```bash
-   git clone https://github.com/PakitoSec/cyvest.git
-   cd cyvest
-   ```
-
-2. **Install Dependencies**
-   ```bash
-   # Using uv (recommended)
-   uv sync --all-extras
-
-   # Or using pip
-   pip install -e ".[dev]"
-   ```
-
-3. **Verify Setup**
-   ```bash
-   pytest
-   ruff check .
-   mypy src/cyvest
-   ```
-
-## Development Workflow
-
-### 1. Create a Branch
-
-```bash
-git checkout -b feature/your-feature-name
-# or
-git checkout -b fix/issue-description
-```
-
-### 2. Make Changes
-
-- Write clear, documented code
-- Follow existing code style
-- Add tests for new features
-- Update documentation as needed
-
-### 3. Run Tests
-
-```bash
-# Run all tests
-pytest
-
-# Run with coverage
-pytest --cov=cyvest --cov-report=html
-
-# Run specific test file
-pytest tests/test_model.py
-
-# Run with verbose output
-pytest -v
-```
-
-### 4. Check Code Quality
-
-```bash
-# Format code
-ruff format .
-
-# Lint code
-ruff check .
-
-# Type check
-mypy src/cyvest
-
-# Fix auto-fixable issues
-ruff check --fix .
-```
-
-### 5. Commit Changes
-
-Write clear commit messages:
-
-```bash
-git add .
-git commit -m "feat: add new observable type support"
-# or
-git commit -m "fix: resolve score propagation issue"
-# or
-git commit -m "docs: update API reference"
-```
-
-Commit message prefixes:
-- `feat:` - New feature
-- `fix:` - Bug fix
-- `docs:` - Documentation changes
-- `test:` - Test additions/changes
-- `refactor:` - Code refactoring
-- `perf:` - Performance improvements
-- `chore:` - Maintenance tasks
-
-### 6. Push and Create PR
-
-```bash
-git push origin feature/your-feature-name
-```
-
-Then create a Pull Request on GitHub with:
-- Clear description of changes
-- Reference to related issues
-- Screenshots/examples if applicable
-
-## Architecture Overview
-
-### Core Components
-
-Cyvest uses a clean layered architecture:
-
-1. **`Investigation`** (`src/cyvest/investigation.py`): Core state management
-   - Owns all object collections (observables, checks, threat intels, etc.)
-   - Handles automatic merge-on-create for all object types
-   - Integrates `ScoreEngine` and `InvestigationStats` internally
-   - All merge logic is private to this class
-
-2. **`Cyvest`** (`src/cyvest/cyvest.py`): High-level API facade
-   - Delegates all operations to `Investigation`
-   - Provides user-facing API
-   - Maintains backward compatibility
-
-3. **DSL Handlers** (`src/cyvest/dsl.py`): Fluent interface
-   - Work directly with `Investigation` for performance
-   - Enable method chaining
-   - Simplify complex operations
-
-4. **Model Classes** (`src/cyvest/model.py`): Data models
-   - Observable, Check, ThreatIntel, Enrichment, Container
-   - Immutable after creation (except for merging)
-
-### Merge-on-Create System
-
-When adding any object to an investigation:
-1. Check if an object with the same key already exists
-2. If yes: merge incoming data into existing object
-3. If no: register as new object
-
-This eliminates the need for separate merge operations and ensures consistency.
-
-## Code Style
-
-### Python Style
-
-- Follow PEP 8
-- Use type hints for all functions
-- Maximum line length: 120 characters
-- Use descriptive variable names
-- Add docstrings for all public functions/classes
-
-### Example
-
-```python
-def observable_create(
-    self,
-    obs_type: str,
-    value: str,
-    internal: bool = True,
-    score: Decimal | None = None,
-) -> Observable:
-    """
-    Create a new observable.
-
-    Args:
-        obs_type: Type of observable (ip, url, domain, etc.)
-        value: Value of the observable
-        internal: Whether this is an internal asset
-        score: Optional explicit score
-
-    Returns:
-        The created observable
-    """
-    # Implementation
-    pass
-```
-
-### Documentation
-
-- Use Google-style docstrings
-- Document all parameters and return values
-- Include examples for complex functions
-- Update user guide when adding features
-
-## Testing Guidelines
-
-### Test Structure
-
-```python
-def test_feature_description() -> None:
-    """Test that feature behaves correctly."""
-    # Arrange
-    cv = Cyvest()
-
-    # Act
-    result = cv.some_method()
-
-    # Assert
-    assert result.expected_value == expected
-```
-
-### Test Coverage
-
-- Aim for >90% test coverage
-- Test happy paths and error cases
-- Test edge cases
-- Test integration between components
-
-### Running Specific Tests
-
-```bash
-# Run single test
-pytest tests/test_model.py::test_observable_creation
-
-# Run tests matching pattern
-pytest -k "observable"
-
-# Run with markers
-pytest -m "slow"
-```
-
-## Documentation
-
-### Building Documentation
-
-```bash
-# Serve locally
-mkdocs serve
-
-# Build static site
-mkdocs build
-
-# Deploy to GitHub Pages
-mkdocs gh-deploy
-```
-
-### Documentation Structure
-
-- **Getting Started**: Installation, quickstart, concepts
-- **User Guide**: Detailed feature documentation
-- **API Reference**: Auto-generated from docstrings
-- **Examples**: Working code examples
-
-## Pull Request Process
-
-1. **Update Tests**: Add tests for new features
-2. **Update Docs**: Update relevant documentation
-3. **Run CI Checks**: Ensure all tests pass
-4. **Request Review**: Tag maintainers for review
-5. **Address Feedback**: Respond to review comments
-6. **Merge**: Maintainer will merge when ready
-
-## Issue Guidelines
-
-### Reporting Bugs
-
-Include:
-- Python version (>=3.10 required)
-- Cyvest version (current: 1.0.0)
-- Minimal reproduction example
-- Expected vs actual behavior
-- Error messages/stack traces
-
-### Requesting Features
-
-Include:
-- Clear use case description
-- Proposed API/interface
-- Examples of how it would be used
-- Alternative solutions considered
-
-## Code of Conduct
-
-### Our Standards
-
-- Be respectful and inclusive
-- Accept constructive criticism
-- Focus on what's best for the community
-- Show empathy towards others
-
-### Unacceptable Behavior
-
-- Harassment or discriminatory language
-- Trolling or insulting comments
-- Publishing others' private information
-- Other unprofessional conduct
-
-## Questions?
-
-- Open a GitHub Discussion
-- Join our community chat
-- Email the maintainers
-
-## License
-
-By contributing, you agree that your contributions will be licensed under the MIT License.
+Thank you for helping us build a better investigation framework. This guide captures the recommended workflow, tooling, and review expectations so contributions stay consistent and easy to merge.
 
 ---
 
-**Thank you for contributing to Cyvest!** 🎉
+## Before You Start
+
+| Task | Command |
+| --- | --- |
+| Fork and clone | `git clone https://github.com/PAKITOSEC/cyvest.git && cd cyvest` |
+| Install runtime + dev deps (uv) | `uv sync --all-extras && uv pip install -e .` |
+| Install runtime + dev deps (pip) | `pip install -e . && pip install -e ".[dev]"` |
+| Smoke test environment | `pytest && ruff check . && mypy src/cyvest` |
+
+!!! note "Code of Conduct"
+    We expect respectful, inclusive collaboration. Report unacceptable behaviour via GitHub Discussions or email.
+
+---
+
+## Standard Workflow
+
+1. **Plan** — Align on scope in an issue or GitHub Discussion. Complex changes benefit from a short design note.
+2. **Branch** — `git checkout -b feat/new-dsl-handler` (keep prefixes meaningful: `feat`, `fix`, `docs`, `test`, `chore`).
+3. **Code** — Prefer small, focused commits. Mirror the module layout (`src/cyvest`, `tests/`, `docs/`).
+4. **Validate** — Run the quality gates below before you push.
+5. **Document** — Update relevant docs/snippets whenever behaviour changes.
+6. **Submit** — Push your branch and open a PR describing motivation, approach, tests, and screenshots/CLI output when applicable.
+
+---
+
+## Quality Gates
+
+```bash
+# Fast feedback loop
+ruff format .
+ruff check .
+mypy src/cyvest
+pytest
+
+# Full coverage / HTML report when touching scoring logic
+pytest --cov=cyvest --cov-report=term-missing --cov-report=html
+```
+
+!!! tip "Docs changed?"
+    Run `mkdocs serve` for live preview or `mkdocs build` before pushing to catch broken links or syntax errors. The docs use the Material theme with extra Markdown extensions enabled.
+
+---
+
+## Architecture Cliff Notes
+
+| Layer | Role | Files |
+| --- | --- | --- |
+| **Investigation** | Authoritative state: observables, checks, TI, containers, score engine | `src/cyvest/investigation.py` |
+| **Cyvest facade** | Public API + CLI entry, manages deterministic keys, exposes DSL helpers | `src/cyvest/cyvest.py`, `src/cyvest/cli.py` |
+| **DSL handlers** | Fluent builders for observables/checks/containers with merge-on-create semantics | `src/cyvest/dsl.py` |
+| **Models** | Dataclasses for Observables, Checks, ThreatIntel, etc. | `src/cyvest/model.py` |
+| **Scoring** | Score modes, propagation, and level determination | `src/cyvest/score.py` |
+
+**Merge-on-create** keeps duplicates out by checking keys before inserts. When extending the DSL, call back into `Investigation` for validation rather than mutating models directly.
+
+---
+
+## Testing Guidelines
+
+- Prefer pytest-style fixtures and descriptive test names (`test_score_propagates_to_parent`).
+- Separate behaviour tests (DSL, CLI) from data-model regression tests.
+- When touching concurrency/shared context, add a stress case under `tests/test_shared_context.py` or a new module.
+- Keep coverage above 90% for touched modules; justify unavoidable gaps in the PR.
+
+Example skeleton:
+
+```python
+def test_observable_merges_by_key() -> None:
+    cv = Cyvest()
+
+    first = cv.observable_create("url", "https://example.com")
+    second = cv.observable_create("url", "https://example.com")
+
+    assert first.key == second.key
+    assert cv.observable_get(first.key) is not None
+```
+
+---
+
+## Documentation Expectations
+
+- User-facing changes require updates under `docs/` and, when applicable, a snippet in `README.md`.
+- The docs site uses [MkDocs Material](https://squidfunk.github.io/mkdocs-material/). Enable the live preview with `mkdocs serve`.
+- Keep prose in plain Markdown, use admonitions (`!!! note`) for callouts, and add code fences with `python`, `bash`, etc.
+
+---
+
+## Pull Requests
+
+**Template**
+
+1. Motivation / user-facing impact
+2. Summary of design decisions
+3. Testing evidence (commands + key output)
+4. Screenshots / CLI snippets for Rich output or docs updates
+
+Maintainers will review for correctness, coverage, docs, and adherence to coding style. Expect feedback on naming, error handling, and scoring regressions.
+
+---
+
+## Issue Guidelines
+
+| Type | Include |
+| --- | --- |
+| **Bug** | Python + Cyvest versions, reproduction snippet, expected vs. actual behaviour, stack traces |
+| **Feature** | Use case, desired API/CLI, example output, alternative approaches considered |
+
+For quick questions or architecture discussions, open a GitHub Discussion before filing a feature request.
+
+---
+
+## Release & Licensing
+
+All contributions fall under the MIT License. By submitting a PR you confirm you own the work and grant permission to license it accordingly.
+
+Thank you for investing time and care into Cyvest! 🎉

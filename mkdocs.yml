@@ -1,0 +1,71 @@
+site_name: Cyvest
+site_description: Build, score, and narrate cybersecurity investigations with confidence.
+site_url: https://example.com/cyvest
+repo_url: https://github.com/PAKITOSEC/cyvest
+repo_name: PAKITOSEC/cyvest
+edit_uri: edit/main/docs/
+
+docs_dir: docs
+
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.path
+    - navigation.top
+    - navigation.expand
+    - toc.integrate
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.action.edit
+    - content.tabs.link
+  palette:
+    - scheme: default
+      primary: blue
+      accent: lime
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - scheme: slate
+      primary: blue
+      accent: lime
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  icon:
+    repo: fontawesome/brands/github
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/PAKITOSEC/cyvest
+      name: Cyvest on GitHub
+    - icon: fontawesome/brands/twitter
+      link: https://twitter.com/pakitosec
+      name: PakitoSec on Twitter
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Installation: getting-started/installation.md
+      - Quickstart: getting-started/quickstart.md
+      - Concepts: getting-started/concepts.md
+  - Shared Investigation Context: shared-investigation-context.md
+  - Contributing: contributing.md
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - toc:
+      permalink: true
+  - tables
+  - def_list
+  - codehilite

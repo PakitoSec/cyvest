@@ -320,6 +320,10 @@ SAFE observables:
 - Protection is preserved during investigation merges
 - Can be marked SAFE by threat intel sources (e.g., whitelists, reputation databases)
 
+SAFE checks:
+- Automatically inherit SAFE level when linked to SAFE observables (if all other observables are ≤ SAFE)
+- Can still upgrade to higher levels when NOTABLE/SUSPICIOUS/MALICIOUS observables are linked
+
 ## Examples
 
 See the `examples/` directory for complete examples:

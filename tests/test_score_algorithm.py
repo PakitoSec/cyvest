@@ -756,3 +756,122 @@ def test_threat_intel_safe_level_with_none_observable() -> None:
     
     # Observable should be SAFE
     assert obs.level == Level.SAFE
+
+
+def test_check_inherits_safe_from_single_observable() -> None:
+    """Test that a check inherits SAFE level from a single SAFE observable."""
+    cv = Cyvest()
+
+    # Create check
+    check = cv.check_create("safe_check", "test", "Test SAFE inheritance")
+    assert check.level == Level.NONE
+
+    # Create SAFE observable and link to check
+    safe_obs = cv.observable_create("domain", "trusted.example.com", level=Level.SAFE)
+    cv.check_link_observable(check.key, safe_obs.key)
+
+    # Check should inherit SAFE level
+    assert check.level == Level.SAFE
+
+
+def test_check_inherits_safe_from_multiple_observables_all_lower() -> None:
+    """Test that a check inherits SAFE when has SAFE observable and others are lower."""
+    cv = Cyvest()
+
+    # Create check
+    check = cv.check_create("safe_check", "test", "Test SAFE inheritance")
+
+    # Create mixed observables: SAFE, INFO, TRUSTED
+    safe_obs = cv.observable_create("domain", "trusted.example.com", level=Level.SAFE)
+    info_obs = cv.observable_create("ip", "10.0.0.1")  # default INFO level
+    trusted_obs = cv.observable_create("ip", "10.0.0.2")
+    cv.observable_add_threat_intel(trusted_obs.key, "source", score=Decimal("-1.0"))  # TRUSTED level
+
+    # Link all to check
+    cv.check_link_observable(check.key, safe_obs.key)
+    cv.check_link_observable(check.key, info_obs.key)
+    cv.check_link_observable(check.key, trusted_obs.key)
+
+    # Check should inherit SAFE level (all observables <= SAFE)
+    assert check.level == Level.SAFE
+
+
+def test_check_does_not_inherit_safe_when_notable_present() -> None:
+    """Test that a check does NOT inherit SAFE when any observable is NOTABLE or higher."""
+    cv = Cyvest()
+
+    # Create check
+    check = cv.check_create("check1", "test", "Test check")
+
+    # Create mixed observables: SAFE and NOTABLE
+    safe_obs = cv.observable_create("domain", "trusted.example.com", level=Level.SAFE)
+    notable_obs = cv.observable_create("ip", "10.0.0.1")
+    cv.observable_add_threat_intel(notable_obs.key, "source", score=Decimal("2.0"))  # NOTABLE level
+
+    # Link both to check
+    cv.check_link_observable(check.key, safe_obs.key)
+    cv.check_link_observable(check.key, notable_obs.key)
+
+    # Check should be NOTABLE (not SAFE) because one observable is NOTABLE
+    assert check.level == Level.NOTABLE
+
+
+def test_check_safe_preserved_when_adding_low_level_observables() -> None:
+    """Test that check SAFE level is preserved when adding INFO/TRUSTED observables."""
+    cv = Cyvest()
+
+    # Create check with SAFE observable
+    check = cv.check_create("safe_check", "test", "Test SAFE preservation")
+    safe_obs = cv.observable_create("domain", "trusted.example.com", level=Level.SAFE)
+    cv.check_link_observable(check.key, safe_obs.key)
+
+    # Check should be SAFE
+    assert check.level == Level.SAFE
+
+    # Add INFO observable
+    info_obs = cv.observable_create("ip", "10.0.0.1")
+    cv.check_link_observable(check.key, info_obs.key)
+
+    # Check should remain SAFE
+    assert check.level == Level.SAFE
+
+
+def test_check_safe_upgrades_to_malicious_when_malicious_observable_added() -> None:
+    """Test that check can upgrade from SAFE to MALICIOUS when MALICIOUS observable is linked."""
+    cv = Cyvest()
+
+    # Create check with SAFE observable
+    check = cv.check_create("check1", "test", "Test SAFE upgrade")
+    safe_obs = cv.observable_create("domain", "trusted.example.com", level=Level.SAFE)
+    cv.check_link_observable(check.key, safe_obs.key)
+
+    # Check should be SAFE
+    assert check.level == Level.SAFE
+
+    # Add MALICIOUS observable
+    malicious_obs = cv.observable_create("ip", "10.0.0.1")
+    cv.observable_add_threat_intel(malicious_obs.key, "source", score=Decimal("6.0"))  # MALICIOUS
+    cv.check_link_observable(check.key, malicious_obs.key)
+
+    # Check should upgrade to MALICIOUS
+    assert check.level == Level.MALICIOUS
+
+
+def test_check_safe_with_multiple_safe_observables() -> None:
+    """Test that check inherits SAFE when multiple observables are all SAFE."""
+    cv = Cyvest()
+
+    # Create check
+    check = cv.check_create("safe_check", "test", "Test multiple SAFE")
+
+    # Create multiple SAFE observables
+    safe_obs1 = cv.observable_create("domain", "trusted1.example.com", level=Level.SAFE)
+    safe_obs2 = cv.observable_create("domain", "trusted2.example.com", level=Level.SAFE)
+
+    # Link all to check
+    cv.check_link_observable(check.key, safe_obs1.key)
+    cv.check_link_observable(check.key, safe_obs2.key)
+
+    # Check should be SAFE
+    assert check.level == Level.SAFE
+

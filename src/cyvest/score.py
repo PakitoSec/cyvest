@@ -215,17 +215,22 @@ class ScoreEngine:
         Check score is calculated as the maximum of all linked observables' scores
         and the check's current score.
 
+        Check level inherits SAFE if any linked observable is SAFE and all others are
+        lower than or equal to SAFE (NONE, TRUSTED, INFO, SAFE).
+
         Args:
             observable: The observable to check
         """
         for check in self._checks.values():
             # Check if this observable is linked to the check (directly or through relationships)
             if self._is_observable_linked_to_check(observable, check):
-                # Collect all linked observable scores
+                # Collect all linked observable scores and observables
                 linked_scores = []
+                linked_observables = []
                 for obs in self._observables.values():
                     if self._is_observable_linked_to_check(obs, check):
                         linked_scores.append(obs.score)
+                        linked_observables.append(obs)
 
                 # Calculate new check score as max of all linked observables and current check score
                 if linked_scores:
@@ -233,6 +238,15 @@ class ScoreEngine:
 
                     if new_check_score != check.score:
                         check.update_score(new_check_score, reason=f"Linked observable {observable.key} updated")
+
+                # Check SAFE level propagation: if any observable is SAFE and all are <= SAFE,
+                # set check to SAFE (overrides any previous level)
+                if linked_observables:
+                    has_safe = any(obs.level == Level.SAFE for obs in linked_observables)
+                    all_lower_or_safe = all(obs.level <= Level.SAFE for obs in linked_observables)
+
+                    if has_safe and all_lower_or_safe and check.level < Level.SAFE:
+                        check.set_level(Level.SAFE)
 
     def _is_observable_linked_to_check(self, observable: "Observable", check: "Check", indirect: bool = False) -> bool:
         """

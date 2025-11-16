@@ -46,6 +46,11 @@ dev = [
     "pytest-cov>=6.0.0",
     "ruff>=0.6",
 ]
+docs = [
+    "mkdocs>=1.6.0",
+    "mkdocs-material>=9.5.39",
+    "pymdown-extensions>=10.11",
+]
 
 [tool.ruff]
 target-version = "py310"

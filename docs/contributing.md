@@ -47,7 +47,7 @@ pytest --cov=cyvest --cov-report=term-missing --cov-report=html
 
 ---
 
-## Architecture Cliff Notes
+## Architecture Cliff Notes {: #architecture-overview }
 
 | Layer | Role | Files |
 | --- | --- | --- |

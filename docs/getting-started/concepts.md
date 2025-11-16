@@ -616,4 +616,4 @@ inv1.merge_investigation(inv2)
 
 - Learn about [Observables](#observables) in detail
 - Understand [Scoring & Levels](#scoring-system)
-- Explore the [Fluent DSL](quickstart.md#2-use-the-fluent-dsl-for-expressiveness) in practice
+- Explore the [Fluent DSL](quickstart.md#using-the-fluent-dsl) in practice

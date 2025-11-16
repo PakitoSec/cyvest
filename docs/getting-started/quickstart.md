@@ -41,7 +41,7 @@ with Cyvest(data={"type": "email_analysis"}) as cv:
 
 ---
 
-## 2. Use the fluent DSL for expressiveness
+## 2. Use the fluent DSL for expressiveness {: #using-the-fluent-dsl }
 
 ```python
 from decimal import Decimal
@@ -128,7 +128,7 @@ Containers keep checks, sub-containers, and metrics scoped. They also enable rep
 
 ---
 
-## 5. Export and share
+## 5. Export and share {: #exporting-results }
 
 ```python
 from cyvest.io_serialization import (

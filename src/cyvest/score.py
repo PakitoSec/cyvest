@@ -75,6 +75,11 @@ class ScoreEngine:
             ti: The threat intel providing the score
             observable: The observable to update
         """
+        # Special handling for SAFE level threat intel
+        # If TI has SAFE level and observable level is lower, upgrade observable to SAFE
+        if ti.level == Level.SAFE and observable.level < Level.SAFE:
+            observable.set_level(Level.SAFE)
+        
         # Calculate the new observable score (includes TI scores and child scores)
         new_score = self._calculate_observable_score(observable)
 

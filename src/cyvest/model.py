@@ -365,6 +365,10 @@ class Observable:
         if not isinstance(self.score, Decimal):
             self.score = Decimal(str(self.score))
 
+        # If level is explicitly set to SAFE, mark it as explicit to prevent downgrades
+        if self.level == Level.SAFE:
+            self.set_level(Level.SAFE)
+
         # Initialize shared context marker (will be set to True for copies from registry)
         if not hasattr(self, "_from_shared_context"):
             self._from_shared_context = False
@@ -388,8 +392,14 @@ class Observable:
         # Calculate new level from score
         calculated_level = get_level_from_score(self.score)
 
+        # Special protection for SAFE level: only allow upgrades, not downgrades
+        if self._explicit_level and self.level == Level.SAFE:
+            # SAFE can only be upgraded to higher levels (NOTABLE, SUSPICIOUS, MALICIOUS)
+            if calculated_level >= Level.SAFE:
+                self.level = calculated_level
+            # Otherwise keep SAFE level even if score suggests lower level
         # Update level only if calculated is higher or level wasn't explicitly set
-        if not self._explicit_level or calculated_level > self.level:
+        elif not self._explicit_level or calculated_level > self.level:
             self.level = calculated_level
 
         # Record the change

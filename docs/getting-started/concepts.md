@@ -336,12 +336,12 @@ Levels are automatically calculated from scores:
 | >= 5.0 | MALICIOUS |
 
 Special cases:
-- **SAFE**: Explicitly set for whitelisted items
+- **SAFE**: Explicitly set for whitelisted/trusted items with downgrade protection
 - **NONE**: Default for new checks (no classification)
 
-### Explicit vs. Calculated
+### Explicit vs. Calculated Levels
 
-You can set levels explicitly or let them be calculated:
+You can set levels explicitly or let them be calculated from scores:
 
 ```python
 # Calculated from score
@@ -353,6 +353,100 @@ obs.set_level(Level.SAFE)  # Overrides calculation
 # Higher calculated level wins
 obs.update_score(Decimal("9.0"))  # Changes to MALICIOUS
 ```
+
+### SAFE Level Protection
+
+The **SAFE level has special protection** against downgrades. When an observable is created with or set to `Level.SAFE`, it cannot be downgraded to lower levels (NONE, TRUSTED, INFO) by threat intelligence or score updates, but can still be upgraded to higher levels (NOTABLE, SUSPICIOUS, MALICIOUS).
+
+**Key Behaviors:**
+
+1. **Automatic Protection**: Creating an observable with `level=SAFE` automatically enables downgrade protection
+2. **Score Updates**: Scores still update based on threat intelligence, but the level won't downgrade
+3. **Allows Upgrades**: SAFE observables can be upgraded to NOTABLE, SUSPICIOUS, or MALICIOUS if warranted
+4. **Merge Preservation**: SAFE level is preserved during investigation merges
+5. **Threat Intel Propagation**: Threat intel with `level=SAFE` can upgrade observables to SAFE level
+
+**Example:**
+
+```python
+from cyvest import Cyvest, Level
+from decimal import Decimal
+
+cv = Cyvest()
+
+# Create a SAFE observable (e.g., known-good domain)
+trusted = cv.observable_create(
+    "domain", 
+    "trusted.example.com", 
+    score=0, 
+    level=Level.SAFE
+)
+
+# Add threat intel with low score (would normally be INFO level)
+cv.observable_add_threat_intel(
+    trusted.key, 
+    "source1", 
+    score=Decimal("0")
+)
+# Score updates to 0, but level stays SAFE (not downgraded to INFO)
+print(f"Score: {trusted.score}, Level: {trusted.level}")  
+# Output: Score: 0, Level: SAFE
+
+# Add threat intel with negative score (would be TRUSTED level)
+cv.observable_add_threat_intel(
+    trusted.key, 
+    "source2", 
+    score=Decimal("-1.0")
+)
+# Score updates to -1.0, but level stays SAFE (not downgraded to TRUSTED)
+print(f"Score: {trusted.score}, Level: {trusted.level}")
+# Output: Score: -1.0, Level: SAFE
+
+# Add threat intel indicating malicious activity
+cv.observable_add_threat_intel(
+    trusted.key, 
+    "source3", 
+    score=Decimal("6.0")
+)
+# Both score and level upgrade (MALICIOUS > SAFE, so upgrade allowed)
+print(f"Score: {trusted.score}, Level: {trusted.level}")
+# Output: Score: 6.0, Level: MALICIOUS
+
+# Threat intel with SAFE level can also mark observables as SAFE
+uncertain = cv.observable_create("domain", "example.com")
+cv.observable_add_threat_intel(
+    uncertain.key,
+    "whitelist_service",
+    score=Decimal("0"),
+    level=Level.SAFE,
+    comment="Verified by corporate whitelist"
+)
+# Observable upgraded to SAFE with automatic protection enabled
+print(f"Score: {uncertain.score}, Level: {uncertain.level}")
+# Output: Score: 0, Level: SAFE
+
+# Further low-score threat intel won't downgrade it
+cv.observable_add_threat_intel(
+    uncertain.key,
+    "another_source",
+    score=Decimal("-1.0")
+)
+print(f"Score: {uncertain.score}, Level: {uncertain.level}")
+# Output: Score: -1.0, Level: SAFE (protected from downgrade)
+```
+
+**Use Cases for SAFE:**
+
+- **Known-good Domains**: Mark trusted corporate domains that shouldn't be flagged
+- **Whitelisted IPs**: Internal infrastructure that may trigger false positives
+- **Legitimate Software**: Files/processes known to be safe
+- **Verified URLs**: Previously validated links that should maintain trust status
+- **Reputation Services**: External whitelist/reputation databases that provide SAFE verdicts
+- **Security Policies**: Enforcement of organizational security policies for trusted assets
+
+**Protection Scope:**
+
+The SAFE protection **only applies to the SAFE level itself**. Other explicit levels (set via `set_level()`) don't have the same protection and can be overridden by higher calculated levels according to the normal rules.
 
 ## Relationships
 

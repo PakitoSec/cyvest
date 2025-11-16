@@ -282,6 +282,44 @@ Score to Level mapping:
 - `< 5.0` → SUSPICIOUS
 - `>= 5.0` → MALICIOUS
 
+**SAFE Level Protection:**
+
+The SAFE level has special protection for trusted/whitelisted observables:
+
+```python
+# Mark a known-good domain as SAFE
+trusted = cv.observable_create(
+    "domain",
+    "trusted.example.com",
+    level=Level.SAFE
+)
+
+# Adding low-score threat intel won't downgrade to TRUSTED or INFO
+cv.observable_add_threat_intel(trusted.key, "source1", score=Decimal("0"))
+# Level stays SAFE, score updates to 0
+
+# But high-score threat intel can still upgrade to MALICIOUS if warranted
+cv.observable_add_threat_intel(trusted.key, "source2", score=Decimal("6.0"))
+# Level upgrades to MALICIOUS, score updates to 6.0
+
+# Threat intel with SAFE level can also mark observables as SAFE
+uncertain = cv.observable_create("domain", "example.com")
+cv.observable_add_threat_intel(
+    uncertain.key,
+    "whitelist_service",
+    score=Decimal("0"),
+    level=Level.SAFE
+)
+# Observable upgraded to SAFE level with automatic downgrade protection
+```
+
+SAFE observables:
+- Cannot be downgraded to lower levels (NONE, TRUSTED, INFO)
+- Can be upgraded to higher levels (NOTABLE, SUSPICIOUS, MALICIOUS)
+- Score values still update based on threat intelligence
+- Protection is preserved during investigation merges
+- Can be marked SAFE by threat intel sources (e.g., whitelists, reputation databases)
+
 ## Examples
 
 See the `examples/` directory for complete examples:

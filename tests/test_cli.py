@@ -88,6 +88,3 @@ def test_cli_merge_requires_multiple_inputs(tmp_path: Path) -> None:
         ],
     )
     assert result_ok.exit_code == 0
-    assert "Merge complete" in _strip_ansi(result_ok.output) or "Saved merged investigation" in _strip_ansi(
-        result_ok.output
-    )

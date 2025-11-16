@@ -61,7 +61,8 @@ class BodiesUrlTask(InvestigationTask):
             data = cy.root().extra
 
             # Reuse the domain observable from EmailFrom task
-            domain = shared_context.get_observable("domain-name:malicious.com")
+            # Using parameter-based lookup (recommended)
+            domain = shared_context.get_observable(ObservableType.DOMAIN_NAME, "malicious.com")
 
             if domain:
                 # Link URL to the shared domain observable
@@ -109,27 +110,55 @@ Manually merges observables and checks from a source into the shared context.
 **Thread-Safety:** Uses lock to ensure safe concurrent merging
 
 ##### `get_observable(key: str) -> Observable | None`
-Retrieves a shared observable by its key.
+##### `get_observable(obs_type: str | ObservableType, value: str) -> Observable | None`
+Retrieves a shared observable by its key or by type and value.
 
 **Parameters:**
-- `key`: Observable key (format: `type:value`, e.g., `"domain-name:example.com"`)
+- **Key-based lookup**: `key` - Observable key (format: `obs:type:value`)
+- **Parameter-based lookup** (recommended):
+  - `obs_type` - Observable type (string like `"email-addr"` or `ObservableType` enum)
+  - `value` - Observable value
 
 **Returns:** Deep copy of the observable, or `None` if not found
 
-**Example:**
+**Examples:**
 ```python
-domain = shared_context.get_observable("domain-name:malicious.com")
+# Parameter-based lookup (recommended) - cleaner and type-safe
+domain = shared_context.get_observable(ObservableType.DOMAIN_NAME, "malicious.com")
+email = shared_context.get_observable("email-addr", "user@example.com")
+
+# Key-based lookup (advanced usage)
+domain = shared_context.get_observable("obs:domain-name:malicious.com")
+
+# Use in task to reference observables from other tasks
 if domain:
-    cy.observable(...).relate_to(domain, ...)
+    cy.observable(ObservableType.URL, "https://example.com").relate_to(
+        domain,
+        RelationshipType.RESOLVES_TO
+    )
 ```
 
 ##### `get_check(key: str) -> Check | None`
-Retrieves a shared check by its key.
+##### `get_check(check_id: str, scope: str) -> Check | None`
+Retrieves a shared check by its key or by check ID and scope.
 
 **Parameters:**
-- `key`: Check key (format: `name:category`, e.g., `"malware-scan:attachment"`)
+- **Key-based lookup**: `key` - Check key (format: `chk:id:scope`)
+- **Parameter-based lookup** (recommended):
+  - `check_id` - Check identifier
+  - `scope` - Check scope
 
 **Returns:** Deep copy of the check, or `None` if not found
+
+**Examples:**
+```python
+# Parameter-based lookup (recommended) - cleaner and more intuitive
+from_check = shared_context.get_check("from", "header")
+malware_check = shared_context.get_check("malware_scan", "attachment")
+
+# Key-based lookup (advanced usage)
+from_check = shared_context.get_check("chk:from:header")
+```
 
 ##### `find_observables_by_type(obs_type: ObservableType) -> list[Observable]`
 Finds all observables of a specific type.
@@ -148,10 +177,42 @@ Finds all observables with a specific value.
 **Returns:** List of deep copies of matching observables
 
 ##### `has_observable(key: str) -> bool`
+##### `has_observable(obs_type: str | ObservableType, value: str) -> bool`
 Checks if an observable exists in the shared context.
 
+**Parameters:**
+- **Key-based**: `key` - Observable key
+- **Parameter-based** (recommended): `obs_type`, `value` - Observable type and value
+
+**Examples:**
+```python
+# Parameter-based check (recommended)
+if shared_context.has_observable(ObservableType.EMAIL_ADDR, "sender@domain.com"):
+    # Observable exists
+    
+# Key-based check
+if shared_context.has_observable("obs:email-addr:sender@domain.com"):
+    # Observable exists
+```
+
 ##### `has_check(key: str) -> bool`
+##### `has_check(check_id: str, scope: str) -> bool`
 Checks if a check exists in the shared context.
+
+**Parameters:**
+- **Key-based**: `key` - Check key
+- **Parameter-based** (recommended): `check_id`, `scope` - Check ID and scope
+
+**Examples:**
+```python
+# Parameter-based check (recommended)
+if shared_context.has_check("malware_scan", "attachment"):
+    # Check exists
+
+# Key-based check  
+if shared_context.has_check("chk:malware_scan:attachment"):
+    # Check exists
+```
 
 ##### `list_observables() -> list[str]`
 Returns a list of all observable keys in the shared context.

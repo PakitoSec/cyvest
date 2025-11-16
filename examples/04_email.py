@@ -9,6 +9,14 @@ Key features:
 - Auto-reconcile pattern using context manager (with shared_context.create_cyvest())
 - Tasks access data from root observable (cy.root().extra) instead of parameters
 - Parallel execution with automatic merging of results
+- Aggregated risk assessment that combines scores from multiple checks and observables
+
+Task Overview:
+1. EmailFrom (order=100): Analyzes sender email/domain/IP with threat intel
+2. EmailReciever (order=150): Analyzes receiver with enrichments
+3. BodiesUrlTask (order=200): Analyzes URLs in email body, references shared domain
+4. AttachmentTask (order=250): Analyzes file attachments with hash analysis
+5. AggregatedRiskTask (order=300): Creates composite risk score from all previous checks
 """
 
 from abc import ABC, abstractmethod
@@ -243,21 +251,13 @@ class BodiesUrlTask(InvestigationTask):
                 )
 
                 # Link to malicious domain if applicable
-                # Try to get the domain from shared context (created by EmailFrom task)
+                # The merge system will automatically deduplicate with EmailFrom's domain observable
                 if link_malicious:
-                    malicious_domain = shared_context.get_observable("domain-name:domainmalicious.com")
-                    if malicious_domain:
-                        logger.info(f"Linking URL {url} to shared malicious domain observable")
-                        url_obs = url_obs.relate_to(
-                            malicious_domain,
-                            RelationshipType.RESOLVES_TO,
-                        )
-                    else:
-                        # Fallback: create new domain observable
-                        url_obs = url_obs.relate_to(
-                            cy.observable(ObservableType.DOMAIN_NAME, "domainmalicious.com"),
-                            RelationshipType.RESOLVES_TO,
-                        )
+                    logger.info(f"Linking URL {url} to malicious domain")
+                    url_obs = url_obs.relate_to(
+                        cy.observable(ObservableType.DOMAIN_NAME, "domainmalicious.com"),
+                        RelationshipType.RESOLVES_TO,
+                    )
 
                 # Create check and link to container
                 chk = (
@@ -335,6 +335,113 @@ class AttachmentTask(InvestigationTask):
             return cy
 
 
+class AggregatedRiskTask(InvestigationTask):
+    """
+    Aggregated risk assessment task.
+
+    This task demonstrates creating an aggregated check that:
+    - References checks created by other tasks
+    - References observables created by other tasks
+    - Calculates a composite risk score based on multiple indicators
+    - Uses shared context to access cross-task data
+
+    This runs last (order=300) to ensure other tasks have completed.
+
+    Note: Due to parallel execution, some tasks may still be running when this
+    executes. The aggregated check will use whatever data is available at the
+    time it runs. For guaranteed sequential execution, use order values with
+    larger gaps or run tasks sequentially.
+    """
+
+    _scope = "risk_assessment"
+    order = 300
+
+    def run(self, shared_context: SharedInvestigationContext) -> Cyvest:
+        """Calculate aggregated risk score based on all previous checks."""
+        with shared_context.create_cyvest() as cy:
+            from decimal import Decimal
+
+            logger.info("Starting aggregated risk assessment")
+
+            # Access checks from other tasks using parameter-based API
+            from_check = shared_context.get_check("from", "header")
+            receiver_check = shared_context.get_check("receiver", "header")
+
+            # Access observables from other tasks using parameter-based API
+            sender_email = shared_context.get_observable(ObservableType.EMAIL_ADDR, "noreply@domainmalicious.com")
+            malicious_domain = shared_context.get_observable(ObservableType.DOMAIN_NAME, "domainmalicious.com")
+
+            # Find all URL checks (created by BodiesUrlTask)
+            all_checks = shared_context.list_checks()
+            url_checks = [shared_context.get_check(key) for key in all_checks if key.startswith("chk:body-url-")]
+
+            # Find all attachment checks
+            attachment_checks = [
+                shared_context.get_check(key) for key in all_checks if key.startswith("chk:attachment-")
+            ]
+
+            # Calculate composite risk score
+            risk_score = Decimal("0")
+            risk_indicators = []
+
+            # Factor 1: Sender reputation (high weight)
+            if sender_email and sender_email.score >= 5:
+                risk_score += sender_email.score * Decimal("0.4")  # 40% weight
+                risk_indicators.append(f"Malicious sender: {sender_email.value} (score: {sender_email.score})")
+
+            # Factor 2: Domain reputation (medium weight)
+            if malicious_domain and malicious_domain.score >= 3:
+                risk_score += malicious_domain.score * Decimal("0.3")  # 30% weight
+                risk_indicators.append(f"Suspicious domain: {malicious_domain.value} (score: {malicious_domain.score})")
+
+            # Factor 3: URL threats (medium weight)
+            if url_checks:
+                max_url_score = max((check.score for check in url_checks), default=Decimal("0"))
+                if max_url_score > 0:
+                    risk_score += max_url_score * Decimal("0.2")  # 20% weight
+                    risk_indicators.append(f"Suspicious URLs detected (max score: {max_url_score})")
+
+            # Factor 4: Attachment threats (high weight)
+            if attachment_checks:
+                max_attachment_score = max((check.score for check in attachment_checks), default=Decimal("0"))
+                if max_attachment_score >= 5:
+                    risk_score += max_attachment_score * Decimal("0.5")  # 50% weight
+                    risk_indicators.append(f"Malicious attachment detected (score: {max_attachment_score})")
+
+            # Build aggregated check comment
+            comment = "> **Aggregated Risk Assessment**\n"
+            comment += f"> Total risk score: {risk_score}\n"
+            comment += f"> Indicators analyzed: {len(risk_indicators)}\n"
+            comment += ">\n"
+            comment += "> **Risk Factors:**\n"
+            for indicator in risk_indicators:
+                comment += f"> - {indicator}\n"
+            comment += ">\n"
+            comment += "> **Component Analysis:**\n"
+            comment += f"> - Header checks: {len([c for c in [from_check, receiver_check] if c])}\n"
+            comment += f"> - URL checks: {len(url_checks)}\n"
+            comment += f"> - Attachment checks: {len(attachment_checks)}\n"
+
+            # Create aggregated check
+            aggregated_check = cy.check(
+                "email_risk_aggregated", "risk_assessment", "Aggregated Email Risk Assessment", comment=comment
+            ).with_score(risk_score)
+
+            # Link all relevant observables to the aggregated check
+            if sender_email:
+                aggregated_check.link_observable(sender_email)
+            if malicious_domain:
+                aggregated_check.link_observable(malicious_domain)
+
+            # Put in a dedicated container
+            aggregated_check.in_container(cy.container("risk_assessment", "Aggregated Risk Analysis"))
+
+            logger.info(f"Aggregated risk assessment complete: score={risk_score}")
+            logger.info(f"Risk indicators: {len(risk_indicators)}")
+
+            return cy
+
+
 # ============================================================================
 # Main Execution
 # ============================================================================
@@ -365,7 +472,13 @@ def main():
     }
 
     # Create tasks
-    tasks = [EmailFrom(), EmailReciever(), BodiesUrlTask(), AttachmentTask()]
+    tasks = [
+        EmailFrom(),
+        EmailReciever(),
+        BodiesUrlTask(),
+        AttachmentTask(),
+        AggregatedRiskTask(),  # Runs last to aggregate results from other tasks
+    ]
 
     # Execute tasks in parallel
     executor = TaskExecutor(max_workers=4)
@@ -378,7 +491,7 @@ def main():
     logger.info("Investigation complete - displaying summary")
 
     cy.display_summary()
-    
+
     cy.display_network()
 
 

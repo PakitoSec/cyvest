@@ -229,14 +229,17 @@ def test_cross_task_observable_sharing():
     # Task 2: Reference domain from Task 1
     with shared.create_cyvest() as cy2:
         data = cy2.root().extra
-        # Get shared domain
-        domain = shared.get_observable("obs:domain-name:malicious.com")
-        assert domain is not None
-        assert domain.value == "malicious.com"
+        # Inspect shared domain (read-only)
+        domain_info = shared.get_observable("obs:domain-name:malicious.com")
+        assert domain_info is not None
+        assert domain_info.value == "malicious.com"
 
-        # Create URL and link to shared domain
+        # Create URL and link to domain (correct pattern: use cy.observable())
         url = cy2.observable(ObservableType.URL, data["url"])
-        url.relate_to(domain, RelationshipType.RESOLVES_TO)
+        url.relate_to(
+            cy2.observable(ObservableType.DOMAIN_NAME, "malicious.com"),
+            RelationshipType.RESOLVES_TO
+        )
 
     # Verify final investigation has both observables
     final_inv = shared.get_investigation()
@@ -426,3 +429,336 @@ def test_deep_copy_prevents_modification():
     retrieved2 = shared.get_observable("obs:domain-name:example.com")
     assert retrieved2.value == "example.com"  # Original value preserved
     assert retrieved1 is not retrieved2  # Different objects
+
+
+# ==============================================================================
+# Tests for parameter-based API (new overloaded methods)
+# ==============================================================================
+
+
+def test_get_observable_with_parameters():
+    """Test get_observable using type and value parameters."""
+    inv = Investigation({"test": "data"}, root_type="artifact")
+    shared = SharedInvestigationContext(inv)
+
+    with shared.create_cyvest() as cy:
+        cy.observable(ObservableType.EMAIL_ADDR, "user@example.com")
+
+    # Test parameter-based lookup with string type
+    obs = shared.get_observable("email-addr", "user@example.com")
+    assert obs is not None
+    assert obs.obs_type == ObservableType.EMAIL_ADDR
+    assert obs.value == "user@example.com"
+
+    # Test parameter-based lookup with ObservableType enum
+    obs_enum = shared.get_observable(ObservableType.EMAIL_ADDR, "user@example.com")
+    assert obs_enum is not None
+    assert obs_enum.obs_type == ObservableType.EMAIL_ADDR
+    assert obs_enum.value == "user@example.com"
+
+    # Test key-based lookup (backward compatibility)
+    obs_key = shared.get_observable("obs:email-addr:user@example.com")
+    assert obs_key is not None
+    assert obs_key.value == "user@example.com"
+
+
+def test_get_check_with_parameters():
+    """Test get_check using check_id and scope parameters."""
+    inv = Investigation({"test": "data"}, root_type="artifact")
+    shared = SharedInvestigationContext(inv)
+
+    with shared.create_cyvest() as cy:
+        cy.check("malware_scan", "attachment", "Scan for malware")
+
+    # Test parameter-based lookup
+    check = shared.get_check("malware_scan", "attachment")
+    assert check is not None
+    assert check.check_id == "malware_scan"
+    assert check.scope == "attachment"
+
+    # Test key-based lookup (backward compatibility)
+    check_key = shared.get_check("chk:malware_scan:attachment")
+    assert check_key is not None
+    assert check_key.check_id == "malware_scan"
+
+
+def test_has_observable_with_parameters():
+    """Test has_observable using type and value parameters."""
+    inv = Investigation({"test": "data"}, root_type="artifact")
+    shared = SharedInvestigationContext(inv)
+
+    with shared.create_cyvest() as cy:
+        cy.observable(ObservableType.DOMAIN_NAME, "malicious.com")
+
+    # Test parameter-based check with string type
+    assert shared.has_observable("domain-name", "malicious.com")
+    assert not shared.has_observable("domain-name", "safe.com")
+
+    # Test parameter-based check with ObservableType enum
+    assert shared.has_observable(ObservableType.DOMAIN_NAME, "malicious.com")
+    assert not shared.has_observable(ObservableType.IPV4_ADDR, "1.2.3.4")
+
+    # Test key-based check (backward compatibility)
+    assert shared.has_observable("obs:domain-name:malicious.com")
+    assert not shared.has_observable("obs:domain-name:safe.com")
+
+
+def test_has_check_with_parameters():
+    """Test has_check using check_id and scope parameters."""
+    inv = Investigation({"test": "data"}, root_type="artifact")
+    shared = SharedInvestigationContext(inv)
+
+    with shared.create_cyvest() as cy:
+        cy.check("url_reputation", "body", "Check URL reputation")
+
+    # Test parameter-based check
+    assert shared.has_check("url_reputation", "body")
+    assert not shared.has_check("email_reputation", "header")
+
+    # Test key-based check (backward compatibility)
+    assert shared.has_check("chk:url_reputation:body")
+    assert not shared.has_check("chk:email_reputation:header")
+
+
+def test_investigation_get_observable_with_parameters():
+    """Test Investigation.get_observable using parameters for API consistency."""
+    inv = Investigation({"test": "data"}, root_type="artifact")
+    cy = Cyvest({"test": "data"}, root_type="artifact")
+    cy.observable(ObservableType.IPV4_ADDR, "10.0.0.1")
+
+    # Merge into investigation
+    inv.merge_investigation(cy._investigation)
+
+    # Test parameter-based lookup with string type
+    obs = inv.get_observable("ipv4-addr", "10.0.0.1")
+    assert obs is not None
+    assert obs.value == "10.0.0.1"
+
+    # Test parameter-based lookup with ObservableType enum
+    obs_enum = inv.get_observable(ObservableType.IPV4_ADDR, "10.0.0.1")
+    assert obs_enum is not None
+    assert obs_enum.value == "10.0.0.1"
+
+    # Test key-based lookup (backward compatibility)
+    obs_key = inv.get_observable("obs:ipv4-addr:10.0.0.1")
+    assert obs_key is not None
+
+
+def test_investigation_get_check_with_parameters():
+    """Test Investigation.get_check using parameters for API consistency."""
+    inv = Investigation({"test": "data"}, root_type="artifact")
+    cy = Cyvest({"test": "data"}, root_type="artifact")
+    cy.check("dns_lookup", "network", "DNS reputation check")
+
+    # Merge into investigation
+    inv.merge_investigation(cy._investigation)
+
+    # Test parameter-based lookup
+    check = inv.get_check("dns_lookup", "network")
+    assert check is not None
+    assert check.check_id == "dns_lookup"
+
+    # Test key-based lookup (backward compatibility)
+    check_key = inv.get_check("chk:dns_lookup:network")
+    assert check_key is not None
+
+
+def test_observable_type_enum_conversion():
+    """Test that ObservableType enums are properly converted to strings."""
+    inv = Investigation({"test": "data"}, root_type="artifact")
+    shared = SharedInvestigationContext(inv)
+
+    with shared.create_cyvest() as cy:
+        # Create observables of different types
+        cy.observable(ObservableType.URL, "https://example.com")
+        cy.observable(ObservableType.FILE, "malware.exe")
+        cy.observable(ObservableType.NETWORK_TRAFFIC, "http-traffic")
+
+    # Test that enum values work correctly
+    assert shared.has_observable(ObservableType.URL, "https://example.com")
+    assert shared.has_observable(ObservableType.FILE, "malware.exe")
+    assert shared.has_observable(ObservableType.NETWORK_TRAFFIC, "http-traffic")
+
+    url_obs = shared.get_observable(ObservableType.URL, "https://example.com")
+    assert url_obs is not None
+    assert url_obs.obs_type == ObservableType.URL
+
+
+def test_get_observable_invalid_arguments():
+    """Test that get_observable raises ValueError for invalid arguments."""
+    inv = Investigation({"test": "data"}, root_type="artifact")
+    shared = SharedInvestigationContext(inv)
+
+    import pytest
+
+    # Too many arguments
+    with pytest.raises(ValueError, match="get_observable\\(\\) accepts either"):
+        shared.get_observable("type", "value", "extra")
+
+    # No arguments
+    with pytest.raises(ValueError, match="get_observable\\(\\) accepts either"):
+        shared.get_observable()
+
+
+def test_get_check_invalid_arguments():
+    """Test that get_check raises ValueError for invalid arguments."""
+    inv = Investigation({"test": "data"}, root_type="artifact")
+    shared = SharedInvestigationContext(inv)
+
+    import pytest
+
+    # Too many arguments
+    with pytest.raises(ValueError, match="get_check\\(\\) accepts either"):
+        shared.get_check("id", "scope", "extra")
+
+    # No arguments
+    with pytest.raises(ValueError, match="get_check\\(\\) accepts either"):
+        shared.get_check()
+
+
+def test_has_observable_invalid_arguments():
+    """Test that has_observable raises ValueError for invalid arguments."""
+    inv = Investigation({"test": "data"}, root_type="artifact")
+    shared = SharedInvestigationContext(inv)
+
+    import pytest
+
+    # Too many arguments
+    with pytest.raises(ValueError, match="has_observable\\(\\) accepts either"):
+        shared.has_observable("type", "value", "extra")
+
+
+def test_has_check_invalid_arguments():
+    """Test that has_check raises ValueError for invalid arguments."""
+    inv = Investigation({"test": "data"}, root_type="artifact")
+    shared = SharedInvestigationContext(inv)
+
+    import pytest
+
+    # Too many arguments
+    with pytest.raises(ValueError, match="has_check\\(\\) accepts either"):
+        shared.has_check("id", "scope", "extra")
+
+
+def test_parameter_based_api_in_parallel_tasks():
+    """Test parameter-based API works correctly in parallel tasks."""
+    inv = Investigation({"test": "data"}, root_type="artifact")
+    shared = SharedInvestigationContext(inv)
+
+    def task1(shared_ctx):
+        with shared_ctx.create_cyvest() as cy:
+            cy.observable(ObservableType.EMAIL_ADDR, "sender@malicious.com").add_ti("EmailRep", Decimal("8.0"))
+            cy.check("sender_check", "header", "Analyze sender")
+
+    def task2(shared_ctx):
+        with shared_ctx.create_cyvest() as cy:
+            # Use parameter-based lookup to get observable from task1
+            sender = shared_ctx.get_observable(ObservableType.EMAIL_ADDR, "sender@malicious.com")
+            if sender and sender.score > 5:
+                cy.check("high_risk_sender", "risk", "High risk detected").with_score(Decimal("9.0"))
+
+    # Execute tasks in parallel
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        f1 = executor.submit(task1, shared)
+        f1.result()  # Wait for task1 to complete
+        f2 = executor.submit(task2, shared)
+        f2.result()
+
+    # Verify both tasks completed and parameter-based lookups worked
+    assert shared.has_observable(ObservableType.EMAIL_ADDR, "sender@malicious.com")
+    assert shared.has_check("sender_check", "header")
+    assert shared.has_check("high_risk_sender", "risk")
+
+    sender_obs = shared.get_observable(ObservableType.EMAIL_ADDR, "sender@malicious.com")
+    assert sender_obs.score >= Decimal("8.0")
+
+
+def test_normalization_consistency():
+    """Test that parameter-based lookups handle normalization correctly."""
+    inv = Investigation({"test": "data"}, root_type="artifact")
+    shared = SharedInvestigationContext(inv)
+
+    with shared.create_cyvest() as cy:
+        # Create with mixed case
+        cy.observable(ObservableType.EMAIL_ADDR, "User@Example.COM")
+
+    # Lookup should work with different casing (normalization)
+    obs1 = shared.get_observable(ObservableType.EMAIL_ADDR, "user@example.com")
+    obs2 = shared.get_observable("email-addr", "USER@EXAMPLE.COM")
+    obs3 = shared.get_observable(ObservableType.EMAIL_ADDR, "  User@Example.COM  ")
+
+    assert obs1 is not None
+    assert obs2 is not None
+    assert obs3 is not None
+    # All should find the same observable (values are normalized in keys)
+    assert obs1.value == obs2.value == obs3.value
+
+
+def test_prevent_relationship_with_shared_copy():
+    """Test that using a copied observable from shared context raises helpful error."""
+    import pytest
+
+    inv = Investigation({"test": "data"}, root_type="artifact")
+    shared = SharedInvestigationContext(inv)
+
+    # Task 1: Create domain observable
+    with shared.create_cyvest() as cy1:
+        cy1.observable(ObservableType.DOMAIN_NAME, "malicious.com").add_ti("VT", 8)
+
+    # Task 2: Try to use the copy (should fail with clear error)
+    with shared.create_cyvest() as cy2:
+        url_obs = cy2.observable(ObservableType.URL, "https://evil.com/payload")
+
+        # Get copy from shared context (anti-pattern)
+        domain_copy = shared.get_observable(ObservableType.DOMAIN_NAME, "malicious.com")
+        assert domain_copy is not None
+        assert domain_copy._from_shared_context is True
+
+        # This should raise ValueError with helpful message
+        with pytest.raises(ValueError) as exc_info:
+            url_obs.relate_to(domain_copy, RelationshipType.RESOLVES_TO)
+
+        # Verify error message is helpful
+        error_msg = str(exc_info.value)
+        assert "Cannot use observable from shared_context.get_observable()" in error_msg
+        assert "read-only copy" in error_msg
+        assert "cy.observable" in error_msg
+        assert "Incorrect pattern" in error_msg
+        assert "Correct pattern" in error_msg
+
+    # Correct pattern should work
+    with shared.create_cyvest() as cy3:
+        url_obs = cy3.observable(ObservableType.URL, "https://evil.com/payload")
+        url_obs.relate_to(
+            cy3.observable(ObservableType.DOMAIN_NAME, "malicious.com"),
+            RelationshipType.RESOLVES_TO,
+        )
+        # Should succeed without error
+
+    # Verify the correct pattern created the relationship
+    final_inv = shared.get_investigation()
+    url = final_inv.get_observable(ObservableType.URL, "https://evil.com/payload")
+    assert url is not None
+    assert len(url.relationships) > 0
+    assert any(rel.target_key.endswith("malicious.com") for rel in url.relationships)
+
+
+def test_copied_observable_has_marker():
+    """Test that copied observables are marked with _from_shared_context flag."""
+    inv = Investigation({"test": "data"}, root_type="artifact")
+    shared = SharedInvestigationContext(inv)
+
+    with shared.create_cyvest() as cy:
+        original = cy.observable(ObservableType.DOMAIN_NAME, "example.com")
+        # Original should not be marked
+        assert original.get()._from_shared_context is False
+
+    # Copy from shared context should be marked
+    copy = shared.get_observable(ObservableType.DOMAIN_NAME, "example.com")
+    assert copy is not None
+    assert copy._from_shared_context is True
+
+    # Get from investigation directly should not be marked
+    direct = inv.get_observable(ObservableType.DOMAIN_NAME, "example.com")
+    assert direct is not None
+    assert direct._from_shared_context is False

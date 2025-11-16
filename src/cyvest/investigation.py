@@ -10,10 +10,11 @@ from __future__ import annotations
 import threading
 from copy import deepcopy
 from decimal import Decimal
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, overload
 
 from logurich import logger
 
+from cyvest import keys
 from cyvest.levels import Level, get_level_from_score
 from cyvest.model import Check, Container, Enrichment, Observable, ObservableType, ThreatIntel
 from cyvest.score import ScoreEngine, ScoreMode
@@ -162,36 +163,144 @@ class SharedInvestigationContext:
                 f"{len(self._check_registry)} checks"
             )
 
+    @overload
     def get_observable(self, key: str) -> Observable | None:
+        """Look up observable by full key string."""
+        ...
+
+    @overload
+    def get_observable(self, obs_type: str | ObservableType, value: str) -> Observable | None:
+        """Look up observable by type and value."""
+        ...
+
+    def get_observable(self, *args, **kwargs) -> Observable | None:
         """
-        Look up a shared observable by key.
+        Look up a shared observable by key or by type and value.
 
         Thread-safe: Returns a deep copy to prevent concurrent modification.
 
+        **IMPORTANT: Returns a READ-ONLY COPY for inspection only.**
+
+        DO NOT use the returned observable directly in relationships!
+        The copy is not registered in your local investigation and will cause errors.
+
+        WRONG:
+            >>> malicious_domain = shared_context.get_observable(ObservableType.DOMAIN_NAME, "evil.com")
+            >>> url_obs.relate_to(malicious_domain, RelationshipType.RESOLVES_TO)  # ERROR!
+
+        CORRECT:
+            >>> # Inspect the shared observable's properties
+            >>> domain_info = shared_context.get_observable(ObservableType.DOMAIN_NAME, "evil.com")
+            >>> if domain_info and domain_info.score > 7:
+            >>>     # Create a NEW observable in your local investigation
+            >>>     url_obs.relate_to(
+            >>>         cy.observable(ObservableType.DOMAIN_NAME, "evil.com"),
+            >>>         RelationshipType.RESOLVES_TO
+            >>>     )
+
         Args:
-            key: Observable key to look up
+            key: Observable key to look up (single argument)
+            obs_type: Observable type (when using two arguments)
+            value: Observable value (when using two arguments)
 
         Returns:
             Copy of the observable if found, None otherwise
+
+        Raises:
+            ValueError: If arguments are invalid or key generation fails
+
+        Examples:
+            >>> # Key-based lookup
+            >>> obs = shared_context.get_observable("obs:email-addr:user@domain.com")
+            >>>
+            >>> # Parameter-based lookup (recommended)
+            >>> obs = shared_context.get_observable(ObservableType.EMAIL_ADDR, "user@domain.com")
+            >>> obs = shared_context.get_observable("email-addr", "user@domain.com")
         """
+        # Parse arguments
+        if len(args) == 1 and not kwargs:
+            # Key-based lookup
+            key = args[0]
+        elif len(args) == 2 and not kwargs:
+            # Parameter-based lookup
+            obs_type, value = args
+            # Convert ObservableType enum to string if needed
+            if isinstance(obs_type, ObservableType):
+                obs_type = obs_type.value
+            # Generate key using keys module
+            try:
+                key = keys.generate_observable_key(obs_type, value)
+            except Exception as e:
+                raise ValueError(
+                    f"Failed to generate observable key for type='{obs_type}', value='{value}': {e}"
+                ) from e
+        else:
+            raise ValueError(
+                "get_observable() accepts either (key: str) or (obs_type: str | ObservableType, value: str)"
+            )
+
         with self._lock:
             obs = self._observable_registry.get(key)
             if obs:
-                return deepcopy(obs)
+                copy = deepcopy(obs)
+                # Mark this as a copy from shared context to prevent misuse in relationships
+                copy._from_shared_context = True
+                return copy
             return None
 
+    @overload
     def get_check(self, key: str) -> Check | None:
+        """Look up check by full key string."""
+        ...
+
+    @overload
+    def get_check(self, check_id: str, scope: str) -> Check | None:
+        """Look up check by ID and scope."""
+        ...
+
+    def get_check(self, *args, **kwargs) -> Check | None:
         """
-        Look up a shared check by key.
+        Look up a shared check by key or by check ID and scope.
 
         Thread-safe: Returns a deep copy to prevent concurrent modification.
 
         Args:
-            key: Check key to look up
+            key: Check key to look up (single argument)
+            check_id: Check identifier (when using two arguments)
+            scope: Check scope (when using two arguments)
 
         Returns:
             Copy of the check if found, None otherwise
+
+        Raises:
+            ValueError: If arguments are invalid or key generation fails
+
+        Examples:
+            >>> # Key-based lookup
+            >>> check = shared_context.get_check("chk:from:header")
+            >>>
+            >>> # Parameter-based lookup (recommended)
+            >>> check = shared_context.get_check("from", "header")
         """
+        # Parse arguments
+        if len(args) == 1 and not kwargs:
+            # Key-based lookup
+            key = args[0]
+        elif len(args) == 2 and not kwargs:
+            # Parameter-based lookup
+            check_id, scope = args
+            # Generate key using keys module
+            try:
+                key = keys.generate_check_key(check_id, scope)
+            except Exception as e:
+                raise ValueError(
+                    f"Failed to generate check key for check_id='{check_id}', scope='{scope}': {e}"
+                ) from e
+        else:
+            raise ValueError(
+                "get_check() accepts either (key: str) or (check_id: str, scope: str)"
+            )
+
         with self._lock:
             check = self._check_registry.get(key)
             if check:
@@ -265,29 +374,93 @@ class SharedInvestigationContext:
                     matches.append(deepcopy(obs))
             return matches
 
+    @overload
     def has_observable(self, key: str) -> bool:
+        """Check if observable exists by full key string."""
+        ...
+
+    @overload
+    def has_observable(self, obs_type: str | ObservableType, value: str) -> bool:
+        """Check if observable exists by type and value."""
+        ...
+
+    def has_observable(self, *args, **kwargs) -> bool:
         """
         Check if an observable exists in the shared context.
 
         Args:
-            key: Observable key to check
+            key: Observable key to check (single argument)
+            obs_type: Observable type (when using two arguments)
+            value: Observable value (when using two arguments)
 
         Returns:
             True if observable exists, False otherwise
+
+        Raises:
+            ValueError: If arguments are invalid or key generation fails
         """
+        # Parse arguments
+        if len(args) == 1 and not kwargs:
+            key = args[0]
+        elif len(args) == 2 and not kwargs:
+            obs_type, value = args
+            if isinstance(obs_type, ObservableType):
+                obs_type = obs_type.value
+            try:
+                key = keys.generate_observable_key(obs_type, value)
+            except Exception as e:
+                raise ValueError(
+                    f"Failed to generate observable key for type='{obs_type}', value='{value}': {e}"
+                ) from e
+        else:
+            raise ValueError(
+                "has_observable() accepts either (key: str) or (obs_type: str | ObservableType, value: str)"
+            )
+
         with self._lock:
             return key in self._observable_registry
 
+    @overload
     def has_check(self, key: str) -> bool:
+        """Check if check exists by full key string."""
+        ...
+
+    @overload
+    def has_check(self, check_id: str, scope: str) -> bool:
+        """Check if check exists by ID and scope."""
+        ...
+
+    def has_check(self, *args, **kwargs) -> bool:
         """
         Check if a check exists in the shared context.
 
         Args:
-            key: Check key to check
+            key: Check key to check (single argument)
+            check_id: Check identifier (when using two arguments)
+            scope: Check scope (when using two arguments)
 
         Returns:
             True if check exists, False otherwise
+
+        Raises:
+            ValueError: If arguments are invalid or key generation fails
         """
+        # Parse arguments
+        if len(args) == 1 and not kwargs:
+            key = args[0]
+        elif len(args) == 2 and not kwargs:
+            check_id, scope = args
+            try:
+                key = keys.generate_check_key(check_id, scope)
+            except Exception as e:
+                raise ValueError(
+                    f"Failed to generate check key for check_id='{check_id}', scope='{scope}': {e}"
+                ) from e
+        else:
+            raise ValueError(
+                "has_check() accepts either (key: str) or (check_id: str, scope: str)"
+            )
+
         with self._lock:
             return key in self._check_registry
 
@@ -717,16 +890,34 @@ class Investigation:
         source_key = source.key if isinstance(source, Observable) else source
         target_key = target.key if isinstance(target, Observable) else target
 
+        # Check if target is a copy from shared context (anti-pattern)
+        if isinstance(target, Observable) and getattr(target, '_from_shared_context', False):
+            obs_type_name = (
+                target.obs_type.name
+                if hasattr(target.obs_type, 'name')
+                else str(target.obs_type).upper().replace('-', '_')
+            )
+            raise ValueError(
+                f"Cannot use observable from shared_context.get_observable() directly in relationships.\n"
+                f"Observable '{target_key}' is a read-only copy not registered in this investigation.\n\n"
+                f"Correct pattern:\n"
+                f"  # Use cy.observable() to create/get observable in local investigation\n"
+                f"  source.relate_to(\n"
+                f"      cy.observable(ObservableType.{obs_type_name}, '{target.value}'),\n"
+                f"      RelationshipType.{relationship_type}\n"
+                f"  )"
+            )
+
         # Validate both source and target exist
         source_obs = self._observables.get(source_key)
         target_obs = self._observables.get(target_key)
 
         if not source_obs:
-            logger.warning(f"Cannot add relationship: source observable '{source_key}' does not exist")
+            logger.critical(f"Cannot add relationship: source observable '{source_key}' does not exist")
             return None
 
         if not target_obs:
-            logger.warning(
+            logger.critical(
                 f"Cannot add relationship: target observable '{target_key}' does not exist. "
                 f"Relationship from '{source_key}' to '{target_key}' was not created."
             )
@@ -801,12 +992,96 @@ class Investigation:
 
     # Query methods
 
+    @overload
     def get_observable(self, key: str) -> Observable | None:
-        """Get an observable by key."""
+        """Get observable by full key string."""
+        ...
+
+    @overload
+    def get_observable(self, obs_type: str | ObservableType, value: str) -> Observable | None:
+        """Get observable by type and value."""
+        ...
+
+    def get_observable(self, *args, **kwargs) -> Observable | None:
+        """
+        Get an observable by key or by type and value.
+
+        Args:
+            key: Observable key (single argument)
+            obs_type: Observable type (when using two arguments)
+            value: Observable value (when using two arguments)
+
+        Returns:
+            Observable if found, None otherwise
+
+        Raises:
+            ValueError: If arguments are invalid or key generation fails
+
+        Examples:
+            >>> obs = investigation.get_observable("obs:email-addr:user@domain.com")
+            >>> obs = investigation.get_observable(ObservableType.EMAIL_ADDR, "user@domain.com")
+        """
+        if len(args) == 1 and not kwargs:
+            key = args[0]
+        elif len(args) == 2 and not kwargs:
+            obs_type, value = args
+            if isinstance(obs_type, ObservableType):
+                obs_type = obs_type.value
+            try:
+                key = keys.generate_observable_key(obs_type, value)
+            except Exception as e:
+                raise ValueError(
+                    f"Failed to generate observable key for type='{obs_type}', value='{value}': {e}"
+                ) from e
+        else:
+            raise ValueError(
+                "get_observable() accepts either (key: str) or (obs_type: str | ObservableType, value: str)"
+            )
         return self._observables.get(key)
 
+    @overload
     def get_check(self, key: str) -> Check | None:
-        """Get a check by key."""
+        """Get check by full key string."""
+        ...
+
+    @overload
+    def get_check(self, check_id: str, scope: str) -> Check | None:
+        """Get check by ID and scope."""
+        ...
+
+    def get_check(self, *args, **kwargs) -> Check | None:
+        """
+        Get a check by key or by check ID and scope.
+
+        Args:
+            key: Check key (single argument)
+            check_id: Check identifier (when using two arguments)
+            scope: Check scope (when using two arguments)
+
+        Returns:
+            Check if found, None otherwise
+
+        Raises:
+            ValueError: If arguments are invalid or key generation fails
+
+        Examples:
+            >>> check = investigation.get_check("chk:from:header")
+            >>> check = investigation.get_check("from", "header")
+        """
+        if len(args) == 1 and not kwargs:
+            key = args[0]
+        elif len(args) == 2 and not kwargs:
+            check_id, scope = args
+            try:
+                key = keys.generate_check_key(check_id, scope)
+            except Exception as e:
+                raise ValueError(
+                    f"Failed to generate check key for check_id='{check_id}', scope='{scope}': {e}"
+                ) from e
+        else:
+            raise ValueError(
+                "get_check() accepts either (key: str) or (check_id: str, scope: str)"
+            )
         return self._checks.get(key)
 
     def get_container(self, key: str) -> Container | None:

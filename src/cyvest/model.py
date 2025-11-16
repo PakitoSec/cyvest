@@ -364,6 +364,10 @@ class Observable:
             self.key = keys.generate_observable_key(obs_type_str, self.value)
         if not isinstance(self.score, Decimal):
             self.score = Decimal(str(self.score))
+        
+        # Initialize shared context marker (will be set to True for copies from registry)
+        if not hasattr(self, '_from_shared_context'):
+            self._from_shared_context = False
 
     def update_score(self, new_score: Decimal, reason: str = "") -> None:
         """

@@ -527,6 +527,7 @@ class Investigation:
         Returns:
             Tuple of (merged observable, deferred relationships)
         """
+        # Normal merge logic for scores and levels (SAFE level protection in Observable.update_score)
         # Take the higher score
         if incoming.score > existing.score:
             existing.update_score(incoming.score, reason=f"Merged from {incoming.key}")

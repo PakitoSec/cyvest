@@ -330,3 +330,114 @@ def test_finalize_relationships_complex_subgraph_selection() -> None:
     assert hub2.key not in root_targets
     assert leaf1.key not in root_targets
     assert leaf2.key not in root_targets
+
+
+def test_merge_safe_observable_preserves_safe_with_low_score() -> None:
+    """Test that merging SAFE observable with low-score incoming preserves SAFE."""
+    cv1 = Cyvest()
+    # Create SAFE observable in first investigation
+    obs1 = cv1.observable_create("domain", "trusted.example.com", score=0, level=Level.SAFE)
+    assert obs1.level == Level.SAFE
+    assert obs1._explicit_level is True
+
+    cv2 = Cyvest()
+    # Create same observable with INFO level (score=0) in second investigation
+    obs2 = cv2.observable_create("domain", "trusted.example.com", score=0, level=Level.INFO)
+    cv2.observable_add_threat_intel(obs2.key, source="ti_source", score=Decimal("0"))
+    assert obs2.level == Level.INFO
+
+    # Merge cv2 into cv1
+    cv1.merge_investigation(cv2)
+
+    # SAFE level should be preserved
+    merged_obs = cv1.observable_get(obs1.key)
+    assert merged_obs.level == Level.SAFE
+    assert merged_obs.score == Decimal("0")
+
+
+def test_merge_safe_observable_with_trusted_score() -> None:
+    """Test that merging SAFE observable with TRUSTED-level incoming preserves SAFE."""
+    cv1 = Cyvest()
+    # Create SAFE observable
+    obs1 = cv1.observable_create("domain", "trusted.example.com", score=0, level=Level.SAFE)
+
+    cv2 = Cyvest()
+    # Create same observable with negative score (TRUSTED level)
+    obs2 = cv2.observable_create("domain", "trusted.example.com")
+    cv2.observable_add_threat_intel(obs2.key, source="ti_source", score=Decimal("-1.0"))
+    assert obs2.level == Level.TRUSTED
+
+    # Merge cv2 into cv1
+    cv1.merge_investigation(cv2)
+
+    # SAFE level should be preserved
+    merged_obs = cv1.observable_get(obs1.key)
+    assert merged_obs.level == Level.SAFE
+    # Score updates to reflect merged TI (max of TI sources = -1.0)
+    assert merged_obs.score == Decimal("-1.0")
+
+
+def test_merge_safe_observable_upgrades_with_notable() -> None:
+    """Test that merging SAFE observable with NOTABLE-level incoming upgrades to NOTABLE."""
+    cv1 = Cyvest()
+    # Create SAFE observable
+    obs1 = cv1.observable_create("domain", "trusted.example.com", score=0, level=Level.SAFE)
+
+    cv2 = Cyvest()
+    # Create same observable with NOTABLE level
+    obs2 = cv2.observable_create("domain", "trusted.example.com")
+    cv2.observable_add_threat_intel(obs2.key, source="ti_source", score=Decimal("2.0"))
+    assert obs2.level == Level.NOTABLE
+
+    # Merge cv2 into cv1
+    cv1.merge_investigation(cv2)
+
+    # Should upgrade to NOTABLE
+    merged_obs = cv1.observable_get(obs1.key)
+    assert merged_obs.level == Level.NOTABLE
+    assert merged_obs.score == Decimal("2.0")
+
+
+def test_merge_safe_observable_upgrades_with_malicious() -> None:
+    """Test that merging SAFE observable with MALICIOUS-level incoming upgrades to MALICIOUS."""
+    cv1 = Cyvest()
+    # Create SAFE observable
+    obs1 = cv1.observable_create("domain", "trusted.example.com", score=0, level=Level.SAFE)
+
+    cv2 = Cyvest()
+    # Create same observable with MALICIOUS level
+    obs2 = cv2.observable_create("domain", "trusted.example.com")
+    cv2.observable_add_threat_intel(obs2.key, source="ti_source", score=Decimal("6.0"))
+    assert obs2.level == Level.MALICIOUS
+
+    # Merge cv2 into cv1
+    cv1.merge_investigation(cv2)
+
+    # Should upgrade to MALICIOUS
+    merged_obs = cv1.observable_get(obs1.key)
+    assert merged_obs.level == Level.MALICIOUS
+    assert merged_obs.score == Decimal("6.0")
+
+
+def test_merge_non_safe_explicit_level_normal_behavior() -> None:
+    """Test that merging non-SAFE explicit levels behaves normally."""
+    cv1 = Cyvest()
+    # Create observable with explicit SUSPICIOUS level
+    obs1 = cv1.observable_create("domain", "test.example.com")
+    obs1.set_level(Level.SUSPICIOUS)
+    cv1.observable_add_threat_intel(obs1.key, source="source1", score=Decimal("4.0"))
+
+    cv2 = Cyvest()
+    # Create same observable with lower score
+    obs2 = cv2.observable_create("domain", "test.example.com")
+    cv2.observable_add_threat_intel(obs2.key, source="source2", score=Decimal("2.0"))
+
+    # Merge cv2 into cv1
+    cv1.merge_investigation(cv2)
+
+    # For non-SAFE levels, normal merge logic applies
+    merged_obs = cv1.observable_get(obs1.key)
+    # Score should be max(4.0, 2.0) = 4.0
+    assert merged_obs.score == Decimal("4.0")
+    # Level stays SUSPICIOUS (explicit level > calculated NOTABLE)
+    assert merged_obs.level == Level.SUSPICIOUS

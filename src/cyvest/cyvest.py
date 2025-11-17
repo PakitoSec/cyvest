@@ -3,17 +3,28 @@ Cyvest facade - high-level API for building cybersecurity investigations.
 
 Provides a simplified interface for creating and managing investigation objects,
 handling score propagation, and generating reports.
+
+Includes JSON/Markdown export (io_save_json, io_save_markdown), import (io_load_json),
+and dictionary export (io_to_dict, io_to_markdown) methods.
 """
 
 from __future__ import annotations
 
 from decimal import Decimal
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
 from logurich import logger
 
 from cyvest.investigation import Investigation
 from cyvest.io_rich import display_statistics, display_summary
+from cyvest.io_serialization import (
+    generate_markdown_report,
+    load_investigation_json,
+    save_investigation_json,
+    save_investigation_markdown,
+    serialize_investigation,
+)
 from cyvest.levels import Level
 from cyvest.model import Check, Container, Enrichment, Observable, ThreatIntel
 from cyvest.score import ScoreMode
@@ -54,6 +65,28 @@ class Cyvest:
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         """Context manager exit."""
         pass
+
+    @staticmethod
+    def io_load_json(filepath: str | Path) -> Cyvest:
+        """
+        Load an investigation from a JSON file.
+
+        Args:
+            filepath: Path to the JSON file (relative or absolute)
+
+        Returns:
+            Reconstructed Cyvest investigation
+
+        Raises:
+            FileNotFoundError: If the file does not exist
+            json.JSONDecodeError: If the file contains invalid JSON
+            Exception: For other file-related errors
+
+        Example:
+            >>> cv = Cyvest.io_load_json("investigation.json")
+            >>> cv = Cyvest.io_load_json("/absolute/path/to/investigation.json")
+        """
+        return load_investigation_json(filepath)
 
     # Internal helpers -------------------------------------------------
 
@@ -435,6 +468,87 @@ class Cyvest:
             Statistics dictionary
         """
         return self._investigation.get_statistics()
+
+    # Serialization and I/O methods
+
+    def io_save_json(self, filepath: str | Path) -> str:
+        """
+        Save the investigation to a JSON file.
+
+        Relative paths are converted to absolute paths before saving.
+
+        Args:
+            filepath: Path to save the JSON file (relative or absolute)
+
+        Returns:
+            Absolute path to the saved file as a string
+
+        Raises:
+            PermissionError: If the file cannot be written
+            OSError: If there are file system issues
+
+        Examples:
+            >>> cv = Cyvest()
+            >>> path = cv.io_save_json("investigation.json")
+            >>> print(path)  # /absolute/path/to/investigation.json
+        """
+        save_investigation_json(self, filepath)
+        return str(Path(filepath).resolve())
+
+    def io_save_markdown(self, filepath: str | Path) -> str:
+        """
+        Save the investigation as a Markdown report.
+
+        Relative paths are converted to absolute paths before saving.
+
+        Args:
+            filepath: Path to save the Markdown file (relative or absolute)
+
+        Returns:
+            Absolute path to the saved file as a string
+
+        Raises:
+            PermissionError: If the file cannot be written
+            OSError: If there are file system issues
+
+        Examples:
+            >>> cv = Cyvest()
+            >>> path = cv.io_save_markdown("report.md")
+            >>> print(path)  # /absolute/path/to/report.md
+        """
+        save_investigation_markdown(self, filepath)
+        return str(Path(filepath).resolve())
+
+    def io_to_markdown(self) -> str:
+        """
+        Generate a Markdown report of the investigation.
+
+        Returns:
+            Markdown formatted report as a string
+
+        Examples:
+            >>> cv = Cyvest()
+            >>> markdown = cv.io_to_markdown()
+            >>> print(markdown)
+            # Cybersecurity Investigation Report
+            ...
+        """
+        return generate_markdown_report(self)
+
+    def io_to_dict(self) -> dict[str, Any]:
+        """
+        Serialize the investigation to a dictionary.
+
+        Returns:
+            Dictionary representation suitable for JSON export
+
+        Examples:
+            >>> cv = Cyvest()
+            >>> data = cv.io_to_dict()
+            >>> print(data.keys())
+            dict_keys(['score', 'level', 'observables', 'checks', ...])
+        """
+        return serialize_investigation(self)
 
     # Merge methods
 

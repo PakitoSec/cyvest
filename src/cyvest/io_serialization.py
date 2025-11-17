@@ -7,11 +7,13 @@ Provides JSON export/import and Markdown generation for LLM consumption.
 import json
 from decimal import Decimal
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from cyvest.cyvest import Cyvest
 from cyvest.levels import Level
 from cyvest.model import Check, Container, Enrichment, Observable, Relationship, ThreatIntel
+
+if TYPE_CHECKING:
+    from cyvest.cyvest import Cyvest
 
 
 def _decimal_to_float(obj: Any) -> Any:
@@ -138,7 +140,7 @@ def serialize_container(container: Container) -> dict[str, Any]:
     }
 
 
-def serialize_investigation(cv: Cyvest) -> dict[str, Any]:
+def serialize_investigation(cv: "Cyvest") -> dict[str, Any]:
     """
     Serialize a complete investigation to a dictionary.
 
@@ -205,7 +207,7 @@ def serialize_investigation(cv: Cyvest) -> dict[str, Any]:
     }
 
 
-def save_investigation_json(cv: Cyvest, filepath: str | Path) -> None:
+def save_investigation_json(cv: "Cyvest", filepath: str | Path) -> None:
     """
     Save an investigation to a JSON file.
 
@@ -218,7 +220,7 @@ def save_investigation_json(cv: Cyvest, filepath: str | Path) -> None:
         json.dump(data, f, indent=2, ensure_ascii=False, default=_decimal_to_float)
 
 
-def generate_markdown_report(cv: Cyvest) -> str:
+def generate_markdown_report(cv: "Cyvest") -> str:
     """
     Generate a Markdown report of the investigation for LLM consumption.
 
@@ -329,7 +331,7 @@ def generate_markdown_report(cv: Cyvest) -> str:
     return "\n".join(lines)
 
 
-def save_investigation_markdown(cv: Cyvest, filepath: str | Path) -> None:
+def save_investigation_markdown(cv: "Cyvest", filepath: str | Path) -> None:
     """
     Save an investigation as a Markdown report.
 
@@ -342,7 +344,7 @@ def save_investigation_markdown(cv: Cyvest, filepath: str | Path) -> None:
         f.write(markdown)
 
 
-def load_investigation_json(filepath: str | Path) -> Cyvest:
+def load_investigation_json(filepath: str | Path) -> "Cyvest":
     """
     Load an investigation from a JSON file into a Cyvest object.
 
@@ -352,6 +354,7 @@ def load_investigation_json(filepath: str | Path) -> Cyvest:
     Returns:
         Reconstructed Cyvest investigation
     """
+    from cyvest.cyvest import Cyvest
     from cyvest.investigation import Investigation
 
     with open(filepath, encoding="utf-8") as handle:

@@ -61,6 +61,43 @@ def test_check_score_update() -> None:
     assert len(check._score_history) == 1
 
 
+def test_check_add_observable_upgrades_level() -> None:
+    """Test that adding an observable to a check with level NONE upgrades it to INFO."""
+    check = Check(check_id="test", scope="scope", description="desc")
+    assert check.level == Level.NONE  # Default level for new checks
+    
+    obs = Observable(obs_type="url", value="https://example.com")
+    check.add_observable(obs)
+    
+    assert check.level == Level.INFO  # Should auto-upgrade from NONE to INFO
+    assert len(check.observables) == 1
+    assert check.observables[0] == obs
+
+
+def test_check_add_observable_preserves_higher_level() -> None:
+    """Test that adding an observable doesn't downgrade an existing higher level."""
+    check = Check(check_id="test", scope="scope", description="desc")
+    check.set_level(Level.SUSPICIOUS)
+    
+    obs = Observable(obs_type="url", value="https://example.com")
+    check.add_observable(obs)
+    
+    assert check.level == Level.SUSPICIOUS  # Should preserve existing higher level
+    assert len(check.observables) == 1
+
+
+def test_check_add_observable_no_duplicate() -> None:
+    """Test that adding the same observable twice doesn't create duplicates."""
+    check = Check(check_id="test", scope="scope", description="desc")
+    obs = Observable(obs_type="url", value="https://example.com")
+    
+    check.add_observable(obs)
+    check.add_observable(obs)  # Add same observable again
+    
+    assert len(check.observables) == 1  # Should only have one instance
+    assert check.level == Level.INFO  # Level should still be INFO
+
+
 def test_threat_intel_creation() -> None:
     """Test creating threat intel."""
     ti = ThreatIntel(source="virustotal", observable_key="obs:url:example.com", score=Decimal("8.0"))

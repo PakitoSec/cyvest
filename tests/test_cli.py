@@ -102,7 +102,8 @@ def test_display_summary_min_level_filtering() -> None:
     cv = Cyvest()
 
     # Create observables and checks at different levels
-    # Score ranges: MALICIOUS >= 5.0, SUSPICIOUS 3.0-5.0, NOTABLE < 3.0, INFO = 0.0, NONE = unscored
+    # Score ranges: MALICIOUS >= 5.0, SUSPICIOUS 3.0-5.0, NOTABLE < 3.0, INFO = 0.0
+    # Note: Checks with observables are now automatically upgraded from NONE to INFO
     obs_malicious = cv.observable("url", "https://malicious.com", internal=False)
     obs_suspicious = cv.observable("url", "https://suspicious.com", internal=False)
     obs_info = cv.observable("url", "https://info.com", internal=False)
@@ -114,8 +115,8 @@ def test_display_summary_min_level_filtering() -> None:
         Decimal("4.0")
     )  # SUSPICIOUS
     cv.check("info_check", "network", "Info URL").link_observable(obs_info.get()).with_score(Decimal("0.0"))  # INFO
-    # Create a check without score (Level.NONE)
-    cv.check("none_check", "network", "None URL").link_observable(obs_info.get())
+    # Create a check without observable (Level.NONE - no auto-upgrade without observable)
+    cv.check("none_check", "network", "None check without observable")
 
     # Test with default (Level.NONE) - should show all checks
     output = StringIO()

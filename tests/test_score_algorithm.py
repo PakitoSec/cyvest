@@ -627,18 +627,13 @@ def test_threat_intel_with_safe_level_upgrades_info_observable() -> None:
     """Test that threat intel with SAFE level upgrades an INFO observable to SAFE."""
     cv = Cyvest()
     obs = cv.observable_create("domain", "trusted.example.com")
-    
+
     # Observable starts with INFO level
     assert obs.level == Level.INFO
-    
+
     # Add threat intel with SAFE level
-    cv.observable_add_threat_intel(
-        obs.key,
-        source="whitelist_db",
-        score=Decimal("0"),
-        level=Level.SAFE
-    )
-    
+    cv.observable_add_threat_intel(obs.key, source="whitelist_db", score=Decimal("0"), level=Level.SAFE)
+
     # Observable should now be SAFE
     assert obs.level == Level.SAFE
     assert obs._explicit_level is True
@@ -648,19 +643,14 @@ def test_threat_intel_with_safe_level_upgrades_trusted_observable() -> None:
     """Test that threat intel with SAFE level upgrades a TRUSTED observable to SAFE."""
     cv = Cyvest()
     obs = cv.observable_create("domain", "example.com")
-    
+
     # Add TI with negative score to get TRUSTED level
     cv.observable_add_threat_intel(obs.key, source="source1", score=Decimal("-1.0"))
     assert obs.level == Level.TRUSTED
-    
+
     # Add threat intel with SAFE level
-    cv.observable_add_threat_intel(
-        obs.key,
-        source="whitelist_db",
-        score=Decimal("0"),
-        level=Level.SAFE
-    )
-    
+    cv.observable_add_threat_intel(obs.key, source="whitelist_db", score=Decimal("0"), level=Level.SAFE)
+
     # Observable should now be SAFE
     assert obs.level == Level.SAFE
     assert obs._explicit_level is True
@@ -670,19 +660,14 @@ def test_threat_intel_with_safe_level_does_not_downgrade_notable() -> None:
     """Test that threat intel with SAFE level doesn't downgrade NOTABLE observable."""
     cv = Cyvest()
     obs = cv.observable_create("domain", "example.com")
-    
+
     # Add TI to get NOTABLE level
     cv.observable_add_threat_intel(obs.key, source="source1", score=Decimal("2.0"))
     assert obs.level == Level.NOTABLE
-    
+
     # Add threat intel with SAFE level (lower than NOTABLE)
-    cv.observable_add_threat_intel(
-        obs.key,
-        source="whitelist_db",
-        score=Decimal("0"),
-        level=Level.SAFE
-    )
-    
+    cv.observable_add_threat_intel(obs.key, source="whitelist_db", score=Decimal("0"), level=Level.SAFE)
+
     # Observable should stay NOTABLE (SAFE < NOTABLE, so no downgrade)
     assert obs.level == Level.NOTABLE
 
@@ -691,19 +676,14 @@ def test_threat_intel_with_safe_level_does_not_downgrade_malicious() -> None:
     """Test that threat intel with SAFE level doesn't downgrade MALICIOUS observable."""
     cv = Cyvest()
     obs = cv.observable_create("domain", "example.com")
-    
+
     # Add TI to get MALICIOUS level
     cv.observable_add_threat_intel(obs.key, source="source1", score=Decimal("6.0"))
     assert obs.level == Level.MALICIOUS
-    
+
     # Add threat intel with SAFE level (lower than MALICIOUS)
-    cv.observable_add_threat_intel(
-        obs.key,
-        source="whitelist_db",
-        score=Decimal("0"),
-        level=Level.SAFE
-    )
-    
+    cv.observable_add_threat_intel(obs.key, source="whitelist_db", score=Decimal("0"), level=Level.SAFE)
+
     # Observable should stay MALICIOUS (no downgrade from SAFE TI)
     assert obs.level == Level.MALICIOUS
 
@@ -712,23 +692,14 @@ def test_threat_intel_safe_then_malicious_upgrades() -> None:
     """Test that SAFE observable can still be upgraded by MALICIOUS threat intel."""
     cv = Cyvest()
     obs = cv.observable_create("domain", "example.com")
-    
+
     # Add threat intel with SAFE level
-    cv.observable_add_threat_intel(
-        obs.key,
-        source="whitelist_db",
-        score=Decimal("0"),
-        level=Level.SAFE
-    )
+    cv.observable_add_threat_intel(obs.key, source="whitelist_db", score=Decimal("0"), level=Level.SAFE)
     assert obs.level == Level.SAFE
-    
+
     # Add threat intel with MALICIOUS score
-    cv.observable_add_threat_intel(
-        obs.key,
-        source="virustotal",
-        score=Decimal("8.0")
-    )
-    
+    cv.observable_add_threat_intel(obs.key, source="virustotal", score=Decimal("8.0"))
+
     # Observable should upgrade to MALICIOUS
     assert obs.score == Decimal("8.0")
     assert obs.level == Level.MALICIOUS
@@ -737,23 +708,18 @@ def test_threat_intel_safe_then_malicious_upgrades() -> None:
 def test_threat_intel_safe_level_with_none_observable() -> None:
     """Test that threat intel with SAFE level upgrades NONE level observable."""
     cv = Cyvest()
-    
+
     # Create a check with NONE level
     check = cv.check_create("test_check", "scope", "description")
     assert check.level == Level.NONE
-    
+
     # Create observable starting at INFO
     obs = cv.observable_create("ip", "192.168.1.1")
     assert obs.level == Level.INFO
-    
+
     # Add threat intel with SAFE level to observable
-    cv.observable_add_threat_intel(
-        obs.key,
-        source="whitelist",
-        score=Decimal("0"),
-        level=Level.SAFE
-    )
-    
+    cv.observable_add_threat_intel(obs.key, source="whitelist", score=Decimal("0"), level=Level.SAFE)
+
     # Observable should be SAFE
     assert obs.level == Level.SAFE
 
@@ -874,4 +840,3 @@ def test_check_safe_with_multiple_safe_observables() -> None:
 
     # Check should be SAFE
     assert check.level == Level.SAFE
-

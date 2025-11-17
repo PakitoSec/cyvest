@@ -144,10 +144,10 @@ with Cyvest() as cv:
 
     console = Console()
     display_summary(cv, console)
-    
+
     # Filter display to show only checks at INFO level or higher (excludes NONE)
     display_summary(cv, console, min_level=Level.INFO)
-    
+
     # Show only high-severity checks (SUSPICIOUS and above)
     display_summary(cv, console, min_level=Level.SUSPICIOUS)
 

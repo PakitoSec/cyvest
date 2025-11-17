@@ -424,7 +424,7 @@ class Cyvest:
             self, lambda renderables: logger.rich("INFO", renderables), show_graph=show_graph, min_level=min_level
         )
 
-    def display_statistics(self, show_graph: bool = True) -> None:
+    def display_statistics(self) -> None:
         display_statistics(self, lambda renderables: logger.rich("INFO", renderables))
 
     def display_network(

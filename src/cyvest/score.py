@@ -79,7 +79,7 @@ class ScoreEngine:
         # If TI has SAFE level and observable level is lower, upgrade observable to SAFE
         if ti.level == Level.SAFE and observable.level < Level.SAFE:
             observable.set_level(Level.SAFE)
-        
+
         # Calculate the new observable score (includes TI scores and child scores)
         new_score = self._calculate_observable_score(observable)
 

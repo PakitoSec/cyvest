@@ -263,11 +263,18 @@ class Check:
         """
         Add an observable to this check.
 
+        When an observable is added to a check with level NONE, the check's level
+        is automatically upgraded to INFO to indicate that the check is now classified.
+
         Args:
             observable: The observable to link
         """
         if observable not in self.observables:
             self.observables.append(observable)
+            
+            # Auto-upgrade level from NONE to INFO when first observable is added
+            if self.level == Level.NONE:
+                self.set_level(Level.INFO)
 
     def get_score_history(self) -> list[ScoreChange]:
         """

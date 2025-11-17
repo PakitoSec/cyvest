@@ -5,6 +5,7 @@ Tests MAX vs SUM modes, check score calculation, hierarchical propagation,
 and score history access.
 """
 
+from collections.abc import Sequence
 from decimal import Decimal
 
 from cyvest import Cyvest, Level
@@ -233,7 +234,7 @@ def test_observable_score_history() -> None:
 
     # Initial history should have 0 entries (no changes yet)
     history = obs.get_score_history()
-    assert isinstance(history, list)
+    assert isinstance(history, Sequence)
     assert len(history) == 0
 
     # Add threat intel (triggers score change)
@@ -268,7 +269,7 @@ def test_check_score_history() -> None:
 
     # Initial history should have 0 entries
     history = check.get_score_history()
-    assert isinstance(history, list)
+    assert isinstance(history, Sequence)
     assert len(history) == 0
 
     # Create observable and link to check
@@ -608,8 +609,8 @@ def test_non_safe_explicit_levels_allow_downgrades() -> None:
     cv = Cyvest()
     obs = cv.observable_create("domain", "test.example.com")
 
-    # Manually set to SUSPICIOUS
-    obs.set_level(Level.SUSPICIOUS)
+    # Manually set to SUSPICIOUS through Cyvest service layer
+    cv.observable_set_level(obs.key, Level.SUSPICIOUS)
     assert obs._explicit_level is True
     assert obs.level == Level.SUSPICIOUS
 

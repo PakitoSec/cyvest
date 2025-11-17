@@ -76,6 +76,14 @@ with Cyvest(data={"type": "email"}) as cv:
     save_investigation_json(cv, "investigation.json")
 ```
 
+### Read-Only Views
+
+Cyvest only exposes immutable model views. Helpers like `observable_create`, `check_create`, and the
+DSL handlers return `ObservableView`, `CheckView`, `ContainerView`, etc. These proxies reflect the
+live investigation state but raise `AttributeError` if you try to assign to their attributes. Always
+go through the facade (`cv.observable_set_level`, `cv.check_update_score`, `cv.observable_add_threat_intel`,
+`ObservableHandler.with_ti`, …) to mutate state so the score engine runs automatically.
+
 ## Core Concepts
 
 ### Observables
@@ -105,9 +113,9 @@ cv.observable_add_threat_intel(
 )
 
 # Create relationships with STIX2 relationship types
-# Accepts Observable objects or string keys
+# Accepts observable views or string keys
 cv.observable_add_relationship(
-    url_obs,  # Can pass Observable object directly
+    url_obs,  # Can pass ObservableView directly
     ip_obs,   # Or use .key for string keys
     RelationshipType.RESOLVES_TO
 )
@@ -138,7 +146,7 @@ from cyvest import RelationshipType, RelationshipDirection
 
 # Automatically gets OUTBOUND (domain → IP)
 # IP is a child of domain, IP's score propagates UP to domain
-# Accepts Observable objects directly
+# Accepts observable views directly
 cv.observable_add_relationship(domain, ip, RelationshipType.RESOLVES_TO)
 
 # Automatically gets INBOUND (file ← URL)
@@ -151,7 +159,7 @@ cv.observable_add_relationship(host1, host2, RelationshipType.COMMUNICATES_WITH)
 
 # Can override semantic defaults if needed
 cv.observable_add_relationship(
-    domain, ip,  # Accepts Observable objects
+    domain, ip,  # Accepts observable views
     RelationshipType.RESOLVES_TO,
     RelationshipDirection.INBOUND  # explicit override
 )

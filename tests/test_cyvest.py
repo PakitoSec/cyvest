@@ -4,6 +4,8 @@ Tests for the Cyvest facade.
 
 from decimal import Decimal
 
+import pytest
+
 from cyvest import Cyvest, Level, RelationshipDirection
 
 
@@ -39,7 +41,8 @@ def test_observable_retrieval() -> None:
     cv = Cyvest()
     obs = cv.observable_create("ip", "10.0.0.1")
     retrieved = cv.observable_get(obs.key)
-    assert retrieved is obs
+    assert retrieved is not None
+    assert retrieved.key == obs.key
 
 
 def test_threat_intel_addition() -> None:
@@ -69,7 +72,7 @@ def test_check_observable_linking() -> None:
     obs = cv.observable_create("url", "https://bad.com")
     check = cv.check_create("url_check", "analysis", "Check URL")
     cv.check_link_observable(check.key, obs.key)
-    assert obs in check.observables
+    assert any(o.key == obs.key for o in check.observables)
 
 
 def test_container_creation() -> None:
@@ -86,7 +89,7 @@ def test_container_check_addition() -> None:
     check = cv.check_create("c1", "s1", "d1")
     ctr = cv.container_create("test_container")
     cv.container_add_check(ctr.key, check.key)
-    assert check in ctr.checks
+    assert any(c.key == check.key for c in ctr.checks)
 
 
 def test_enrichment_creation() -> None:
@@ -145,7 +148,9 @@ def test_root_observable() -> None:
     root = cv.observable_get_root()
     assert root is not None
     # Root should be accessible through API
-    assert cv.observable_get(root.key) is root
+    retrieved = cv.observable_get(root.key)
+    assert retrieved is not None
+    assert retrieved.key == root.key
 
 
 def test_relationship_with_direction() -> None:
@@ -424,7 +429,7 @@ def test_merge_non_safe_explicit_level_normal_behavior() -> None:
     cv1 = Cyvest()
     # Create observable with explicit SUSPICIOUS level
     obs1 = cv1.observable_create("domain", "test.example.com")
-    obs1.set_level(Level.SUSPICIOUS)
+    cv1.observable_set_level(obs1.key, Level.SUSPICIOUS)
     cv1.observable_add_threat_intel(obs1.key, source="source1", score=Decimal("4.0"))
 
     cv2 = Cyvest()
@@ -441,3 +446,28 @@ def test_merge_non_safe_explicit_level_normal_behavior() -> None:
     assert merged_obs.score == Decimal("4.0")
     # Level stays SUSPICIOUS (explicit level > calculated NOTABLE)
     assert merged_obs.level == Level.SUSPICIOUS
+
+
+def test_observable_view_is_read_only() -> None:
+    """Observable views should block direct attribute mutation."""
+    cv = Cyvest()
+    obs = cv.observable_create("ip", "203.0.113.5")
+
+    with pytest.raises(AttributeError):
+        obs.score = Decimal("5")  # type: ignore[misc]
+
+    cv.observable_add_threat_intel(obs.key, source="source1", score=Decimal("4.0"))
+    assert obs.score == Decimal("4.0")
+
+
+def test_check_view_is_read_only() -> None:
+    """Check views should only change through Cyvest services."""
+    cv = Cyvest()
+    handler = cv.check("chk-1", "scoped", "desc").with_score(Decimal("2.0"))
+    check_view = handler.get()
+
+    with pytest.raises(AttributeError):
+        check_view.score = Decimal("3.0")  # type: ignore[misc]
+
+    cv.check_update_score(check_view.key, Decimal("3.0"))
+    assert check_view.score == Decimal("3.0")

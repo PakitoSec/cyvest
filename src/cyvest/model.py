@@ -271,7 +271,7 @@ class Check:
         """
         if observable not in self.observables:
             self.observables.append(observable)
-            
+
             # Auto-upgrade level from NONE to INFO when first observable is added
             if self.level == Level.NONE:
                 self.set_level(Level.INFO)

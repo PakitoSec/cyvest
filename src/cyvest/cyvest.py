@@ -17,6 +17,7 @@ from cyvest.io_rich import display_statistics, display_summary
 from cyvest.levels import Level
 from cyvest.model import Check, Container, Enrichment, Observable, ThreatIntel
 from cyvest.score import ScoreMode
+from cyvest.views import CheckView, ContainerView, EnrichmentView, ObservableView, ThreatIntelView
 
 if TYPE_CHECKING:
     from cyvest.dsl import CheckHandler, ContainerHandler, ObservableHandler
@@ -54,6 +55,41 @@ class Cyvest:
         """Context manager exit."""
         pass
 
+    # Internal helpers -------------------------------------------------
+
+    def _observable_view(self, observable: Observable | None) -> ObservableView | None:
+        if observable is None:
+            return None
+        return ObservableView(self._investigation, observable.key)
+
+    def _check_view(self, check: Check | None) -> CheckView | None:
+        if check is None:
+            return None
+        return CheckView(self._investigation, check.key)
+
+    def _container_view(self, container: Container | None) -> ContainerView | None:
+        if container is None:
+            return None
+        return ContainerView(self._investigation, container.key)
+
+    def _threat_intel_view(self, ti: ThreatIntel | None) -> ThreatIntelView | None:
+        if ti is None:
+            return None
+        return ThreatIntelView(self._investigation, ti.key)
+
+    def _enrichment_view(self, enrichment: Enrichment | None) -> EnrichmentView | None:
+        if enrichment is None:
+            return None
+        return EnrichmentView(self._investigation, enrichment.key)
+
+    @staticmethod
+    def _resolve_key(value: Observable | ObservableView | str) -> str:
+        if isinstance(value, str):
+            return value
+        if hasattr(value, "key"):
+            return value.key  # type: ignore[return-value]
+        raise TypeError("Expected an observable key, ObservableView, or Observable instance.")
+
     # Observable methods
 
     def observable_create(
@@ -66,7 +102,7 @@ class Cyvest:
         extra: dict[str, Any] | None = None,
         score: Decimal | float | None = None,
         level: Level | None = None,
-    ) -> Observable:
+    ) -> ObservableView:
         """
         Create a new observable or return existing one.
 
@@ -95,9 +131,9 @@ class Cyvest:
         )
         # Unwrap tuple - facade returns only Observable, discards deferred relationships
         obs_result, _ = self._investigation.add_observable(obs)
-        return obs_result
+        return self._observable_view(obs_result)
 
-    def observable_get(self, key: str) -> Observable | None:
+    def observable_get(self, key: str) -> ObservableView | None:
         """
         Get an observable by key.
 
@@ -107,24 +143,24 @@ class Cyvest:
         Returns:
             Observable if found, None otherwise
         """
-        return self._investigation.get_observable(key)
+        return self._observable_view(self._investigation.get_observable(key))
 
-    def observable_get_root(self) -> Observable:
+    def observable_get_root(self) -> ObservableView:
         """
         Get the root observable.
 
         Returns:
             Root observable
         """
-        return self._investigation.get_root()
+        return self._observable_view(self._investigation.get_root())
 
     def observable_add_relationship(
         self,
-        source: Observable | str,
-        target: Observable | str,
+        source: Observable | ObservableView | str,
+        target: Observable | ObservableView | str,
         relationship_type: str,
         direction: str | None = None,
-    ) -> Observable | None:
+    ) -> ObservableView | None:
         """
         Add a relationship between observables.
 
@@ -137,7 +173,10 @@ class Cyvest:
         Returns:
             The source observable if both source and target exist, None otherwise
         """
-        return self._investigation.add_relationship(source, target, relationship_type, direction)
+        source_key = self._resolve_key(source)
+        target_key = self._resolve_key(target)
+        result = self._investigation.add_relationship(source_key, target_key, relationship_type, direction)
+        return self._observable_view(result)
 
     def observable_add_threat_intel(
         self,
@@ -148,7 +187,7 @@ class Cyvest:
         extra: dict[str, Any] | None = None,
         level: Level | None = None,
         taxonomies: list[dict[str, Any]] | None = None,
-    ) -> ThreatIntel | None:
+    ) -> ThreatIntelView | None:
         """
         Add threat intelligence to an observable.
 
@@ -177,7 +216,25 @@ class Cyvest:
             level=level or Level.INFO,
             taxonomies=taxonomies or [],
         )
-        return self._investigation.add_threat_intel(ti, observable)
+        result = self._investigation.add_threat_intel(ti, observable)
+        return self._threat_intel_view(result)
+
+    def observable_set_level(self, observable_key: str, level: Level) -> ObservableView | None:
+        """
+        Explicitly set an observable's level via the service layer.
+
+        Args:
+            observable_key: Key of the observable to update
+            level: Level to apply
+
+        Returns:
+            Updated observable view if found, None otherwise
+        """
+        observable = self._investigation.get_observable(observable_key)
+        if not observable:
+            return None
+        observable.set_level(level)
+        return self._observable_view(observable)
 
     def observable_finalize_relationships(self) -> None:
         """
@@ -198,7 +255,7 @@ class Cyvest:
         extra: dict[str, Any] | None = None,
         score: Decimal | float | None = None,
         level: Level | None = None,
-    ) -> Check:
+    ) -> CheckView:
         """
         Create a new check.
 
@@ -223,9 +280,9 @@ class Cyvest:
             score=Decimal(str(score)) if score is not None else Decimal("0"),
             level=level or Level.NONE,
         )
-        return self._investigation.add_check(check)
+        return self._check_view(self._investigation.add_check(check))
 
-    def check_get(self, key: str) -> Check | None:
+    def check_get(self, key: str) -> CheckView | None:
         """
         Get a check by key.
 
@@ -235,9 +292,9 @@ class Cyvest:
         Returns:
             Check if found, None otherwise
         """
-        return self._investigation.get_check(key)
+        return self._check_view(self._investigation.get_check(key))
 
-    def check_link_observable(self, check_key: str, observable_key: str) -> Check | None:
+    def check_link_observable(self, check_key: str, observable_key: str) -> CheckView | None:
         """
         Link an observable to a check.
 
@@ -248,9 +305,9 @@ class Cyvest:
         Returns:
             The check if found, None otherwise
         """
-        return self._investigation.link_check_observable(check_key, observable_key)
+        return self._check_view(self._investigation.link_check_observable(check_key, observable_key))
 
-    def check_update_score(self, check_key: str, score: Decimal | float, reason: str = "") -> Check | None:
+    def check_update_score(self, check_key: str, score: Decimal | float, reason: str = "") -> CheckView | None:
         """
         Update a check's score.
 
@@ -265,11 +322,11 @@ class Cyvest:
         check = self._investigation.get_check(check_key)
         if check:
             check.update_score(Decimal(str(score)), reason)
-        return check
+        return self._check_view(check)
 
     # Container methods
 
-    def container_create(self, path: str, description: str = "") -> Container:
+    def container_create(self, path: str, description: str = "") -> ContainerView:
         """
         Create a new container.
 
@@ -281,9 +338,9 @@ class Cyvest:
             The created container
         """
         container = Container(path=path, description=description)
-        return self._investigation.add_container(container)
+        return self._container_view(self._investigation.add_container(container))
 
-    def container_get(self, key: str) -> Container | None:
+    def container_get(self, key: str) -> ContainerView | None:
         """
         Get a container by key.
 
@@ -293,9 +350,9 @@ class Cyvest:
         Returns:
             Container if found, None otherwise
         """
-        return self._investigation.get_container(key)
+        return self._container_view(self._investigation.get_container(key))
 
-    def container_add_check(self, container_key: str, check_key: str) -> Container | None:
+    def container_add_check(self, container_key: str, check_key: str) -> ContainerView | None:
         """
         Add a check to a container.
 
@@ -306,9 +363,9 @@ class Cyvest:
         Returns:
             The container if found, None otherwise
         """
-        return self._investigation.add_check_to_container(container_key, check_key)
+        return self._container_view(self._investigation.add_check_to_container(container_key, check_key))
 
-    def container_add_sub_container(self, parent_key: str, child_key: str) -> Container | None:
+    def container_add_sub_container(self, parent_key: str, child_key: str) -> ContainerView | None:
         """
         Add a sub-container to a container.
 
@@ -319,11 +376,11 @@ class Cyvest:
         Returns:
             The parent container if found, None otherwise
         """
-        return self._investigation.add_sub_container(parent_key, child_key)
+        return self._container_view(self._investigation.add_sub_container(parent_key, child_key))
 
     # Enrichment methods
 
-    def enrichment_create(self, name: str, data: dict[str, Any], context: str = "") -> Enrichment:
+    def enrichment_create(self, name: str, data: dict[str, Any], context: str = "") -> EnrichmentView:
         """
         Create a new enrichment.
 
@@ -336,9 +393,9 @@ class Cyvest:
             The created enrichment
         """
         enrichment = Enrichment(name=name, data=data, context=context)
-        return self._investigation.add_enrichment(enrichment)
+        return self._enrichment_view(self._investigation.add_enrichment(enrichment))
 
-    def enrichment_get(self, key: str) -> Enrichment | None:
+    def enrichment_get(self, key: str) -> EnrichmentView | None:
         """
         Get an enrichment by key.
 
@@ -348,7 +405,7 @@ class Cyvest:
         Returns:
             Enrichment if found, None otherwise
         """
-        return self._investigation.get_enrichment(key)
+        return self._enrichment_view(self._investigation.get_enrichment(key))
 
     # Score and statistics methods
 
@@ -399,25 +456,31 @@ class Cyvest:
         """
         self._investigation.finalize_relationships()
 
-    def get_all_observables(self) -> dict[str, Observable]:
-        """Get all observables."""
-        return self._investigation.get_all_observables()
+    def get_all_observables(self) -> dict[str, ObservableView]:
+        """Get read-only views for all observables."""
+        return {
+            key: ObservableView(self._investigation, key) for key in self._investigation.get_all_observables().keys()
+        }
 
-    def get_all_checks(self) -> dict[str, Check]:
-        """Get all checks."""
-        return self._investigation.get_all_checks()
+    def get_all_checks(self) -> dict[str, CheckView]:
+        """Get read-only views for all checks."""
+        return {key: CheckView(self._investigation, key) for key in self._investigation.get_all_checks().keys()}
 
-    def get_all_threat_intels(self) -> dict[str, ThreatIntel]:
-        """Get all threat intels."""
-        return self._investigation.get_all_threat_intels()
+    def get_all_threat_intels(self) -> dict[str, ThreatIntelView]:
+        """Get read-only views for all threat intel entries."""
+        return {
+            key: ThreatIntelView(self._investigation, key) for key in self._investigation.get_all_threat_intels().keys()
+        }
 
-    def get_all_enrichments(self) -> dict[str, Enrichment]:
-        """Get all enrichments."""
-        return self._investigation.get_all_enrichments()
+    def get_all_enrichments(self) -> dict[str, EnrichmentView]:
+        """Get read-only views for all enrichments."""
+        return {
+            key: EnrichmentView(self._investigation, key) for key in self._investigation.get_all_enrichments().keys()
+        }
 
-    def get_all_containers(self) -> dict[str, Container]:
-        """Get all containers."""
-        return self._investigation.get_all_containers()
+    def get_all_containers(self) -> dict[str, ContainerView]:
+        """Get read-only views for all containers."""
+        return {key: ContainerView(self._investigation, key) for key in self._investigation.get_all_containers().keys()}
 
     def display_summary(self, show_graph: bool = True, min_level: Level = Level.INFO) -> None:
         display_summary(
@@ -510,7 +573,7 @@ class Cyvest:
         from cyvest.dsl import ObservableHandler
 
         obs = self.observable_create(obs_type, value, internal, whitelisted, comment, extra, score, level)
-        return ObservableHandler(self._investigation, obs)
+        return ObservableHandler(self._investigation, obs.key)
 
     def check(
         self,
@@ -540,7 +603,7 @@ class Cyvest:
         from cyvest.dsl import CheckHandler
 
         chk = self.check_create(check_id, scope, description, comment, extra, score, level)
-        return CheckHandler(self._investigation, chk)
+        return CheckHandler(self._investigation, chk.key)
 
     def container(self, path: str, description: str = "") -> ContainerHandler:
         """
@@ -556,7 +619,7 @@ class Cyvest:
         from cyvest.dsl import ContainerHandler
 
         ctr = self.container_create(path, description)
-        return ContainerHandler(self._investigation, ctr)
+        return ContainerHandler(self._investigation, ctr.key)
 
     def root(self) -> Observable:
         """

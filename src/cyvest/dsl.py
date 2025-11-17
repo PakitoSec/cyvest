@@ -14,21 +14,22 @@ from cyvest.levels import Level
 if TYPE_CHECKING:
     from cyvest.investigation import Investigation
     from cyvest.model import Check, Container, Observable
+    from cyvest.views import CheckView, ContainerView, ObservableView
 
 
 class ObservableHandler:
     """Fluent interface for observable operations."""
 
-    def __init__(self, investigation: Investigation, observable: Observable) -> None:
+    def __init__(self, investigation: Investigation, observable_key: str) -> None:
         """
         Initialize the observable handler.
 
         Args:
             investigation: The Investigation instance
-            observable: The observable being handled
+            observable_key: Key of the observable being handled
         """
         self._investigation = investigation
-        self._observable = observable
+        self._observable_key = observable_key
 
     def with_ti(
         self,
@@ -57,16 +58,20 @@ class ObservableHandler:
 
         from cyvest.model import ThreatIntel
 
+        observable = self._investigation.get_observable(self._observable_key)
+        if observable is None:
+            raise ValueError(f"Observable '{self._observable_key}' no longer exists.")
+
         ti = ThreatIntel(
             source=source,
-            observable_key=self._observable.key,
+            observable_key=self._observable_key,
             comment=comment,
             extra=extra or {},
             score=Decimal(str(score)),
             level=level or Level.INFO,
             taxonomies=taxonomies or [],
         )
-        self._investigation.add_threat_intel(ti, self._observable)
+        self._investigation.add_threat_intel(ti, observable)
         return self
 
     def add_ti(
@@ -111,15 +116,24 @@ class ObservableHandler:
         Returns:
             Self for chaining
         """
-        # Extract Observable from ObservableHandler if needed
-        if isinstance(target, ObservableHandler):
-            target = target._observable
+        from cyvest.model import Observable
 
-        # Pass to Investigation - it handles Observable | str
-        self._investigation.add_relationship(self._observable, target, relationship_type, direction)
+        if isinstance(target, ObservableHandler):
+            resolved_target: Observable | str = target._observable_key
+        elif isinstance(target, Observable):
+            # Pass Observable instances directly so shared-context guardrails work
+            resolved_target = target
+        elif hasattr(target, "key"):
+            resolved_target = target.key  # ObservableView or CheckView exposing key
+        elif isinstance(target, str):
+            resolved_target = target
+        else:
+            raise TypeError("Target must be an observable key, handler, view, or Observable instance.")
+
+        self._investigation.add_relationship(self._observable_key, resolved_target, relationship_type, direction)
         return self
 
-    def link_check(self, check: Check | CheckHandler) -> ObservableHandler:
+    def link_check(self, check: Check | CheckHandler | CheckView) -> ObservableHandler:
         """
         Link this observable to a check.
 
@@ -129,24 +143,32 @@ class ObservableHandler:
         Returns:
             Self for chaining
         """
-        check_obj = check._check if isinstance(check, CheckHandler) else check
-        self._investigation.link_check_observable(check_obj.key, self._observable.key)
+        if isinstance(check, CheckHandler):
+            check_key = check._check_key
+        elif hasattr(check, "key"):
+            check_key = check.key
+        else:
+            raise TypeError("Check must provide a key attribute.")
+
+        self._investigation.link_check_observable(check_key, self._observable_key)
         return self
 
-    def get(self) -> Observable:
+    def get(self) -> ObservableView:
         """
         Get the underlying observable.
 
         Returns:
             The observable
         """
-        return self._observable
+        from cyvest.views import ObservableView
+
+        return ObservableView(self._investigation, self._observable_key)
 
 
 class CheckHandler:
     """Fluent interface for check operations."""
 
-    def __init__(self, investigation: Investigation, check: Check) -> None:
+    def __init__(self, investigation: Investigation, check_key: str) -> None:
         """
         Initialize the check handler.
 
@@ -155,7 +177,7 @@ class CheckHandler:
             check: The check being handled
         """
         self._investigation = investigation
-        self._check = check
+        self._check_key = check_key
 
     def in_container(self, container: Container | ContainerHandler) -> CheckHandler:
         """
@@ -167,11 +189,16 @@ class CheckHandler:
         Returns:
             Self for chaining
         """
-        container_obj = container._container if isinstance(container, ContainerHandler) else container
-        self._investigation.add_check_to_container(container_obj.key, self._check.key)
+        if isinstance(container, ContainerHandler):
+            container_key = container._container_key
+        elif hasattr(container, "key"):
+            container_key = container.key
+        else:
+            raise TypeError("Container must provide a key attribute.")
+        self._investigation.add_check_to_container(container_key, self._check_key)
         return self
 
-    def link_observable(self, observable: Observable | ObservableHandler) -> CheckHandler:
+    def link_observable(self, observable: Observable | ObservableHandler | ObservableView) -> CheckHandler:
         """
         Link an observable to this check.
 
@@ -181,8 +208,13 @@ class CheckHandler:
         Returns:
             Self for chaining
         """
-        obs_obj = observable._observable if isinstance(observable, ObservableHandler) else observable
-        self._investigation.link_check_observable(self._check.key, obs_obj.key)
+        if isinstance(observable, ObservableHandler):
+            observable_key = observable._observable_key
+        elif hasattr(observable, "key"):
+            observable_key = observable.key
+        else:
+            raise TypeError("Observable must provide a key attribute.")
+        self._investigation.link_check_observable(self._check_key, observable_key)
         return self
 
     def with_score(self, score: Decimal | float, reason: str = "") -> CheckHandler:
@@ -198,25 +230,27 @@ class CheckHandler:
         """
         from decimal import Decimal
 
-        check = self._investigation.get_check(self._check.key)
+        check = self._investigation.get_check(self._check_key)
         if check:
             check.update_score(Decimal(str(score)), reason)
         return self
 
-    def get(self) -> Check:
+    def get(self) -> CheckView:
         """
         Get the underlying check.
 
         Returns:
             The check
         """
-        return self._check
+        from cyvest.views import CheckView
+
+        return CheckView(self._investigation, self._check_key)
 
 
 class ContainerHandler:
     """Fluent interface for container operations."""
 
-    def __init__(self, investigation: Investigation, container: Container) -> None:
+    def __init__(self, investigation: Investigation, container_key: str) -> None:
         """
         Initialize the container handler.
 
@@ -225,7 +259,7 @@ class ContainerHandler:
             container: The container being handled
         """
         self._investigation = investigation
-        self._container = container
+        self._container_key = container_key
 
     def add_check(self, check: Check | CheckHandler) -> ContainerHandler:
         """
@@ -237,8 +271,14 @@ class ContainerHandler:
         Returns:
             Self for chaining
         """
-        check_obj = check._check if isinstance(check, CheckHandler) else check
-        self._investigation.add_check_to_container(self._container.key, check_obj.key)
+        if isinstance(check, CheckHandler):
+            check_key = check._check_key
+        elif hasattr(check, "key"):
+            check_key = check.key
+        else:
+            raise TypeError("Check must provide a key attribute.")
+
+        self._investigation.add_check_to_container(self._container_key, check_key)
         return self
 
     def sub_container(self, path: str, description: str = "") -> ContainerHandler:
@@ -258,8 +298,8 @@ class ContainerHandler:
         full_path = f"{self._container.path}/{path}"
         sub = Container(path=full_path, description=description)
         sub = self._investigation.add_container(sub)
-        self._investigation.add_sub_container(self._container.key, sub.key)
-        return ContainerHandler(self._investigation, sub)
+        self._investigation.add_sub_container(self._container_key, sub.key)
+        return ContainerHandler(self._investigation, sub.key)
 
     def __enter__(self) -> ContainerHandler:
         """Context manager entry."""
@@ -269,11 +309,13 @@ class ContainerHandler:
         """Context manager exit."""
         pass
 
-    def get(self) -> Container:
+    def get(self) -> ContainerView:
         """
         Get the underlying container.
 
         Returns:
             The container
         """
-        return self._container
+        from cyvest.views import ContainerView
+
+        return ContainerView(self._investigation, self._container_key)

@@ -87,6 +87,7 @@ def test_get_observable():
 
     with shared.create_cyvest() as cy:
         original = cy.observable(ObservableType.IPV4_ADDR, "192.168.1.1")
+        original_model = cy._investigation.get_observable(original.get().key)
 
     # Retrieve observable
     retrieved = shared.get_observable("obs:ipv4-addr:192.168.1.1")
@@ -95,7 +96,7 @@ def test_get_observable():
     assert retrieved.obs_type == ObservableType.IPV4_ADDR
     assert retrieved.value == "192.168.1.1"
     # Should be a deep copy, not the same object
-    assert retrieved is not original.get()
+    assert retrieved is not original_model
 
 
 def test_get_nonexistent_observable():
@@ -114,6 +115,7 @@ def test_get_check():
 
     with shared.create_cyvest() as cy:
         original = cy.check("test_check", "scope", "Description")
+        original_check = cy._investigation.get_check(original.get().key)
 
     # Retrieve check
     retrieved = shared.get_check("chk:test_check:scope")
@@ -122,7 +124,7 @@ def test_get_check():
     assert retrieved.check_id == "test_check"
     assert retrieved.scope == "scope"
     # Should be a deep copy
-    assert retrieved is not original.get()
+    assert retrieved is not original_check
 
 
 def test_has_observable():
@@ -747,8 +749,10 @@ def test_copied_observable_has_marker():
 
     with shared.create_cyvest() as cy:
         original = cy.observable(ObservableType.DOMAIN_NAME, "example.com")
+        original_model = cy._investigation.get_observable(original.get().key)
+        assert original_model is not None
         # Original should not be marked
-        assert original.get()._from_shared_context is False
+        assert original_model._from_shared_context is False
 
     # Copy from shared context should be marked
     copy = shared.get_observable(ObservableType.DOMAIN_NAME, "example.com")

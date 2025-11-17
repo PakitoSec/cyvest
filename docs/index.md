@@ -56,6 +56,9 @@ with Cyvest(data={"type": "email"}) as cv:
 !!! tip "Best practice"
     Store the investigation metadata (request ID, analyst, ticket link) in the root observable's `extra` field. It travels with every export format.
 
+!!! note "Immutable views"
+    The objects returned by `cv.observable_*`/`cv.check_*` are read-only `*View` proxies. Use the facade or DSL methods to apply changes so scoring stays consistent.
+
 ---
 
 ## Architecture Snapshot

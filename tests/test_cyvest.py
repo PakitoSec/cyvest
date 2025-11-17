@@ -2,7 +2,9 @@
 Tests for the Cyvest facade.
 """
 
+import tempfile
 from decimal import Decimal
+from pathlib import Path
 
 import pytest
 
@@ -471,3 +473,170 @@ def test_check_view_is_read_only() -> None:
 
     cv.check_update_score(check_view.key, Decimal("3.0"))
     assert check_view.score == Decimal("3.0")
+
+
+def test_io_save_load_json_roundtrip() -> None:
+    """Test saving and loading investigation from JSON."""
+    # Create investigation with various components
+    cv = Cyvest()
+    obs1 = cv.observable_create("ip", "192.168.1.1", internal=False)
+    cv.observable_add_threat_intel(obs1.key, source="virustotal", score=Decimal("7.5"), comment="Malicious IP")
+
+    obs2 = cv.observable_create("domain", "evil.com", internal=False)
+    cv.observable_add_threat_intel(obs2.key, source="urlscan", score=Decimal("8.0"))
+
+    cv.observable_add_relationship(obs1.key, obs2.key, "resolves-to")
+
+    check = cv.check_create("malware_check", "network", "Detected malware communication", score=Decimal("9.0"))
+    cv.check_link_observable(check.key, obs1.key)
+
+    cv.enrichment_create("whois", {"registrar": "Evil Corp"}, context="Domain registration")
+
+    # Save to temp file
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+        temp_path = f.name
+
+    try:
+        saved_path = cv.io_save_json(temp_path)
+        assert Path(saved_path).exists()
+
+        # Load and verify
+        loaded_cv = Cyvest.io_load_json(temp_path)
+
+        # Verify observables
+        assert len(loaded_cv.get_all_observables()) == len(cv.get_all_observables())
+        loaded_obs1 = loaded_cv.observable_get(obs1.key)
+        assert loaded_obs1 is not None
+        assert loaded_obs1.value == "192.168.1.1"
+        assert loaded_obs1.score == Decimal("7.5")
+
+        # Verify threat intel
+        assert len(loaded_cv.get_all_threat_intels()) == len(cv.get_all_threat_intels())
+
+        # Verify checks
+        assert len(loaded_cv.get_all_checks()) == len(cv.get_all_checks())
+        loaded_check = loaded_cv.check_get(check.key)
+        assert loaded_check is not None
+        assert loaded_check.scope == "network"
+
+        # Verify enrichments
+        assert len(loaded_cv.get_all_enrichments()) == len(cv.get_all_enrichments())
+
+        # Verify scores match
+        assert loaded_cv.get_global_score() == cv.get_global_score()
+        assert loaded_cv.get_global_level() == cv.get_global_level()
+    finally:
+        Path(temp_path).unlink(missing_ok=True)
+
+
+def test_io_save_json_returns_absolute_path() -> None:
+    """Test that io_save_json returns absolute path."""
+    cv = Cyvest()
+
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+        temp_path = f.name
+
+    try:
+        # Use relative path notation
+        relative_path = Path(temp_path).name
+        saved_path = cv.io_save_json(relative_path)
+
+        # Should return absolute path
+        assert Path(saved_path).is_absolute()
+        assert saved_path.endswith(relative_path)
+    finally:
+        # Clean up both the relative and absolute paths
+        Path(relative_path).unlink(missing_ok=True)
+        Path(temp_path).unlink(missing_ok=True)
+
+
+def test_io_save_markdown_returns_absolute_path() -> None:
+    """Test that io_save_markdown returns absolute path."""
+    cv = Cyvest()
+    cv.observable_create("ip", "10.0.0.1")
+
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
+        temp_path = f.name
+
+    try:
+        saved_path = cv.io_save_markdown(temp_path)
+
+        # Should return absolute path
+        assert Path(saved_path).is_absolute()
+        assert Path(saved_path).exists()
+
+        # Verify content
+        content = Path(saved_path).read_text()
+        assert "# Cybersecurity Investigation Report" in content
+        assert "10.0.0.1" in content
+    finally:
+        Path(temp_path).unlink(missing_ok=True)
+
+
+def test_io_to_dict_serialization() -> None:
+    """Test dictionary serialization contains expected keys."""
+    cv = Cyvest()
+    obs = cv.observable_create("url", "https://malicious.com")
+    cv.observable_add_threat_intel(obs.key, source="virustotal", score=Decimal("6.0"))
+    cv.check_create("url_check", "network", "URL analysis")
+
+    data = cv.io_to_dict()
+
+    # Verify all expected top-level keys exist
+    assert "score" in data
+    assert "level" in data
+    assert "observables" in data
+    assert "checks" in data
+    assert "threat_intels" in data
+    assert "enrichments" in data
+    assert "containers" in data
+    assert "graph" in data
+    assert "stats" in data
+
+    # Verify data structure
+    assert isinstance(data["observables"], dict)
+    assert isinstance(data["checks"], dict)
+    assert isinstance(data["threat_intels"], dict)
+    assert isinstance(data["graph"], list)
+
+    # Verify content
+    assert obs.key in data["observables"]
+    assert data["observables"][obs.key]["value"] == "https://malicious.com"
+
+
+def test_io_to_markdown_generates_report() -> None:
+    """Test Markdown report generation."""
+    cv = Cyvest()
+    obs = cv.observable_create("domain", "test.com", internal=False)
+    cv.observable_add_threat_intel(obs.key, source="abuse.ch", score=Decimal("5.0"))
+    check = cv.check_create("domain_check", "dns", "DNS analysis", score=Decimal("4.0"), level=Level.SUSPICIOUS)
+    cv.check_link_observable(check.key, obs.key)
+
+    markdown = cv.io_to_markdown()
+
+    # Verify markdown structure
+    assert "# Cybersecurity Investigation Report" in markdown
+    assert "## Statistics" in markdown
+    assert "## Observables" in markdown
+    assert "## Checks by Scope" in markdown
+
+    # Verify content
+    assert "test.com" in markdown
+    assert "abuse.ch" in markdown
+    assert "DNS analysis" in markdown
+    assert "domain_check" in markdown
+
+
+def test_io_load_json_with_nonexistent_file() -> None:
+    """Test that loading nonexistent file raises FileNotFoundError."""
+    with pytest.raises(FileNotFoundError):
+        Cyvest.io_load_json("/nonexistent/path/to/file.json")
+
+
+def test_io_save_json_with_invalid_path() -> None:
+    """Test that saving to invalid path raises OSError."""
+    cv = Cyvest()
+
+    # Try to write to a directory that doesn't exist
+    with pytest.raises(OSError):
+        cv.io_save_json("/nonexistent/directory/investigation.json")

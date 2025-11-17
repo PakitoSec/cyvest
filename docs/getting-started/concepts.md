@@ -376,26 +376,26 @@ cv = Cyvest()
 
 # Create a SAFE observable (e.g., known-good domain)
 trusted = cv.observable_create(
-    "domain", 
-    "trusted.example.com", 
-    score=0, 
+    "domain",
+    "trusted.example.com",
+    score=0,
     level=Level.SAFE
 )
 
 # Add threat intel with low score (would normally be INFO level)
 cv.observable_add_threat_intel(
-    trusted.key, 
-    "source1", 
+    trusted.key,
+    "source1",
     score=Decimal("0")
 )
 # Score updates to 0, but level stays SAFE (not downgraded to INFO)
-print(f"Score: {trusted.score}, Level: {trusted.level}")  
+print(f"Score: {trusted.score}, Level: {trusted.level}")
 # Output: Score: 0, Level: SAFE
 
 # Add threat intel with negative score (would be TRUSTED level)
 cv.observable_add_threat_intel(
-    trusted.key, 
-    "source2", 
+    trusted.key,
+    "source2",
     score=Decimal("-1.0")
 )
 # Score updates to -1.0, but level stays SAFE (not downgraded to TRUSTED)
@@ -404,8 +404,8 @@ print(f"Score: {trusted.score}, Level: {trusted.level}")
 
 # Add threat intel indicating malicious activity
 cv.observable_add_threat_intel(
-    trusted.key, 
-    "source3", 
+    trusted.key,
+    "source3",
     score=Decimal("6.0")
 )
 # Both score and level upgrade (MALICIOUS > SAFE, so upgrade allowed)

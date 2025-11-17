@@ -11,13 +11,34 @@ import webbrowser
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from pyvis.network import Network
-
 from cyvest.levels import LEVEL_COLORS, Level
 from cyvest.model import ObservableType, RelationshipDirection, RelationshipType
 
 if TYPE_CHECKING:
+    from pyvis.network import Network
+
     from cyvest.cyvest import Cyvest
+
+try:
+    from pyvis.network import Network  # type: ignore[assignment]
+
+    PYVIS_AVAILABLE = True
+except ImportError:  # pragma: no cover - optional dependency not installed
+    Network = None  # type: ignore[assignment]
+    PYVIS_AVAILABLE = False
+
+
+VISUALIZATION_INSTALL_HINT = (
+    "Network visualization requires the 'pyvis' optional dependency. "
+    'Install via `pip install "cyvest[visualization]"`.'
+)
+
+
+class VisualizationDependencyMissingError(RuntimeError):
+    """Raised when the optional visualization extra is not installed."""
+
+    def __init__(self) -> None:
+        super().__init__(VISUALIZATION_INSTALL_HINT)
 
 
 # Pyvis color mapping from Rich color names
@@ -133,6 +154,9 @@ def generate_network_graph(
         ...     generate_network_graph(cv)
         '/tmp/cyvest_network_12345.html'
     """
+    if not PYVIS_AVAILABLE or Network is None:  # pragma: no branch - both change together
+        raise VisualizationDependencyMissingError()
+
     # Create pyvis network with physics enabled for organic layout
     net = Network(
         height="800px",

@@ -277,8 +277,12 @@ source = { editable = "." }
 dependencies = [
     { name = "click" },
     { name = "logurich", extra = ["click"] },
-    { name = "pyvis" },
     { name = "rich" },
+]
+
+[package.optional-dependencies]
+visualization = [
+    { name = "pyvis" },
 ]
 
 [package.dev-dependencies]
@@ -299,9 +303,10 @@ docs = [
 requires-dist = [
     { name = "click", specifier = ">=8" },
     { name = "logurich", extras = ["click"], specifier = ">=0.1" },
-    { name = "pyvis", specifier = ">=0.3.2" },
+    { name = "pyvis", marker = "extra == 'visualization'", specifier = ">=0.3.2" },
     { name = "rich", specifier = ">=13" },
 ]
+provides-extras = ["visualization"]
 
 [package.metadata.requires-dev]
 dev = [

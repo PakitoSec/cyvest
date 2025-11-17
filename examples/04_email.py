@@ -472,8 +472,9 @@ def main(workers, browser, stats):
     # Finalize relationships
     cy.observable_finalize_relationships()
     cy._investigation._score_engine.recalculate_all()
+
     c = cy._investigation.get_check("email_risk_aggregated", "full")
-    logger.info(f"\n{c.comment}")
+    logger.info(c.comment)
 
     # Display results
     logger.info("Investigation complete - displaying summary")

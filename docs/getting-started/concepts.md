@@ -24,6 +24,11 @@ Each observable has:
 - **Relationships**: Links to other observables (can use `RelationshipType` enum)
 - **Threat Intelligence**: Verdicts from external sources
 
+> **Read-only views:** All public Cyvest APIs return `ObservableView` instances rather than raw
+> dataclasses. These proxies provide live scores/levels but raise an error if you attempt to assign
+> attributes. Use the facade/DSL methods (`cv.observable_add_threat_intel`, `cv.observable_set_level`,
+> `ObservableHandler.with_ti`, etc.) for any mutation so the score engine remains consistent.
+
 **STIX2 Observable Types:**
 
 ```python
@@ -281,7 +286,7 @@ cv.observable_add_threat_intel(ip2.key, "source", score=Decimal("5.0"))
 
 # Override RESOLVES_TO to BIDIRECTIONAL (no hierarchy)
 cv.observable_add_relationship(
-    domain2, ip2,  # Observable objects
+    domain2, ip2,  # Observable views
     RelationshipType.RESOLVES_TO,
     RelationshipDirection.BIDIRECTIONAL
 )
@@ -344,14 +349,14 @@ Special cases:
 You can set levels explicitly or let them be calculated from scores:
 
 ```python
-# Calculated from score
-obs.update_score(Decimal("8.0"))  # Becomes MALICIOUS
+# Calculated from score via threat intel
+cv.observable_add_threat_intel(obs.key, source="analysis", score=Decimal("8.0"))  # Becomes MALICIOUS
 
-# Explicitly set
-obs.set_level(Level.SAFE)  # Overrides calculation
+# Explicitly set through the facade
+cv.observable_set_level(obs.key, Level.SAFE)  # Overrides calculation
 
-# Higher calculated level wins
-obs.update_score(Decimal("9.0"))  # Changes to MALICIOUS
+# Higher calculated level wins when new intel arrives
+cv.observable_add_threat_intel(obs.key, source="analysis", score=Decimal("9.0"))  # Changes to MALICIOUS
 ```
 
 ### SAFE Level Protection
@@ -491,7 +496,7 @@ This propagation ensures that checks analyzing whitelisted/trusted assets are pr
 
 Relationships follow **STIX2 conventions** with built-in type support.
 
-**Important:** Relationships must be added through the Investigation or Cyvest layer using methods like `cv.observable_add_relationship()`. Observable objects do not have a public `add_relationship()` method. This design ensures:
+**Important:** Relationships must be added through the Investigation or Cyvest layer using methods like `cv.observable_add_relationship()`. Observable views do not expose mutating helpers. This design ensures:
 - **Validation**: Both source and target observables must exist in the investigation
 - **Centralized management**: All relationships are tracked in one place
 - **Data integrity**: No dangling references to non-existent observables
@@ -541,10 +546,10 @@ RelationshipType.DUPLICATE_OF          # Duplication
 **Creating Relationships:**
 
 ```python
-# Using Observable objects (recommended)
+# Using observable views (recommended)
 cv.observable_add_relationship(
-    source=url,  # Observable object
-    target=ip,   # Observable object
+    source=url,  # Observable view
+    target=ip,   # Observable view
     relationship_type=RelationshipType.RESOLVES_TO
 )
 
@@ -555,9 +560,9 @@ cv.observable_add_relationship(
     relationship_type=RelationshipType.RESOLVES_TO
 )
 
-# Mix Observable objects and keys
+# Mix observable views and keys
 cv.observable_add_relationship(
-    source=email,      # Observable object
+    source=email,      # Observable view
     target=url.key,    # String key
     relationship_type="related-to"
 )
@@ -578,7 +583,7 @@ Relationships support directional semantics with **automatic semantic defaults**
 from cyvest import RelationshipType
 
 # Automatically gets OUTBOUND (domain → IP)
-# Accepts Observable objects directly
+# Accepts observable views directly
 cv.observable_add_relationship(domain, ip, RelationshipType.RESOLVES_TO)
 
 # Automatically gets INBOUND (file ← URL)
@@ -589,13 +594,13 @@ cv.observable_add_relationship(host1, host2, RelationshipType.COMMUNICATES_WITH)
 
 # Can still override semantic defaults if needed
 cv.observable_add_relationship(
-    domain, ip,  # Observable objects
+    domain, ip,  # Observable views
     RelationshipType.RESOLVES_TO,
     RelationshipDirection.INBOUND  # explicit override
 )
 
 # Using the fluent DSL (also uses semantic defaults)
-# Accepts Observable objects, ObservableHandler, or string keys
+# Accepts observable views, ObservableHandler, or string keys
 url.relate_to(domain, RelationshipType.RELATED_TO)  # auto: BIDIRECTIONAL
 ```
 

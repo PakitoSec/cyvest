@@ -148,8 +148,12 @@ def test_investigation_add_relationship_with_observables() -> None:
 
     source = cv.observable_create("domain", "example.com")
     target = cv.observable_create("ip", "192.0.2.1")
+    source_model = cv._investigation.get_observable(source.key)
+    target_model = cv._investigation.get_observable(target.key)
+    assert source_model is not None
+    assert target_model is not None
 
-    result = cv._investigation.add_relationship(source, target, "resolves-to")
+    result = cv._investigation.add_relationship(source_model, target_model, "resolves-to")
 
     assert result is not None
     assert result.key == source.key

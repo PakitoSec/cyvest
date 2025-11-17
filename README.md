@@ -44,6 +44,9 @@ uv pip install -e .
 pip install -e .
 ```
 
+>  Install the optional visualization extra with\
+> `pip install "cyvest[visualization]"` (or `uv pip install -e ".[visualization]"`).
+
 ## Quick Start
 
 ```python
@@ -364,6 +367,9 @@ cyvest merge inv1.json inv2.json -o merged.json --stats
 
 # Merge and display rich summary
 cyvest merge inv1.json inv2.json -o merged.json -f rich --stats
+
+# Generate an interactive visualization (requires visualization extra)
+cyvest visualize investigation.json --min-level SUSPICIOUS --group-by-type
 ```
 
 ## Development

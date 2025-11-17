@@ -18,6 +18,7 @@ from rich.console import Console
 
 from cyvest import __version__
 from cyvest.io_serialization import load_investigation_json
+from cyvest.io_visualization import VisualizationDependencyMissingError
 
 CONTEXT_SETTINGS = {"help_option_names": ["-h", "--help"]}
 console = Console()
@@ -298,15 +299,18 @@ def visualize(
     # Generate visualization
     logger.info(f"[cyan]Generating network visualization for: {input}[/cyan]")
 
-    html_path = cv.display_network(
-        output_dir=output_dir_str,
-        open_browser=not no_browser,
-        min_level=min_level_enum,
-        observable_types=observable_types,
-        title=title,
-        physics=physics,
-        group_by_type=group_by_type,
-    )
+    try:
+        html_path = cv.display_network(
+            output_dir=output_dir_str,
+            open_browser=not no_browser,
+            min_level=min_level_enum,
+            observable_types=observable_types,
+            title=title,
+            physics=physics,
+            group_by_type=group_by_type,
+        )
+    except VisualizationDependencyMissingError as exc:
+        raise click.ClickException(str(exc)) from exc
 
     logger.info(f"[green]✓ Visualization saved to: {html_path}[/green]")
 

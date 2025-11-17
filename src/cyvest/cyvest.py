@@ -621,7 +621,7 @@ class Cyvest:
         ctr = self.container_create(path, description)
         return ContainerHandler(self._investigation, ctr.key)
 
-    def root(self) -> Observable:
+    def root(self) -> ObservableView:
         """
         Get the root observable.
 

@@ -39,12 +39,12 @@ with Cyvest(data={"type": "email_analysis"}) as cv:
 !!! tip "Context-first mindset"
     Pass incident metadata through `Cyvest(data={...})`. Every container, check, and export inherits it so you never lose analyst intent.
 
-!!! note "Immutable views"
-    `observable_create`, `check_create`, and the DSL handlers return read-only views (`ObservableView`, `CheckView`, …). Inspect their attributes freely, but use the Cyvest facade/DSL methods for any updates so the score engine runs automatically.
+!!! note "Immutable proxies"
+    `observable_create`, `check_create`, and the fluent helpers return read-only proxies (`ObservableProxy`, `CheckProxy`, …). Inspect their attributes freely, but use the Cyvest facade or the proxy helper methods for any updates so the score engine runs automatically.
 
 ---
 
-## 2. Use the fluent DSL for expressiveness {: #using-the-fluent-dsl }
+## 2. Use the fluent API for expressiveness {: #using-the-fluent-api }
 
 ```python
 from decimal import Decimal
@@ -59,16 +59,15 @@ with Cyvest() as cv:
 
     (
         cv.check("url_check", "analysis", "Check suspicious URL")
-        .link_observable(url.get())
+        .link_observable(url)
         .with_score(Decimal("8.5"))
     )
 ```
 
-**Why the DSL?**
+**Why the fluent helpers?**
 
 - Deterministic keys let you merge multiple builders without collisions.
 - Relationships infer default directions from STIX2 semantics.
-- Handlers expose `.get()` so you can pivot back to immutable views when needed.
 
 ---
 

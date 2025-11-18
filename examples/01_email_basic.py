@@ -20,11 +20,9 @@ def main() -> None:
     """Run a basic email investigation example."""
     # Create investigation
     with Cyvest(data={"type": "email", "subject": "Urgent: Verify Your Account"}) as cv:
-        # Create email-related observables using DSL
-        sender_email = (
-            cv.observable("email", "suspicious@phishing-domain.com", internal=False)
-            .with_ti("internal_db", score=Decimal("0"), comment="Unknown sender")
-            .get()
+        # Create email-related observables using the fluent proxy interface
+        sender_email = cv.observable("email", "suspicious@phishing-domain.com", internal=False).with_ti(
+            "internal_db", score=Decimal("0"), comment="Unknown sender"
         )
 
         # Create URL observables
@@ -33,14 +31,11 @@ def main() -> None:
             .with_ti("virustotal", score=Decimal("8.5"), level=Level.MALICIOUS, comment="Known phishing URL")
             .with_ti("urlscan", score=Decimal("7.0"), level=Level.MALICIOUS, comment="Malicious content detected")
             .relate_to(cv.root(), "related-to")
-            .get()
         )
 
         # Create domain observable
-        domain = (
-            cv.observable("domain", "fake-bank-login.com", internal=False)
-            .with_ti("dns_lookup", score=Decimal("0"), comment="Recently registered domain (2 days old)")
-            .get()
+        domain = cv.observable("domain", "fake-bank-login.com", internal=False).with_ti(
+            "dns_lookup", score=Decimal("0"), comment="Recently registered domain (2 days old)"
         )
 
         # Link URL to domain

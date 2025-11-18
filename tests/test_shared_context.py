@@ -87,7 +87,7 @@ def test_get_observable():
 
     with shared.create_cyvest() as cy:
         original = cy.observable(ObservableType.IPV4_ADDR, "192.168.1.1")
-        original_model = cy._investigation.get_observable(original.get().key)
+        original_model = cy._investigation.get_observable(original.key)
 
     # Retrieve observable
     retrieved = shared.get_observable("obs:ipv4-addr:192.168.1.1")
@@ -115,7 +115,7 @@ def test_get_check():
 
     with shared.create_cyvest() as cy:
         original = cy.check("test_check", "scope", "Description")
-        original_check = cy._investigation.get_check(original.get().key)
+        original_check = cy._investigation.get_check(original.key)
 
     # Retrieve check
     retrieved = shared.get_check("chk:test_check:scope")
@@ -386,7 +386,7 @@ def test_shared_context_with_checks_and_observables():
         email_obs.add_ti("EmailRep", Decimal("7.0"))
 
         check = cy.check("email_analysis", "header", "Analyze sender")
-        check.link_observable(email_obs.get())
+        check.link_observable(email_obs)
 
     # Task 2: Analyze URL, reference email check
     with shared.create_cyvest() as cy:
@@ -400,7 +400,7 @@ def test_shared_context_with_checks_and_observables():
         assert email_check.check_id == "email_analysis"
 
         check = cy.check("url_analysis", "body", "Analyze malicious URL")
-        check.link_observable(url_obs.get())
+        check.link_observable(url_obs)
 
     # Verify final state
     assert len(shared.list_observables()) == 3  # 2 created + 1 root
@@ -749,7 +749,7 @@ def test_copied_observable_has_marker():
 
     with shared.create_cyvest() as cy:
         original = cy.observable(ObservableType.DOMAIN_NAME, "example.com")
-        original_model = cy._investigation.get_observable(original.get().key)
+        original_model = cy._investigation.get_observable(original.key)
         assert original_model is not None
         # Original should not be marked
         assert original_model._from_shared_context is False

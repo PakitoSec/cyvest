@@ -21,7 +21,7 @@ Thank you for helping us build a better investigation framework. This guide capt
 ## Standard Workflow
 
 1. **Plan** — Align on scope in an issue or GitHub Discussion. Complex changes benefit from a short design note.
-2. **Branch** — `git checkout -b feat/new-dsl-handler` (keep prefixes meaningful: `feat`, `fix`, `docs`, `test`, `chore`).
+2. **Branch** — `git checkout -b feat/new-relationship-helper` (keep prefixes meaningful: `feat`, `fix`, `docs`, `test`, `chore`).
 3. **Code** — Prefer small, focused commits. Mirror the module layout (`src/cyvest`, `tests/`, `docs/`).
 4. **Validate** — Run the quality gates below before you push.
 5. **Document** — Update relevant docs/snippets whenever behaviour changes.
@@ -52,19 +52,19 @@ pytest --cov=cyvest --cov-report=term-missing --cov-report=html
 | Layer | Role | Files |
 | --- | --- | --- |
 | **Investigation** | Authoritative state: observables, checks, TI, containers, score engine | `src/cyvest/investigation.py` |
-| **Cyvest facade** | Public API + CLI entry, manages deterministic keys, exposes DSL helpers | `src/cyvest/cyvest.py`, `src/cyvest/cli.py` |
-| **DSL handlers** | Fluent builders for observables/checks/containers with merge-on-create semantics | `src/cyvest/dsl.py` |
+| **Cyvest facade** | Public API + CLI entry, manages deterministic keys, exposes fluent helpers | `src/cyvest/cyvest.py`, `src/cyvest/cli.py` |
+| **Proxy helpers** | Fluent builders for observables/checks/containers with merge-on-create semantics | `src/cyvest/proxies.py` |
 | **Models** | Dataclasses for Observables, Checks, ThreatIntel, etc. | `src/cyvest/model.py` |
 | **Scoring** | Score modes, propagation, and level determination | `src/cyvest/score.py` |
 
-**Merge-on-create** keeps duplicates out by checking keys before inserts. When extending the DSL, call back into `Investigation` for validation rather than mutating models directly.
+**Merge-on-create** keeps duplicates out by checking keys before inserts. When extending the fluent helpers, call back into `Investigation` for validation rather than mutating models directly.
 
 ---
 
 ## Testing Guidelines
 
 - Prefer pytest-style fixtures and descriptive test names (`test_score_propagates_to_parent`).
-- Separate behaviour tests (DSL, CLI) from data-model regression tests.
+- Separate behaviour tests (fluent helpers, CLI) from data-model regression tests.
 - When touching concurrency/shared context, add a stress case under `tests/test_shared_context.py` or a new module.
 - Keep coverage above 90% for touched modules; justify unavoidable gaps in the PR.
 

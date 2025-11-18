@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal
+from typing import Any, Literal
 
 from logurich import logger
 
@@ -27,11 +27,8 @@ from cyvest.io_serialization import (
 )
 from cyvest.levels import Level
 from cyvest.model import Check, Container, Enrichment, Observable, ThreatIntel
+from cyvest.proxies import CheckProxy, ContainerProxy, EnrichmentProxy, ObservableProxy, ThreatIntelProxy
 from cyvest.score import ScoreMode
-from cyvest.views import CheckView, ContainerView, EnrichmentView, ObservableView, ThreatIntelView
-
-if TYPE_CHECKING:
-    from cyvest.dsl import CheckHandler, ContainerHandler, ObservableHandler
 
 
 class Cyvest:
@@ -90,38 +87,38 @@ class Cyvest:
 
     # Internal helpers -------------------------------------------------
 
-    def _observable_view(self, observable: Observable | None) -> ObservableView | None:
+    def _observable_proxy(self, observable: Observable | None) -> ObservableProxy | None:
         if observable is None:
             return None
-        return ObservableView(self._investigation, observable.key)
+        return ObservableProxy(self._investigation, observable.key)
 
-    def _check_view(self, check: Check | None) -> CheckView | None:
+    def _check_proxy(self, check: Check | None) -> CheckProxy | None:
         if check is None:
             return None
-        return CheckView(self._investigation, check.key)
+        return CheckProxy(self._investigation, check.key)
 
-    def _container_view(self, container: Container | None) -> ContainerView | None:
+    def _container_proxy(self, container: Container | None) -> ContainerProxy | None:
         if container is None:
             return None
-        return ContainerView(self._investigation, container.key)
+        return ContainerProxy(self._investigation, container.key)
 
-    def _threat_intel_view(self, ti: ThreatIntel | None) -> ThreatIntelView | None:
+    def _threat_intel_proxy(self, ti: ThreatIntel | None) -> ThreatIntelProxy | None:
         if ti is None:
             return None
-        return ThreatIntelView(self._investigation, ti.key)
+        return ThreatIntelProxy(self._investigation, ti.key)
 
-    def _enrichment_view(self, enrichment: Enrichment | None) -> EnrichmentView | None:
+    def _enrichment_proxy(self, enrichment: Enrichment | None) -> EnrichmentProxy | None:
         if enrichment is None:
             return None
-        return EnrichmentView(self._investigation, enrichment.key)
+        return EnrichmentProxy(self._investigation, enrichment.key)
 
     @staticmethod
-    def _resolve_key(value: Observable | ObservableView | str) -> str:
+    def _resolve_key(value: Observable | ObservableProxy | str) -> str:
         if isinstance(value, str):
             return value
         if hasattr(value, "key"):
             return value.key  # type: ignore[return-value]
-        raise TypeError("Expected an observable key, ObservableView, or Observable instance.")
+        raise TypeError("Expected an observable key, ObservableProxy, or Observable instance.")
 
     # Observable methods
 
@@ -135,7 +132,7 @@ class Cyvest:
         extra: dict[str, Any] | None = None,
         score: Decimal | float | None = None,
         level: Level | None = None,
-    ) -> ObservableView:
+    ) -> ObservableProxy:
         """
         Create a new observable or return existing one.
 
@@ -164,9 +161,9 @@ class Cyvest:
         )
         # Unwrap tuple - facade returns only Observable, discards deferred relationships
         obs_result, _ = self._investigation.add_observable(obs)
-        return self._observable_view(obs_result)
+        return self._observable_proxy(obs_result)
 
-    def observable_get(self, key: str) -> ObservableView | None:
+    def observable_get(self, key: str) -> ObservableProxy | None:
         """
         Get an observable by key.
 
@@ -176,24 +173,24 @@ class Cyvest:
         Returns:
             Observable if found, None otherwise
         """
-        return self._observable_view(self._investigation.get_observable(key))
+        return self._observable_proxy(self._investigation.get_observable(key))
 
-    def observable_get_root(self) -> ObservableView:
+    def observable_get_root(self) -> ObservableProxy:
         """
         Get the root observable.
 
         Returns:
             Root observable
         """
-        return self._observable_view(self._investigation.get_root())
+        return self._observable_proxy(self._investigation.get_root())
 
     def observable_add_relationship(
         self,
-        source: Observable | ObservableView | str,
-        target: Observable | ObservableView | str,
+        source: Observable | ObservableProxy | str,
+        target: Observable | ObservableProxy | str,
         relationship_type: str,
         direction: str | None = None,
-    ) -> ObservableView | None:
+    ) -> ObservableProxy | None:
         """
         Add a relationship between observables.
 
@@ -209,7 +206,7 @@ class Cyvest:
         source_key = self._resolve_key(source)
         target_key = self._resolve_key(target)
         result = self._investigation.add_relationship(source_key, target_key, relationship_type, direction)
-        return self._observable_view(result)
+        return self._observable_proxy(result)
 
     def observable_add_threat_intel(
         self,
@@ -220,7 +217,7 @@ class Cyvest:
         extra: dict[str, Any] | None = None,
         level: Level | None = None,
         taxonomies: list[dict[str, Any]] | None = None,
-    ) -> ThreatIntelView | None:
+    ) -> ThreatIntelProxy | None:
         """
         Add threat intelligence to an observable.
 
@@ -250,9 +247,9 @@ class Cyvest:
             taxonomies=taxonomies or [],
         )
         result = self._investigation.add_threat_intel(ti, observable)
-        return self._threat_intel_view(result)
+        return self._threat_intel_proxy(result)
 
-    def observable_set_level(self, observable_key: str, level: Level) -> ObservableView | None:
+    def observable_set_level(self, observable_key: str, level: Level) -> ObservableProxy | None:
         """
         Explicitly set an observable's level via the service layer.
 
@@ -261,13 +258,13 @@ class Cyvest:
             level: Level to apply
 
         Returns:
-            Updated observable view if found, None otherwise
+            Updated observable proxy if found, None otherwise
         """
         observable = self._investigation.get_observable(observable_key)
         if not observable:
             return None
         observable.set_level(level)
-        return self._observable_view(observable)
+        return self._observable_proxy(observable)
 
     def observable_finalize_relationships(self) -> None:
         """
@@ -288,7 +285,7 @@ class Cyvest:
         extra: dict[str, Any] | None = None,
         score: Decimal | float | None = None,
         level: Level | None = None,
-    ) -> CheckView:
+    ) -> CheckProxy:
         """
         Create a new check.
 
@@ -313,9 +310,9 @@ class Cyvest:
             score=Decimal(str(score)) if score is not None else Decimal("0"),
             level=level or Level.NONE,
         )
-        return self._check_view(self._investigation.add_check(check))
+        return self._check_proxy(self._investigation.add_check(check))
 
-    def check_get(self, key: str) -> CheckView | None:
+    def check_get(self, key: str) -> CheckProxy | None:
         """
         Get a check by key.
 
@@ -325,9 +322,9 @@ class Cyvest:
         Returns:
             Check if found, None otherwise
         """
-        return self._check_view(self._investigation.get_check(key))
+        return self._check_proxy(self._investigation.get_check(key))
 
-    def check_link_observable(self, check_key: str, observable_key: str) -> CheckView | None:
+    def check_link_observable(self, check_key: str, observable_key: str) -> CheckProxy | None:
         """
         Link an observable to a check.
 
@@ -338,9 +335,9 @@ class Cyvest:
         Returns:
             The check if found, None otherwise
         """
-        return self._check_view(self._investigation.link_check_observable(check_key, observable_key))
+        return self._check_proxy(self._investigation.link_check_observable(check_key, observable_key))
 
-    def check_update_score(self, check_key: str, score: Decimal | float, reason: str = "") -> CheckView | None:
+    def check_update_score(self, check_key: str, score: Decimal | float, reason: str = "") -> CheckProxy | None:
         """
         Update a check's score.
 
@@ -355,11 +352,11 @@ class Cyvest:
         check = self._investigation.get_check(check_key)
         if check:
             check.update_score(Decimal(str(score)), reason)
-        return self._check_view(check)
+        return self._check_proxy(check)
 
     # Container methods
 
-    def container_create(self, path: str, description: str = "") -> ContainerView:
+    def container_create(self, path: str, description: str = "") -> ContainerProxy:
         """
         Create a new container.
 
@@ -371,9 +368,9 @@ class Cyvest:
             The created container
         """
         container = Container(path=path, description=description)
-        return self._container_view(self._investigation.add_container(container))
+        return self._container_proxy(self._investigation.add_container(container))
 
-    def container_get(self, key: str) -> ContainerView | None:
+    def container_get(self, key: str) -> ContainerProxy | None:
         """
         Get a container by key.
 
@@ -383,9 +380,9 @@ class Cyvest:
         Returns:
             Container if found, None otherwise
         """
-        return self._container_view(self._investigation.get_container(key))
+        return self._container_proxy(self._investigation.get_container(key))
 
-    def container_add_check(self, container_key: str, check_key: str) -> ContainerView | None:
+    def container_add_check(self, container_key: str, check_key: str) -> ContainerProxy | None:
         """
         Add a check to a container.
 
@@ -396,9 +393,9 @@ class Cyvest:
         Returns:
             The container if found, None otherwise
         """
-        return self._container_view(self._investigation.add_check_to_container(container_key, check_key))
+        return self._container_proxy(self._investigation.add_check_to_container(container_key, check_key))
 
-    def container_add_sub_container(self, parent_key: str, child_key: str) -> ContainerView | None:
+    def container_add_sub_container(self, parent_key: str, child_key: str) -> ContainerProxy | None:
         """
         Add a sub-container to a container.
 
@@ -409,11 +406,11 @@ class Cyvest:
         Returns:
             The parent container if found, None otherwise
         """
-        return self._container_view(self._investigation.add_sub_container(parent_key, child_key))
+        return self._container_proxy(self._investigation.add_sub_container(parent_key, child_key))
 
     # Enrichment methods
 
-    def enrichment_create(self, name: str, data: dict[str, Any], context: str = "") -> EnrichmentView:
+    def enrichment_create(self, name: str, data: dict[str, Any], context: str = "") -> EnrichmentProxy:
         """
         Create a new enrichment.
 
@@ -426,9 +423,9 @@ class Cyvest:
             The created enrichment
         """
         enrichment = Enrichment(name=name, data=data, context=context)
-        return self._enrichment_view(self._investigation.add_enrichment(enrichment))
+        return self._enrichment_proxy(self._investigation.add_enrichment(enrichment))
 
-    def enrichment_get(self, key: str) -> EnrichmentView | None:
+    def enrichment_get(self, key: str) -> EnrichmentProxy | None:
         """
         Get an enrichment by key.
 
@@ -438,7 +435,7 @@ class Cyvest:
         Returns:
             Enrichment if found, None otherwise
         """
-        return self._enrichment_view(self._investigation.get_enrichment(key))
+        return self._enrichment_proxy(self._investigation.get_enrichment(key))
 
     # Score and statistics methods
 
@@ -570,31 +567,34 @@ class Cyvest:
         """
         self._investigation.finalize_relationships()
 
-    def get_all_observables(self) -> dict[str, ObservableView]:
-        """Get read-only views for all observables."""
+    def get_all_observables(self) -> dict[str, ObservableProxy]:
+        """Get read-only proxies for all observables."""
         return {
-            key: ObservableView(self._investigation, key) for key in self._investigation.get_all_observables().keys()
+            key: ObservableProxy(self._investigation, key) for key in self._investigation.get_all_observables().keys()
         }
 
-    def get_all_checks(self) -> dict[str, CheckView]:
-        """Get read-only views for all checks."""
-        return {key: CheckView(self._investigation, key) for key in self._investigation.get_all_checks().keys()}
+    def get_all_checks(self) -> dict[str, CheckProxy]:
+        """Get read-only proxies for all checks."""
+        return {key: CheckProxy(self._investigation, key) for key in self._investigation.get_all_checks().keys()}
 
-    def get_all_threat_intels(self) -> dict[str, ThreatIntelView]:
-        """Get read-only views for all threat intel entries."""
+    def get_all_threat_intels(self) -> dict[str, ThreatIntelProxy]:
+        """Get read-only proxies for all threat intel entries."""
         return {
-            key: ThreatIntelView(self._investigation, key) for key in self._investigation.get_all_threat_intels().keys()
+            key: ThreatIntelProxy(self._investigation, key)
+            for key in self._investigation.get_all_threat_intels().keys()
         }
 
-    def get_all_enrichments(self) -> dict[str, EnrichmentView]:
-        """Get read-only views for all enrichments."""
+    def get_all_enrichments(self) -> dict[str, EnrichmentProxy]:
+        """Get read-only proxies for all enrichments."""
         return {
-            key: EnrichmentView(self._investigation, key) for key in self._investigation.get_all_enrichments().keys()
+            key: EnrichmentProxy(self._investigation, key) for key in self._investigation.get_all_enrichments().keys()
         }
 
-    def get_all_containers(self) -> dict[str, ContainerView]:
-        """Get read-only views for all containers."""
-        return {key: ContainerView(self._investigation, key) for key in self._investigation.get_all_containers().keys()}
+    def get_all_containers(self) -> dict[str, ContainerProxy]:
+        """Get read-only proxies for all containers."""
+        return {
+            key: ContainerProxy(self._investigation, key) for key in self._investigation.get_all_containers().keys()
+        }
 
     def display_summary(self, show_graph: bool = True, min_level: Level = Level.INFO) -> None:
         display_summary(
@@ -655,7 +655,7 @@ class Cyvest:
             group_by_type=group_by_type,
         )
 
-    # DSL methods for fluent interface
+    # Fluent helper entrypoints
 
     def observable(
         self,
@@ -667,9 +667,9 @@ class Cyvest:
         extra: dict[str, Any] | None = None,
         score: Decimal | float | None = None,
         level: Level | None = None,
-    ) -> ObservableHandler:
+    ) -> ObservableProxy:
         """
-        Create an observable with fluent interface.
+        Create (or fetch) an observable with fluent helper methods.
 
         Args:
             obs_type: Type of observable
@@ -682,12 +682,9 @@ class Cyvest:
             level: Optional explicit level
 
         Returns:
-            Observable handler for chaining
+            Observable proxy exposing mutation helpers for chaining
         """
-        from cyvest.dsl import ObservableHandler
-
-        obs = self.observable_create(obs_type, value, internal, whitelisted, comment, extra, score, level)
-        return ObservableHandler(self._investigation, obs.key)
+        return self.observable_create(obs_type, value, internal, whitelisted, comment, extra, score, level)
 
     def check(
         self,
@@ -698,9 +695,9 @@ class Cyvest:
         extra: dict[str, Any] | None = None,
         score: Decimal | float | None = None,
         level: Level | None = None,
-    ) -> CheckHandler:
+    ) -> CheckProxy:
         """
-        Create a check with fluent interface.
+        Create a check with fluent helper methods.
 
         Args:
             check_id: Check identifier
@@ -712,30 +709,24 @@ class Cyvest:
             level: Optional explicit level
 
         Returns:
-            Check handler for chaining
+            Check proxy exposing mutation helpers for chaining
         """
-        from cyvest.dsl import CheckHandler
+        return self.check_create(check_id, scope, description, comment, extra, score, level)
 
-        chk = self.check_create(check_id, scope, description, comment, extra, score, level)
-        return CheckHandler(self._investigation, chk.key)
-
-    def container(self, path: str, description: str = "") -> ContainerHandler:
+    def container(self, path: str, description: str = "") -> ContainerProxy:
         """
-        Create a container with fluent interface.
+        Create a container with fluent helper methods.
 
         Args:
             path: Container path
             description: Container description
 
         Returns:
-            Container handler for chaining
+            Container proxy exposing mutation helpers for chaining
         """
-        from cyvest.dsl import ContainerHandler
+        return self.container_create(path, description)
 
-        ctr = self.container_create(path, description)
-        return ContainerHandler(self._investigation, ctr.key)
-
-    def root(self) -> ObservableView:
+    def root(self) -> ObservableProxy:
         """
         Get the root observable.
 

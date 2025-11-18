@@ -24,11 +24,19 @@ Each observable has:
 - **Relationships**: Links to other observables (can use `RelationshipType` enum)
 - **Threat Intelligence**: Verdicts from external sources
 
-> **Read-only proxies:** All public Cyvest APIs return `ObservableProxy` instances rather than raw
-> dataclasses. These proxies provide live scores/levels but raise an error if you attempt to assign
-> attributes. Use the facade helpers (`cv.observable_add_threat_intel`, `cv.observable_set_level`, …)
-> or the fluent methods on the proxies themselves (`with_ti`, `relate_to`, `link_observable`, etc.) so
-> the score engine remains consistent.
+> **Model proxies:** All public Cyvest APIs return `ObservableProxy` (and `CheckProxy`, `ThreatIntelProxy`, …)
+> instances rather than raw dataclasses. These proxies provide live scores/levels but raise an error if you
+> attempt to assign attributes. Use the facade helpers (`cv.observable_add_threat_intel`, `cv.observable_set_level`, …)
+> or the fluent methods on the proxies themselves (`with_ti`, `relate_to`, `link_observable`, etc.) so the score engine
+> remains consistent. Safe metadata fields (`comment`, `extra`, `internal`, etc.) can be updated via the dedicated
+> `update_metadata()` helpers on each proxy:
+>
+> ```python
+> url_obs.update_metadata(comment="triaged", extra={"ticket": "INC-4242"})
+> check.update_metadata(description="Updated scope")
+> ```
+>
+> Dictionary fields are merged by default; pass `merge_extra=False` (or `merge_data=False`) to overwrite them completely.
 
 **STIX2 Observable Types:**
 

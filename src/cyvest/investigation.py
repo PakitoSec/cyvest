@@ -10,7 +10,7 @@ from __future__ import annotations
 import threading
 from copy import deepcopy
 from decimal import Decimal
-from typing import TYPE_CHECKING, Any, overload
+from typing import TYPE_CHECKING, Any, Literal, overload
 
 from logurich import logger
 
@@ -464,6 +464,29 @@ class Investigation:
     Manages all investigation objects (observables, checks, threat intel, etc.),
     handles automatic merging on creation, score propagation, and statistics tracking.
     """
+
+    _MODEL_METADATA_RULES: dict[str, dict[str, set[str]]] = {
+        "observable": {
+            "fields": {"comment", "extra", "internal", "whitelisted"},
+            "dict_fields": {"extra"},
+        },
+        "check": {
+            "fields": {"comment", "extra", "description"},
+            "dict_fields": {"extra"},
+        },
+        "threat_intel": {
+            "fields": {"comment", "extra", "level"},
+            "dict_fields": {"extra"},
+        },
+        "enrichment": {
+            "fields": {"context", "data"},
+            "dict_fields": {"data"},
+        },
+        "container": {
+            "fields": {"description"},
+            "dict_fields": set(),
+        },
+    }
 
     def __init__(self, data: Any, root_type: str = "file", score_mode: ScoreMode = ScoreMode.MAX) -> None:
         """
@@ -1090,6 +1113,72 @@ class Investigation:
     def get_root(self) -> Observable:
         """Get the root observable."""
         return self._root_observable
+
+    def update_model_metadata(
+        self,
+        model_type: Literal["observable", "check", "threat_intel", "enrichment", "container"],
+        key: str,
+        updates: dict[str, Any],
+        *,
+        dict_merge: dict[str, bool] | None = None,
+    ):
+        """
+        Update mutable metadata fields for a stored model instance.
+
+        Args:
+            model_type: Model family to update.
+            key: Key of the target object.
+            updates: Mapping of field names to new values. ``None`` values are ignored.
+            dict_merge: Optional overrides for dict fields (True=merge, False=replace).
+
+        Returns:
+            The updated model instance.
+
+        Raises:
+            KeyError: If the key cannot be found.
+            ValueError: If an unsupported field is requested.
+            TypeError: If a dict field receives a non-dict value.
+        """
+        store_lookup: dict[str, dict[str, Any]] = {
+            "observable": self._observables,
+            "check": self._checks,
+            "threat_intel": self._threat_intels,
+            "enrichment": self._enrichments,
+            "container": self._containers,
+        }
+        store = store_lookup[model_type]
+        target = store.get(key)
+        if target is None:
+            raise KeyError(f"{model_type} '{key}' not found in investigation.")
+
+        if not updates:
+            return target
+
+        rules = self._MODEL_METADATA_RULES[model_type]
+        allowed_fields = rules["fields"]
+        dict_fields = rules["dict_fields"]
+
+        for field, value in updates.items():
+            if field not in allowed_fields:
+                raise ValueError(f"Field '{field}' is not mutable on {model_type}.")
+            if value is None:
+                continue
+            if field in dict_fields:
+                if not isinstance(value, dict):
+                    raise TypeError(f"Field '{field}' on {model_type} expects a dict value.")
+                merge = dict_merge.get(field, True) if dict_merge else True
+                if merge:
+                    current_value = getattr(target, field, None)
+                    if current_value is None:
+                        setattr(target, field, deepcopy(value))
+                    else:
+                        current_value.update(value)
+                else:
+                    setattr(target, field, deepcopy(value))
+            else:
+                setattr(target, field, value)
+
+        return target
 
     def get_all_observables(self) -> dict[str, Observable]:
         """Get all observables."""

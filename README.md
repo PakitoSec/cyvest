@@ -76,7 +76,7 @@ with Cyvest(data={"type": "email"}) as cv:
     save_investigation_json(cv, "investigation.json")
 ```
 
-### Read-Only Proxies
+### Model Proxies
 
 Cyvest only exposes immutable model proxies. Helpers like `observable_create`, `check_create`, and the
 fluent `cv.observable()`/`cv.check()` convenience methods return `ObservableProxy`, `CheckProxy`, `ContainerProxy`, etc.
@@ -84,6 +84,16 @@ These proxies reflect the live investigation state but raise `AttributeError` if
 Use the facade helpers (`cv.observable_set_level`, `cv.check_update_score`, `cv.observable_add_threat_intel`) or the
 built-in fluent methods on the proxies themselves (`with_ti`, `relate_to`, `link_observable`, `with_score`, …) so the
 score engine runs automatically.
+
+Safe metadata fields like `comment`, `extra`, or `internal` can be updated through the proxies without breaking score
+consistency:
+
+```python
+url_obs.update_metadata(comment="triaged", internal=False, extra={"ticket": "INC-4242"})
+check.update_metadata(description="New scope", extra={"playbook": "url-analysis"})
+```
+
+Dictionary fields merge by default; pass `merge_extra=False` (or `merge_data=False` for enrichments) to overwrite them.
 
 ## Core Concepts
 

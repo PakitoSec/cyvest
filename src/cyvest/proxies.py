@@ -99,6 +99,42 @@ class ObservableProxy(_ReadOnlyProxy[Observable]):
         history = self._call_readonly("get_score_history")
         return tuple(history)
 
+    def update_metadata(
+        self,
+        *,
+        comment: str | None = None,
+        extra: dict[str, Any] | None = None,
+        internal: bool | None = None,
+        whitelisted: bool | None = None,
+        merge_extra: bool = True,
+    ) -> ObservableProxy:
+        """
+        Update mutable metadata fields on the observable.
+
+        Args:
+            comment: Optional comment override.
+            extra: Dictionary to merge into (or replace) ``extra``.
+            internal: Whether the observable is an internal asset.
+            whitelisted: Whether the observable is whitelisted.
+            merge_extra: When False, replaces ``extra`` entirely.
+        """
+        updates: dict[str, Any] = {}
+        if comment is not None:
+            updates["comment"] = comment
+        if extra is not None:
+            updates["extra"] = extra
+        if internal is not None:
+            updates["internal"] = internal
+        if whitelisted is not None:
+            updates["whitelisted"] = whitelisted
+
+        if not updates:
+            return self
+
+        dict_merge = {"extra": merge_extra} if extra is not None else None
+        self._get_investigation().update_model_metadata("observable", self.key, updates, dict_merge=dict_merge)
+        return self
+
     def with_ti(
         self,
         source: str,
@@ -187,6 +223,30 @@ class CheckProxy(_ReadOnlyProxy[Check]):
         history = self._call_readonly("get_score_history")
         return tuple(history)
 
+    def update_metadata(
+        self,
+        *,
+        comment: str | None = None,
+        description: str | None = None,
+        extra: dict[str, Any] | None = None,
+        merge_extra: bool = True,
+    ) -> CheckProxy:
+        """Update mutable metadata on the check."""
+        updates: dict[str, Any] = {}
+        if comment is not None:
+            updates["comment"] = comment
+        if description is not None:
+            updates["description"] = description
+        if extra is not None:
+            updates["extra"] = extra
+
+        if not updates:
+            return self
+
+        dict_merge = {"extra": merge_extra} if extra is not None else None
+        self._get_investigation().update_model_metadata("check", self.key, updates, dict_merge=dict_merge)
+        return self
+
     def in_container(self, container: Container | ContainerProxy | str) -> CheckProxy:
         """Add this check to a container."""
         if isinstance(container, ContainerProxy):
@@ -270,6 +330,13 @@ class ContainerProxy(_ReadOnlyProxy[Container]):
         """Context manager exit (no-op)."""
         return None
 
+    def update_metadata(self, *, description: str | None = None) -> ContainerProxy:
+        """Update mutable metadata on the container."""
+        if description is None:
+            return self
+        self._get_investigation().update_model_metadata("container", self.key, {"description": description})
+        return self
+
 
 class ThreatIntelProxy(_ReadOnlyProxy[ThreatIntel]):
     """Read-only proxy over a threat intel entry."""
@@ -280,6 +347,30 @@ class ThreatIntelProxy(_ReadOnlyProxy[ThreatIntel]):
             raise ModelNotFoundError(f"Threat intel '{self.key}' no longer exists in this investigation.")
         return ti
 
+    def update_metadata(
+        self,
+        *,
+        comment: str | None = None,
+        extra: dict[str, Any] | None = None,
+        level: Level | None = None,
+        merge_extra: bool = True,
+    ) -> ThreatIntelProxy:
+        """Update mutable metadata on the threat intel entry."""
+        updates: dict[str, Any] = {}
+        if comment is not None:
+            updates["comment"] = comment
+        if extra is not None:
+            updates["extra"] = extra
+        if level is not None:
+            updates["level"] = level
+
+        if not updates:
+            return self
+
+        dict_merge = {"extra": merge_extra} if extra is not None else None
+        self._get_investigation().update_model_metadata("threat_intel", self.key, updates, dict_merge=dict_merge)
+        return self
+
 
 class EnrichmentProxy(_ReadOnlyProxy[Enrichment]):
     """Read-only proxy over an enrichment."""
@@ -289,3 +380,24 @@ class EnrichmentProxy(_ReadOnlyProxy[Enrichment]):
         if enrichment is None:
             raise ModelNotFoundError(f"Enrichment '{self.key}' no longer exists in this investigation.")
         return enrichment
+
+    def update_metadata(
+        self,
+        *,
+        context: str | None = None,
+        data: dict[str, Any] | None = None,
+        merge_data: bool = True,
+    ) -> EnrichmentProxy:
+        """Update mutable metadata on the enrichment."""
+        updates: dict[str, Any] = {}
+        if context is not None:
+            updates["context"] = context
+        if data is not None:
+            updates["data"] = data
+
+        if not updates:
+            return self
+
+        dict_merge = {"data": merge_data} if data is not None else None
+        self._get_investigation().update_model_metadata("enrichment", self.key, updates, dict_merge=dict_merge)
+        return self

@@ -24,10 +24,11 @@ Each observable has:
 - **Relationships**: Links to other observables (can use `RelationshipType` enum)
 - **Threat Intelligence**: Verdicts from external sources
 
-> **Read-only views:** All public Cyvest APIs return `ObservableView` instances rather than raw
+> **Read-only proxies:** All public Cyvest APIs return `ObservableProxy` instances rather than raw
 > dataclasses. These proxies provide live scores/levels but raise an error if you attempt to assign
-> attributes. Use the facade/DSL methods (`cv.observable_add_threat_intel`, `cv.observable_set_level`,
-> `ObservableHandler.with_ti`, etc.) for any mutation so the score engine remains consistent.
+> attributes. Use the facade helpers (`cv.observable_add_threat_intel`, `cv.observable_set_level`, …)
+> or the fluent methods on the proxies themselves (`with_ti`, `relate_to`, `link_observable`, etc.) so
+> the score engine remains consistent.
 
 **STIX2 Observable Types:**
 
@@ -286,7 +287,7 @@ cv.observable_add_threat_intel(ip2.key, "source", score=Decimal("5.0"))
 
 # Override RESOLVES_TO to BIDIRECTIONAL (no hierarchy)
 cv.observable_add_relationship(
-    domain2, ip2,  # Observable views
+    domain2, ip2,  # Observable proxies
     RelationshipType.RESOLVES_TO,
     RelationshipDirection.BIDIRECTIONAL
 )
@@ -496,7 +497,7 @@ This propagation ensures that checks analyzing whitelisted/trusted assets are pr
 
 Relationships follow **STIX2 conventions** with built-in type support.
 
-**Important:** Relationships must be added through the Investigation or Cyvest layer using methods like `cv.observable_add_relationship()`. Observable views do not expose mutating helpers. This design ensures:
+**Important:** Relationships should be added via the Cyvest facade or proxy helpers (e.g., `cv.observable_add_relationship()` or `ObservableProxy.relate_to()`). This ensures:
 - **Validation**: Both source and target observables must exist in the investigation
 - **Centralized management**: All relationships are tracked in one place
 - **Data integrity**: No dangling references to non-existent observables
@@ -546,10 +547,10 @@ RelationshipType.DUPLICATE_OF          # Duplication
 **Creating Relationships:**
 
 ```python
-# Using observable views (recommended)
+# Using observable proxies (recommended)
 cv.observable_add_relationship(
-    source=url,  # Observable view
-    target=ip,   # Observable view
+    source=url,  # Observable proxy
+    target=ip,   # Observable proxy
     relationship_type=RelationshipType.RESOLVES_TO
 )
 
@@ -560,9 +561,9 @@ cv.observable_add_relationship(
     relationship_type=RelationshipType.RESOLVES_TO
 )
 
-# Mix observable views and keys
+# Mix observable proxies and keys
 cv.observable_add_relationship(
-    source=email,      # Observable view
+    source=email,      # Observable proxy
     target=url.key,    # String key
     relationship_type="related-to"
 )
@@ -583,7 +584,7 @@ Relationships support directional semantics with **automatic semantic defaults**
 from cyvest import RelationshipType
 
 # Automatically gets OUTBOUND (domain → IP)
-# Accepts observable views directly
+# Accepts observable proxies directly
 cv.observable_add_relationship(domain, ip, RelationshipType.RESOLVES_TO)
 
 # Automatically gets INBOUND (file ← URL)
@@ -594,13 +595,13 @@ cv.observable_add_relationship(host1, host2, RelationshipType.COMMUNICATES_WITH)
 
 # Can still override semantic defaults if needed
 cv.observable_add_relationship(
-    domain, ip,  # Observable views
+    domain, ip,  # Observable proxies
     RelationshipType.RESOLVES_TO,
     RelationshipDirection.INBOUND  # explicit override
 )
 
-# Using the fluent DSL (also uses semantic defaults)
-# Accepts observable views, ObservableHandler, or string keys
+# Using the fluent helpers (also uses semantic defaults)
+# Accepts observable proxies or string keys
 url.relate_to(domain, RelationshipType.RELATED_TO)  # auto: BIDIRECTIONAL
 ```
 
@@ -699,7 +700,7 @@ Cyvest uses a clean, layered architecture with automatic merge-on-create:
    - Delegates to `Investigation`
    - Provides convenience methods
 
-3. **DSL Handlers**: Fluent interface for method chaining
+3. **Fluent helpers**: Convenience methods exposed on the proxy classes for method chaining
 
 ### Automatic Merge-on-Create
 
@@ -754,4 +755,4 @@ inv1.merge_investigation(inv2)
 
 - Learn about [Observables](#observables) in detail
 - Understand [Scoring & Levels](#scoring-system)
-- Explore the [Fluent DSL](quickstart.md#using-the-fluent-dsl) in practice
+- Explore the [fluent helpers](quickstart.md#using-the-fluent-api) in practice

@@ -13,9 +13,9 @@ Build, score, and narrate cybersecurity investigations with a single fluent Pyth
 3. **Master the vocabulary** with [Core Concepts](getting-started/concepts.md).
 
 !!! info "Need help choosing the right entry point?"
-    - Automating SOC workflows? Jump straight to [Quick Start](getting-started/quickstart.md#using-the-fluent-dsl).
+    - Automating SOC workflows? Jump straight to [Quick Start](getting-started/quickstart.md#using-the-fluent-api).
     - Running multi-threaded tasks? See [Shared Investigation Context](shared-investigation-context.md).
-    - Contributing or extending the DSL? Review the [Contributing guide](contributing.md#architecture-overview).
+    - Contributing or extending the fluent helpers? Review the [Contributing guide](contributing.md#architecture-overview).
 
 ---
 
@@ -25,7 +25,7 @@ Build, score, and narrate cybersecurity investigations with a single fluent Pyth
 | --- | --- | --- |
 | **Structured objects** | Model observables, checks, TI, containers, and enrichments with STIX2-safe enums | `cyvest.model`, [Concepts](getting-started/concepts.md#observables) |
 | **Deterministic scoring** | MAX/SUM propagation, full score history, and automatic level classification | `cyvest.score`, [Scoring System](getting-started/concepts.md#scoring-system) |
-| **Composable DSL** | Fluent builders with deterministic keys and safe merges | `cyvest.cyvest`, [Quick Start](getting-started/quickstart.md#using-the-fluent-dsl) |
+| **Fluent helpers** | Builder-style methods with deterministic keys and safe merges | `cyvest.cyvest`, [Quick Start](getting-started/quickstart.md#using-the-fluent-api) |
 | **Shared context** | Thread-safe fragments that can reconcile into a single story | `cyvest.investigation.SharedInvestigationContext`, [Guide](shared-investigation-context.md) |
 | **Reporting** | Export JSON, Markdown, or render rich terminal summaries | `cyvest.io_serialization`, `cyvest.io_rich`, [Quick Start](getting-started/quickstart.md#exporting-results) |
 
@@ -46,7 +46,7 @@ with Cyvest(data={"type": "email"}) as cv:
 
     (
         cv.check("email:url", "body", "Analyze embedded URL")
-        .link_observable(phishing_url.get())
+        .link_observable(phishing_url)
         .with_score(Decimal("8.5"))
     )
 
@@ -56,15 +56,15 @@ with Cyvest(data={"type": "email"}) as cv:
 !!! tip "Best practice"
     Store the investigation metadata (request ID, analyst, ticket link) in the root observable's `extra` field. It travels with every export format.
 
-!!! note "Immutable views"
-    The objects returned by `cv.observable_*`/`cv.check_*` are read-only `*View` proxies. Use the facade or DSL methods to apply changes so scoring stays consistent.
+!!! note "Immutable proxies"
+    The objects returned by `cv.observable_*`/`cv.check_*` are read-only `*Proxy` wrappers. Use the facade or their fluent helper methods to apply changes so scoring stays consistent.
 
 ---
 
 ## Architecture Snapshot
 
 ```
-Cyvest (facade + DSL)
+Cyvest (facade + fluent proxies)
 └─ Investigation (core state)
    ├─ Observables & relationships (STIX2)
    ├─ Checks and containers (workflow context)
@@ -78,7 +78,7 @@ Cyvest (facade + DSL)
 
 - Deterministic keys guarantee lossless merges from concurrent builders.
 - Relationship direction controls score propagation and keeps STIX semantics intact.
-- The fluent DSL is thin—everything ultimately stores data inside a single `Investigation`.
+- The fluent helper layer is thin—everything ultimately stores data inside a single `Investigation`.
 
 ---
 
@@ -89,7 +89,7 @@ Cyvest (facade + DSL)
 | Evaluate Cyvest in <10 minutes | [Getting Started](getting-started/quickstart.md) |
 | Understand observables vs. checks | [Core Concepts](getting-started/concepts.md#investigation-structure) |
 | Share state across threads | [Shared Investigation Context](shared-investigation-context.md) |
-| Extend scoring or DSL handlers | [Contributing](contributing.md#architecture-overview) |
+| Extend scoring or fluent helpers | [Contributing](contributing.md#architecture-overview) |
 | Embed results in other tools | [Quick Start → Exporting Results](getting-started/quickstart.md#exporting-results) |
 
 ---

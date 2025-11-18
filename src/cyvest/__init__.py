@@ -10,7 +10,7 @@ from logurich import logger
 from cyvest.cyvest import Cyvest
 from cyvest.levels import Level
 from cyvest.model import ObservableType, RelationshipDirection, RelationshipType
-from cyvest.views import CheckView, ContainerView, EnrichmentView, ObservableView, ThreatIntelView
+from cyvest.proxies import CheckProxy, ContainerProxy, EnrichmentProxy, ObservableProxy, ThreatIntelProxy
 
 __version__ = "1.0.0"
 
@@ -19,12 +19,12 @@ logger.disable("cyvest")
 __all__ = [
     "Cyvest",
     "Level",
-    "CheckView",
-    "ObservableView",
+    "CheckProxy",
+    "ObservableProxy",
     "ObservableType",
     "RelationshipDirection",
     "RelationshipType",
-    "ThreatIntelView",
-    "EnrichmentView",
-    "ContainerView",
+    "ThreatIntelProxy",
+    "EnrichmentProxy",
+    "ContainerProxy",
 ]

@@ -450,8 +450,8 @@ def test_merge_non_safe_explicit_level_normal_behavior() -> None:
     assert merged_obs.level == Level.SUSPICIOUS
 
 
-def test_observable_view_is_read_only() -> None:
-    """Observable views should block direct attribute mutation."""
+def test_observable_proxy_is_read_only() -> None:
+    """Observable proxies should block direct attribute mutation."""
     cv = Cyvest()
     obs = cv.observable_create("ip", "203.0.113.5")
 
@@ -462,17 +462,16 @@ def test_observable_view_is_read_only() -> None:
     assert obs.score == Decimal("4.0")
 
 
-def test_check_view_is_read_only() -> None:
-    """Check views should only change through Cyvest services."""
+def test_check_proxy_is_read_only() -> None:
+    """Check proxies should only change through Cyvest services."""
     cv = Cyvest()
-    handler = cv.check("chk-1", "scoped", "desc").with_score(Decimal("2.0"))
-    check_view = handler.get()
+    check_proxy = cv.check("chk-1", "scoped", "desc").with_score(Decimal("2.0"))
 
     with pytest.raises(AttributeError):
-        check_view.score = Decimal("3.0")  # type: ignore[misc]
+        check_proxy.score = Decimal("3.0")  # type: ignore[misc]
 
-    cv.check_update_score(check_view.key, Decimal("3.0"))
-    assert check_view.score == Decimal("3.0")
+    cv.check_update_score(check_proxy.key, Decimal("3.0"))
+    assert check_proxy.score == Decimal("3.0")
 
 
 def test_io_save_load_json_roundtrip() -> None:

@@ -27,24 +27,19 @@ def main() -> None:
                 cv.observable("url", "http://malicious-c2.com/beacon", internal=False)
                 .with_ti("virustotal", score=Decimal("9.0"), level=Level.MALICIOUS, comment="C2 server detected")
                 .with_ti("alienvault", score=Decimal("8.5"), level=Level.MALICIOUS, comment="Known APT infrastructure")
-                .get()
             )
 
             # IP address for URL1
-            ip1 = (
-                cv.observable("ipv4", "192.0.2.100", internal=False)
-                .with_ti("abuseipdb", score=Decimal("7.5"), level=Level.MALICIOUS, comment="High abuse score")
-                .get()
+            ip1 = cv.observable("ipv4", "192.0.2.100", internal=False).with_ti(
+                "abuseipdb", score=Decimal("7.5"), level=Level.MALICIOUS, comment="High abuse score"
             )
 
             # Link URL to IP
             cv.observable_add_relationship(url1.key, ip1.key, "resolves-to")
 
             # Suspicious URL 2
-            url2 = (
-                cv.observable("url", "http://evil-download.net/payload.exe", internal=False)
-                .with_ti("virustotal", score=Decimal("8.0"), level=Level.MALICIOUS, comment="Malware distribution")
-                .get()
+            url2 = cv.observable("url", "http://evil-download.net/payload.exe", internal=False).with_ti(
+                "virustotal", score=Decimal("8.0"), level=Level.MALICIOUS, comment="Malware distribution"
             )
 
             # IP address for URL2
@@ -52,17 +47,14 @@ def main() -> None:
                 cv.observable("ipv4", "198.51.100.50", internal=False)
                 .with_ti("shodan", score=Decimal("0"), comment="Open ports: 80, 443, 8080")
                 .with_ti("abuseipdb", score=Decimal("6.0"), level=Level.SUSPICIOUS, comment="Moderate abuse score")
-                .get()
             )
 
             # Link URL to IP
             cv.observable_add_relationship(url2.key, ip2.key, "resolves-to")
 
             # Internal host that connected
-            internal_host = (
-                cv.observable("hostname", "workstation-042.company.local", internal=True)
-                .with_ti("edr", score=Decimal("0"), comment="Detected outbound connection to suspicious IP")
-                .get()
+            internal_host = cv.observable("hostname", "workstation-042.company.local", internal=True).with_ti(
+                "edr", score=Decimal("0"), comment="Detected outbound connection to suspicious IP"
             )
 
             # Link internal host to external URLs

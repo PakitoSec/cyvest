@@ -27,7 +27,7 @@ def _write_sample(tmp_path: Path) -> Path:
     observable = cv.observable("url", "https://example.com", internal=False).with_ti(
         "virustotal", score=Decimal("6.0"), level=Level.MALICIOUS
     )
-    cv.check("url_check", "network", "Validate URL").link_observable(observable.get()).with_score(Decimal("6.0"))
+    cv.check("url_check", "network", "Validate URL").link_observable(observable).with_score(Decimal("6.0"))
 
     sample_path = tmp_path / "sample.json"
     save_investigation_json(cv, sample_path)
@@ -108,13 +108,13 @@ def test_display_summary_min_level_filtering() -> None:
     obs_suspicious = cv.observable("url", "https://suspicious.com", internal=False)
     obs_info = cv.observable("url", "https://info.com", internal=False)
 
-    cv.check("malicious_check", "network", "Malicious URL").link_observable(obs_malicious.get()).with_score(
+    cv.check("malicious_check", "network", "Malicious URL").link_observable(obs_malicious).with_score(
         Decimal("6.0")
     )  # MALICIOUS
-    cv.check("suspicious_check", "network", "Suspicious URL").link_observable(obs_suspicious.get()).with_score(
+    cv.check("suspicious_check", "network", "Suspicious URL").link_observable(obs_suspicious).with_score(
         Decimal("4.0")
     )  # SUSPICIOUS
-    cv.check("info_check", "network", "Info URL").link_observable(obs_info.get()).with_score(Decimal("0.0"))  # INFO
+    cv.check("info_check", "network", "Info URL").link_observable(obs_info).with_score(Decimal("0.0"))  # INFO
     # Create a check without observable (Level.NONE - no auto-upgrade without observable)
     cv.check("none_check", "network", "None check without observable")
 

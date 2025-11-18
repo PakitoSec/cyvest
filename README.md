@@ -17,7 +17,7 @@
 - 🧵 **Multi-Threading Support**: Advanced thread-safe shared context available via `cyvest.investigation` module
 - 💾 **Multiple Export Formats**: JSON and Markdown output for reporting and LLM consumption
 - 🎨 **Rich Console Output**: Beautiful terminal displays with the Rich library
-- 🧩 **Fluent DSL**: Convenient API with method chaining for rapid development
+- 🧩 **Fluent helpers**: Convenient API with method chaining for rapid development
 
 ## Installation
 
@@ -64,7 +64,7 @@ with Cyvest(data={"type": "email"}) as cv:
 
     # Create checks
     check = cv.check("url_analysis", "email_body", "Analyze suspicious URL")
-    check.link_observable(url.get())
+    check.link_observable(url)
     check.with_score(Decimal("8.5"), "Malicious URL detected")
 
     # Display results
@@ -76,13 +76,14 @@ with Cyvest(data={"type": "email"}) as cv:
     save_investigation_json(cv, "investigation.json")
 ```
 
-### Read-Only Views
+### Read-Only Proxies
 
-Cyvest only exposes immutable model views. Helpers like `observable_create`, `check_create`, and the
-DSL handlers return `ObservableView`, `CheckView`, `ContainerView`, etc. These proxies reflect the
-live investigation state but raise `AttributeError` if you try to assign to their attributes. Always
-go through the facade (`cv.observable_set_level`, `cv.check_update_score`, `cv.observable_add_threat_intel`,
-`ObservableHandler.with_ti`, …) to mutate state so the score engine runs automatically.
+Cyvest only exposes immutable model proxies. Helpers like `observable_create`, `check_create`, and the
+fluent `cv.observable()`/`cv.check()` convenience methods return `ObservableProxy`, `CheckProxy`, `ContainerProxy`, etc.
+These proxies reflect the live investigation state but raise `AttributeError` if you try to assign to their attributes.
+Use the facade helpers (`cv.observable_set_level`, `cv.check_update_score`, `cv.observable_add_threat_intel`) or the
+built-in fluent methods on the proxies themselves (`with_ti`, `relate_to`, `link_observable`, `with_score`, …) so the
+score engine runs automatically.
 
 ## Core Concepts
 
@@ -113,9 +114,9 @@ cv.observable_add_threat_intel(
 )
 
 # Create relationships with STIX2 relationship types
-# Accepts observable views or string keys
+# Accepts observable proxies or string keys
 cv.observable_add_relationship(
-    url_obs,  # Can pass ObservableView directly
+    url_obs,  # Can pass ObservableProxy directly
     ip_obs,   # Or use .key for string keys
     RelationshipType.RESOLVES_TO
 )
@@ -146,7 +147,7 @@ from cyvest import RelationshipType, RelationshipDirection
 
 # Automatically gets OUTBOUND (domain → IP)
 # IP is a child of domain, IP's score propagates UP to domain
-# Accepts observable views directly
+# Accepts observable proxies directly
 cv.observable_add_relationship(domain, ip, RelationshipType.RESOLVES_TO)
 
 # Automatically gets INBOUND (file ← URL)
@@ -159,7 +160,7 @@ cv.observable_add_relationship(host1, host2, RelationshipType.COMMUNICATES_WITH)
 
 # Can override semantic defaults if needed
 cv.observable_add_relationship(
-    domain, ip,  # Accepts observable views
+    domain, ip,  # Accepts observable proxies
     RelationshipType.RESOLVES_TO,
     RelationshipDirection.INBOUND  # explicit override
 )
@@ -440,7 +441,7 @@ cyvest/
 │   ├── __init__.py          # Package initialization
 │   ├── cyvest.py            # High-level API facade
 │   ├── investigation.py     # Core state management with merge-on-create
-│   ├── dsl.py               # Fluent chaining DSL
+│   ├── proxies.py           # Read-only proxies + fluent helper methods
 │   ├── levels.py            # Level enum and scoring logic
 │   ├── keys.py              # Key generation utilities
 │   ├── model.py             # Core data models

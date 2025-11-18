@@ -153,7 +153,6 @@ class EmailFrom(BaseRule):
                 RelationshipType.RELATED_TO,
             )
             .add_ti("VT", 10, "test")
-            .get()
         )
 
         # Create check for header analysis
@@ -161,7 +160,6 @@ class EmailFrom(BaseRule):
             cy.check("from", "header", "test email vt 10", "> ok boys")
             .link_observable(obs)
             .in_container(cy.container("emails"))
-            .get()
         )
 
         logger.info(f"Email header analysis complete: {obs.key}")
@@ -250,13 +248,12 @@ class BodiesUrlTask(BaseRule):
                 cy.check(f"body-url-{url}", "body", f"URL analysis {url}", comment=f"> score: {score}")
                 .link_observable(url_obs)
                 .in_container(container)
-                .get()
             )
 
             logger.info("[bold red]Check Score: {}[/bold red]", chk.score)
 
         logger.info(f"Bodies URLs analysis complete: {len(urls_with_scores)} URLs processed")
-        logger.info("[bold red]Container Score: {}[/bold red]", container.get().get_aggregated_score())
+        logger.info("[bold red]Container Score: {}[/bold red]", container.get_aggregated_score())
 
 
 class AttachmentTask(BaseRule):
@@ -425,7 +422,7 @@ class AI(BaseRule):
 
     def run(self, cy: Cyvest) -> None:
         """Calculate aggregated risk score based on all previous checks."""
-        cy.check("ai", "full", "ai", score=0, level=Level.MALICIOUS).get()
+        cy.check("ai", "full", "ai", score=0, level=Level.MALICIOUS)
 
 
 # ============================================================================

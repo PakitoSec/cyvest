@@ -1,6 +1,6 @@
 # Installation
 
-The fastest way to evaluate Cyvest is to install it in editable mode so the CLI, DSL, and docs stay in sync with your workspace.
+The fastest way to evaluate Cyvest is to install it in editable mode so the CLI, fluent helpers, and docs stay in sync with your workspace.
 
 ---
 

@@ -7,6 +7,7 @@ Provides formatted display of investigation results using the Rich library.
 from __future__ import annotations
 
 from collections.abc import Callable
+from decimal import Decimal, InvalidOperation
 from typing import TYPE_CHECKING, Any
 
 from rich.align import Align
@@ -43,6 +44,13 @@ def display_summary(
         caption_parts.append(f"Displayed: {len(filtered_checks)} (min level: {min_level.name})")
     caption_parts.append(f"Applied: {applied_checks}")
 
+    def sort_key_by_score(check: Any) -> Decimal:
+        score = getattr(check, "score", 0)
+        try:
+            return Decimal(score)
+        except (TypeError, ValueError, InvalidOperation):
+            return Decimal(0)
+
     table = Table(
         title="Investigation Report",
         caption=" | ".join(caption_parts),
@@ -67,7 +75,7 @@ def display_summary(
     for scope_name, checks in checks_by_scope.items():
         scope_rule = Align(f"[bold magenta]{scope_name}[/bold magenta]", align="left")
         table.add_row(scope_rule, "-", "-")
-
+        checks = sorted(checks, key=sort_key_by_score, reverse=True)
         for check in checks:
             color_level = get_color_level(check.level)
             color_score = get_color_score(check.score)
@@ -100,6 +108,7 @@ def display_summary(
 
     for level_enum in [Level.MALICIOUS, Level.SUSPICIOUS, Level.NOTABLE, Level.SAFE, Level.INFO, Level.TRUSTED]:
         checks = [c for c in cv.get_all_checks().values() if c.level == level_enum and c.level >= min_level]
+        checks = sorted(checks, key=sort_key_by_score, reverse=True)
         if checks:
             color_level = get_color_level(level_enum)
             level_rule = Align(

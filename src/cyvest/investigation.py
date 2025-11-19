@@ -67,6 +67,7 @@ class SharedInvestigationContext:
         # Thread-safe registries (copies of objects for lookup)
         self._observable_registry: dict[str, Observable] = {}
         self._check_registry: dict[str, Check] = {}
+        self._enrichment_registry: dict[str, Enrichment] = {}
 
     def create_cyvest(self, data: Any | None = None):
         """
@@ -155,12 +156,15 @@ class SharedInvestigationContext:
             for check in task_investigation.get_all_checks().values():
                 self._check_registry[check.key] = deepcopy(check)
 
+            for enrichment in task_investigation.get_all_enrichments().values():
+                self._enrichment_registry[enrichment.key] = deepcopy(enrichment)
+
             # Merge into main investigation
             self._main_investigation.merge_investigation(task_investigation)
 
             logger.debug(
                 f"Reconciliation complete. Registry: {len(self._observable_registry)} observables, "
-                f"{len(self._check_registry)} checks"
+                f"{len(self._check_registry)} checks, {len(self._enrichment_registry)} enrichments"
             )
 
     @overload
@@ -303,6 +307,72 @@ class SharedInvestigationContext:
                 return deepcopy(check)
             return None
 
+    @overload
+    def get_enrichment(self, key: str) -> Enrichment | None:
+        """Look up enrichment by full key string."""
+        ...
+
+    @overload
+    def get_enrichment(self, name: str, context: str = "") -> Enrichment | None:
+        """Look up enrichment by name and optional context."""
+        ...
+
+    def get_enrichment(self, *args, **kwargs) -> Enrichment | None:
+        """
+        Look up a shared enrichment by key or by name and context.
+
+        Thread-safe: Returns a deep copy to prevent concurrent modification.
+
+        Args:
+            key: Enrichment key to look up (single argument)
+            name: Enrichment name (when using one or two arguments)
+            context: Optional enrichment context (when using two arguments)
+
+        Returns:
+            Copy of the enrichment if found, None otherwise
+
+        Raises:
+            ValueError: If arguments are invalid or key generation fails
+
+        Examples:
+            >>> # Key-based lookup
+            >>> enr = shared_context.get_enrichment("enr:whois")
+            >>>
+            >>> # Parameter-based lookup (recommended)
+            >>> enr = shared_context.get_enrichment("whois")
+            >>> enr = shared_context.get_enrichment("dns", "specific-context")
+        """
+        # Parse arguments
+        if len(args) == 1 and not kwargs:
+            # Could be key-based or name-only lookup
+            arg = args[0]
+            if arg.startswith("enr:"):
+                # Key-based lookup
+                key = arg
+            else:
+                # Name-only lookup
+                try:
+                    key = keys.generate_enrichment_key(arg)
+                except Exception as e:
+                    raise ValueError(f"Failed to generate enrichment key for name='{arg}': {e}") from e
+        elif len(args) == 2 and not kwargs:
+            # Parameter-based lookup with context
+            name, context = args
+            try:
+                key = keys.generate_enrichment_key(name, context)
+            except Exception as e:
+                raise ValueError(
+                    f"Failed to generate enrichment key for name='{name}', context='{context}': {e}"
+                ) from e
+        else:
+            raise ValueError("get_enrichment() accepts either (key: str) or (name: str, context: str = '')")
+
+        with self._lock:
+            enrichment = self._enrichment_registry.get(key)
+            if enrichment:
+                return deepcopy(enrichment)
+            return None
+
     def get_investigation(self) -> Investigation:
         """
         Get the main investigation (thread-safe read-only access).
@@ -312,6 +382,23 @@ class SharedInvestigationContext:
         """
         with self._lock:
             return self._main_investigation
+
+    def get_global_score(self) -> Decimal:
+        """
+        Get the global score from the main investigation.
+
+        Thread-safe: Uses lock to ensure consistent read.
+
+        Returns:
+            The global investigation score
+
+        Example:
+            >>> shared = SharedInvestigationContext(main_inv)
+            >>> score = shared.get_global_score()
+            >>> print(f"Investigation score: {score}")
+        """
+        with self._lock:
+            return self._main_investigation.get_global_score()
 
     def list_observables(self) -> list[str]:
         """
@@ -332,6 +419,16 @@ class SharedInvestigationContext:
         """
         with self._lock:
             return list(self._check_registry.keys())
+
+    def list_enrichments(self) -> list[str]:
+        """
+        List all enrichment keys available for cross-task reference.
+
+        Returns:
+            List of enrichment keys
+        """
+        with self._lock:
+            return list(self._enrichment_registry.keys())
 
     def find_observables_by_type(self, obs_type: ObservableType) -> list[Observable]:
         """
@@ -644,12 +741,44 @@ class Investigation:
         existing_obs_keys = {obs.key for obs in existing.observables}
         for obs in incoming.observables:
             if obs.key not in existing_obs_keys:
-                existing.add_observable(obs)
+                target_obs = self._observables.get(obs.key)
+                if target_obs is None:
+                    target_obs, _ = self.add_observable(obs)
+                existing.add_observable(target_obs)
+                existing_obs_keys.add(target_obs.key)
+
+        # Ensure final observable references are canonical
+        self._reattach_check_observables(existing)
 
         # Recalculate scores after merge
         self._score_engine.recalculate_all()
 
         return existing
+
+    def _reattach_check_observables(self, check: Check) -> None:
+        """
+        Rebind a check's observables to the canonical investigation objects.
+
+        When merging investigations, check.observables may reference Observable instances
+        that belong to the temporary task investigation, which breaks identity-based
+        score propagation. This helper replaces them with the instances stored in this
+        investigation and refreshes generated-by metadata.
+        """
+        if not check.observables:
+            return
+
+        canonical: list[Observable] = []
+        for obs in check.observables:
+            target = self._observables.get(obs.key)
+            if target is None:
+                target, _ = self.add_observable(obs)
+            if target not in canonical:
+                canonical.append(target)
+
+        check.observables = []
+        for obs in canonical:
+            check.add_observable(obs)
+            obs.mark_generated_by_check(check.key)
 
     def _merge_threat_intel(self, existing: ThreatIntel, incoming: ThreatIntel) -> ThreatIntel:
         """
@@ -809,6 +938,9 @@ class Investigation:
         """
         if check.key in self._checks:
             return self._merge_check(self._checks[check.key], check)
+
+        # Ensure observables linked to the check reference canonical instances
+        self._reattach_check_observables(check)
 
         # Register new check
         self._checks[check.key] = check

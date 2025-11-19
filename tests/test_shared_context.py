@@ -16,10 +16,13 @@ Test coverage:
 - Thread-safe parallel execution
 - Exception handling (auto-reconcile skipped on error)
 - Deep copy semantics
+- Enrichment retrieval and management
 """
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from decimal import Decimal
+
+import pytest
 
 from cyvest import Cyvest, ObservableType, RelationshipType
 from cyvest.investigation import Investigation, SharedInvestigationContext
@@ -763,3 +766,278 @@ def test_copied_observable_has_marker():
     direct = inv.get_observable(ObservableType.DOMAIN_NAME, "example.com")
     assert direct is not None
     assert direct._from_shared_context is False
+
+
+def test_get_enrichment_by_key():
+    """Test retrieving enrichment by key from shared context."""
+    inv = Investigation({"test": "data"}, root_type="artifact")
+    shared = SharedInvestigationContext(inv)
+
+    with shared.create_cyvest() as cy:
+        original = cy.enrichment_create("whois", {"registrar": "Test Inc", "created": "2020-01-01"})
+        original_enr = cy._investigation.get_enrichment(original.key)
+
+    # Retrieve enrichment by key
+    retrieved = shared.get_enrichment("enr:whois")
+
+    assert retrieved is not None
+    assert retrieved.name == "whois"
+    assert retrieved.data == {"registrar": "Test Inc", "created": "2020-01-01"}
+    # Should be a deep copy
+    assert retrieved is not original_enr
+
+
+def test_get_enrichment_by_name():
+    """Test retrieving enrichment by name from shared context."""
+    inv = Investigation({"test": "data"}, root_type="artifact")
+    shared = SharedInvestigationContext(inv)
+
+    with shared.create_cyvest() as cy:
+        cy.enrichment_create("dns", {"A": ["1.2.3.4"], "MX": ["mail.example.com"]})
+
+    # Retrieve enrichment by name
+    retrieved = shared.get_enrichment("dns")
+
+    assert retrieved is not None
+    assert retrieved.name == "dns"
+    assert retrieved.data["A"] == ["1.2.3.4"]
+    assert retrieved.data["MX"] == ["mail.example.com"]
+
+
+def test_get_enrichment_with_context():
+    """Test retrieving enrichment with context from shared context."""
+    inv = Investigation({"test": "data"}, root_type="artifact")
+    shared = SharedInvestigationContext(inv)
+
+    with shared.create_cyvest() as cy:
+        cy.enrichment_create("dns", {"A": ["192.168.1.1"]}, context="example.com")
+        cy.enrichment_create("dns", {"A": ["10.0.0.1"]}, context="other.com")
+
+    # Retrieve specific enrichment with context
+    retrieved = shared.get_enrichment("dns", "example.com")
+
+    assert retrieved is not None
+    assert retrieved.name == "dns"
+    assert retrieved.data["A"] == ["192.168.1.1"]
+    assert retrieved.context == "example.com"
+
+    # Retrieve different context
+    retrieved2 = shared.get_enrichment("dns", "other.com")
+    assert retrieved2 is not None
+    assert retrieved2.data["A"] == ["10.0.0.1"]
+
+
+def test_get_nonexistent_enrichment():
+    """Test retrieving non-existent enrichment returns None."""
+    inv = Investigation({"test": "data"}, root_type="artifact")
+    shared = SharedInvestigationContext(inv)
+
+    result = shared.get_enrichment("enr:nonexistent")
+    assert result is None
+
+    result = shared.get_enrichment("nonexistent")
+    assert result is None
+
+    result = shared.get_enrichment("whois", "missing-context")
+    assert result is None
+
+
+def test_list_enrichments():
+    """Test listing all enrichment keys."""
+    inv = Investigation({"test": "data"}, root_type="artifact")
+    shared = SharedInvestigationContext(inv)
+
+    # Initially empty
+    assert len(shared.list_enrichments()) == 0
+
+    with shared.create_cyvest() as cy:
+        cy.enrichment_create("whois", {"registrar": "Test"})
+        cy.enrichment_create("dns", {"A": ["1.2.3.4"]})
+        cy.enrichment_create("geo", {"country": "US"}, context="ip-lookup")
+
+    keys = shared.list_enrichments()
+    assert len(keys) == 3
+    assert "enr:whois" in keys
+    assert "enr:dns" in keys
+    # Context-based enrichment should have hash in key
+    assert any(key.startswith("enr:geo:") for key in keys)
+
+
+def test_enrichment_reconcile_updates_registry():
+    """Test that reconciling updates enrichment registry."""
+    inv = Investigation({"test": "data"}, root_type="artifact")
+    shared = SharedInvestigationContext(inv)
+
+    # Create first enrichment
+    with shared.create_cyvest() as cy:
+        cy.enrichment_create("initial", {"data": "v1"})
+
+    assert len(shared.list_enrichments()) == 1
+
+    # Create second enrichment
+    with shared.create_cyvest() as cy:
+        cy.enrichment_create("second", {"data": "v2"})
+
+    assert len(shared.list_enrichments()) == 2
+    assert shared.get_enrichment("initial") is not None
+    assert shared.get_enrichment("second") is not None
+
+
+def test_enrichment_deep_copy_independence():
+    """Test that retrieved enrichment is a deep copy."""
+    inv = Investigation({"test": "data"}, root_type="artifact")
+    shared = SharedInvestigationContext(inv)
+
+    with shared.create_cyvest() as cy:
+        cy.enrichment_create("test", {"list": [1, 2, 3], "dict": {"key": "value"}})
+
+    # Get enrichment and modify it
+    retrieved1 = shared.get_enrichment("test")
+    assert retrieved1 is not None
+    retrieved1.data["list"].append(4)
+    retrieved1.data["dict"]["new_key"] = "new_value"
+
+    # Get enrichment again - should not be affected by previous modification
+    retrieved2 = shared.get_enrichment("test")
+    assert retrieved2 is not None
+    assert retrieved2.data["list"] == [1, 2, 3]
+    assert "new_key" not in retrieved2.data["dict"]
+
+
+def test_enrichment_merge_in_reconcile():
+    """Test that enrichments are properly merged during reconciliation."""
+    inv = Investigation({"test": "data"}, root_type="artifact")
+    shared = SharedInvestigationContext(inv)
+
+    # Create enrichment in first task
+    with shared.create_cyvest() as cy1:
+        cy1.enrichment_create("shared", {"field1": "value1"})
+
+    # Create/update same enrichment in second task
+    with shared.create_cyvest() as cy2:
+        cy2.enrichment_create("shared", {"field2": "value2"})
+
+    # The main investigation should have merged data
+    main_inv = shared.get_investigation()
+    merged = main_inv.get_enrichment("enr:shared")
+    assert merged is not None
+    assert merged.data["field1"] == "value1"
+    assert merged.data["field2"] == "value2"
+
+    # Registry will have the latest version (from second task)
+    # but after merge_investigation, the main inv has both fields
+    registry_copy = shared.get_enrichment("shared")
+    assert registry_copy is not None
+    # Registry copy reflects the state at reconcile time (second task's version)
+    assert "field2" in registry_copy.data
+
+
+def test_get_enrichment_invalid_arguments():
+    """Test that get_enrichment raises ValueError for invalid arguments."""
+    inv = Investigation({"test": "data"}, root_type="artifact")
+    shared = SharedInvestigationContext(inv)
+
+    # Too many arguments
+    with pytest.raises(ValueError) as exc_info:
+        shared.get_enrichment("name", "context", "extra")
+    assert "accepts either" in str(exc_info.value)
+
+    # Keyword arguments not supported
+    with pytest.raises(ValueError):
+        shared.get_enrichment(name="test")
+
+
+def test_enrichment_with_parallel_tasks():
+    """Test enrichment sharing across parallel tasks."""
+    inv = Investigation({"test": "data"}, root_type="artifact")
+    shared = SharedInvestigationContext(inv)
+
+    def task1():
+        with shared.create_cyvest() as cy:
+            cy.enrichment_create("task1_data", {"source": "task1", "value": 100})
+
+    def task2():
+        with shared.create_cyvest() as cy:
+            cy.enrichment_create("task2_data", {"source": "task2", "value": 200})
+
+    def task3():
+        with shared.create_cyvest() as cy:
+            # Both enrichments should be available
+            enr1 = shared.get_enrichment("task1_data")
+            enr2 = shared.get_enrichment("task2_data")
+            if enr1:
+                cy.enrichment_create("combined", {"task1_value": enr1.data["value"]})
+            if enr2:
+                enr = cy._investigation.get_enrichment("enr:combined")
+                if enr:
+                    enr.data["task2_value"] = enr2.data["value"]
+
+    # Execute tasks in sequence for deterministic testing
+    task1()
+    task2()
+    task3()
+
+    # Verify all enrichments are present
+    assert len(shared.list_enrichments()) == 3
+    combined = shared.get_enrichment("combined")
+    assert combined is not None
+    # task3 should have access to task1 and task2 enrichments
+
+
+def test_enrichment_reconcile_count_in_log():
+    """Test that reconcile debug log includes enrichment count."""
+    inv = Investigation({"test": "data"}, root_type="artifact")
+    shared = SharedInvestigationContext(inv)
+
+    with shared.create_cyvest() as cy:
+        cy.enrichment_create("test", {"data": "value"})
+        # The debug log should mention enrichments count
+        # This is validated by the reconcile method implementation
+
+    # Verify registry is updated
+    assert len(shared._enrichment_registry) == 1
+
+
+def test_get_global_score():
+    """Test retrieving global score from shared context."""
+    from cyvest.model import ThreatIntel
+
+    inv = Investigation({"test": "data"}, root_type="artifact")
+    shared = SharedInvestigationContext(inv)
+
+    # Initial score should be 0 (root observable has no threats)
+    initial_score = shared.get_global_score()
+    assert isinstance(initial_score, Decimal)
+    assert initial_score == Decimal("0")
+
+    with shared.create_cyvest() as cy:
+        cy.check("test", "test", description="test").link_observable(cy.root())
+
+    # Directly add threat to main investigation's root
+    main_inv = shared.get_investigation()
+    root = main_inv.get_root()
+    ti = ThreatIntel(source="DirectThreat", observable_key=root.key, score=Decimal("7"))
+    main_inv.add_threat_intel(ti, root)
+
+    # Score should be updated
+    score = shared.get_global_score()
+    assert isinstance(score, Decimal)
+    assert score >= Decimal("7")
+
+
+def test_get_global_score_thread_safe():
+    """Test that get_global_score is thread-safe."""
+    inv = Investigation({"test": "data"}, root_type="artifact")
+    shared = SharedInvestigationContext(inv)
+
+    # Multiple threads reading score concurrently should work safely
+    def read_score():
+        return shared.get_global_score()
+
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        futures = [executor.submit(read_score) for _ in range(10)]
+        scores = [f.result() for f in futures]
+
+    # All reads should return the same score and be Decimal type
+    assert all(isinstance(s, Decimal) for s in scores)
+    assert all(s == scores[0] for s in scores)

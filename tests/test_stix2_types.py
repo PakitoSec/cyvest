@@ -29,29 +29,33 @@ def test_observable_type_enum_values() -> None:
 
 def test_relationship_type_enum_values() -> None:
     """Test that RelationshipType enum has expected STIX2 values."""
-    # Network relationships
-    assert RelationshipType.RESOLVES_TO.value == "resolves-to"
-    assert RelationshipType.BELONGS_TO.value == "belongs-to"
-    assert RelationshipType.COMMUNICATES_WITH.value == "communicates-with"
+    expected_values = {
+        RelationshipType.RELATED_TO: "related-to",
+        RelationshipType.DERIVED_FROM: "derived-from",
+        RelationshipType.DUPLICATE_OF: "duplicate-of",
+        RelationshipType.INDICATES: "indicates",
+        RelationshipType.MITIGATES: "mitigates",
+        RelationshipType.INVESTIGATES: "investigates",
+        RelationshipType.USES: "uses",
+        RelationshipType.TARGETS: "targets",
+        RelationshipType.ATTRIBUTED_TO: "attributed-to",
+        RelationshipType.IMPERSONATES: "impersonates",
+        RelationshipType.LOCATED_AT: "located-at",
+        RelationshipType.ORIGINATES_FROM: "originates-from",
+        RelationshipType.OWNED_BY: "owned-by",
+        RelationshipType.COMMUNICATES_WITH: "communicates-with",
+        RelationshipType.DELIVERS: "delivers",
+        RelationshipType.EXPLOITS: "exploits",
+        RelationshipType.DROPS: "drops",
+        RelationshipType.BEACONS_TO: "beacons-to",
+        RelationshipType.COMPROMISES: "compromises",
+        RelationshipType.HOSTS: "hosts",
+        RelationshipType.AUTHORED_BY: "authored-by",
+        RelationshipType.VARIANT_OF: "variant-of",
+    }
 
-    # File relationships
-    assert RelationshipType.CONTAINS.value == "contains"
-    assert RelationshipType.DOWNLOADED.value == "downloaded"
-    assert RelationshipType.DROPPED.value == "dropped"
-
-    # Email relationships
-    assert RelationshipType.FROM.value == "from"
-    assert RelationshipType.TO.value == "to"
-    assert RelationshipType.SENDER.value == "sender"
-
-    # Process relationships
-    assert RelationshipType.CREATED.value == "created"
-    assert RelationshipType.PARENT.value == "parent"
-    assert RelationshipType.CHILD.value == "child"
-
-    # General relationships
-    assert RelationshipType.RELATED_TO.value == "related-to"
-    assert RelationshipType.DERIVED_FROM.value == "derived-from"
+    for rel_type, value in expected_values.items():
+        assert rel_type.value == value
 
 
 def test_observable_with_enum_type() -> None:
@@ -110,25 +114,25 @@ def test_relationship_with_enum_type() -> None:
     """Test creating relationship with RelationshipType enum."""
     rel = Relationship(
         target_key="obs:ipv4-addr:192.0.2.1",
-        relationship_type=RelationshipType.RESOLVES_TO,
+        relationship_type=RelationshipType.RELATED_TO,
     )
 
     # Type should be normalized to enum
     assert isinstance(rel.relationship_type, RelationshipType)
-    assert rel.relationship_type == RelationshipType.RESOLVES_TO
-    assert rel.relationship_type.value == "resolves-to"
+    assert rel.relationship_type == RelationshipType.RELATED_TO
+    assert rel.relationship_type.value == "related-to"
 
 
 def test_relationship_with_string_type() -> None:
     """Test creating relationship with string type (backward compatibility)."""
     rel = Relationship(
         target_key="obs:ipv4-addr:192.0.2.1",
-        relationship_type="resolves-to",
+        relationship_type="related-to",
     )
 
     # String should be normalized to enum if it's a valid STIX2 type
     assert isinstance(rel.relationship_type, RelationshipType)
-    assert rel.relationship_type == RelationshipType.RESOLVES_TO
+    assert rel.relationship_type == RelationshipType.RELATED_TO
 
 
 def test_relationship_with_custom_type() -> None:
@@ -152,12 +156,12 @@ def test_observable_add_relationship_with_enum() -> None:
 
     obs._add_relationship_internal(
         target_key="obs:ipv4-addr:192.0.2.1",
-        relationship_type=RelationshipType.RESOLVES_TO,
+        relationship_type=RelationshipType.RELATED_TO,
     )
 
     assert len(obs.relationships) == 1
     assert obs.relationships[0].target_key == "obs:ipv4-addr:192.0.2.1"
-    assert obs.relationships[0].relationship_type == RelationshipType.RESOLVES_TO
+    assert obs.relationships[0].relationship_type == RelationshipType.RELATED_TO
 
 
 def test_observable_type_enum_is_string() -> None:
@@ -170,5 +174,5 @@ def test_observable_type_enum_is_string() -> None:
 def test_relationship_type_enum_is_string() -> None:
     """Test that RelationshipType enum values are strings."""
     # This ensures compatibility with string comparisons
-    assert isinstance(RelationshipType.RESOLVES_TO.value, str)
-    assert RelationshipType.RESOLVES_TO == "resolves-to"  # Can compare directly with strings
+    assert isinstance(RelationshipType.RELATED_TO.value, str)
+    assert RelationshipType.RELATED_TO == "related-to"  # Can compare directly with strings

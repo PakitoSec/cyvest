@@ -35,10 +35,10 @@ def test_observable_relationships() -> None:
     """Test observable relationships."""
     obs1 = Observable(obs_type="url", value="https://example.com")
     obs2 = Observable(obs_type="ip", value="192.168.1.1")
-    obs1._add_relationship_internal(obs2.key, "resolves-to")
+    obs1._add_relationship_internal(obs2.key, "related-to")
     assert len(obs1.relationships) == 1
     assert obs1.relationships[0].target_key == obs2.key
-    assert obs1.relationships[0].relationship_type == "resolves-to"
+    assert obs1.relationships[0].relationship_type == "related-to"
 
 
 def test_check_creation() -> None:
@@ -163,10 +163,10 @@ def test_explicit_level_setting() -> None:
 
 
 def test_relationship_direction_default() -> None:
-    """Test relationship direction defaults to OUTBOUND."""
+    """Test relationship direction defaults follow semantic mapping."""
     obs1 = Observable(obs_type="url", value="https://example.com")
     obs2 = Observable(obs_type="ip", value="192.168.1.1")
-    obs1._add_relationship_internal(obs2.key, "resolves-to")
+    obs1._add_relationship_internal(obs2.key, "indicates")
     assert len(obs1.relationships) == 1
     assert obs1.relationships[0].direction == RelationshipDirection.OUTBOUND
 
@@ -177,15 +177,15 @@ def test_relationship_direction_explicit() -> None:
     obs2 = Observable(obs_type="ip", value="192.168.1.1")
 
     # Test outbound
-    obs1._add_relationship_internal(obs2.key, "resolves-to", RelationshipDirection.OUTBOUND)
+    obs1._add_relationship_internal(obs2.key, "indicates", RelationshipDirection.OUTBOUND)
     assert obs1.relationships[0].direction == RelationshipDirection.OUTBOUND
 
     # Test inbound
-    obs1._add_relationship_internal(obs2.key, "belongs-to", RelationshipDirection.INBOUND)
+    obs1._add_relationship_internal(obs2.key, "owned-by", RelationshipDirection.INBOUND)
     assert obs1.relationships[1].direction == RelationshipDirection.INBOUND
 
     # Test bidirectional
-    obs1._add_relationship_internal(obs2.key, "communicates-with", RelationshipDirection.BIDIRECTIONAL)
+    obs1._add_relationship_internal(obs2.key, "related-to", RelationshipDirection.BIDIRECTIONAL)
     assert obs1.relationships[2].direction == RelationshipDirection.BIDIRECTIONAL
 
 
@@ -194,10 +194,10 @@ def test_relationship_direction_string() -> None:
     obs1 = Observable(obs_type="url", value="https://example.com")
     obs2 = Observable(obs_type="ip", value="192.168.1.1")
 
-    obs1._add_relationship_internal(obs2.key, "resolves-to", "inbound")
+    obs1._add_relationship_internal(obs2.key, "indicates", "inbound")
     assert obs1.relationships[0].direction == RelationshipDirection.INBOUND
 
-    obs1._add_relationship_internal(obs2.key, "communicates-with", "bidirectional")
+    obs1._add_relationship_internal(obs2.key, "related-to", "bidirectional")
     assert obs1.relationships[1].direction == RelationshipDirection.BIDIRECTIONAL
 
 
@@ -205,32 +205,22 @@ def test_relationship_semantic_defaults() -> None:
     """Test that relationship types get correct semantic default directions."""
     from cyvest.model import RelationshipType
 
-    # Test network relationships
-    assert RelationshipType.RESOLVES_TO.get_default_direction() == RelationshipDirection.OUTBOUND
-    assert RelationshipType.BELONGS_TO.get_default_direction() == RelationshipDirection.OUTBOUND
+    # Symmetric relationships
+    assert RelationshipType.RELATED_TO.get_default_direction() == RelationshipDirection.BIDIRECTIONAL
+    assert RelationshipType.DUPLICATE_OF.get_default_direction() == RelationshipDirection.BIDIRECTIONAL
     assert RelationshipType.COMMUNICATES_WITH.get_default_direction() == RelationshipDirection.BIDIRECTIONAL
 
-    # Test file relationships
-    assert RelationshipType.CONTAINS.get_default_direction() == RelationshipDirection.OUTBOUND
-    assert RelationshipType.DOWNLOADED.get_default_direction() == RelationshipDirection.INBOUND
-    assert RelationshipType.DROPPED.get_default_direction() == RelationshipDirection.INBOUND
+    # Outbound relationships
+    assert RelationshipType.INDICATES.get_default_direction() == RelationshipDirection.OUTBOUND
+    assert RelationshipType.MITIGATES.get_default_direction() == RelationshipDirection.OUTBOUND
+    assert RelationshipType.TARGETS.get_default_direction() == RelationshipDirection.OUTBOUND
+    assert RelationshipType.BEACONS_TO.get_default_direction() == RelationshipDirection.OUTBOUND
+    assert RelationshipType.VARIANT_OF.get_default_direction() == RelationshipDirection.OUTBOUND
 
-    # Test email relationships
-    assert RelationshipType.FROM.get_default_direction() == RelationshipDirection.INBOUND
-    assert RelationshipType.SENDER.get_default_direction() == RelationshipDirection.INBOUND
-    assert RelationshipType.TO.get_default_direction() == RelationshipDirection.OUTBOUND
-    assert RelationshipType.CC.get_default_direction() == RelationshipDirection.OUTBOUND
-    assert RelationshipType.BCC.get_default_direction() == RelationshipDirection.OUTBOUND
-
-    # Test process relationships
-    assert RelationshipType.CREATED.get_default_direction() == RelationshipDirection.OUTBOUND
-    assert RelationshipType.PARENT.get_default_direction() == RelationshipDirection.OUTBOUND
-    assert RelationshipType.CHILD.get_default_direction() == RelationshipDirection.INBOUND
-
-    # Test general relationships
-    assert RelationshipType.RELATED_TO.get_default_direction() == RelationshipDirection.BIDIRECTIONAL
+    # Inbound relationships
     assert RelationshipType.DERIVED_FROM.get_default_direction() == RelationshipDirection.INBOUND
-    assert RelationshipType.DUPLICATE_OF.get_default_direction() == RelationshipDirection.BIDIRECTIONAL
+    assert RelationshipType.OWNED_BY.get_default_direction() == RelationshipDirection.INBOUND
+    assert RelationshipType.AUTHORED_BY.get_default_direction() == RelationshipDirection.INBOUND
 
 
 def test_relationship_auto_direction() -> None:
@@ -240,16 +230,16 @@ def test_relationship_auto_direction() -> None:
     obs1 = Observable(obs_type="url", value="https://example.com")
     obs2 = Observable(obs_type="ip", value="192.168.1.1")
 
-    # No direction specified - should use semantic default (OUTBOUND for RESOLVES_TO)
-    obs1._add_relationship_internal(obs2.key, RelationshipType.RESOLVES_TO)
+    # No direction specified - should use semantic default (OUTBOUND for INDICATES)
+    obs1._add_relationship_internal(obs2.key, RelationshipType.INDICATES)
     assert obs1.relationships[0].direction == RelationshipDirection.OUTBOUND
 
-    # No direction specified - should use semantic default (INBOUND for DOWNLOADED)
-    obs1._add_relationship_internal(obs2.key, RelationshipType.DOWNLOADED)
+    # No direction specified - should use semantic default (INBOUND for DERIVED_FROM)
+    obs1._add_relationship_internal(obs2.key, RelationshipType.DERIVED_FROM)
     assert obs1.relationships[1].direction == RelationshipDirection.INBOUND
 
-    # No direction specified - should use semantic default (BIDIRECTIONAL for COMMUNICATES_WITH)
-    obs1._add_relationship_internal(obs2.key, RelationshipType.COMMUNICATES_WITH)
+    # No direction specified - should use semantic default (BIDIRECTIONAL for RELATED_TO)
+    obs1._add_relationship_internal(obs2.key, RelationshipType.RELATED_TO)
     assert obs1.relationships[2].direction == RelationshipDirection.BIDIRECTIONAL
 
 
@@ -260,6 +250,6 @@ def test_relationship_override_default() -> None:
     obs1 = Observable(obs_type="url", value="https://example.com")
     obs2 = Observable(obs_type="ip", value="192.168.1.1")
 
-    # Override default: RESOLVES_TO normally OUTBOUND, force INBOUND
-    obs1._add_relationship_internal(obs2.key, RelationshipType.RESOLVES_TO, RelationshipDirection.INBOUND)
+    # Override default: INDICATES normally OUTBOUND, force INBOUND
+    obs1._add_relationship_internal(obs2.key, RelationshipType.INDICATES, RelationshipDirection.INBOUND)
     assert obs1.relationships[0].direction == RelationshipDirection.INBOUND

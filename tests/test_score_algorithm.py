@@ -63,8 +63,8 @@ def test_max_mode_hierarchical_scoring() -> None:
     ip = cv.observable_create("ip", "1.2.3.4")
     cv.observable_add_threat_intel(ip.key, source="source2", score=Decimal("8.0"))
 
-    # Domain resolves to IP
-    cv.observable_add_relationship(domain.key, ip.key, "resolves-to")
+    # Domain relates to IP (hierarchical via outbound direction)
+    cv.observable_add_relationship(domain.key, ip.key, "related-to", "outbound")
 
     # In MAX mode, domain score = max(domain TI=2.0, ip score=8.0) = 8.0
     assert domain.score == Decimal("8.0")
@@ -83,8 +83,8 @@ def test_sum_mode_hierarchical_scoring() -> None:
     ip = cv.observable_create("ip", "1.2.3.4")
     cv.observable_add_threat_intel(ip.key, source="source2", score=Decimal("8.0"))
 
-    # Domain resolves to IP
-    cv.observable_add_relationship(domain.key, ip.key, "resolves-to")
+    # Domain relates to IP (hierarchical via outbound direction)
+    cv.observable_add_relationship(domain.key, ip.key, "related-to", "outbound")
 
     # In SUM mode, domain score = max(domain TI=2.0) + sum(child scores=8.0) = 10.0
     assert domain.score == Decimal("10.0")
@@ -110,9 +110,9 @@ def test_max_mode_multiple_children() -> None:
     cv.observable_add_threat_intel(child3.key, source="source4", score=Decimal("2.0"))
 
     # Connect parent to children
-    cv.observable_add_relationship(parent.key, child1.key, "resolves-to")
-    cv.observable_add_relationship(parent.key, child2.key, "resolves-to")
-    cv.observable_add_relationship(parent.key, child3.key, "resolves-to")
+    cv.observable_add_relationship(parent.key, child1.key, "related-to", "outbound")
+    cv.observable_add_relationship(parent.key, child2.key, "related-to", "outbound")
+    cv.observable_add_relationship(parent.key, child3.key, "related-to", "outbound")
 
     # In MAX mode, parent score = max(1.0, 3.0, 6.0, 2.0) = 6.0
     assert parent.score == Decimal("6.0")
@@ -138,9 +138,9 @@ def test_sum_mode_multiple_children() -> None:
     cv.observable_add_threat_intel(child3.key, source="source4", score=Decimal("2.0"))
 
     # Connect parent to children
-    cv.observable_add_relationship(parent.key, child1.key, "resolves-to")
-    cv.observable_add_relationship(parent.key, child2.key, "resolves-to")
-    cv.observable_add_relationship(parent.key, child3.key, "resolves-to")
+    cv.observable_add_relationship(parent.key, child1.key, "related-to", "outbound")
+    cv.observable_add_relationship(parent.key, child2.key, "related-to", "outbound")
+    cv.observable_add_relationship(parent.key, child3.key, "related-to", "outbound")
 
     # In SUM mode, parent score = max(parent TI=1.0) + sum(children=3.0+6.0+2.0) = 1.0 + 11.0 = 12.0
     assert parent.score == Decimal("12.0")
@@ -298,8 +298,8 @@ def test_score_propagation_through_hierarchy() -> None:
     cv.observable_add_threat_intel(child.key, source="source3", score=Decimal("9.0"))
 
     # Connect hierarchy
-    cv.observable_add_relationship(grandparent.key, parent.key, "resolves-to")
-    cv.observable_add_relationship(parent.key, child.key, "resolves-to")
+    cv.observable_add_relationship(grandparent.key, parent.key, "related-to", "outbound")
+    cv.observable_add_relationship(parent.key, child.key, "related-to", "outbound")
 
     # In MAX mode:
     # child score = 9.0 (its own TI)
@@ -323,7 +323,7 @@ def test_score_propagation_updates_parent() -> None:
     cv.observable_add_threat_intel(child.key, source="source2", score=Decimal("2.0"))
 
     # Connect them
-    cv.observable_add_relationship(parent.key, child.key, "resolves-to")
+    cv.observable_add_relationship(parent.key, child.key, "related-to", "outbound")
 
     # Parent score should be max(1.0, 2.0) = 2.0
     assert parent.score == Decimal("2.0")
@@ -395,7 +395,7 @@ def test_outbound_vs_inbound_direction_semantics() -> None:
     ip1 = cv.observable_create("ip", "1.1.1.1")
     cv.observable_add_threat_intel(ip1.key, source="source2", score=Decimal("7.0"))
 
-    cv.observable_add_relationship(domain1.key, ip1.key, "resolves-to", RelationshipDirection.OUTBOUND)
+    cv.observable_add_relationship(domain1.key, ip1.key, "related-to", RelationshipDirection.OUTBOUND)
 
     # Domain has OUTBOUND to IP, so IP is child, domain gets child's score
     # domain1 score = max(1.0, 7.0) = 7.0
@@ -409,7 +409,7 @@ def test_outbound_vs_inbound_direction_semantics() -> None:
     ip2 = cv.observable_create("ip", "2.2.2.2")
     cv.observable_add_threat_intel(ip2.key, source="source4", score=Decimal("2.0"))
 
-    cv.observable_add_relationship(domain2.key, ip2.key, "resolves-to", RelationshipDirection.INBOUND)
+    cv.observable_add_relationship(domain2.key, ip2.key, "related-to", RelationshipDirection.INBOUND)
 
     # Domain has INBOUND to IP, so IP is parent, IP gets domain's score
     # ip2 score = max(2.0, 8.0) = 8.0
@@ -437,7 +437,7 @@ def test_mixed_directions_in_hierarchy() -> None:
     cv.observable_add_threat_intel(obs_c.key, source="source3", score=Decimal("9.0"))
 
     # A → B (B is child of A)
-    cv.observable_add_relationship(obs_a.key, obs_b.key, "resolves-to", RelationshipDirection.OUTBOUND)
+    cv.observable_add_relationship(obs_a.key, obs_b.key, "related-to", RelationshipDirection.OUTBOUND)
 
     # C has INBOUND to B (B is parent of C)
     cv.observable_add_relationship(obs_c.key, obs_b.key, "related-to", RelationshipDirection.INBOUND)
@@ -456,16 +456,16 @@ def test_explicit_direction_override() -> None:
 
     cv = Cyvest(score_mode=ScoreMode.MAX)
 
-    # RESOLVES_TO normally defaults to OUTBOUND, but we can override
+    # INDICATES normally defaults to OUTBOUND, but we can override
     domain = cv.observable_create("domain", "override.com")
     cv.observable_add_threat_intel(domain.key, source="source1", score=Decimal("1.0"))
 
     ip = cv.observable_create("ip", "3.3.3.3")
     cv.observable_add_threat_intel(ip.key, source="source2", score=Decimal("8.0"))
 
-    # Override RESOLVES_TO to be BIDIRECTIONAL (no hierarchy)
+    # Override INDICATES to be BIDIRECTIONAL (no hierarchy)
     cv.observable_add_relationship(
-        domain.key, ip.key, RelationshipType.RESOLVES_TO, RelationshipDirection.BIDIRECTIONAL
+        domain.key, ip.key, RelationshipType.INDICATES, RelationshipDirection.BIDIRECTIONAL
     )
 
     # Bidirectional means no hierarchical propagation
@@ -494,8 +494,8 @@ def test_sum_mode_with_direction_based_children() -> None:
     cv.observable_add_threat_intel(child2.key, source="source3", score=Decimal("5.0"))
 
     # Add OUTBOUND relationships
-    cv.observable_add_relationship(parent.key, child1.key, "resolves-to", RelationshipDirection.OUTBOUND)
-    cv.observable_add_relationship(parent.key, child2.key, "resolves-to", RelationshipDirection.OUTBOUND)
+    cv.observable_add_relationship(parent.key, child1.key, "related-to", RelationshipDirection.OUTBOUND)
+    cv.observable_add_relationship(parent.key, child2.key, "related-to", RelationshipDirection.OUTBOUND)
 
     # Also add one BIDIRECTIONAL that should be ignored
     noise_obs = cv.observable_create("ip", "9.9.9.9")
@@ -841,3 +841,158 @@ def test_check_safe_with_multiple_safe_observables() -> None:
 
     # Check should be SAFE
     assert check.level == Level.SAFE
+
+
+def test_max_mode_hierarchical_root_barrier_scoring() -> None:
+    """Test MAX mode with root observable as a score propagation barrier."""
+    cv = Cyvest(score_mode=ScoreMode.MAX)
+
+    root = cv.root()
+
+    # Create domain with TI score 2.0
+    domain = cv.observable_create("domain", "example.com")
+    cv.observable_add_threat_intel(domain.key, source="source1", score=Decimal("2.0"))
+
+    # Create IP with TI score 8.0
+    ip = cv.observable_create("ip", "1.2.3.4")
+    cv.observable_add_threat_intel(ip.key, source="source2", score=Decimal("8.0"))
+
+    # Link both through root: root → IP (OUTBOUND), domain → root (INBOUND)
+    cv.observable_add_relationship(root.key, ip.key, "related-to", direction="outbound")
+    cv.observable_add_relationship(domain.key, root.key, "related-to", direction="inbound")
+
+    # Verify root barrier behavior:
+    # - Domain keeps its own TI score (2.0), not affected by root
+    # - IP keeps its own TI score (8.0), not affected by root
+    # - Root DOES aggregate child scores: max(0.0 TI, 8.0 child) = 8.0 (MAX mode)
+    # - Domain does NOT receive propagation from root (barrier blocks upward)
+    assert domain.score == Decimal("2.0")
+    assert domain.level == Level.NOTABLE
+    assert ip.score == Decimal("8.0")
+    assert ip.level == Level.MALICIOUS
+    assert root.score == Decimal("8.0")  # Aggregates child IP score
+    assert root.level == Level.MALICIOUS
+
+
+def test_sum_mode_hierarchical_root_barrier_scoring() -> None:
+    """Test SUM mode with root observable as a score propagation barrier."""
+    cv = Cyvest(score_mode=ScoreMode.SUM)
+
+    root = cv.root()
+
+    # Create domain with TI score 3.0
+    domain = cv.observable_create("domain", "example.com")
+    cv.observable_add_threat_intel(domain.key, source="source1", score=Decimal("3.0"))
+
+    # Create IP with TI score 5.0
+    ip = cv.observable_create("ip", "1.2.3.4")
+    cv.observable_add_threat_intel(ip.key, source="source2", score=Decimal("5.0"))
+
+    # Link both through root: root → IP (OUTBOUND), domain → root (INBOUND)
+    cv.observable_add_relationship(root.key, ip.key, "related-to", direction="outbound")
+    cv.observable_add_relationship(domain.key, root.key, "related-to", direction="inbound")
+
+    # Verify root barrier in SUM mode:
+    # - Domain keeps its own TI score (3.0), not receiving propagation from root
+    # - IP keeps its own TI score (5.0), not receiving propagation from root
+    # - Root DOES aggregate both children: max(0.0 TI) + sum(5.0 IP + 3.0 domain) = 8.0 (SUM mode)
+    #   (domain has INBOUND to root, making domain a child of root via Method 2)
+    # - Domain does NOT receive propagation from root (barrier blocks upward)
+    assert domain.score == Decimal("3.0")
+    assert ip.score == Decimal("5.0")
+    assert root.score == Decimal("8.0")  # Aggregates both child scores via SUM mode
+
+
+def test_root_with_threat_intel_only_affects_root() -> None:
+    """Test that threat intel added to root only affects root's score."""
+    cv = Cyvest(score_mode=ScoreMode.MAX)
+
+    root = cv.root()
+
+    # Create observables linked to root
+    obs1 = cv.observable_create("ip", "10.0.0.1")
+    cv.observable_add_threat_intel(obs1.key, source="source1", score=Decimal("2.0"))
+
+    obs2 = cv.observable_create("domain", "example.com")
+    cv.observable_add_threat_intel(obs2.key, source="source2", score=Decimal("3.0"))
+
+    # Link to root
+    cv.observable_add_relationship(root.key, obs1.key, "related-to", direction="outbound")
+    cv.observable_add_relationship(root.key, obs2.key, "related-to", direction="outbound")
+
+    # Add threat intel to root
+    cv.observable_add_threat_intel(root.key, source="root_source", score=Decimal("7.0"))
+
+    # Verify root barrier:
+    # - Root score = max(7.0 TI, 3.0 child obs2) = 7.0 (MAX mode, aggregates children)
+    # - obs1 and obs2 keep their own scores, NOT affected by root's TI (barrier blocks upward)
+    assert root.score == Decimal("7.0")  # max(7.0 TI, 2.0 obs1, 3.0 obs2)
+    assert root.level == Level.MALICIOUS
+    assert obs1.score == Decimal("2.0")
+    assert obs1.level == Level.NOTABLE
+    assert obs2.score == Decimal("3.0")
+    assert obs2.level == Level.SUSPICIOUS
+
+
+def test_root_barrier_with_multiple_levels() -> None:
+    """Test root barrier with multi-level observable hierarchy."""
+    cv = Cyvest(score_mode=ScoreMode.MAX)
+
+    root = cv.root()
+
+    # Create 3-level hierarchy: domain → IP → URL
+    domain = cv.observable_create("domain", "malicious.com")
+    cv.observable_add_threat_intel(domain.key, source="source1", score=Decimal("9.0"))
+
+    ip = cv.observable_create("ip", "1.2.3.4")
+    cv.observable_add_threat_intel(ip.key, source="source2", score=Decimal("8.0"))
+
+    url = cv.observable_create("url", "http://malicious.com/evil")
+    cv.observable_add_threat_intel(url.key, source="source3", score=Decimal("7.0"))
+
+    # Build hierarchy: domain → IP → URL
+    cv.observable_add_relationship(domain.key, ip.key, "related-to", direction="outbound")
+    cv.observable_add_relationship(ip.key, url.key, "related-to", direction="outbound")
+
+    # Link root to domain
+    cv.observable_add_relationship(root.key, domain.key, "related-to", direction="outbound")
+
+    # Verify normal hierarchical propagation works (domain inherits max from children)
+    assert domain.score == Decimal("9.0")  # max(9.0, 8.0, 7.0) = 9.0
+    assert ip.score == Decimal("8.0")  # max(8.0, 7.0) = 8.0
+    assert url.score == Decimal("7.0")  # only its TI
+
+    # Verify root DOES aggregate domain's score, but doesn't propagate upward
+    assert root.score == Decimal("9.0")  # max(0.0 TI, 9.0 child domain)
+    assert root.level == Level.MALICIOUS
+
+
+def test_root_propagates_to_checks_not_parents() -> None:
+    """Test that root observable score DOES propagate to checks, but NOT to parent observables."""
+    cv = Cyvest(score_mode=ScoreMode.MAX)
+
+    root = cv.root()
+
+    # Create a check and link root to it
+    check = cv.check_create("root_check", "test", "Test root check")
+    cv.check_link_observable(check.key, root.key)
+
+    # Add threat intel to root
+    cv.observable_add_threat_intel(root.key, source="root_ti", score=Decimal("8.0"))
+
+    # Verify root has the score from its TI
+    assert root.score == Decimal("8.0")
+    assert root.level == Level.MALICIOUS
+
+    # Verify check DOES get root's score (root propagates to checks)
+    assert check.score == Decimal("8.0")
+    assert check.level == Level.MALICIOUS
+
+    # Now create a non-root observable and link to the same check
+    obs = cv.observable_create("ip", "10.0.0.1")
+    cv.observable_add_threat_intel(obs.key, source="ip_ti", score=Decimal("5.0"))
+    cv.check_link_observable(check.key, obs.key)
+
+    # Check should now get max of both observables (root=8.0, ip=5.0)
+    assert check.score == Decimal("8.0")
+    assert check.level == Level.MALICIOUS

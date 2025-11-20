@@ -1,8 +1,15 @@
-"""
+""" 
 Scoring and propagation engine for Cyvest.
 
 Handles automatic score calculation and propagation between threat intelligence,
 observables, and checks based on relationships and hierarchies.
+
+Root Observable Barrier:
+    The root observable (identified by value="input-data") acts as a propagation barrier:
+    - Root DOES aggregate scores from child observables (using normal MAX/SUM algorithm)
+    - Root does NOT propagate scores upward to parent observables (barrier blocks upward flow)
+    - Root DOES propagate scores to linked checks (like any other observable)
+    - This prevents score contamination of observables linked through root while maintaining normal child aggregation
 """
 
 from decimal import Decimal
@@ -37,6 +44,13 @@ class ScoreEngine:
     - OUTBOUND (→): source → target, target is a child of source
     - INBOUND (←): source ← target, target is a parent of source
     - BIDIRECTIONAL (↔): excluded from hierarchical propagation
+
+    Root Observable Barrier:
+    The root observable (value="input-data") has special propagation rules:
+    - Root score calculated normally: max(TI scores, child scores) in MAX mode or max(TI) + sum(children) in SUM mode
+    - Root does NOT propagate to parent observables (barrier prevents upward flow beyond root)
+    - Root DOES propagate to linked checks normally
+    - This isolates observables linked through root while allowing normal score calculation and check scoring
     """
 
     def __init__(self, score_mode: ScoreMode = ScoreMode.MAX) -> None:
@@ -86,6 +100,13 @@ class ScoreEngine:
         if new_score != observable.score:
             observable.update_score(new_score, reason=f"Threat intel update from {ti.source}")
 
+            # Root observable barrier: stop upward propagation at root level
+            # Root does NOT propagate to parent observables, but DOES propagate to checks
+            if observable.value == "input-data":
+                # Allow root to propagate to checks only
+                self._propagate_observable_to_checks(observable)
+                return
+
             # Propagate to parent observables
             self._propagate_to_parent_observables(observable)
 
@@ -100,6 +121,9 @@ class ScoreEngine:
         - OUTBOUND relationships: target is a hierarchical child
         - INBOUND relationships: not considered for child score calculation
         - BIDIRECTIONAL relationships: excluded from hierarchy
+
+        All observables (including root) use the same calculation algorithm.
+        The root barrier affects propagation, not calculation.
 
         Args:
             observable: The observable to calculate score for
@@ -170,6 +194,10 @@ class ScoreEngine:
         1. INBOUND relationships: source ← target (target is parent)
         2. Other observables with OUTBOUND relationships to this observable (they are parents)
 
+        Root observable barrier:
+        - Propagation stops at root observable (value="input-data")
+        - Root does not receive score updates from its children
+
         Args:
             observable: The observable whose score changed
         """
@@ -179,6 +207,9 @@ class ScoreEngine:
             if rel.direction == RelationshipDirection.INBOUND:
                 parent_obs = self._observables.get(rel.target_key)
                 if parent_obs and parent_obs.key != observable.key:
+                    # Root observable barrier: skip propagation to root
+                    if parent_obs.value == "input-data":
+                        continue
                     # Recalculate parent's score
                     new_parent_score = self._calculate_observable_score(parent_obs)
 
@@ -193,6 +224,10 @@ class ScoreEngine:
         # Those observables are parents (they point to this observable as their child)
         for parent_key, parent_obs in self._observables.items():
             if parent_key == observable.key:
+                continue
+
+            # Root observable barrier: skip propagation to root
+            if parent_obs.value == "input-data":
                 continue
 
             # Check if parent has an OUTBOUND relationship to this observable
@@ -217,6 +252,8 @@ class ScoreEngine:
 
         Check level inherits SAFE if any linked observable is SAFE and all others are
         lower than or equal to SAFE (NONE, TRUSTED, INFO, SAFE).
+
+        Note: Root observable CAN propagate to checks (unlike parent observables).
 
         Args:
             observable: The observable to check

@@ -233,6 +233,26 @@ score = max(threat-intel-scores) + sum(child-observable-scores)
 
 **Children** are determined by OUTBOUND relationships only. BIDIRECTIONAL relationships are excluded from hierarchy.
 
+#### Root Observable Barrier
+
+The **root observable** (identified by `value="input-data"`) has special propagation rules to prevent score contamination:
+
+- **Score calculation**: Root's score is calculated using the **same algorithm** as other observables
+  - MAX mode: `max(root's TI scores, child observable scores)`
+  - SUM mode: `max(root's TI scores) + sum(child observable scores)`
+  - Root DOES aggregate child scores normally
+  
+- **Upward propagation barrier**: Root does **NOT** propagate scores to parent observables
+  - If root has parent relationships, those parents are not affected by root's score
+  - Propagation stops after root's score is calculated
+  - Prevents contamination of upstream observables
+  
+- **Check propagation**: Root **DOES** propagate normally to linked checks
+  - Checks referencing the root observable receive root's final score
+  - Maintains expected behavior for verification steps
+
+This barrier ensures that observables linked through the root remain isolated from each other while the root itself properly aggregates threat intelligence from its investigation tree.
+
 **Examples:**
 
 ```python
@@ -674,6 +694,53 @@ Every investigation has a **root observable** representing the analyzed artifact
 cv = Cyvest()
 root = cv.root()  # or cv.observable_get_root()
 ```
+
+The root observable is automatically created with:
+- **Type**: `ObservableType.FILE` (default) or `ObservableType.ARTIFACT` if `root_type="artifact"`
+- **Value**: `"input-data"` (fixed identifier)
+- **Purpose**: Entry point for the investigation
+
+### Root Observable Barrier
+
+The root observable has special scoring behavior to isolate investigation branches:
+
+**What the barrier does:**
+1. Root's score is calculated **normally** using MAX or SUM mode algorithm
+2. Root DOES aggregate scores from child observables (like any other observable)
+3. Root does NOT propagate its score to parent observables (barrier blocks upward)
+4. Root DOES propagate normally to linked checks
+
+**Why this matters:**
+- Root properly aggregates all threat intelligence from the investigation tree
+- Observables linked through root remain isolated from each other
+- Prevents root's aggregated score from contaminating unrelated parent observables
+- Maintains proper check scoring for root verification steps
+
+**Example:**
+```python
+cv = Cyvest()
+root = cv.root()
+
+# Add threat intel to root
+cv.observable_add_threat_intel(root.key, "scanner", score=Decimal("9.0"))
+
+# Create observables linked to root
+child = cv.observable_create("url", "https://example.com")
+cv.observable_add_threat_intel(child.key, "urlscan", score=Decimal("5.0"))
+cv.relationship_add(root.key, child.key, "related-to", direction="outbound")
+
+# Create check for root
+check = cv.check_create("root-check", "validation")
+cv.check_link_observable(check.check_id, root.key)
+
+# Results (MAX mode):
+# - root.score = max(9.0 TI, 5.0 child) = 9.0
+# - child.score = 5.0 (NOT affected by root TI due to barrier)
+# - check.score = 9.0 (receives root score)
+# - If root had a parent, parent.score would NOT include root's 9.0 (barrier blocks upward)
+```
+
+### Automatic Root Linking
 
 Orphan observables (without relationships) are automatically linked to root with `related-to`.
 

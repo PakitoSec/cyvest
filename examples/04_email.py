@@ -142,13 +142,13 @@ class EmailFrom(BaseRule):
         # Build observable chain with threat intel
         obs = (
             cy.observable(ObservableType.EMAIL_ADDR, from_addr)
-            .relate_to(cy.root(), relationship_type=RelationshipType.FROM, direction="inbound")
+            .relate_to(cy.root(), relationship_type=RelationshipType.RELATED_TO, direction="inbound")
             .relate_to(
                 cy.observable(ObservableType.DOMAIN_NAME, from_domain)
                 .add_ti("VT", 2)
                 .relate_to(
                     cy.observable(ObservableType.IPV4_ADDR, from_ip).add_ti("SEKOIA", 0),
-                    RelationshipType.RESOLVES_TO,
+                    RelationshipType.RELATED_TO,
                 ),
                 RelationshipType.RELATED_TO,
             )
@@ -182,7 +182,7 @@ class EmailReciever(BaseRule):
         cy.enrichment_create("receiver", {"receiver": ["ok"]}, context="from splunk")
         cy.check("receiver", "header", "description", "> receiver").with_score(0.1).link_observable(
             cy.observable(ObservableType.EMAIL_ADDR, "user@company.com").relate_to(
-                cy.root(), RelationshipType.TO, direction="inbound"
+                cy.root(), RelationshipType.RELATED_TO, direction="inbound"
             )
         ).in_container(cy.container("emails"))
 
@@ -227,9 +227,9 @@ class BodiesUrlTask(BaseRule):
                 .add_ti("VT", score)
                 .relate_to(
                     cy.observable(ObservableType.FILE, "BODY/HTML").relate_to(
-                        cy.root(), RelationshipType.BODY_RAW, direction="inbound"
+                        cy.root(), RelationshipType.RELATED_TO, direction="inbound"
                     ),
-                    RelationshipType.CONTAINS,
+                    RelationshipType.RELATED_TO,
                     direction="inbound",
                 )
             )
@@ -240,7 +240,7 @@ class BodiesUrlTask(BaseRule):
                 logger.info(f"Linking URL {url} to malicious domain")
                 url_obs = url_obs.relate_to(
                     cy.observable(ObservableType.DOMAIN_NAME, "domainmalicious.com"),
-                    RelationshipType.RESOLVES_TO,
+                    RelationshipType.RELATED_TO,
                 )
 
             # Create check and link to container
@@ -289,7 +289,7 @@ class AttachmentTask(BaseRule):
             # Build file observable with hash observables
             file_obs = (
                 cy.observable(ObservableType.FILE, filename)
-                .relate_to(cy.root(), RelationshipType.CONTAINS, direction="inbound")
+                .relate_to(cy.root(), RelationshipType.RELATED_TO, direction="inbound")
                 .relate_to(
                     cy.observable(ObservableType.FILE, f"MD5:{md5_hash}").add_ti("VT", score, "MD5 hash analysis"),
                     RelationshipType.RELATED_TO,

@@ -241,7 +241,7 @@ def test_cross_task_observable_sharing():
 
         # Create URL and link to domain (correct pattern: use cy.observable())
         url = cy2.observable(ObservableType.URL, data["url"])
-        url.relate_to(cy2.observable(ObservableType.DOMAIN_NAME, "malicious.com"), RelationshipType.RESOLVES_TO)
+        url.relate_to(cy2.observable(ObservableType.DOMAIN_NAME, "malicious.com"), RelationshipType.RELATED_TO)
 
     # Verify final investigation has both observables
     final_inv = shared.get_investigation()
@@ -718,7 +718,7 @@ def test_prevent_relationship_with_shared_copy():
 
         # This should raise ValueError with helpful message
         with pytest.raises(ValueError) as exc_info:
-            url_obs.relate_to(domain_copy, RelationshipType.RESOLVES_TO)
+            url_obs.relate_to(domain_copy, RelationshipType.RELATED_TO)
 
         # Verify error message is helpful
         error_msg = str(exc_info.value)
@@ -733,7 +733,7 @@ def test_prevent_relationship_with_shared_copy():
         url_obs = cy3.observable(ObservableType.URL, "https://evil.com/payload")
         url_obs.relate_to(
             cy3.observable(ObservableType.DOMAIN_NAME, "malicious.com"),
-            RelationshipType.RESOLVES_TO,
+            RelationshipType.RELATED_TO,
         )
         # Should succeed without error
 
@@ -1019,7 +1019,7 @@ def test_get_global_score():
     ti = ThreatIntel(source="DirectThreat", observable_key=root.key, score=Decimal("7"))
     main_inv.add_threat_intel(ti, root)
 
-    # Score should be updated
+    # Score should be updated (root propagates to checks now)
     score = shared.get_global_score()
     assert isinstance(score, Decimal)
     assert score >= Decimal("7")

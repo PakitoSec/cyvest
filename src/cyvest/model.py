@@ -58,108 +58,103 @@ class ObservableType(str, Enum):
 
 
 class RelationshipType(str, Enum):
-    """STIX2 Cyber Observable Relationship types."""
+    """
+    STIX 2.1 Relationship Object (SRO) relationship_type values.
+    Only SRO-level relationships, no SCO/cyber-observable links.
+    """
 
-    # Network relationships
-    RESOLVES_TO = "resolves-to"
-    BELONGS_TO = "belongs-to"
-
-    # Communication relationships
-    COMMUNICATES_WITH = "communicates-with"
-
-    # File relationships
-    CONTAINS = "contains"
-    DOWNLOADED = "downloaded"
-    DROPPED = "dropped"
-
-    # Email relationships
-    FROM = "from"
-    SENDER = "sender"
-    TO = "to"
-    CC = "cc"
-    BCC = "bcc"
-    RAW_EMAIL = "raw-email"
-    BODY_RAW = "body-raw"
-
-    # Process relationships
-    CREATED = "created"
-    OPENED = "opened"
-    PARENT = "parent"
-    CHILD = "child"
-
-    # General relationships
+    # Common / generic
     RELATED_TO = "related-to"
     DERIVED_FROM = "derived-from"
     DUPLICATE_OF = "duplicate-of"
 
-    # Windows Registry
-    VALUES = "values"
+    # Indicator / COA / general CTI semantics
+    INDICATES = "indicates"
+    MITIGATES = "mitigates"
+    INVESTIGATES = "investigates"
+    USES = "uses"
+    TARGETS = "targets"
+
+    # Attribution / identity
+    ATTRIBUTED_TO = "attributed-to"
+    IMPERSONATES = "impersonates"
+    LOCATED_AT = "located-at"
+    ORIGINATES_FROM = "originates-from"
+    OWNED_BY = "owned-by"
+
+    # Infrastructure / malware / tool
+    COMMUNICATES_WITH = "communicates-with"
+    DELIVERS = "delivers"
+    EXPLOITS = "exploits"
+    DROPS = "drops"
+    BEACONS_TO = "beacons-to"
+    COMPROMISES = "compromises"
+    HOSTS = "hosts"
+    AUTHORED_BY = "authored-by"
+    VARIANT_OF = "variant-of"
 
     def get_default_direction(self) -> RelationshipDirection:
         """
-        Get the semantically appropriate default direction for this relationship type.
+        Get the semantically appropriate default direction for this SRO relationship type.
 
-        Returns:
-            The default RelationshipDirection for this relationship type
-
-        Examples:
-            >>> RelationshipType.RESOLVES_TO.get_default_direction()
-            RelationshipDirection.OUTBOUND
-            >>> RelationshipType.DOWNLOADED.get_default_direction()
-            RelationshipDirection.INBOUND
-            >>> RelationshipType.COMMUNICATES_WITH.get_default_direction()
-            RelationshipDirection.BIDIRECTIONAL
+        This is the *conceptual* direction, i.e. "source → target" meaning
+        "source has this effect on / relation to target".
         """
-        # Import here to avoid circular dependency
-        # Network relationships
-        if self == RelationshipType.RESOLVES_TO:
-            return RelationshipDirection.OUTBOUND  # domain → IP
-        elif self == RelationshipType.BELONGS_TO:
-            return RelationshipDirection.OUTBOUND  # IP → network/AS
-        elif self == RelationshipType.COMMUNICATES_WITH:
-            return RelationshipDirection.BIDIRECTIONAL  # mutual communication
 
-        # File relationships
-        elif self == RelationshipType.CONTAINS:
-            return RelationshipDirection.OUTBOUND  # container → item
-        elif self == RelationshipType.DOWNLOADED:
-            return RelationshipDirection.INBOUND  # file ← source
-        elif self == RelationshipType.DROPPED:
-            return RelationshipDirection.INBOUND  # file ← dropper
-
-        # Email relationships
-        elif self in (RelationshipType.FROM, RelationshipType.SENDER):
-            return RelationshipDirection.INBOUND  # email ← sender
-        elif self in (RelationshipType.TO, RelationshipType.CC, RelationshipType.BCC):
-            return RelationshipDirection.OUTBOUND  # email → recipient
-        elif self in (RelationshipType.RAW_EMAIL, RelationshipType.BODY_RAW):
-            return RelationshipDirection.OUTBOUND  # message → content
-
-        # Process relationships
-        elif self == RelationshipType.CREATED:
-            return RelationshipDirection.OUTBOUND  # creator → created
-        elif self == RelationshipType.OPENED:
-            return RelationshipDirection.OUTBOUND  # opener → opened
-        elif self == RelationshipType.PARENT:
-            return RelationshipDirection.OUTBOUND  # parent → child
-        elif self == RelationshipType.CHILD:
-            return RelationshipDirection.INBOUND  # child ← parent
-
-        # General relationships
-        elif self == RelationshipType.RELATED_TO:
+        # Generic
+        if self == RelationshipType.RELATED_TO:
             return RelationshipDirection.BIDIRECTIONAL  # symmetric
         elif self == RelationshipType.DERIVED_FROM:
             return RelationshipDirection.INBOUND  # derived ← source
         elif self == RelationshipType.DUPLICATE_OF:
             return RelationshipDirection.BIDIRECTIONAL  # symmetric
 
-        # Windows Registry
-        elif self == RelationshipType.VALUES:
-            return RelationshipDirection.OUTBOUND  # key → values
+        # Detection / response
+        elif self == RelationshipType.INDICATES:
+            return RelationshipDirection.OUTBOUND  # indicator → thing it indicates
+        elif self == RelationshipType.MITIGATES:
+            return RelationshipDirection.OUTBOUND  # COA → thing mitigated
+        elif self == RelationshipType.INVESTIGATES:
+            return RelationshipDirection.OUTBOUND  # COA → thing investigated
+        elif self == RelationshipType.USES:
+            return RelationshipDirection.OUTBOUND  # actor/pattern → thing used
+        elif self == RelationshipType.TARGETS:
+            return RelationshipDirection.OUTBOUND  # actor/campaign → target
 
-        # Default fallback
-        else:
-            return RelationshipDirection.OUTBOUND
+        # Attribution / identity / geo
+        elif self == RelationshipType.ATTRIBUTED_TO:
+            return RelationshipDirection.OUTBOUND  # campaign/intrusion-set → actor
+        elif self == RelationshipType.IMPERSONATES:
+            return RelationshipDirection.OUTBOUND  # actor → identity impersonated
+        elif self == RelationshipType.LOCATED_AT:
+            return RelationshipDirection.OUTBOUND  # thing → location
+        elif self == RelationshipType.ORIGINATES_FROM:
+            return RelationshipDirection.OUTBOUND  # campaign → location of origin
+        elif self == RelationshipType.OWNED_BY:
+            return RelationshipDirection.INBOUND  # owned object ← owner
+
+        # Infra / malware / tool
+        elif self == RelationshipType.COMMUNICATES_WITH:
+            return RelationshipDirection.BIDIRECTIONAL  # symmetric communication
+        elif self == RelationshipType.DELIVERS:
+            return RelationshipDirection.OUTBOUND  # infra/tool → malware
+        elif self == RelationshipType.EXPLOITS:
+            return RelationshipDirection.OUTBOUND  # malware/attack-pattern → vuln
+        elif self == RelationshipType.DROPS:
+            return RelationshipDirection.OUTBOUND  # dropper → dropped malware/file
+        elif self == RelationshipType.BEACONS_TO:
+            return RelationshipDirection.OUTBOUND  # malware → C2 infra
+        elif self == RelationshipType.COMPROMISES:
+            return RelationshipDirection.OUTBOUND  # actor/campaign → infra
+        elif self == RelationshipType.HOSTS:
+            return RelationshipDirection.OUTBOUND  # infra → hosted thing
+        elif self == RelationshipType.AUTHORED_BY:
+            return RelationshipDirection.INBOUND  # malware/tool ← author
+        elif self == RelationshipType.VARIANT_OF:
+            return RelationshipDirection.OUTBOUND  # variant → family
+
+        # Fallback
+        return RelationshipDirection.OUTBOUND
 
 
 class RelationshipDirection(str, Enum):

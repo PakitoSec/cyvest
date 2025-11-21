@@ -118,6 +118,22 @@ def get_edge_arrows(direction: RelationshipDirection) -> str:
         return "to;from"
 
 
+def truncate_middle(text: str, max_length: int) -> str:
+    """Truncate text in the middle with an ellipsis when exceeding ``max_length``.
+
+    Keeps both the start and end of the string visible for context while
+    respecting the provided length budget.
+    """
+    if max_length < 4 or len(text) <= max_length:
+        return text
+
+    reserved = max_length - 3
+    head = reserved // 2 + reserved % 2
+    tail = reserved - head
+
+    return f"{text[:head]}...{text[-tail:]}"
+
+
 def generate_network_graph(
     cv: Cyvest,
     output_dir: str | None = None,
@@ -126,6 +142,7 @@ def generate_network_graph(
     observable_types: list[ObservableType] | None = None,
     physics: bool = False,
     group_by_type: bool = False,
+    max_label_length: int = 60,
 ) -> str:
     """
     Generate an interactive network graph visualization of observables and relationships.
@@ -142,6 +159,7 @@ def generate_network_graph(
         observable_types: List of observable types to include (filters out others)
         physics: Enable physics simulation for organic layout (default: False for static layout)
         group_by_type: Group observables by type using hierarchical layout (default: False)
+        max_label_length: Maximum length for node labels before truncation (default: 60)
 
     Returns:
         Path to the generated HTML file
@@ -241,7 +259,8 @@ def generate_network_graph(
 
         # Build label with type, value, and level
         obs_type_str = obs.obs_type.value if isinstance(obs.obs_type, ObservableType) else str(obs.obs_type)
-        label = f"{obs.value}"
+        obs_value = f"{obs.value}"
+        label = truncate_middle(obs_value, max_label_length)
 
         # Build title (hover text) with detailed info
         title_parts = [

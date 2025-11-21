@@ -934,6 +934,22 @@ def test_root_with_threat_intel_only_affects_root() -> None:
     assert obs2.level == Level.SUSPICIOUS
 
 
+def test_root_updates_when_child_score_changes() -> None:
+    """Ensure root aggregates child score updates while remaining a barrier upward."""
+    cv = Cyvest(score_mode=ScoreMode.MAX)
+
+    root = cv.root()
+    child = cv.observable_create("ip", "10.0.0.1")
+    cv.observable_add_relationship(root.key, child.key, "related-to", direction="outbound")
+
+    cv.observable_add_threat_intel(child.key, source="source1", score=Decimal("2.0"))
+    assert root.score == Decimal("2.0")
+
+    # Increase child score and ensure root follows without needing a full recalculation
+    cv.observable_add_threat_intel(child.key, source="source2", score=Decimal("5.0"))
+    assert root.score == Decimal("5.0")
+
+
 def test_root_barrier_with_multiple_levels() -> None:
     """Test root barrier with multi-level observable hierarchy."""
     cv = Cyvest(score_mode=ScoreMode.MAX)

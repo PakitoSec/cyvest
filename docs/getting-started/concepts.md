@@ -235,19 +235,60 @@ score = max(threat-intel-scores) + sum(child-observable-scores)
 
 #### Root Observable Barrier
 
-The **root observable** (identified by `value="input-data"`) has special propagation rules to prevent score contamination:
+The **root observable** (identified by `value="input-data"`) acts as a special barrier to prevent cross-contamination between observables while maintaining normal score aggregation. The barrier has two components:
 
-- **Score calculation**: Root's score is calculated using the **same algorithm** as other observables
-  - MAX mode: `max(root's TI scores, child observable scores)`
-  - SUM mode: `max(root's TI scores) + sum(child observable scores)`
-  - Root DOES aggregate child scores normally
+**1. Calculation Phase Barrier (Root as Child)**
+
+When root appears as a child of other observables, it is **SKIPPED** in their score calculations:
+
+- Observables that have root as a child do NOT include root's score
+- This prevents cross-contamination between separate branches linked through root
+- Example: If `domain -> root <- ip`, both domain and ip skip root's score
+
+```python
+# Example: Cross-contamination prevention
+domain = cv.observable("domain", "branch1.com")
+domain.with_ti("source1", score=Decimal("9.0"))
+
+ip = cv.observable("ipv4-addr", "192.0.2.1")  
+ip.with_ti("source2", score=Decimal("1.0"))
+
+root = cv.root()
+
+# Both have root as child
+cv.observable_add_relationship(domain, root, "related-to", direction="outbound")
+cv.observable_add_relationship(ip, root, "related-to", direction="outbound")
+
+# Results:
+# - domain score: 9.0 (only its TI, root skipped)
+# - ip score: 1.0 (only its TI, root skipped)  
+# - root score: 9.0 (aggregates domain and ip normally)
+# - domain and ip remain isolated despite shared root connection
+```
+
+**2. Propagation Phase Barrier (Root as Parent)**
+
+Root's propagation behavior is asymmetric:
+
+- **Root CAN be updated**: When children's scores change, root recalculates normally
+  - Root aggregates child scores: `max(root TI, child scores)` in MAX mode
+  - Root acts as aggregation point for investigation tree
   
-- **Upward propagation barrier**: Root does **NOT** propagate scores to parent observables
-  - If root has parent relationships, those parents are not affected by root's score
-  - Propagation stops after root's score is calculated
-  - Prevents contamination of upstream observables
+- **Root does NOT propagate upward**: After root updates, propagation stops
+  - If root has parent relationships, they are not affected by root's score changes
+  - Prevents upstream contamination beyond root
+  - Updates flow TO root but not THROUGH root
+
+- **Root DOES propagate to checks**: Root propagates to linked checks normally
+  - Checks can reflect root's aggregated investigation score
   
-- **Check propagation**: Root **DOES** propagate normally to linked checks
+**Why the Barrier?**
+
+The root barrier design enables:
+- **Isolation**: Separate investigation branches remain independent
+- **Aggregation**: Root still collects overall investigation severity
+- **Flexibility**: You can link arbitrary observables to root without contamination
+- **Clarity**: Parent observables only reflect their direct threat landscape
   - Checks referencing the root observable receive root's final score
   - Maintains expected behavior for verification steps
 

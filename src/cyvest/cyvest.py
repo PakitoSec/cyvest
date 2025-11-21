@@ -612,6 +612,7 @@ class Cyvest:
         observable_types: list[str] | None = None,
         physics: bool = False,
         group_by_type: bool = False,
+        max_label_length: int = 60,
     ) -> str:
         """
         Generate and display an interactive network graph visualization.
@@ -627,6 +628,7 @@ class Cyvest:
             observable_types: List of observable types to include (filters out others)
             physics: Enable physics simulation for organic layout (default: False for static layout)
             group_by_type: Group observables by type using hierarchical layout (default: False)
+            max_label_length: Maximum length for node labels before truncation (default: 60)
 
         Returns:
             Path to the generated HTML file
@@ -653,6 +655,7 @@ class Cyvest:
             observable_types=obs_types_enum,
             physics=physics,
             group_by_type=group_by_type,
+            max_label_length=max_label_length,
         )
 
     # Fluent helper entrypoints

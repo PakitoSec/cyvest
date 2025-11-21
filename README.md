@@ -346,6 +346,19 @@ SAFE checks:
 - Automatically inherit SAFE level when linked to SAFE observables (if all other observables are ≤ SAFE)
 - Can still upgrade to higher levels when NOTABLE/SUSPICIOUS/MALICIOUS observables are linked
 
+**Root Observable Barrier:**
+
+The root observable (the investigation's entry point with `value="input-data"`) acts as a special barrier to prevent cross-contamination:
+
+**Barrier as Child** - When root appears as a child of other observables, it is **skipped** in their score calculations.
+
+**Barrier as Parent** - Root's propagation is asymmetric:
+- Root **CAN** be updated when children change (aggregates child scores)
+- Root **does NOT** propagate upward beyond itself (stops recursive propagation)
+- Root **DOES** propagate to checks normally
+
+This design enables flexible investigation structures while preventing unintended score contamination.
+
 ## Examples
 
 See the `examples/` directory for complete examples:

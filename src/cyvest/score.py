@@ -4,12 +4,31 @@ Scoring and propagation engine for Cyvest.
 Handles automatic score calculation and propagation between threat intelligence,
 observables, and checks based on relationships and hierarchies.
 
+Score Calculation:
+    - MAX mode: Score = max(all TI scores, all child observable scores)
+    - SUM mode: Score = max(TI scores) + sum(child observable scores)
+    - Children are determined by relationship direction (OUTBOUND = hierarchical child)
+
 Root Observable Barrier:
-    The root observable (identified by value="input-data") acts as a propagation barrier:
-    - Root DOES aggregate scores from child observables (using normal MAX/SUM algorithm)
-    - Root does NOT propagate scores upward to parent observables (barrier blocks upward flow)
-    - Root DOES propagate scores to linked checks (like any other observable)
-    - This prevents score contamination of observables linked through root while maintaining normal child aggregation
+    The root observable (identified by value="input-data") acts as a special barrier
+    to prevent cross-contamination of observables while maintaining normal scoring:
+    
+    Calculation Phase:
+        - Root is SKIPPED when appearing as a child in other observables' calculations
+        - This prevents observables linked through root from contaminating each other
+        - Root's own score calculation works normally (aggregates its children)
+    
+    Propagation Phase:
+        - Root CAN be updated when its children's scores change (normal parent update)
+        - Root does NOT propagate upward beyond itself (stops recursive propagation)
+        - Root DOES propagate to linked checks (normal check propagation)
+    
+    Example:
+        domain -> root <- ip  (domain and ip both have root as child)
+        - domain score: only its own TI (root skipped as child)
+        - ip score: only its own TI (root skipped as child)
+        - root score: max(root TI, domain score, ip score) - normal calculation
+        - Result: domain and ip remain isolated despite shared root connection
 """
 
 from decimal import Decimal
@@ -46,11 +65,21 @@ class ScoreEngine:
     - BIDIRECTIONAL (↔): excluded from hierarchical propagation
 
     Root Observable Barrier:
-    The root observable (value="input-data") has special propagation rules:
-    - Root score calculated normally: max(TI scores, child scores) in MAX mode or max(TI) + sum(children) in SUM mode
-    - Root does NOT propagate to parent observables (barrier prevents upward flow beyond root)
-    - Root DOES propagate to linked checks normally
-    - This isolates observables linked through root while allowing normal score calculation and check scoring
+    The root observable (value="input-data") has asymmetric barrier behavior:
+    
+    1. In Score Calculation (_calculate_observable_score):
+       - When root appears as a child, it is SKIPPED (not included in parent's score)
+       - Root's own calculation works normally (aggregates its children)
+       - Prevents cross-contamination between observables linked through root
+    
+    2. In Score Propagation (_propagate_to_parent_observables):
+       - Root CAN be updated when children change (receives propagation as parent)
+       - Root does NOT propagate beyond itself (stops upward recursive propagation)
+       - Maintains root as aggregation point while preventing upward flow
+    
+    3. In Check Propagation (_propagate_observable_to_checks):
+       - Root propagates to checks normally (no special handling)
+       - Ensures checks linked to root receive updated scores
     """
 
     def __init__(self, score_mode: ScoreMode = ScoreMode.MAX) -> None:
@@ -119,11 +148,19 @@ class ScoreEngine:
 
         Hierarchical relationships are determined by direction:
         - OUTBOUND relationships: target is a hierarchical child
-        - INBOUND relationships: not considered for child score calculation
+        - INBOUND relationships: source has inbound to this observable (source is child)
         - BIDIRECTIONAL relationships: excluded from hierarchy
 
-        All observables (including root) use the same calculation algorithm.
-        The root barrier affects propagation, not calculation.
+        Root Barrier in Calculation:
+        When collecting child scores, observables with value="input-data" (root) are SKIPPED.
+        This prevents:
+        - Observables from including root's aggregated score when root appears as their child
+        - Cross-contamination between separate branches connected through root
+        
+        Example: If parent -> root and root -> child1, child2:
+        - parent's child collection will skip root (barrier)
+        - root's child collection includes child1, child2 (normal)
+        - Result: parent score = only parent's TI (isolated from child1, child2)
 
         Args:
             observable: The observable to calculate score for
@@ -153,6 +190,9 @@ class ScoreEngine:
         # Children are defined two ways:
         # 1. Targets of this observable's OUTBOUND relationships (source → target)
         # 2. Sources of INBOUND relationships where this observable is the target (child ← this)
+        # 
+        # Root Barrier Note: Root (value="input-data") is SKIPPED when appearing as a child
+        # to prevent cross-contamination between observables linked through root
         child_scores = []
 
         # Method 1: OUTBOUND relationships from this observable
@@ -161,6 +201,9 @@ class ScoreEngine:
             if rel.direction == RelationshipDirection.OUTBOUND:
                 child = self._observables.get(rel.target_key)
                 if child:
+                    # Root barrier: skip root observable (value="input-data") when it appears as a child
+                    if child.value == "input-data":
+                        continue
                     # Recursively calculate child's complete score
                     child_score = self._calculate_observable_score(child, visited)
                     child_scores.append(child_score)
@@ -169,6 +212,9 @@ class ScoreEngine:
         # If obs_x has INBOUND to this observable, then obs_x is a child
         for other_key, other_obs in self._observables.items():
             if other_key == observable.key:
+                continue
+            # Root barrier: skip root observable (value="input-data") when it appears as a child
+            if other_obs.value == "input-data":
                 continue
             for rel in other_obs.relationships:
                 if rel.direction == RelationshipDirection.INBOUND and rel.target_key == observable.key:
@@ -194,31 +240,52 @@ class ScoreEngine:
         1. INBOUND relationships: source ← target (target is parent)
         2. Other observables with OUTBOUND relationships to this observable (they are parents)
 
-        Root observable barrier:
-        - Propagation stops at root observable (value="input-data")
-        - Root does not receive score updates from its children
+        Root Barrier in Propagation:
+        The root observable (value="input-data") has special propagation behavior:
+        
+        1. Root CAN be updated (receives propagation):
+           - When children's scores change, root is recalculated as a parent
+           - Ensures root's aggregated score stays current
+           - Uses helper function _update_parent to avoid duplicate processing
+        
+        2. Root does NOT propagate further (stops recursion):
+           - After root is updated, propagation stops (no recursive call)
+           - Prevents root from updating its parents (if any exist)
+           - Maintains root as terminal node in upward propagation
+        
+        This creates an asymmetric barrier: updates flow TO root but not THROUGH root.
 
         Args:
             observable: The observable whose score changed
         """
+        processed_parents: set[str] = set()
+
+        def _update_parent(parent_obs: "Observable") -> None:
+            """Helper to update a parent and optionally propagate beyond it."""
+            # Avoid double-processing the same parent when reached via both methods
+            if parent_obs.key in processed_parents:
+                return
+            processed_parents.add(parent_obs.key)
+
+            # Recalculate parent's score
+            new_parent_score = self._calculate_observable_score(parent_obs)
+
+            if new_parent_score != parent_obs.score:
+                parent_obs.update_score(new_parent_score, reason=f"Child observable {observable.key} updated")
+                # Propagate to checks even for root; root barrier only stops upward flow
+                self._propagate_observable_to_checks(parent_obs)
+
+                # Stop upward propagation at root (value="input-data")
+                if parent_obs.value != "input-data":
+                    self._propagate_to_parent_observables(parent_obs)
+
         # Method 1: Find parents through INBOUND relationships
         # For INBOUND: source ← target, target is the parent
         for rel in observable.relationships:
             if rel.direction == RelationshipDirection.INBOUND:
                 parent_obs = self._observables.get(rel.target_key)
                 if parent_obs and parent_obs.key != observable.key:
-                    # Root observable barrier: skip propagation to root
-                    if parent_obs.value == "input-data":
-                        continue
-                    # Recalculate parent's score
-                    new_parent_score = self._calculate_observable_score(parent_obs)
-
-                    if new_parent_score != parent_obs.score:
-                        parent_obs.update_score(new_parent_score, reason=f"Child observable {observable.key} updated")
-                        # Recursively propagate upwards
-                        self._propagate_to_parent_observables(parent_obs)
-                        # Propagate to checks linked to parent
-                        self._propagate_observable_to_checks(parent_obs)
+                    _update_parent(parent_obs)
 
         # Method 2: Find observables that have OUTBOUND relationships TO this observable
         # Those observables are parents (they point to this observable as their child)
@@ -226,22 +293,10 @@ class ScoreEngine:
             if parent_key == observable.key:
                 continue
 
-            # Root observable barrier: skip propagation to root
-            if parent_obs.value == "input-data":
-                continue
-
             # Check if parent has an OUTBOUND relationship to this observable
             for rel in parent_obs.relationships:
                 if rel.direction == RelationshipDirection.OUTBOUND and rel.target_key == observable.key:
-                    # Recalculate parent's score
-                    new_parent_score = self._calculate_observable_score(parent_obs)
-
-                    if new_parent_score != parent_obs.score:
-                        parent_obs.update_score(new_parent_score, reason=f"Child observable {observable.key} updated")
-                        # Recursively propagate upwards
-                        self._propagate_to_parent_observables(parent_obs)
-                        # Propagate to checks linked to parent
-                        self._propagate_observable_to_checks(parent_obs)
+                    _update_parent(parent_obs)
 
     def _propagate_observable_to_checks(self, observable: "Observable") -> None:
         """

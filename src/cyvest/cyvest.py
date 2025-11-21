@@ -610,7 +610,7 @@ class Cyvest:
         open_browser: bool = True,
         min_level: Level | None = None,
         observable_types: list[str] | None = None,
-        physics: bool = False,
+        physics: bool = True,
         group_by_type: bool = False,
         max_label_length: int = 60,
     ) -> str:

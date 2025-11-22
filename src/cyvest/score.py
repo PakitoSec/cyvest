@@ -1,4 +1,4 @@
-""" 
+"""
 Scoring and propagation engine for Cyvest.
 
 Handles automatic score calculation and propagation between threat intelligence,
@@ -12,17 +12,17 @@ Score Calculation:
 Root Observable Barrier:
     The root observable (identified by value="input-data") acts as a special barrier
     to prevent cross-contamination of observables while maintaining normal scoring:
-    
+
     Calculation Phase:
         - Root is SKIPPED when appearing as a child in other observables' calculations
         - This prevents observables linked through root from contaminating each other
         - Root's own score calculation works normally (aggregates its children)
-    
+
     Propagation Phase:
         - Root CAN be updated when its children's scores change (normal parent update)
         - Root does NOT propagate upward beyond itself (stops recursive propagation)
         - Root DOES propagate to linked checks (normal check propagation)
-    
+
     Example:
         domain -> root <- ip  (domain and ip both have root as child)
         - domain score: only its own TI (root skipped as child)
@@ -66,17 +66,17 @@ class ScoreEngine:
 
     Root Observable Barrier:
     The root observable (value="input-data") has asymmetric barrier behavior:
-    
+
     1. In Score Calculation (_calculate_observable_score):
        - When root appears as a child, it is SKIPPED (not included in parent's score)
        - Root's own calculation works normally (aggregates its children)
        - Prevents cross-contamination between observables linked through root
-    
+
     2. In Score Propagation (_propagate_to_parent_observables):
        - Root CAN be updated when children change (receives propagation as parent)
        - Root does NOT propagate beyond itself (stops upward recursive propagation)
        - Maintains root as aggregation point while preventing upward flow
-    
+
     3. In Check Propagation (_propagate_observable_to_checks):
        - Root propagates to checks normally (no special handling)
        - Ensures checks linked to root receive updated scores
@@ -156,7 +156,7 @@ class ScoreEngine:
         This prevents:
         - Observables from including root's aggregated score when root appears as their child
         - Cross-contamination between separate branches connected through root
-        
+
         Example: If parent -> root and root -> child1, child2:
         - parent's child collection will skip root (barrier)
         - root's child collection includes child1, child2 (normal)
@@ -190,7 +190,7 @@ class ScoreEngine:
         # Children are defined two ways:
         # 1. Targets of this observable's OUTBOUND relationships (source → target)
         # 2. Sources of INBOUND relationships where this observable is the target (child ← this)
-        # 
+        #
         # Root Barrier Note: Root (value="input-data") is SKIPPED when appearing as a child
         # to prevent cross-contamination between observables linked through root
         child_scores = []
@@ -242,17 +242,17 @@ class ScoreEngine:
 
         Root Barrier in Propagation:
         The root observable (value="input-data") has special propagation behavior:
-        
+
         1. Root CAN be updated (receives propagation):
            - When children's scores change, root is recalculated as a parent
            - Ensures root's aggregated score stays current
            - Uses helper function _update_parent to avoid duplicate processing
-        
+
         2. Root does NOT propagate further (stops recursion):
            - After root is updated, propagation stops (no recursive call)
            - Prevents root from updating its parents (if any exist)
            - Maintains root as terminal node in upward propagation
-        
+
         This creates an asymmetric barrier: updates flow TO root but not THROUGH root.
 
         Args:

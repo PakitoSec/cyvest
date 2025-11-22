@@ -58,6 +58,23 @@ def test_threat_intel_addition() -> None:
     assert obs.score == Decimal("8.0")  # Should propagate
 
 
+def test_string_levels_are_accepted_by_api() -> None:
+    """Cyvest APIs should accept string level values."""
+    cv = Cyvest()
+    obs = cv.observable_create("domain-name", "example.com", level="safe")
+    assert obs.level == Level.SAFE
+
+    check = cv.check_create("string_level", "scope", "desc", level="notable")
+    assert check.level == Level.NOTABLE
+
+    ti = cv.observable_add_threat_intel(obs.key, source="vt", score=Decimal("5.0"), level="malicious")
+    assert ti is not None
+    assert ti.level == Level.MALICIOUS
+
+    cv.observable_set_level(obs.key, "trusted")
+    assert cv.get_all_observables()[obs.key].level == Level.TRUSTED
+
+
 def test_check_creation() -> None:
     """Test creating checks."""
     cv = Cyvest()

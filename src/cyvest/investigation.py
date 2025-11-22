@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, Any, Literal, overload
 from logurich import logger
 
 from cyvest import keys
-from cyvest.levels import Level, get_level_from_score
+from cyvest.levels import Level, get_level_from_score, normalize_level
 from cyvest.model import Check, Container, Enrichment, Observable, ObservableType, ThreatIntel
 from cyvest.score import ScoreEngine, ScoreMode
 from cyvest.stats import InvestigationStats
@@ -1295,6 +1295,8 @@ class Investigation:
                 raise ValueError(f"Field '{field}' is not mutable on {model_type}.")
             if value is None:
                 continue
+            if field == "level":
+                value = normalize_level(value)
             if field in dict_fields:
                 if not isinstance(value, dict):
                     raise TypeError(f"Field '{field}' on {model_type} expects a dict value.")

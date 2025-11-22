@@ -15,7 +15,7 @@ from rich.rule import Rule
 from rich.table import Table
 from rich.tree import Tree
 
-from cyvest.levels import Level, get_color_level, get_color_score
+from cyvest.levels import Level, get_color_level, get_color_score, normalize_level
 from cyvest.model import Observable, Relationship, RelationshipDirection
 
 if TYPE_CHECKING:
@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 
 
 def display_summary(
-    cv: Cyvest, rich_print: Callable[[Any], None], show_graph: bool = True, min_level: Level = Level.NONE
+    cv: Cyvest, rich_print: Callable[[Any], None], show_graph: bool = True, min_level: Level | str = Level.NONE
 ) -> None:
     """
     Display a comprehensive summary of the investigation using Rich.
@@ -35,13 +35,15 @@ def display_summary(
         min_level: Minimum level threshold for displaying checks (default: Level.NONE)
     """
     # Create main table
+    resolved_min_level = normalize_level(min_level) if isinstance(min_level, str) else min_level
+
     all_checks = cv.get_all_checks().values()
-    filtered_checks = [c for c in all_checks if c.level >= min_level]
+    filtered_checks = [c for c in all_checks if c.level >= resolved_min_level]
     applied_checks = sum(1 for c in filtered_checks if c.level != Level.NONE)
 
     caption_parts = [f"Total Checks: {len(cv.get_all_checks())}"]
-    if min_level != Level.NONE:
-        caption_parts.append(f"Displayed: {len(filtered_checks)} (min level: {min_level.name})")
+    if resolved_min_level != Level.NONE:
+        caption_parts.append(f"Displayed: {len(filtered_checks)} (min level: {resolved_min_level.name})")
     caption_parts.append(f"Applied: {applied_checks}")
 
     def sort_key_by_score(check: Any) -> Decimal:
@@ -66,7 +68,7 @@ def display_summary(
     # Organize checks by scope
     checks_by_scope: dict[str, list[Any]] = {}
     for check in cv.get_all_checks().values():
-        if check.level < min_level:
+        if check.level < resolved_min_level:
             continue
         if check.scope not in checks_by_scope:
             checks_by_scope[check.scope] = []
@@ -107,7 +109,7 @@ def display_summary(
     table.add_row(rule, "-", "-")
 
     for level_enum in [Level.MALICIOUS, Level.SUSPICIOUS, Level.NOTABLE, Level.SAFE, Level.INFO, Level.TRUSTED]:
-        checks = [c for c in cv.get_all_checks().values() if c.level == level_enum and c.level >= min_level]
+        checks = [c for c in cv.get_all_checks().values() if c.level == level_enum and c.level >= resolved_min_level]
         checks = sorted(checks, key=sort_key_by_score, reverse=True)
         if checks:
             color_level = get_color_level(level_enum)

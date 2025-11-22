@@ -13,7 +13,7 @@ from enum import Enum
 from typing import Any
 
 from cyvest import keys
-from cyvest.levels import Level, get_level_from_score
+from cyvest.levels import Level, get_level_from_score, normalize_level
 
 
 class ObservableType(str, Enum):
@@ -204,6 +204,7 @@ class Check:
             self.key = keys.generate_check_key(self.check_id, self.scope)
         if not isinstance(self.score, Decimal):
             self.score = Decimal(str(self.score))
+        self.level = normalize_level(self.level)
 
     def update_score(self, new_score: Decimal, reason: str = "") -> None:
         """
@@ -244,14 +245,14 @@ class Check:
         )
         self._score_history.append(change)
 
-    def set_level(self, level: Level) -> None:
+    def set_level(self, level: Level | str) -> None:
         """
         Explicitly set the level (overrides automatic calculation).
 
         Args:
             level: The level to set
         """
-        self.level = level
+        self.level = normalize_level(level)
         self._explicit_level = True
 
     def add_observable(self, observable: Observable) -> None:
@@ -366,6 +367,7 @@ class Observable:
             self.key = keys.generate_observable_key(obs_type_str, self.value)
         if not isinstance(self.score, Decimal):
             self.score = Decimal(str(self.score))
+        self.level = normalize_level(self.level)
 
         # If level is explicitly set to SAFE, mark it as explicit to prevent downgrades
         if self.level == Level.SAFE:
@@ -415,14 +417,14 @@ class Observable:
         )
         self._score_history.append(change)
 
-    def set_level(self, level: Level) -> None:
+    def set_level(self, level: Level | str) -> None:
         """
         Explicitly set the level (overrides automatic calculation).
 
         Args:
             level: The level to set
         """
-        self.level = level
+        self.level = normalize_level(level)
         self._explicit_level = True
 
     def add_threat_intel(self, ti: ThreatIntel) -> None:
@@ -504,20 +506,21 @@ class ThreatIntel:
             self.key = keys.generate_threat_intel_key(self.source, self.observable_key)
         if not isinstance(self.score, Decimal):
             self.score = Decimal(str(self.score))
+        self.level = normalize_level(self.level)
         # Recalculate level from score if not explicitly set
         if not self._explicit_level and self.level == Level.INFO:
             calculated_level = get_level_from_score(self.score)
             if calculated_level != Level.NONE:
                 self.level = calculated_level
 
-    def set_level(self, level: Level) -> None:
+    def set_level(self, level: Level | str) -> None:
         """
         Explicitly set the level (overrides automatic calculation).
 
         Args:
             level: The level to set
         """
-        self.level = level
+        self.level = normalize_level(level)
         self._explicit_level = True
 
 

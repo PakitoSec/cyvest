@@ -162,6 +162,24 @@ def test_explicit_level_setting() -> None:
     assert obs.level == Level.MALICIOUS  # Higher level wins
 
 
+def test_string_level_inputs_are_normalized() -> None:
+    """String level values should be accepted and normalized."""
+    obs = Observable(obs_type="domain-name", value="example.com", level="suspicious")
+    assert obs.level == Level.SUSPICIOUS
+    obs.set_level("malicious")
+    assert obs.level == Level.MALICIOUS
+
+    check = Check(check_id="string_level", scope="scope", description="desc", level="notable")
+    assert check.level == Level.NOTABLE
+    check.set_level("trusted")
+    assert check.level == Level.TRUSTED
+
+    ti = ThreatIntel(source="src", observable_key="obs:test", level="safe")
+    assert ti.level == Level.SAFE
+    ti.set_level("info")
+    assert ti.level == Level.INFO
+
+
 def test_relationship_direction_default() -> None:
     """Test relationship direction defaults follow semantic mapping."""
     obs1 = Observable(obs_type="url", value="https://example.com")

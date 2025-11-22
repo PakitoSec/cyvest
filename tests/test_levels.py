@@ -4,7 +4,9 @@ Tests for the levels module.
 
 from decimal import Decimal
 
-from cyvest.levels import Level, get_color_level, get_color_score, get_level_from_score
+import pytest
+
+from cyvest.levels import Level, get_color_level, get_color_score, get_level_from_score, normalize_level
 
 
 def test_level_ordering() -> None:
@@ -50,3 +52,12 @@ def test_get_color_score() -> None:
     assert get_color_score(Decimal("0.0")) == "cyan"  # INFO
     # Test with float
     assert get_color_score(5.0) == "red"  # MALICIOUS
+
+
+def test_normalize_level_accepts_strings() -> None:
+    """Ensure normalize_level handles enums and case-insensitive strings."""
+    assert normalize_level(Level.SAFE) is Level.SAFE
+    assert normalize_level("safe") is Level.SAFE
+    assert normalize_level("MALICIOUS") is Level.MALICIOUS
+    with pytest.raises(ValueError):
+        normalize_level("unknown")

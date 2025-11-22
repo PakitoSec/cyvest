@@ -25,7 +25,7 @@ from cyvest.io_serialization import (
     save_investigation_markdown,
     serialize_investigation,
 )
-from cyvest.levels import Level
+from cyvest.levels import Level, normalize_level
 from cyvest.model import Check, Container, Enrichment, Observable, ThreatIntel
 from cyvest.proxies import CheckProxy, ContainerProxy, EnrichmentProxy, ObservableProxy, ThreatIntelProxy
 from cyvest.score import ScoreMode
@@ -131,7 +131,7 @@ class Cyvest:
         comment: str = "",
         extra: dict[str, Any] | None = None,
         score: Decimal | float | None = None,
-        level: Level | None = None,
+        level: Level | str | None = None,
     ) -> ObservableProxy:
         """
         Create a new observable or return existing one.
@@ -149,6 +149,8 @@ class Cyvest:
         Returns:
             The created or existing observable
         """
+        resolved_level = normalize_level(level) if level is not None else Level.INFO
+
         obs = Observable(
             obs_type=obs_type,
             value=value,
@@ -157,7 +159,7 @@ class Cyvest:
             comment=comment,
             extra=extra or {},
             score=Decimal(str(score)) if score is not None else Decimal("0"),
-            level=level or Level.INFO,
+            level=resolved_level,
         )
         # Unwrap tuple - facade returns only Observable, discards deferred relationships
         obs_result, _ = self._investigation.add_observable(obs)
@@ -215,7 +217,7 @@ class Cyvest:
         score: Decimal | float,
         comment: str = "",
         extra: dict[str, Any] | None = None,
-        level: Level | None = None,
+        level: Level | str | None = None,
         taxonomies: list[dict[str, Any]] | None = None,
     ) -> ThreatIntelProxy | None:
         """
@@ -237,19 +239,21 @@ class Cyvest:
         if not observable:
             return None
 
+        resolved_level = normalize_level(level) if level is not None else Level.INFO
+
         ti = ThreatIntel(
             source=source,
             observable_key=observable_key,
             comment=comment,
             extra=extra or {},
             score=Decimal(str(score)),
-            level=level or Level.INFO,
+            level=resolved_level,
             taxonomies=taxonomies or [],
         )
         result = self._investigation.add_threat_intel(ti, observable)
         return self._threat_intel_proxy(result)
 
-    def observable_set_level(self, observable_key: str, level: Level) -> ObservableProxy | None:
+    def observable_set_level(self, observable_key: str, level: Level | str) -> ObservableProxy | None:
         """
         Explicitly set an observable's level via the service layer.
 
@@ -263,7 +267,7 @@ class Cyvest:
         observable = self._investigation.get_observable(observable_key)
         if not observable:
             return None
-        observable.set_level(level)
+        observable.set_level(normalize_level(level))
         return self._observable_proxy(observable)
 
     def observable_finalize_relationships(self) -> None:
@@ -284,7 +288,7 @@ class Cyvest:
         comment: str = "",
         extra: dict[str, Any] | None = None,
         score: Decimal | float | None = None,
-        level: Level | None = None,
+        level: Level | str | None = None,
     ) -> CheckProxy:
         """
         Create a new check.
@@ -301,6 +305,8 @@ class Cyvest:
         Returns:
             The created check
         """
+        resolved_level = normalize_level(level) if level is not None else Level.NONE
+
         check = Check(
             check_id=check_id,
             scope=scope,
@@ -308,7 +314,7 @@ class Cyvest:
             comment=comment,
             extra=extra or {},
             score=Decimal(str(score)) if score is not None else Decimal("0"),
-            level=level or Level.NONE,
+            level=resolved_level,
         )
         return self._check_proxy(self._investigation.add_check(check))
 
@@ -596,7 +602,7 @@ class Cyvest:
             key: ContainerProxy(self._investigation, key) for key in self._investigation.get_all_containers().keys()
         }
 
-    def display_summary(self, show_graph: bool = True, min_level: Level = Level.INFO) -> None:
+    def display_summary(self, show_graph: bool = True, min_level: Level | str = Level.INFO) -> None:
         display_summary(
             self, lambda renderables: logger.rich("INFO", renderables), show_graph=show_graph, min_level=min_level
         )
@@ -608,7 +614,7 @@ class Cyvest:
         self,
         output_dir: str | None = None,
         open_browser: bool = True,
-        min_level: Level | None = None,
+        min_level: Level | str | None = None,
         observable_types: list[str] | None = None,
         physics: bool = True,
         group_by_type: bool = False,
@@ -647,11 +653,13 @@ class Cyvest:
         if observable_types is not None:
             obs_types_enum = [ObservableType(t) for t in observable_types]
 
+        normalized_min_level = normalize_level(min_level) if min_level is not None else None
+
         return generate_network_graph(
             self,
             output_dir=output_dir,
             open_browser=open_browser,
-            min_level=min_level,
+            min_level=normalized_min_level,
             observable_types=obs_types_enum,
             physics=physics,
             group_by_type=group_by_type,
@@ -669,7 +677,7 @@ class Cyvest:
         comment: str = "",
         extra: dict[str, Any] | None = None,
         score: Decimal | float | None = None,
-        level: Level | None = None,
+        level: Level | str | None = None,
     ) -> ObservableProxy:
         """
         Create (or fetch) an observable with fluent helper methods.
@@ -697,7 +705,7 @@ class Cyvest:
         comment: str = "",
         extra: dict[str, Any] | None = None,
         score: Decimal | float | None = None,
-        level: Level | None = None,
+        level: Level | str | None = None,
     ) -> CheckProxy:
         """
         Create a check with fluent helper methods.

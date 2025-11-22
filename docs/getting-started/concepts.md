@@ -250,7 +250,7 @@ When root appears as a child of other observables, it is **SKIPPED** in their sc
 domain = cv.observable("domain", "branch1.com")
 domain.with_ti("source1", score=Decimal("9.0"))
 
-ip = cv.observable("ipv4-addr", "192.0.2.1")  
+ip = cv.observable("ipv4-addr", "192.0.2.1")
 ip.with_ti("source2", score=Decimal("1.0"))
 
 root = cv.root()
@@ -261,7 +261,7 @@ cv.observable_add_relationship(ip, root, "related-to", direction="outbound")
 
 # Results:
 # - domain score: 9.0 (only its TI, root skipped)
-# - ip score: 1.0 (only its TI, root skipped)  
+# - ip score: 1.0 (only its TI, root skipped)
 # - root score: 9.0 (aggregates domain and ip normally)
 # - domain and ip remain isolated despite shared root connection
 ```
@@ -273,7 +273,7 @@ Root's propagation behavior is asymmetric:
 - **Root CAN be updated**: When children's scores change, root recalculates normally
   - Root aggregates child scores: `max(root TI, child scores)` in MAX mode
   - Root acts as aggregation point for investigation tree
-  
+
 - **Root does NOT propagate upward**: After root updates, propagation stops
   - If root has parent relationships, they are not affected by root's score changes
   - Prevents upstream contamination beyond root
@@ -281,7 +281,7 @@ Root's propagation behavior is asymmetric:
 
 - **Root DOES propagate to checks**: Root propagates to linked checks normally
   - Checks can reflect root's aggregated investigation score
-  
+
 **Why the Barrier?**
 
 The root barrier design enables:

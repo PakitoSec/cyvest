@@ -46,6 +46,33 @@ class Level(Enum):
         return f"Level.{self.name}"
 
 
+def normalize_level(level: "Level | str") -> Level:
+    """
+    Normalize a level input to the Level enum.
+
+    Accepts either a Level enum instance or a case-insensitive string name
+    corresponding to a Level member.
+
+    Args:
+        level: Level enum or string representation (e.g., "malicious")
+
+    Returns:
+        The corresponding Level enum member
+
+    Raises:
+        ValueError: If the string does not match a Level name
+        TypeError: If the input type is unsupported
+    """
+    if isinstance(level, Level):
+        return level
+    if isinstance(level, str):
+        try:
+            return Level[level.upper()]
+        except KeyError as exc:
+            raise ValueError(f"Invalid level name: {level}") from exc
+    raise TypeError(f"Expected Level or str for level, got {type(level).__name__}")
+
+
 def get_level_from_score(score: Decimal) -> Level:
     """
     Calculate the security level from a numeric score.
@@ -100,8 +127,8 @@ def get_color_level(level: Level | str) -> str:
     """
     if isinstance(level, str):
         try:
-            level = Level[level]
-        except KeyError:
+            level = normalize_level(level)
+        except (TypeError, ValueError):
             return "white"
     return LEVEL_COLORS.get(level, "white")
 

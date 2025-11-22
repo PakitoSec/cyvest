@@ -464,9 +464,7 @@ def test_explicit_direction_override() -> None:
     cv.observable_add_threat_intel(ip.key, source="source2", score=Decimal("8.0"))
 
     # Override INDICATES to be BIDIRECTIONAL (no hierarchy)
-    cv.observable_add_relationship(
-        domain.key, ip.key, RelationshipType.INDICATES, RelationshipDirection.BIDIRECTIONAL
-    )
+    cv.observable_add_relationship(domain.key, ip.key, RelationshipType.INDICATES, RelationshipDirection.BIDIRECTIONAL)
 
     # Bidirectional means no hierarchical propagation
     # Each keeps only its own score

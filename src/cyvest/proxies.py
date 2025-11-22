@@ -14,7 +14,7 @@ from copy import deepcopy
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
-from cyvest.levels import Level
+from cyvest.levels import Level, normalize_level
 from cyvest.model import Check, Container, Enrichment, Observable, ThreatIntel
 
 if TYPE_CHECKING:
@@ -141,7 +141,7 @@ class ObservableProxy(_ReadOnlyProxy[Observable]):
         score: Decimal | float = 0,
         comment: str = "",
         extra: dict[str, Any] | None = None,
-        level: Level | None = None,
+        level: Level | str | None = None,
         taxonomies: list[dict[str, Any]] | None = None,
     ) -> ObservableProxy:
         """
@@ -151,13 +151,14 @@ class ObservableProxy(_ReadOnlyProxy[Observable]):
         under the proxy wrapper.
         """
         observable = self._resolve()
+        resolved_level = normalize_level(level) if level is not None else Level.INFO
         ti = ThreatIntel(
             source=source,
             observable_key=self.key,
             comment=comment,
             extra=extra or {},
             score=Decimal(str(score)),
-            level=level or Level.INFO,
+            level=resolved_level,
             taxonomies=taxonomies or [],
         )
         self._get_investigation().add_threat_intel(ti, observable)
@@ -169,7 +170,7 @@ class ObservableProxy(_ReadOnlyProxy[Observable]):
         score: Decimal | float = 0,
         comment: str = "",
         extra: dict[str, Any] | None = None,
-        level: Level | None = None,
+        level: Level | str | None = None,
         taxonomies: list[dict[str, Any]] | None = None,
     ) -> ObservableProxy:
         """Alias for :meth:`with_ti`."""
@@ -352,7 +353,7 @@ class ThreatIntelProxy(_ReadOnlyProxy[ThreatIntel]):
         *,
         comment: str | None = None,
         extra: dict[str, Any] | None = None,
-        level: Level | None = None,
+        level: Level | str | None = None,
         merge_extra: bool = True,
     ) -> ThreatIntelProxy:
         """Update mutable metadata on the threat intel entry."""
@@ -362,7 +363,7 @@ class ThreatIntelProxy(_ReadOnlyProxy[ThreatIntel]):
         if extra is not None:
             updates["extra"] = extra
         if level is not None:
-            updates["level"] = level
+            updates["level"] = normalize_level(level)
 
         if not updates:
             return self

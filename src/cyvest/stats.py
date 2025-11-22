@@ -8,7 +8,7 @@ and other investigation metrics.
 from collections import defaultdict
 from typing import Any
 
-from cyvest.levels import Level
+from cyvest.levels import Level, normalize_level
 from cyvest.model import Check, Container, Observable, ThreatIntel
 
 
@@ -224,7 +224,7 @@ class InvestigationStats:
         """
         return len(self._containers)
 
-    def get_checks_by_level(self, level: Level) -> list[Check]:
+    def get_checks_by_level(self, level: Level | str) -> list[Check]:
         """
         Get all checks with a specific level.
 
@@ -234,9 +234,10 @@ class InvestigationStats:
         Returns:
             List of checks with the specified level
         """
-        return [check for check in self._checks.values() if check.level == level]
+        level_value = normalize_level(level)
+        return [check for check in self._checks.values() if check.level == level_value]
 
-    def get_observables_by_level(self, level: Level) -> list[Observable]:
+    def get_observables_by_level(self, level: Level | str) -> list[Observable]:
         """
         Get all observables with a specific level.
 
@@ -246,7 +247,8 @@ class InvestigationStats:
         Returns:
             List of observables with the specified level
         """
-        return [obs for obs in self._observables.values() if obs.level == level]
+        level_value = normalize_level(level)
+        return [obs for obs in self._observables.values() if obs.level == level_value]
 
     def get_observables_by_type(self, obs_type: str) -> list[Observable]:
         """

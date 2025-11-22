@@ -9,7 +9,7 @@ from decimal import Decimal
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from cyvest.levels import Level
+from cyvest.levels import Level, normalize_level
 from cyvest.model import Check, Container, Enrichment, Observable, Relationship, ThreatIntel
 
 if TYPE_CHECKING:
@@ -369,8 +369,8 @@ def load_investigation_json(filepath: str | Path) -> "Cyvest":
         if not name:
             return default
         try:
-            return Level[name]
-        except KeyError:
+            return normalize_level(name)
+        except (TypeError, ValueError):
             return default
 
     # Observables

@@ -696,9 +696,6 @@ class Investigation:
             if check_key not in existing._generated_by_checks:
                 existing.mark_generated_by_check(check_key)
 
-        # Recalculate scores after merge
-        self._score_engine.recalculate_all()
-
         return existing, deferred_relationships
 
     def _merge_check(self, existing: Check, incoming: Check) -> Check:
@@ -749,9 +746,6 @@ class Investigation:
 
         # Ensure final observable references are canonical
         self._reattach_check_observables(existing)
-
-        # Recalculate scores after merge
-        self._score_engine.recalculate_all()
 
         return existing
 
@@ -918,7 +912,9 @@ class Investigation:
             Tuple of (resulting observable, deferred relationships)
         """
         if obs.key in self._observables:
-            return self._merge_observable(self._observables[obs.key], obs)
+            r = self._merge_observable(self._observables[obs.key], obs)
+            self._score_engine.recalculate_all()
+            return r
 
         # Register new observable
         self._observables[obs.key] = obs
@@ -937,7 +933,9 @@ class Investigation:
             The resulting check (either new or merged)
         """
         if check.key in self._checks:
-            return self._merge_check(self._checks[check.key], check)
+            r = self._merge_check(self._checks[check.key], check)
+            self._score_engine.recalculate_all()
+            return r
 
         # Ensure observables linked to the check reference canonical instances
         self._reattach_check_observables(check)
@@ -1005,7 +1003,9 @@ class Investigation:
             The resulting container (either new or merged)
         """
         if container.key in self._containers:
-            return self._merge_container(self._containers[container.key], container)
+            r = self._merge_container(self._containers[container.key], container)
+            self._score_engine.recalculate_all()
+            return r
 
         # Register new container
         self._containers[container.key] = container
@@ -1419,7 +1419,7 @@ class Investigation:
             # Link the best starting node to root
             if best_node:
                 self._root_observable._add_relationship_internal(best_node, RelationshipType.RELATED_TO)
-                self._score_engine.recalculate_all()
+        self._score_engine.recalculate_all()
 
     # Investigation merging
 

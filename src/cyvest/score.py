@@ -314,7 +314,7 @@ class ScoreEngine:
             observable: The observable to check
         """
         for check in self._checks.values():
-            # Check if this observable is linked to the check (directly or through relationships)
+            # Check if this observable is linked to the check
             if self._is_observable_linked_to_check(observable, check):
                 # Collect all linked observable scores and observables
                 linked_scores = []

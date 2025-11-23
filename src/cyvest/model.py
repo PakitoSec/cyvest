@@ -177,6 +177,13 @@ class ScoreChange:
     reason: str
 
 
+class CheckScorePolicy(str, Enum):
+    """Controls how a check reacts to linked observables."""
+
+    AUTO = "auto"  # Default: observables can update the check score/level
+    MANUAL = "manual"  # Score/level only change via explicit check updates
+
+
 @dataclass
 class Check:
     """
@@ -194,6 +201,7 @@ class Check:
     score: Decimal = field(default_factory=lambda: Decimal("0"))
     level: Level = Level.NONE
     observables: list[Observable] = field(default_factory=list)
+    score_policy: CheckScorePolicy = CheckScorePolicy.AUTO
     key: str = field(default="", init=False)
     _explicit_level: bool = field(default=False, init=False)
     _score_history: list[ScoreChange] = field(default_factory=list, init=False)
@@ -205,6 +213,8 @@ class Check:
         if not isinstance(self.score, Decimal):
             self.score = Decimal(str(self.score))
         self.level = normalize_level(self.level)
+        if isinstance(self.score_policy, str):
+            self.score_policy = CheckScorePolicy(self.score_policy)
 
     def update_score(self, new_score: Decimal, reason: str = "") -> None:
         """
@@ -254,6 +264,12 @@ class Check:
         """
         self.level = normalize_level(level)
         self._explicit_level = True
+
+    def set_score_policy(self, policy: CheckScorePolicy | str) -> None:
+        """
+        Control whether observables can update this check's score/level.
+        """
+        self.score_policy = CheckScorePolicy(policy)
 
     def add_observable(self, observable: Observable) -> None:
         """

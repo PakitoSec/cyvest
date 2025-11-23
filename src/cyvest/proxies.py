@@ -15,7 +15,7 @@ from decimal import Decimal
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 from cyvest.levels import Level, normalize_level
-from cyvest.model import Check, Container, Enrichment, Observable, ThreatIntel
+from cyvest.model import Check, CheckScorePolicy, Container, Enrichment, Observable, ThreatIntel
 
 if TYPE_CHECKING:
     from cyvest.investigation import Investigation
@@ -230,6 +230,7 @@ class CheckProxy(_ReadOnlyProxy[Check]):
         comment: str | None = None,
         description: str | None = None,
         extra: dict[str, Any] | None = None,
+        score_policy: CheckScorePolicy | str | None = None,
         merge_extra: bool = True,
     ) -> CheckProxy:
         """Update mutable metadata on the check."""
@@ -240,6 +241,8 @@ class CheckProxy(_ReadOnlyProxy[Check]):
             updates["description"] = description
         if extra is not None:
             updates["extra"] = extra
+        if score_policy is not None:
+            updates["score_policy"] = score_policy
 
         if not updates:
             return self
@@ -247,6 +250,19 @@ class CheckProxy(_ReadOnlyProxy[Check]):
         dict_merge = {"extra": merge_extra} if extra is not None else None
         self._get_investigation().update_model_metadata("check", self.key, updates, dict_merge=dict_merge)
         return self
+
+    def set_score_policy(self, policy: CheckScorePolicy | str) -> CheckProxy:
+        """Switch between AUTO (default) and MANUAL scoring behavior."""
+        self.update_metadata(score_policy=policy)
+        return self
+
+    def disable_auto_score(self) -> CheckProxy:
+        """Convenience: prevent observables from updating this check."""
+        return self.set_score_policy(CheckScorePolicy.MANUAL)
+
+    def enable_auto_score(self) -> CheckProxy:
+        """Convenience: allow observables to update this check (default)."""
+        return self.set_score_policy(CheckScorePolicy.AUTO)
 
     def in_container(self, container: Container | ContainerProxy | str) -> CheckProxy:
         """Add this check to a container."""

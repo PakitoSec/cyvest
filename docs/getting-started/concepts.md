@@ -141,6 +141,7 @@ Scores are **Decimal** values with automatic propagation:
 1. **Threat Intel → Observable**: Observable score = **max** of all threat intel scores (not sum)
 2. **Child Observable → Parent**: Child scores aggregate to parents based on scoring mode
 3. **Observable → Check**: Check score = **max** of all linked observables' scores and check's current score
+   - Use `score_policy=CheckScorePolicy.MANUAL` (or `check.disable_auto_score()`) to prevent observables from changing a check
 4. **All Checks → Global**: Check scores sum to global score
 
 ### Scoring Modes

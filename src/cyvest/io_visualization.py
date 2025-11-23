@@ -143,6 +143,7 @@ def generate_network_graph(
     physics: bool = True,
     group_by_type: bool = False,
     max_label_length: int = 60,
+    title: str = "Cyvest Investigation Network",
 ) -> str:
     """
     Generate an interactive network graph visualization of observables and relationships.
@@ -160,6 +161,7 @@ def generate_network_graph(
         physics: Enable physics simulation for organic layout (default: False for static layout)
         group_by_type: Group observables by type using hierarchical layout (default: False)
         max_label_length: Maximum length for node labels before truncation (default: 60)
+        title: Title displayed in the HTML visualization
 
     Returns:
         Path to the generated HTML file
@@ -185,6 +187,7 @@ def generate_network_graph(
         font_color="#1E1E1E",
         directed=True,
     )
+    net.heading = title
 
     # Configure physics and interaction options
     physics_enabled = "true" if physics else "false"

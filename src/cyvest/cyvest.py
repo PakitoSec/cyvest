@@ -623,6 +623,7 @@ class Cyvest:
         physics: bool = True,
         group_by_type: bool = False,
         max_label_length: int = 60,
+        title: str = "Cyvest Investigation Network",
     ) -> str:
         """
         Generate and display an interactive network graph visualization.
@@ -639,6 +640,7 @@ class Cyvest:
             physics: Enable physics simulation for organic layout (default: False for static layout)
             group_by_type: Group observables by type using hierarchical layout (default: False)
             max_label_length: Maximum length for node labels before truncation (default: 60)
+            title: Title displayed in the generated HTML visualization
 
         Returns:
             Path to the generated HTML file
@@ -668,6 +670,7 @@ class Cyvest:
             physics=physics,
             group_by_type=group_by_type,
             max_label_length=max_label_length,
+            title=title,
         )
 
     # Fluent helper entrypoints

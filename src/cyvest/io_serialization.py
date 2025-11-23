@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any
 
 from cyvest.levels import Level, normalize_level
 from cyvest.model import Check, CheckScorePolicy, Container, Enrichment, Observable, Relationship, ThreatIntel
+from cyvest.score import ScoreMode
 
 if TYPE_CHECKING:
     from cyvest.cyvest import Cyvest
@@ -187,6 +188,15 @@ def serialize_investigation(cv: "Cyvest") -> dict[str, Any]:
         }
 
     root = cv.observable_get_root()
+    root_type_value = None
+    if root:
+        root_type_value = root.obs_type.value if hasattr(root.obs_type, "value") else str(root.obs_type)
+
+    score_mode_value = ScoreMode.MAX.value
+    score_mode = getattr(getattr(cv, "_investigation", None), "_score_engine", None)
+    if score_mode and hasattr(score_mode, "_score_mode"):
+        mode = score_mode._score_mode
+        score_mode_value = mode.value if hasattr(mode, "value") else str(mode)
     graph = [build_obs_tree(root, set())] if root else []
 
     return {
@@ -204,7 +214,10 @@ def serialize_investigation(cv: "Cyvest") -> dict[str, Any]:
             "checks": len(cv.get_all_checks()),
             "applied": sum(1 for c in cv.get_all_checks().values() if c.level != Level.NONE),
         },
-        "data_extraction": {"root_type": cv.observable_get_root().obs_type if cv.observable_get_root() else None},
+        "data_extraction": {
+            "root_type": root_type_value,
+            "score_mode": score_mode_value,
+        },
     }
 
 
@@ -361,10 +374,26 @@ def load_investigation_json(filepath: str | Path) -> "Cyvest":
     with open(filepath, encoding="utf-8") as handle:
         data = json.load(handle)
 
-    cv = Cyvest(data=data.get("data"))
+    data_payload = data.get("data")
+    extraction = data.get("data_extraction", {})
+
+    root_type_raw = extraction.get("root_type")
+    root_type = "file"
+    if root_type_raw:
+        root_type = root_type_raw.value if hasattr(root_type_raw, "value") else str(root_type_raw)
+    if root_type not in ("file", "artifact"):
+        root_type = "file"
+
+    score_mode_raw = extraction.get("score_mode")
+    try:
+        score_mode = ScoreMode(score_mode_raw) if score_mode_raw else ScoreMode.MAX
+    except (TypeError, ValueError):
+        score_mode = ScoreMode.MAX
+
+    cv = Cyvest(data=data_payload, root_type=root_type, score_mode=score_mode)
 
     # Reset internal state to avoid default root pollution
-    cv._investigation = Investigation(data.get("data"), root_type="file")
+    cv._investigation = Investigation(data_payload, root_type=root_type, score_mode=score_mode)
 
     def _level_from_name(name: str | None, default: Level) -> Level:
         if not name:

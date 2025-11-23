@@ -4,6 +4,8 @@ Tests for proxy helper mutators.
 
 from decimal import Decimal
 
+import pytest
+
 from cyvest import Cyvest, Level
 
 
@@ -87,3 +89,117 @@ def test_container_proxy_update_metadata() -> None:
 
     container.update_metadata(description="new description")
     assert container.description == "new description"
+
+
+def test_proxy_dir_exposes_public_fields() -> None:
+    """Proxies should list readable dataclass fields for IDE auto-completion."""
+    cv = Cyvest()
+    obs = cv.observable_create("url", "https://example.com")
+    check = cv.check_create("check-id", "scope", "desc")
+    container = cv.container_create("root")
+    ti = cv.observable_add_threat_intel(obs.key, source="vt", score=Decimal("1"), comment="c")
+    enrichment = cv.enrichment_create("metadata", {"k": "v"}, context="ctx")
+    assert ti is not None
+
+    expectations = {
+        obs: {
+            "obs_type",
+            "value",
+            "internal",
+            "whitelisted",
+            "comment",
+            "extra",
+            "score",
+            "level",
+            "_generated_by_checks",
+            "generated_by_checks",
+            "_explicit_level",
+            "explicit_level",
+            "key",
+        },
+        check: {
+            "check_id",
+            "scope",
+            "description",
+            "comment",
+            "extra",
+            "score",
+            "level",
+            "score_policy",
+            "_explicit_level",
+            "explicit_level",
+            "key",
+        },
+        container: {"path", "description", "checks", "sub_containers", "key"},
+        ti: {
+            "source",
+            "observable_key",
+            "comment",
+            "extra",
+            "score",
+            "level",
+            "taxonomies",
+            "_explicit_level",
+            "explicit_level",
+            "key",
+        },
+        enrichment: {"name", "data", "context", "key"},
+    }
+
+    for proxy, fields in expectations.items():
+        entries = set(dir(proxy))
+        assert fields.issubset(entries)
+        assert "_score_history" not in entries
+
+    with pytest.raises(AttributeError):
+        _ = obs._score_history  # type: ignore[attr-defined]
+
+
+def test_proxy_public_fields_are_deep_copied() -> None:
+    """Mutable model data exposed through proxies should be defensive copies."""
+    cv = Cyvest()
+    obs = cv.observable_create("domain-name", "example.com")
+    check = cv.check_create("check-id", "scope", "desc")
+    linked_check = cv.check_link_observable(check.key, obs.key)
+    assert linked_check is not None
+
+    container = cv.container_create("root")
+    container.add_check(check)
+
+    ti = cv.observable_add_threat_intel(obs.key, source="vt", score=Decimal("2.5"), taxonomies=[{"k": "v"}])
+    assert ti is not None
+
+    enrichment = cv.enrichment_create("metadata", {"host": {"ip": "10.0.0.1"}}, context="ctx")
+
+    extra_copy = obs.extra
+    extra_copy["owner"] = "secops"
+    assert "owner" not in obs.extra
+
+    observables_copy = check.observables
+    assert len(observables_copy) == 1
+    observables_copy.clear()
+    assert len(check.observables) == 1
+
+    checks_copy = container.checks
+    checks_copy.clear()
+    assert len(container.checks) == 1
+
+    taxonomies_copy = ti.taxonomies
+    taxonomies_copy.append({"new": "value"})
+    assert ti.taxonomies == [{"k": "v"}]
+
+    data_copy = enrichment.data
+    data_copy["host"]["ip"] = "10.0.0.2"
+    assert enrichment.data["host"]["ip"] == "10.0.0.1"
+
+    generated_copy = obs.generated_by_checks
+    assert check.key in generated_copy
+    generated_copy.append("another-check")
+    assert obs.generated_by_checks == [check.key]
+
+    assert isinstance(obs._explicit_level, bool)
+    assert obs.explicit_level is obs._explicit_level
+    assert isinstance(check._explicit_level, bool)
+    assert check.explicit_level is check._explicit_level
+    assert isinstance(ti._explicit_level, bool)
+    assert ti.explicit_level is ti._explicit_level

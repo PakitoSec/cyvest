@@ -15,7 +15,16 @@ from decimal import Decimal
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 from cyvest.levels import Level, normalize_level
-from cyvest.model import Check, CheckScorePolicy, Container, Enrichment, Observable, ThreatIntel
+from cyvest.model import (
+    Check,
+    CheckScorePolicy,
+    Container,
+    Enrichment,
+    Observable,
+    ObservableType,
+    Relationship,
+    ThreatIntel,
+)
 
 if TYPE_CHECKING:
     from cyvest.investigation import Investigation
@@ -31,6 +40,8 @@ class _ReadOnlyProxy(Generic[_T]):
     """Base helper for wrapping model objects."""
 
     __slots__ = ("__investigation", "__key")
+    _PUBLIC_FIELDS: tuple[str, ...] = ()
+    _COMPUTED_FIELDS: tuple[str, ...] = ()
 
     def __init__(self, investigation: Investigation, key: str) -> None:
         object.__setattr__(self, "_ReadOnlyProxy__investigation", investigation)
@@ -47,6 +58,30 @@ class _ReadOnlyProxy(Generic[_T]):
     def _resolve(self) -> _T:  # pragma: no cover - overridden in subclasses
         raise NotImplementedError
 
+    def _public_attributes(self) -> set[str]:
+        """
+        Allowed readable attributes for IDE auto-completion.
+
+        Includes the proxy key plus the dataclass fields surfaced by
+        subclasses and any computed helpers.
+        """
+        attrs: set[str] = set(self._PUBLIC_FIELDS)
+        attrs.update(self._COMPUTED_FIELDS)
+        attrs.add("key")
+        return attrs
+
+    def _read_attr(self, name: str):
+        """Resolve and deep-copy a public attribute from the model."""
+        model = self._resolve()
+        if not hasattr(model, name):
+            raise AttributeError(f"{self.__class__.__name__} exposes no attribute '{name}'")
+        value = getattr(model, name)
+        if callable(value):
+            raise AttributeError(
+                f"Method '{name}' is not available on read-only proxies. Use Cyvest services for mutations."
+            )
+        return deepcopy(value)
+
     def __setattr__(self, name: str, value) -> None:  # noqa: ANN001
         """Prevent attribute mutation."""
         raise AttributeError(f"{self.__class__.__name__} is read-only. Use Cyvest APIs to modify investigation data.")
@@ -61,16 +96,9 @@ class _ReadOnlyProxy(Generic[_T]):
         Methods on the underlying dataclasses (like ``update_score``) are
         intentionally blocked to ensure all mutations flow through the façade.
         """
-        model = self._resolve()
-        if not hasattr(model, item):
-            raise AttributeError(f"{self.__class__.__name__} has no attribute '{item}'")
-
-        value = getattr(model, item)
-        if callable(value):
-            raise AttributeError(
-                f"Method '{item}' is not available on read-only proxies. Use Cyvest services for mutations."
-            )
-        return deepcopy(value)
+        if item not in self._public_attributes():
+            raise AttributeError(f"{self.__class__.__name__} exposes no attribute '{item}'")
+        return self._read_attr(item)
 
     def _call_readonly(self, method: str, *args, **kwargs):
         """Invoke a model method in read-only mode and deepcopy the result."""
@@ -84,15 +112,95 @@ class _ReadOnlyProxy(Generic[_T]):
         model = self._resolve()
         return f"{self.__class__.__name__}(key={self.key!r}, type={model.__class__.__name__})"
 
+    def __dir__(self) -> list[str]:
+        """Expose allowed readable fields alongside proxy helpers."""
+        base_dir = set(super().__dir__())
+        return sorted(base_dir | self._public_attributes())
+
 
 class ObservableProxy(_ReadOnlyProxy[Observable]):
     """Read-only proxy over an observable."""
+
+    _PUBLIC_FIELDS = (
+        "obs_type",
+        "value",
+        "internal",
+        "whitelisted",
+        "comment",
+        "extra",
+        "score",
+        "level",
+        "threat_intels",
+        "relationships",
+        "_generated_by_checks",
+        "_explicit_level",
+        "key",
+    )
+    _COMPUTED_FIELDS = ("generated_by_checks", "explicit_level")
 
     def _resolve(self):
         observable = self._get_investigation().get_observable(self.key)
         if observable is None:
             raise ModelNotFoundError(f"Observable '{self.key}' no longer exists in this investigation.")
         return observable
+
+    @property
+    def obs_type(self) -> ObservableType | str:
+        return self._read_attr("obs_type")
+
+    @property
+    def value(self) -> str:
+        return self._read_attr("value")
+
+    @property
+    def internal(self) -> bool:
+        return self._read_attr("internal")
+
+    @property
+    def whitelisted(self) -> bool:
+        return self._read_attr("whitelisted")
+
+    @property
+    def comment(self) -> str:
+        return self._read_attr("comment")
+
+    @property
+    def extra(self) -> dict[str, Any]:
+        return self._read_attr("extra")
+
+    @property
+    def score(self) -> Decimal:
+        return self._read_attr("score")
+
+    @property
+    def level(self) -> Level:
+        return self._read_attr("level")
+
+    @property
+    def threat_intels(self) -> list[ThreatIntel]:
+        return self._read_attr("threat_intels")
+
+    @property
+    def relationships(self) -> list[Relationship]:
+        return self._read_attr("relationships")
+
+    @property
+    def _generated_by_checks(self) -> list[str]:
+        return self._read_attr("_generated_by_checks")
+
+    @property
+    def generated_by_checks(self) -> list[str]:
+        """Alias for generated-by checks with a stable public name."""
+        return deepcopy(self._generated_by_checks)
+
+    @property
+    def _explicit_level(self) -> bool:
+        return self._read_attr("_explicit_level")
+
+    @property
+    def explicit_level(self) -> bool:
+        """Whether level was explicitly set on the observable."""
+        return bool(self._explicit_level)
 
     def get_score_history(self) -> tuple:
         """Return a copy of the score change history."""
@@ -213,11 +321,71 @@ class ObservableProxy(_ReadOnlyProxy[Observable]):
 class CheckProxy(_ReadOnlyProxy[Check]):
     """Read-only proxy over a check."""
 
+    _PUBLIC_FIELDS = (
+        "check_id",
+        "scope",
+        "description",
+        "comment",
+        "extra",
+        "score",
+        "level",
+        "observables",
+        "score_policy",
+        "_explicit_level",
+        "key",
+    )
+    _COMPUTED_FIELDS = ("explicit_level",)
+
     def _resolve(self):
         check = self._get_investigation().get_check(self.key)
         if check is None:
             raise ModelNotFoundError(f"Check '{self.key}' no longer exists in this investigation.")
         return check
+
+    @property
+    def check_id(self) -> str:
+        return self._read_attr("check_id")
+
+    @property
+    def scope(self) -> str:
+        return self._read_attr("scope")
+
+    @property
+    def description(self) -> str:
+        return self._read_attr("description")
+
+    @property
+    def comment(self) -> str:
+        return self._read_attr("comment")
+
+    @property
+    def extra(self) -> dict[str, Any]:
+        return self._read_attr("extra")
+
+    @property
+    def score(self) -> Decimal:
+        return self._read_attr("score")
+
+    @property
+    def level(self) -> Level:
+        return self._read_attr("level")
+
+    @property
+    def observables(self) -> list[Observable]:
+        return self._read_attr("observables")
+
+    @property
+    def score_policy(self) -> CheckScorePolicy:
+        return self._read_attr("score_policy")
+
+    @property
+    def _explicit_level(self) -> bool:
+        return self._read_attr("_explicit_level")
+
+    @property
+    def explicit_level(self) -> bool:
+        """Whether level was explicitly set on the check."""
+        return bool(self._explicit_level)
 
     def get_score_history(self) -> tuple:
         """Return a copy of the score change history."""
@@ -302,11 +470,29 @@ class CheckProxy(_ReadOnlyProxy[Check]):
 class ContainerProxy(_ReadOnlyProxy[Container]):
     """Read-only proxy over a container."""
 
+    _PUBLIC_FIELDS = ("path", "description", "checks", "sub_containers", "key")
+
     def _resolve(self):
         container = self._get_investigation().get_container(self.key)
         if container is None:
             raise ModelNotFoundError(f"Container '{self.key}' no longer exists in this investigation.")
         return container
+
+    @property
+    def path(self) -> str:
+        return self._read_attr("path")
+
+    @property
+    def description(self) -> str:
+        return self._read_attr("description")
+
+    @property
+    def checks(self) -> list[Check]:
+        return self._read_attr("checks")
+
+    @property
+    def sub_containers(self) -> dict[str, Container]:
+        return self._read_attr("sub_containers")
 
     def get_aggregated_score(self):
         """Return the aggregated score copy."""
@@ -358,11 +544,51 @@ class ContainerProxy(_ReadOnlyProxy[Container]):
 class ThreatIntelProxy(_ReadOnlyProxy[ThreatIntel]):
     """Read-only proxy over a threat intel entry."""
 
+    _PUBLIC_FIELDS = ("source", "observable_key", "comment", "extra", "score", "level", "taxonomies", "key")
+    _COMPUTED_FIELDS = ("explicit_level",)
+
     def _resolve(self):
         ti = self._get_investigation().get_threat_intel(self.key)
         if ti is None:
             raise ModelNotFoundError(f"Threat intel '{self.key}' no longer exists in this investigation.")
         return ti
+
+    @property
+    def source(self) -> str:
+        return self._read_attr("source")
+
+    @property
+    def observable_key(self) -> str:
+        return self._read_attr("observable_key")
+
+    @property
+    def comment(self) -> str:
+        return self._read_attr("comment")
+
+    @property
+    def extra(self) -> dict[str, Any]:
+        return self._read_attr("extra")
+
+    @property
+    def score(self) -> Decimal:
+        return self._read_attr("score")
+
+    @property
+    def level(self) -> Level:
+        return self._read_attr("level")
+
+    @property
+    def taxonomies(self) -> list[dict[str, Any]]:
+        return self._read_attr("taxonomies")
+
+    @property
+    def _explicit_level(self) -> bool:
+        return self._read_attr("_explicit_level")
+
+    @property
+    def explicit_level(self) -> bool:
+        """Whether level was explicitly set on the threat intel entry."""
+        return bool(self._explicit_level)
 
     def update_metadata(
         self,
@@ -392,11 +618,25 @@ class ThreatIntelProxy(_ReadOnlyProxy[ThreatIntel]):
 class EnrichmentProxy(_ReadOnlyProxy[Enrichment]):
     """Read-only proxy over an enrichment."""
 
+    _PUBLIC_FIELDS = ("name", "data", "context", "key")
+
     def _resolve(self):
         enrichment = self._get_investigation().get_enrichment(self.key)
         if enrichment is None:
             raise ModelNotFoundError(f"Enrichment '{self.key}' no longer exists in this investigation.")
         return enrichment
+
+    @property
+    def name(self) -> str:
+        return self._read_attr("name")
+
+    @property
+    def data(self) -> dict[str, Any]:
+        return self._read_attr("data")
+
+    @property
+    def context(self) -> str:
+        return self._read_attr("context")
 
     def update_metadata(
         self,

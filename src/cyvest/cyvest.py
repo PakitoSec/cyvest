@@ -26,7 +26,7 @@ from cyvest.io_serialization import (
     serialize_investigation,
 )
 from cyvest.levels import Level, normalize_level
-from cyvest.model import Check, Container, Enrichment, Observable, ThreatIntel
+from cyvest.model import Check, CheckScorePolicy, Container, Enrichment, Observable, ThreatIntel
 from cyvest.proxies import CheckProxy, ContainerProxy, EnrichmentProxy, ObservableProxy, ThreatIntelProxy
 from cyvest.score import ScoreMode
 
@@ -289,6 +289,7 @@ class Cyvest:
         extra: dict[str, Any] | None = None,
         score: Decimal | float | None = None,
         level: Level | str | None = None,
+        score_policy: CheckScorePolicy | str | None = None,
     ) -> CheckProxy:
         """
         Create a new check.
@@ -301,11 +302,13 @@ class Cyvest:
             extra: Optional extra data
             score: Optional explicit score
             level: Optional explicit level
+            score_policy: Whether observables can update the check (AUTO|MANUAL)
 
         Returns:
             The created check
         """
         resolved_level = normalize_level(level) if level is not None else Level.NONE
+        resolved_policy = CheckScorePolicy(score_policy) if score_policy is not None else CheckScorePolicy.AUTO
 
         check = Check(
             check_id=check_id,
@@ -315,6 +318,7 @@ class Cyvest:
             extra=extra or {},
             score=Decimal(str(score)) if score is not None else Decimal("0"),
             level=resolved_level,
+            score_policy=resolved_policy,
         )
         return self._check_proxy(self._investigation.add_check(check))
 
@@ -706,6 +710,7 @@ class Cyvest:
         extra: dict[str, Any] | None = None,
         score: Decimal | float | None = None,
         level: Level | str | None = None,
+        score_policy: CheckScorePolicy | str | None = None,
     ) -> CheckProxy:
         """
         Create a check with fluent helper methods.
@@ -718,11 +723,12 @@ class Cyvest:
             extra: Optional extra data
             score: Optional explicit score
             level: Optional explicit level
+            score_policy: Whether observables can update the check (AUTO|MANUAL)
 
         Returns:
             Check proxy exposing mutation helpers for chaining
         """
-        return self.check_create(check_id, scope, description, comment, extra, score, level)
+        return self.check_create(check_id, scope, description, comment, extra, score, level, score_policy)
 
     def container(self, path: str, description: str = "") -> ContainerProxy:
         """

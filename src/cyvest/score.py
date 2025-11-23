@@ -36,7 +36,7 @@ from enum import Enum
 from typing import TYPE_CHECKING
 
 from cyvest.levels import Level, get_level_from_score
-from cyvest.model import RelationshipDirection
+from cyvest.model import CheckScorePolicy, RelationshipDirection
 
 
 class ScoreMode(Enum):
@@ -314,6 +314,8 @@ class ScoreEngine:
             observable: The observable to check
         """
         for check in self._checks.values():
+            if check.score_policy == CheckScorePolicy.MANUAL:
+                continue  # Manual checks ignore observable-driven updates
             # Check if this observable is linked to the check
             if self._is_observable_linked_to_check(observable, check):
                 # Collect all linked observable scores and observables

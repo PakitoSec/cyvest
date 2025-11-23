@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from cyvest.levels import Level, normalize_level
-from cyvest.model import Check, Container, Enrichment, Observable, Relationship, ThreatIntel
+from cyvest.model import Check, CheckScorePolicy, Container, Enrichment, Observable, Relationship, ThreatIntel
 
 if TYPE_CHECKING:
     from cyvest.cyvest import Cyvest
@@ -75,6 +75,7 @@ def serialize_check(check: Check) -> dict[str, Any]:
         "extra": check.extra,
         "score": float(check.score),
         "level": check.level.name,
+        "score_policy": check.score_policy.value,
         "observables": [obs.key for obs in check.observables],
     }
 
@@ -424,6 +425,7 @@ def load_investigation_json(filepath: str | Path) -> "Cyvest":
                 extra=check_info.get("extra", {}),
                 score=Decimal(str(check_info.get("score", 0))),
                 level=_level_from_name(check_info.get("level"), Level.NONE),
+                score_policy=check_info.get("score_policy", CheckScorePolicy.AUTO),
             )
             check.key = check_info.get("key", check.key)
             observable_keys = check_info.get("observables", [])

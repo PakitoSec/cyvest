@@ -8,7 +8,8 @@ and score history access.
 from collections.abc import Sequence
 from decimal import Decimal
 
-from cyvest import Cyvest, Level
+from cyvest import CheckScorePolicy, Cyvest, Level
+from cyvest.io_serialization import load_investigation_json, save_investigation_json
 from cyvest.score import ScoreMode
 
 
@@ -281,6 +282,40 @@ def test_check_score_history() -> None:
     history = check.get_score_history()
     assert len(history) >= 1
     assert any(entry.new_score == Decimal("5.0") for entry in history)
+
+
+def test_manual_check_ignores_observable_scores() -> None:
+    """Ensure MANUAL score policy blocks observable-driven updates."""
+    cv = Cyvest()
+
+    check = cv.check_create("manual_check", "test", "Manual scoring only", score_policy=CheckScorePolicy.MANUAL)
+    obs = cv.observable_create("ip", "10.0.0.50")
+    cv.observable_add_threat_intel(obs.key, source="source1", score=Decimal("9.0"))
+
+    cv.check_link_observable(check.key, obs.key)
+
+    # Score should not change and level should stay at the link-upgrade (INFO)
+    assert check.score == Decimal("0")
+    assert check.level == Level.INFO
+
+    # Further observable score changes still do not flow into the check
+    cv.observable_add_threat_intel(obs.key, source="source2", score=Decimal("10.0"))
+    assert check.score == Decimal("0")
+    assert check.level == Level.INFO
+
+
+def test_manual_check_policy_round_trip(tmp_path) -> None:
+    """Persist and restore manual policy via JSON serialization."""
+    cv = Cyvest()
+    check = cv.check_create("persisted_manual", "scope", "desc", score_policy=CheckScorePolicy.MANUAL)
+
+    path = tmp_path / "inv.json"
+    save_investigation_json(cv, path)
+
+    loaded = load_investigation_json(path)
+    loaded_check = loaded.check_get(check.key)
+    assert loaded_check is not None
+    assert loaded_check.score_policy == CheckScorePolicy.MANUAL
 
 
 def test_score_propagation_through_hierarchy() -> None:

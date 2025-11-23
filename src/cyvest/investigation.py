@@ -16,7 +16,7 @@ from logurich import logger
 
 from cyvest import keys
 from cyvest.levels import Level, get_level_from_score, normalize_level
-from cyvest.model import Check, Container, Enrichment, Observable, ObservableType, ThreatIntel
+from cyvest.model import Check, CheckScorePolicy, Container, Enrichment, Observable, ObservableType, ThreatIntel
 from cyvest.score import ScoreEngine, ScoreMode
 from cyvest.stats import InvestigationStats
 
@@ -568,7 +568,7 @@ class Investigation:
             "dict_fields": {"extra"},
         },
         "check": {
-            "fields": {"comment", "extra", "description"},
+            "fields": {"comment", "extra", "description", "score_policy"},
             "dict_fields": {"extra"},
         },
         "threat_intel": {
@@ -723,6 +723,11 @@ class Investigation:
         # Take the higher level
         if incoming.level > existing.level:
             existing.set_level(incoming.level)
+
+        # Preserve the stricter score policy (MANUAL wins)
+        if incoming.score_policy == CheckScorePolicy.MANUAL or existing.score_policy == CheckScorePolicy.MANUAL:
+            if existing.score_policy != CheckScorePolicy.MANUAL:
+                existing.set_score_policy(CheckScorePolicy.MANUAL)
 
         # Update extra (merge dictionaries)
         existing.extra.update(incoming.extra)
@@ -1297,6 +1302,8 @@ class Investigation:
                 continue
             if field == "level":
                 value = normalize_level(value)
+            if field == "score_policy":
+                value = CheckScorePolicy(value)
             if field in dict_fields:
                 if not isinstance(value, dict):
                     raise TypeError(f"Field '{field}' on {model_type} expects a dict value.")

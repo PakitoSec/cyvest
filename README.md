@@ -294,6 +294,7 @@ Scores and levels are automatically calculated and propagated:
   - **INBOUND relationships**: source scores propagate to target (target is parent)
   - **BIDIRECTIONAL relationships**: no hierarchical propagation
 - **Observable → Check**: Check score = **max** of all linked observables' scores and check's current score
+- **Manual checks**: Set `score_policy=CheckScorePolicy.MANUAL` (or `check.disable_auto_score()`) to prevent observable-driven score/level changes
 - **Check → Global**: All check scores sum to global investigation score
 
 Score to Level mapping:

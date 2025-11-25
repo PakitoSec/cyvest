@@ -278,8 +278,8 @@ with ThreadPoolExecutor(max_workers=4) as executor:
     for future in as_completed(futures):
         future.result()  # Auto-reconciled
 
-# Get merged investigation
-final_investigation = shared.get_investigation()
+# Get merged investigation (same object passed to SharedInvestigationContext)
+final_investigation = main_inv
 ```
 
 See `examples/04_email.py` for a complete multi-threaded investigation example.

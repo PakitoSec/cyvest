@@ -603,6 +603,7 @@ class Investigation:
         # Internal components
         self._score_engine = ScoreEngine(score_mode=score_mode)
         self._stats = InvestigationStats()
+        self._whitelisted: bool = False
 
         # Create root observable
         obj_type = ObservableType.FILE
@@ -1351,6 +1352,23 @@ class Investigation:
         """Get the global investigation level."""
         return self._score_engine.get_global_level()
 
+    def is_whitelisted(self) -> bool:
+        """Return whether the investigation is whitelisted/safe."""
+        return self._whitelisted
+
+    def set_whitelisted(self, whitelisted: bool = True) -> bool:
+        """
+        Mark the investigation as whitelisted or not.
+
+        Args:
+            whitelisted: True to whitelist/mark safe, False to clear the flag.
+
+        Returns:
+            Current whitelisted state.
+        """
+        self._whitelisted = bool(whitelisted)
+        return self._whitelisted
+
     def get_statistics(self) -> dict[str, Any]:
         """Get comprehensive investigation statistics."""
         return self._stats.get_summary()
@@ -1482,6 +1500,10 @@ class Investigation:
         # Merge containers
         for container in other._containers.values():
             self.add_container(container)
+
+        # Preserve whitelisted flag if either investigation is whitelisted
+        if other.is_whitelisted():
+            self.set_whitelisted(True)
 
         # Final score recalculation
         self._score_engine.recalculate_all()

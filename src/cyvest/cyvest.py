@@ -120,6 +120,31 @@ class Cyvest:
             return value.key  # type: ignore[return-value]
         raise TypeError("Expected an observable key, ObservableProxy, or Observable instance.")
 
+    # Investigation-level helpers
+
+    def investigation_is_whitelisted(self) -> bool:
+        """
+        Return whether the investigation is whitelisted/marked safe.
+
+        Examples:
+            >>> cv = Cyvest()
+            >>> cv.investigation_is_whitelisted()
+            False
+        """
+        return self._investigation.is_whitelisted()
+
+    def investigation_set_whitelisted(self, whitelisted: bool = True) -> bool:
+        """
+        Mark the investigation as whitelisted or clear the flag.
+
+        Args:
+            whitelisted: True to whitelist/mark safe, False to remove the flag.
+
+        Returns:
+            Current whitelisted state.
+        """
+        return self._investigation.set_whitelisted(whitelisted)
+
     # Observable methods
 
     def observable_create(

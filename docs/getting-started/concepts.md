@@ -6,6 +6,17 @@ Understanding the core concepts of Cyvest will help you build effective cybersec
 
 A Cyvest investigation consists of several key components:
 
+### Investigation whitelisting
+
+Mark the entire investigation as **safe** without changing any scores or levels:
+
+```python
+cv.investigation_set_whitelisted(True)
+assert cv.investigation_is_whitelisted() is True
+```
+
+The whitelisted flag is included in JSON/Markdown exports so downstream systems can respect the analyst's verdict.
+
 ### Observables
 
 **Observables** represent cyber artifacts under investigation:

@@ -395,6 +395,15 @@ class SharedInvestigationContext:
         with self._lock:
             return self._main_investigation.get_global_score()
 
+    def is_whitelisted(self) -> bool:
+        """
+        Return whether the shared investigation is whitelisted.
+
+        Thread-safe: Uses lock to ensure consistent read.
+        """
+        with self._lock:
+            return self._main_investigation.is_whitelisted()
+
     def list_observables(self) -> list[str]:
         """
         List all observable keys available for cross-task reference.

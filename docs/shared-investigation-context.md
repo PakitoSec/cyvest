@@ -227,6 +227,9 @@ Returns a list of all observable keys in the shared context.
 ##### `list_checks() -> list[str]`
 Returns a list of all check keys in the shared context.
 
+##### `is_whitelisted() -> bool`
+Returns whether the underlying investigation has whitelist entries.
+
 > Access merged results by reusing the original `Investigation` instance you passed to `SharedInvestigationContext`; reconciliation mutates it in place.
 
 ### Cyvest Updates

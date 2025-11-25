@@ -8,8 +8,8 @@ Provides automatic merge-on-create for all object types.
 from __future__ import annotations
 
 import threading
-from dataclasses import dataclass
 from copy import deepcopy
+from dataclasses import dataclass
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, Literal, overload
 

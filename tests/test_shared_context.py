@@ -1011,6 +1011,17 @@ def test_get_global_score():
     assert score >= Decimal("7")
 
 
+def test_is_whitelisted_reflects_main_investigation():
+    """Shared context exposes whitelisted status of underlying investigation."""
+    inv = Investigation({"test": "data"}, root_type="artifact")
+    shared = SharedInvestigationContext(inv)
+
+    assert shared.is_whitelisted() is False
+
+    inv.add_whitelist("id-1", "False positive", "reason")
+    assert shared.is_whitelisted() is True
+
+
 def test_get_global_score_thread_safe():
     """Test that get_global_score is thread-safe."""
     inv = Investigation({"test": "data"}, root_type="artifact")

@@ -8,14 +8,21 @@ A Cyvest investigation consists of several key components:
 
 ### Investigation whitelisting
 
-Mark the entire investigation as **safe** without changing any scores or levels:
+Mark the investigation as **safe** with one or more whitelist entries (identifier, name, and optional markdown justification):
 
 ```python
-cv.investigation_set_whitelisted(True)
+cv.investigation_add_whitelist("ticket-4242", "False positive", "Sandbox flagged a benign file")
+cv.investigation_add_whitelist("allowlist-host", "Known asset")
+
+entries = cv.investigation_get_whitelists()
 assert cv.investigation_is_whitelisted() is True
+assert entries[0].identifier == "ticket-4242"
+
+cv.investigation_remove_whitelist("ticket-4242")
+cv.investigation_clear_whitelists()  # remove all entries
 ```
 
-The whitelisted flag is included in JSON/Markdown exports so downstream systems can respect the analyst's verdict.
+Whitelist entries are included in JSON/Markdown exports so downstream systems can respect the analyst's verdict.
 
 ### Observables
 

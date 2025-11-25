@@ -49,6 +49,10 @@ def test_create_cyvest_inherits_config():
         assert cy.root().obs_type == ObservableType.ARTIFACT
         # Should inherit data
         assert cy.root().extra == {"email": "test@example.com"}
+        # Mutations should not leak back to main investigation data
+        cy.root().extra["email"] = "modified@example.com"
+
+    assert inv._root_observable.extra == {"email": "test@example.com"}
 
 
 def test_auto_reconcile_on_context_exit():
@@ -244,9 +248,8 @@ def test_cross_task_observable_sharing():
         url.relate_to(cy2.observable(ObservableType.DOMAIN_NAME, "malicious.com"), RelationshipType.RELATED_TO)
 
     # Verify final investigation has both observables
-    final_inv = shared.get_investigation()
-    assert "obs:domain-name:malicious.com" in final_inv._observables
-    assert "obs:url:https://malicious.com/payload" in final_inv._observables
+    assert "obs:domain-name:malicious.com" in inv._observables
+    assert "obs:url:https://malicious.com/payload" in inv._observables
 
 
 def test_thread_safety_parallel_tasks():
@@ -315,19 +318,6 @@ def test_concurrent_reconciliation():
 
     # Verify all checks were registered
     assert len(shared.list_checks()) == 50
-
-
-def test_get_investigation_returns_copy():
-    """Test that get_investigation returns a proper copy."""
-    inv = Investigation({"test": "data"}, root_type="artifact")
-    shared = SharedInvestigationContext(inv)
-
-    with shared.create_cyvest() as cy:
-        cy.observable(ObservableType.EMAIL_ADDR, "test@example.com")
-
-    inv_copy = shared.get_investigation()
-    assert inv_copy is shared._main_investigation
-    assert "obs:email-addr:test@example.com" in inv_copy._observables
 
 
 def test_reconcile_with_investigation_object():
@@ -738,8 +728,7 @@ def test_prevent_relationship_with_shared_copy():
         # Should succeed without error
 
     # Verify the correct pattern created the relationship
-    final_inv = shared.get_investigation()
-    url = final_inv.get_observable(ObservableType.URL, "https://evil.com/payload")
+    url = inv.get_observable(ObservableType.URL, "https://evil.com/payload")
     assert url is not None
     assert len(url.relationships) > 0
     assert any(rel.target_key.endswith("malicious.com") for rel in url.relationships)
@@ -918,18 +907,16 @@ def test_enrichment_merge_in_reconcile():
         cy2.enrichment_create("shared", {"field2": "value2"})
 
     # The main investigation should have merged data
-    main_inv = shared.get_investigation()
-    merged = main_inv.get_enrichment("enr:shared")
+    merged = inv.get_enrichment("enr:shared")
     assert merged is not None
     assert merged.data["field1"] == "value1"
     assert merged.data["field2"] == "value2"
 
-    # Registry will have the latest version (from second task)
-    # but after merge_investigation, the main inv has both fields
+    # Registry should reflect merged canonical state after reconcile refresh
     registry_copy = shared.get_enrichment("shared")
     assert registry_copy is not None
-    # Registry copy reflects the state at reconcile time (second task's version)
-    assert "field2" in registry_copy.data
+    assert registry_copy.data["field1"] == "value1"
+    assert registry_copy.data["field2"] == "value2"
 
 
 def test_get_enrichment_invalid_arguments():
@@ -1014,10 +1001,9 @@ def test_get_global_score():
         cy.check("test", "test", description="test").link_observable(cy.root())
 
     # Directly add threat to main investigation's root
-    main_inv = shared.get_investigation()
-    root = main_inv.get_root()
+    root = inv.get_root()
     ti = ThreatIntel(source="DirectThreat", observable_key=root.key, score=Decimal("7"))
-    main_inv.add_threat_intel(ti, root)
+    inv.add_threat_intel(ti, root)
 
     # Score should be updated (root propagates to checks now)
     score = shared.get_global_score()

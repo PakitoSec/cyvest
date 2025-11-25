@@ -110,7 +110,7 @@ class RuleExecutor:
 
         # Return final merged investigation as Cyvest
         final_cy = Cyvest(data, root_type="artifact")
-        final_cy._investigation = shared.get_investigation()
+        final_cy._investigation = main_inv
         return final_cy
 
 

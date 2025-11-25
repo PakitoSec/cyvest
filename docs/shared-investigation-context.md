@@ -227,8 +227,7 @@ Returns a list of all observable keys in the shared context.
 ##### `list_checks() -> list[str]`
 Returns a list of all check keys in the shared context.
 
-##### `get_investigation() -> Investigation`
-Returns a deep copy of the current merged investigation.
+> Access merged results by reusing the original `Investigation` instance you passed to `SharedInvestigationContext`; reconciliation mutates it in place.
 
 ### Cyvest Updates
 

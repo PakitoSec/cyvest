@@ -98,7 +98,7 @@ class SharedInvestigationContext:
         # Use main investigation's data if not provided
         if data is None:
             with self._lock:
-                data = self._main_investigation._root_observable.extra
+                data = deepcopy(self._main_investigation._root_observable.extra)
 
         cy = Cyvest(data, root_type=self._root_type, score_mode=self._score_mode)
 
@@ -149,19 +149,23 @@ class SharedInvestigationContext:
         with self._lock:
             logger.info("Reconciling task investigation into shared context")
 
-            # Register all observables and checks for cross-task sharing
-            for obs in task_investigation.get_all_observables().values():
-                # Update registry (latest version wins)
-                self._observable_registry[obs.key] = deepcopy(obs)
-
-            for check in task_investigation.get_all_checks().values():
-                self._check_registry[check.key] = deepcopy(check)
-
-            for enrichment in task_investigation.get_all_enrichments().values():
-                self._enrichment_registry[enrichment.key] = deepcopy(enrichment)
-
             # Merge into main investigation
             self._main_investigation.merge_investigation(task_investigation)
+
+            # Refresh registries from canonical, post-merge investigation state
+            self._observable_registry = {}
+            for obs in self._main_investigation.get_all_observables().values():
+                copy = deepcopy(obs)
+                copy._from_shared_context = True
+                self._observable_registry[obs.key] = copy
+
+            self._check_registry = {
+                check.key: deepcopy(check) for check in self._main_investigation.get_all_checks().values()
+            }
+            self._enrichment_registry = {
+                enrichment.key: deepcopy(enrichment)
+                for enrichment in self._main_investigation.get_all_enrichments().values()
+            }
 
             logger.debug(
                 f"Reconciliation complete. Registry: {len(self._observable_registry)} observables, "
@@ -373,16 +377,6 @@ class SharedInvestigationContext:
             if enrichment:
                 return deepcopy(enrichment)
             return None
-
-    def get_investigation(self) -> Investigation:
-        """
-        Get the main investigation (thread-safe read-only access).
-
-        Returns:
-            The main investigation instance
-        """
-        with self._lock:
-            return self._main_investigation
 
     def get_global_score(self) -> Decimal:
         """

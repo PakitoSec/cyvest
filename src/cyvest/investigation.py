@@ -8,6 +8,7 @@ Provides automatic merge-on-create for all object types.
 from __future__ import annotations
 
 import threading
+from dataclasses import dataclass
 from copy import deepcopy
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, Literal, overload
@@ -554,6 +555,35 @@ class SharedInvestigationContext:
             return key in self._check_registry
 
 
+@dataclass
+class InvestigationWhitelist:
+    """Represents a whitelist entry on an investigation."""
+
+    identifier: str
+    name: str
+    justification: str | None = None
+
+    def to_dict(self) -> dict[str, str | None]:
+        """Serialize whitelist entry to a dictionary."""
+        return {
+            "identifier": self.identifier,
+            "name": self.name,
+            "justification": self.justification,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> InvestigationWhitelist:
+        """Construct a whitelist entry from a dictionary."""
+        justification = data.get("justification")
+        if justification is not None:
+            justification = str(justification)
+        return cls(
+            identifier=str(data.get("identifier", "")).strip(),
+            name=str(data.get("name", "")).strip(),
+            justification=justification,
+        )
+
+
 class Investigation:
     """
     Core investigation state and operations.
@@ -603,7 +633,7 @@ class Investigation:
         # Internal components
         self._score_engine = ScoreEngine(score_mode=score_mode)
         self._stats = InvestigationStats()
-        self._whitelisted: bool = False
+        self._whitelists: dict[str, InvestigationWhitelist] = {}
 
         # Create root observable
         obj_type = ObservableType.FILE
@@ -1353,21 +1383,50 @@ class Investigation:
         return self._score_engine.get_global_level()
 
     def is_whitelisted(self) -> bool:
-        """Return whether the investigation is whitelisted/safe."""
-        return self._whitelisted
+        """Return whether the investigation has any whitelist entries."""
+        return bool(self._whitelists)
 
-    def set_whitelisted(self, whitelisted: bool = True) -> bool:
+    def add_whitelist(self, identifier: str, name: str, justification: str | None = None) -> InvestigationWhitelist:
         """
-        Mark the investigation as whitelisted or not.
+        Add or update a whitelist entry.
 
         Args:
-            whitelisted: True to whitelist/mark safe, False to clear the flag.
+            identifier: Unique identifier for this whitelist entry.
+            name: Human-readable name for the whitelist entry.
+            justification: Optional markdown justification.
 
         Returns:
-            Current whitelisted state.
+            The stored whitelist entry.
         """
-        self._whitelisted = bool(whitelisted)
-        return self._whitelisted
+        identifier = str(identifier).strip()
+        name = str(name).strip()
+        if not identifier:
+            raise ValueError("Whitelist identifier must be provided.")
+        if not name:
+            raise ValueError("Whitelist name must be provided.")
+        if justification is not None:
+            justification = str(justification)
+
+        entry = InvestigationWhitelist(identifier=identifier, name=name, justification=justification)
+        self._whitelists[identifier] = entry
+        return entry
+
+    def remove_whitelist(self, identifier: str) -> bool:
+        """
+        Remove a whitelist entry by identifier.
+
+        Returns:
+            True if removed, False if it did not exist.
+        """
+        return self._whitelists.pop(identifier, None) is not None
+
+    def clear_whitelists(self) -> None:
+        """Remove all whitelist entries."""
+        self._whitelists.clear()
+
+    def get_whitelists(self) -> list[InvestigationWhitelist]:
+        """Return a copy of all whitelist entries."""
+        return deepcopy(list(self._whitelists.values()))
 
     def get_statistics(self) -> dict[str, Any]:
         """Get comprehensive investigation statistics."""
@@ -1501,9 +1560,9 @@ class Investigation:
         for container in other._containers.values():
             self.add_container(container)
 
-        # Preserve whitelisted flag if either investigation is whitelisted
-        if other.is_whitelisted():
-            self.set_whitelisted(True)
+        # Merge whitelists (other investigation overrides on identifier conflicts)
+        for entry in other.get_whitelists():
+            self.add_whitelist(entry.identifier, entry.name, entry.justification)
 
         # Final score recalculation
         self._score_engine.recalculate_all()

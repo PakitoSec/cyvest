@@ -203,6 +203,14 @@ def serialize_investigation(cv: "Cyvest") -> dict[str, Any]:
         "score": float(cv.get_global_score()),
         "level": cv.get_global_level().name,
         "whitelisted": cv.investigation_is_whitelisted(),
+        "whitelists": [
+            {
+                "identifier": entry.identifier,
+                "name": entry.name,
+                "justification": entry.justification,
+            }
+            for entry in cv.investigation_get_whitelists()
+        ],
         "observables": {key: serialize_observable(obs) for key, obs in cv.get_all_observables().items()},
         "checks": checks_by_scope,
         "checks_by_level": checks_by_level,
@@ -252,8 +260,11 @@ def generate_markdown_report(cv: "Cyvest") -> str:
     lines.append("")
     lines.append(f"**Global Score:** {cv.get_global_score()}")
     lines.append(f"**Global Level:** {cv.get_global_level().name}")
-    whitelist_status = "Yes" if cv.investigation_is_whitelisted() else "No"
+    whitelists = cv.investigation_get_whitelists()
+    whitelist_status = "Yes" if whitelists else "No"
     lines.append(f"**Whitelisted Investigation:** {whitelist_status}")
+    if whitelists:
+        lines.append(f"**Whitelist Entries:** {len(whitelists)}")
     lines.append("")
 
     # Statistics
@@ -268,6 +279,16 @@ def generate_markdown_report(cv: "Cyvest") -> str:
     lines.append(f"- **Applied Checks:** {stats['applied_checks']}")
     lines.append(f"- **Total Threat Intel:** {stats['total_threat_intel']}")
     lines.append("")
+
+    # Whitelists
+    if whitelists:
+        lines.append("## Whitelists")
+        lines.append("")
+        for entry in whitelists:
+            lines.append(f"- **{entry.identifier}** - {entry.name}")
+            if entry.justification:
+                lines.append(f"  - Justification: {entry.justification}")
+        lines.append("")
 
     # Observables by Type and Level
     lines.append("### Observables by Type and Level")
@@ -397,8 +418,19 @@ def load_investigation_json(filepath: str | Path) -> "Cyvest":
 
     # Reset internal state to avoid default root pollution
     cv._investigation = Investigation(data_payload, root_type=root_type, score_mode=score_mode)
-    if data.get("whitelisted"):
-        cv._investigation.set_whitelisted(True)
+    whitelists = data.get("whitelists") or []
+    for whitelist_info in whitelists:
+        try:
+            cv._investigation.add_whitelist(
+                whitelist_info.get("identifier", ""),
+                whitelist_info.get("name", ""),
+                whitelist_info.get("justification"),
+            )
+        except ValueError:
+            continue
+    # Backward compatibility for older exports
+    if data.get("whitelisted") and not cv._investigation.is_whitelisted():
+        cv._investigation.add_whitelist("default", "Whitelisted", data.get("whitelisted_reason"))
 
     def _level_from_name(name: str | None, default: Level) -> Level:
         if not name:

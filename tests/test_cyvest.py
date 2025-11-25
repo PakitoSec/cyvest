@@ -141,15 +141,26 @@ def test_statistics() -> None:
 
 
 def test_investigation_whitelisting_flag() -> None:
-    """Investigation can be marked safe without changing scores."""
+    """Investigation can hold multiple whitelist entries and remove them."""
     cv = Cyvest()
     assert cv.investigation_is_whitelisted() is False
+    assert cv.investigation_get_whitelists() == ()
 
-    cv.investigation_set_whitelisted(True)
+    cv.investigation_add_whitelist("id-1", "False positive", "Sandbox reason")
+    cv.investigation_add_whitelist("id-2", "Customer allowlist")
+
+    whitelists = cv.investigation_get_whitelists()
+    assert len(whitelists) == 2
+    assert any(entry.identifier == "id-1" and entry.justification == "Sandbox reason" for entry in whitelists)
     assert cv.investigation_is_whitelisted() is True
 
-    cv.investigation_set_whitelisted(False)
+    removed = cv.investigation_remove_whitelist("id-1")
+    assert removed is True
+    assert len(cv.investigation_get_whitelists()) == 1
+
+    cv.investigation_clear_whitelists()
     assert cv.investigation_is_whitelisted() is False
+    assert cv.investigation_get_whitelists() == ()
 
 
 def test_investigation_merge() -> None:
@@ -620,12 +631,14 @@ def test_io_to_dict_serialization() -> None:
     assert "containers" in data
     assert "graph" in data
     assert "stats" in data
+    assert "whitelists" in data
 
     # Verify data structure
     assert isinstance(data["observables"], dict)
     assert isinstance(data["checks"], dict)
     assert isinstance(data["threat_intels"], dict)
     assert isinstance(data["graph"], list)
+    assert isinstance(data["whitelists"], list)
 
     # Verify content
     assert obs.key in data["observables"]

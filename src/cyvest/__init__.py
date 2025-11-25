@@ -8,6 +8,7 @@ programmatically with automatic scoring, level calculation, and rich reporting c
 from logurich import logger
 
 from cyvest.cyvest import Cyvest
+from cyvest.investigation import InvestigationWhitelist
 from cyvest.levels import Level
 from cyvest.model import CheckScorePolicy, ObservableType, RelationshipDirection, RelationshipType
 from cyvest.proxies import CheckProxy, ContainerProxy, EnrichmentProxy, ObservableProxy, ThreatIntelProxy
@@ -20,6 +21,7 @@ __all__ = [
     "Cyvest",
     "Level",
     "CheckScorePolicy",
+    "InvestigationWhitelist",
     "CheckProxy",
     "ObservableProxy",
     "ObservableType",

@@ -16,7 +16,7 @@ from typing import Any, Literal
 
 from logurich import logger
 
-from cyvest.investigation import Investigation
+from cyvest.investigation import Investigation, InvestigationWhitelist
 from cyvest.io_rich import display_statistics, display_summary
 from cyvest.io_serialization import (
     generate_markdown_report,
@@ -128,22 +128,60 @@ class Cyvest:
 
         Examples:
             >>> cv = Cyvest()
+            >>> cv.investigation_add_whitelist("id-1", "False positive", "Sandboxed sample")
             >>> cv.investigation_is_whitelisted()
-            False
+            True
         """
         return self._investigation.is_whitelisted()
 
-    def investigation_set_whitelisted(self, whitelisted: bool = True) -> bool:
+    def investigation_add_whitelist(
+        self, identifier: str, name: str, justification: str | None = None
+    ) -> InvestigationWhitelist:
         """
-        Mark the investigation as whitelisted or clear the flag.
+        Add or update a whitelist entry for the investigation.
 
         Args:
-            whitelisted: True to whitelist/mark safe, False to remove the flag.
+            identifier: Unique identifier for the whitelist entry.
+            name: Human-readable name.
+            justification: Optional markdown justification.
+        """
+        return self._investigation.add_whitelist(identifier, name, justification)
+
+    def investigation_remove_whitelist(self, identifier: str) -> bool:
+        """
+        Remove a whitelist entry by identifier.
 
         Returns:
-            Current whitelisted state.
+            True if removed, False if the identifier was not present.
         """
-        return self._investigation.set_whitelisted(whitelisted)
+        return self._investigation.remove_whitelist(identifier)
+
+    def investigation_clear_whitelists(self) -> None:
+        """Remove all whitelist entries."""
+        self._investigation.clear_whitelists()
+
+    def investigation_get_whitelists(self) -> tuple[InvestigationWhitelist, ...]:
+        """
+        Get all whitelist entries.
+
+        Returns:
+            Tuple of whitelist entries.
+        """
+        return tuple(self._investigation.get_whitelists())
+
+    def investigation_set_whitelisted(self, whitelisted: bool = True, reason: str | None = None) -> bool:
+        """
+        Compatibility helper: clears all whitelists when False; adds/updates a default entry when True.
+
+        Args:
+            whitelisted: Whether to mark whitelisted.
+            reason: Optional justification used for the default entry.
+        """
+        if not whitelisted:
+            self.investigation_clear_whitelists()
+            return False
+        self.investigation_add_whitelist("default", "Whitelisted", reason)
+        return True
 
     # Observable methods
 

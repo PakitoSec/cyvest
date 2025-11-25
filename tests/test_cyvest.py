@@ -140,6 +140,18 @@ def test_statistics() -> None:
     assert stats["total_checks"] == 1
 
 
+def test_investigation_whitelisting_flag() -> None:
+    """Investigation can be marked safe without changing scores."""
+    cv = Cyvest()
+    assert cv.investigation_is_whitelisted() is False
+
+    cv.investigation_set_whitelisted(True)
+    assert cv.investigation_is_whitelisted() is True
+
+    cv.investigation_set_whitelisted(False)
+    assert cv.investigation_is_whitelisted() is False
+
+
 def test_investigation_merge() -> None:
     """Test merging investigations."""
     cv1 = Cyvest()

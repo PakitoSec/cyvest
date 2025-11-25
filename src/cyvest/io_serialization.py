@@ -202,6 +202,7 @@ def serialize_investigation(cv: "Cyvest") -> dict[str, Any]:
     return {
         "score": float(cv.get_global_score()),
         "level": cv.get_global_level().name,
+        "whitelisted": cv.investigation_is_whitelisted(),
         "observables": {key: serialize_observable(obs) for key, obs in cv.get_all_observables().items()},
         "checks": checks_by_scope,
         "checks_by_level": checks_by_level,
@@ -251,6 +252,8 @@ def generate_markdown_report(cv: "Cyvest") -> str:
     lines.append("")
     lines.append(f"**Global Score:** {cv.get_global_score()}")
     lines.append(f"**Global Level:** {cv.get_global_level().name}")
+    whitelist_status = "Yes" if cv.investigation_is_whitelisted() else "No"
+    lines.append(f"**Whitelisted Investigation:** {whitelist_status}")
     lines.append("")
 
     # Statistics
@@ -394,6 +397,8 @@ def load_investigation_json(filepath: str | Path) -> "Cyvest":
 
     # Reset internal state to avoid default root pollution
     cv._investigation = Investigation(data_payload, root_type=root_type, score_mode=score_mode)
+    if data.get("whitelisted"):
+        cv._investigation.set_whitelisted(True)
 
     def _level_from_name(name: str | None, default: Level) -> Level:
         if not name:

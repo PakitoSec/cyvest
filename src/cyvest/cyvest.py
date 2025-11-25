@@ -10,6 +10,7 @@ and dictionary export (io_to_dict, io_to_markdown) methods.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from decimal import Decimal
 from pathlib import Path
 from typing import Any, Literal
@@ -669,9 +670,14 @@ class Cyvest:
             key: ContainerProxy(self._investigation, key) for key in self._investigation.get_all_containers().keys()
         }
 
-    def display_summary(self, show_graph: bool = True, min_level: Level | str = Level.INFO) -> None:
+    def display_summary(
+        self, show_graph: bool = True, exclude_levels: Level | str | Iterable[Level | str] = Level.NONE
+    ) -> None:
         display_summary(
-            self, lambda renderables: logger.rich("INFO", renderables), show_graph=show_graph, min_level=min_level
+            self,
+            lambda renderables: logger.rich("INFO", renderables),
+            show_graph=show_graph,
+            exclude_levels=exclude_levels,
         )
 
     def display_statistics(self) -> None:

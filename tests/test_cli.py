@@ -90,8 +90,8 @@ def test_cli_merge_requires_multiple_inputs(tmp_path: Path) -> None:
     assert result_ok.exit_code == 0
 
 
-def test_display_summary_min_level_filtering() -> None:
-    """Test that display_summary filters checks by minimum level."""
+def test_display_summary_exclude_levels() -> None:
+    """Test that display_summary omits selected levels."""
     from decimal import Decimal
     from io import StringIO
 
@@ -118,51 +118,36 @@ def test_display_summary_min_level_filtering() -> None:
     # Create a check without observable (Level.NONE - no auto-upgrade without observable)
     cv.check("none_check", "network", "None check without observable")
 
-    # Test with default (Level.NONE) - should show all checks
+    # Default excludes Level.NONE
     output = StringIO()
     console = Console(file=output, width=120)
-    display_summary(cv, console.print, show_graph=False, min_level=Level.NONE)
+    display_summary(cv, console.print, show_graph=False)
     output_default = output.getvalue()
 
-    # Should contain all 4 checks
     assert "malicious_check" in output_default
     assert "suspicious_check" in output_default
     assert "info_check" in output_default
-    assert "none_check" in output_default
+    assert "none_check" not in output_default
+    assert "excluding: NONE" in output_default
 
-    # Test with Level.INFO - should exclude NONE
+    # Exclude INFO and SUSPICIOUS along with NONE
     output = StringIO()
     console = Console(file=output, width=120)
-    display_summary(cv, console.print, show_graph=False, min_level=Level.INFO)
-    output_info = output.getvalue()
+    display_summary(cv, console.print, show_graph=False, exclude_levels=[Level.INFO, Level.SUSPICIOUS])
+    output_excluding_info = output.getvalue()
 
-    assert "malicious_check" in output_info
-    assert "suspicious_check" in output_info
-    assert "info_check" in output_info
-    assert "none_check" not in output_info
-    assert "INFO" in output_info  # Level name should appear in caption
+    assert "malicious_check" in output_excluding_info
+    assert "suspicious_check" not in output_excluding_info
+    assert "info_check" not in output_excluding_info
+    assert "none_check" not in output_excluding_info
 
-    # Test with Level.SUSPICIOUS - should show only SUSPICIOUS and MALICIOUS
+    # Allow displaying all checks when exclusions are cleared
     output = StringIO()
     console = Console(file=output, width=120)
-    display_summary(cv, console.print, show_graph=False, min_level=Level.SUSPICIOUS)
-    output_suspicious = output.getvalue()
+    display_summary(cv, console.print, show_graph=False, exclude_levels=[])
+    output_all = output.getvalue()
 
-    assert "malicious_check" in output_suspicious
-    assert "suspicious_check" in output_suspicious
-    assert "info_check" not in output_suspicious
-    assert "none_check" not in output_suspicious
-    assert "SUSPICIOUS" in output_suspicious  # Level name should appear in caption
-
-    # Test with Level.MALICIOUS - should show only MALICIOUS
-    output = StringIO()
-    console = Console(file=output, width=120)
-    display_summary(cv, console.print, show_graph=False, min_level=Level.MALICIOUS)
-    output_malicious = output.getvalue()
-
-    assert "malicious_check" in output_malicious
-    assert "suspicious_check" not in output_malicious
-    assert "info_check" not in output_malicious
-    assert "none_check" not in output_malicious
-    # Check that filtering info is displayed
-    assert "Displayed: 1" in output_malicious or "1 (min level" in output_malicious
+    assert "malicious_check" in output_all
+    assert "suspicious_check" in output_all
+    assert "info_check" in output_all
+    assert "none_check" in output_all

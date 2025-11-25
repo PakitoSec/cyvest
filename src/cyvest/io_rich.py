@@ -6,7 +6,7 @@ Provides formatted display of investigation results using the Rich library.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from decimal import Decimal, InvalidOperation
 from typing import TYPE_CHECKING, Any
 
@@ -23,7 +23,10 @@ if TYPE_CHECKING:
 
 
 def display_summary(
-    cv: Cyvest, rich_print: Callable[[Any], None], show_graph: bool = True, min_level: Level | str = Level.NONE
+    cv: Cyvest,
+    rich_print: Callable[[Any], None],
+    show_graph: bool = True,
+    exclude_levels: Level | str | Iterable[Level | str] = Level.NONE,
 ) -> None:
     """
     Display a comprehensive summary of the investigation using Rich.
@@ -32,19 +35,42 @@ def display_summary(
         cv: Cyvest investigation to display
         rich_print: A rich renderable handler that is called with renderables for output
         show_graph: Whether to display the observable graph
-        min_level: Minimum level threshold for displaying checks (default: Level.NONE)
+        exclude_levels: Level(s) to omit from the report (default: Level.NONE)
     """
-    # Create main table
-    resolved_min_level = normalize_level(min_level) if isinstance(min_level, str) else min_level
+
+    def _normalize_exclude(levels: Level | str | Iterable[Level | str]) -> set[Level]:
+        base_excluded: set[Level] = {Level.NONE}
+        if levels is None:
+            return base_excluded
+        if isinstance(levels, (Level, str)):
+            normalized_level = normalize_level(levels) if isinstance(levels, str) else levels
+            return base_excluded | {normalized_level}
+
+        collected = list(levels)
+        if not collected:
+            return set()
+
+        normalized: set[Level] = set()
+        for level in collected:
+            normalized.add(normalize_level(level) if isinstance(level, str) else level)
+        return base_excluded | normalized
+
+    resolved_excluded_levels = _normalize_exclude(exclude_levels)
 
     all_checks = cv.get_all_checks().values()
-    filtered_checks = [c for c in all_checks if c.level >= resolved_min_level]
+    filtered_checks = [c for c in all_checks if c.level not in resolved_excluded_levels]
     applied_checks = sum(1 for c in filtered_checks if c.level != Level.NONE)
 
-    caption_parts = [f"Total Checks: {len(cv.get_all_checks())}"]
-    if resolved_min_level != Level.NONE:
-        caption_parts.append(f"Displayed: {len(filtered_checks)} (min level: {resolved_min_level.name})")
-    caption_parts.append(f"Applied: {applied_checks}")
+    excluded_caption = ""
+    if resolved_excluded_levels:
+        excluded_names = ", ".join(level.name for level in sorted(resolved_excluded_levels, key=lambda lvl: lvl.value))
+        excluded_caption = f" (excluding: {excluded_names})"
+
+    caption_parts = [
+        f"Total Checks: {len(cv.get_all_checks())}",
+        f"Displayed: {len(filtered_checks)}{excluded_caption}",
+        f"Applied: {applied_checks}",
+    ]
 
     def sort_key_by_score(check: Any) -> Decimal:
         score = getattr(check, "score", 0)
@@ -68,7 +94,7 @@ def display_summary(
     # Organize checks by scope
     checks_by_scope: dict[str, list[Any]] = {}
     for check in cv.get_all_checks().values():
-        if check.level < resolved_min_level:
+        if check.level in resolved_excluded_levels:
             continue
         if check.scope not in checks_by_scope:
             checks_by_scope[check.scope] = []
@@ -109,7 +135,11 @@ def display_summary(
     table.add_row(rule, "-", "-")
 
     for level_enum in [Level.MALICIOUS, Level.SUSPICIOUS, Level.NOTABLE, Level.SAFE, Level.INFO, Level.TRUSTED]:
-        checks = [c for c in cv.get_all_checks().values() if c.level == level_enum and c.level >= resolved_min_level]
+        if level_enum in resolved_excluded_levels:
+            continue
+        checks = [
+            c for c in cv.get_all_checks().values() if c.level == level_enum and c.level not in resolved_excluded_levels
+        ]
         checks = sorted(checks, key=sort_key_by_score, reverse=True)
         if checks:
             color_level = get_color_level(level_enum)

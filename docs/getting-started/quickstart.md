@@ -147,18 +147,25 @@ with Cyvest() as cv:
     console = Console()
     display_summary(cv, console)
 
-    # Filter display to show only checks at INFO level or higher (excludes NONE)
-    display_summary(cv, console, min_level=Level.INFO)
+    # Hide unscored and INFO-level checks
+    display_summary(cv, console, exclude_levels=[Level.NONE, Level.INFO])
 
     # Show only high-severity checks (SUSPICIOUS and above)
-    display_summary(cv, console, min_level=Level.SUSPICIOUS)
+    display_summary(
+        cv,
+        console,
+        exclude_levels=[Level.NONE, Level.TRUSTED, Level.INFO, Level.SAFE, Level.NOTABLE],
+    )
 
     save_investigation_json(cv, "investigation.json")
     save_investigation_markdown(cv, "report.md")
 ```
 
 !!! tip "Filtering checks by severity"
-    Use the `min_level` parameter to focus on actionable findings. Setting `min_level=Level.INFO` (default: `Level.NONE`) hides checks that haven't been scored, reducing noise in large investigations.
+    Use `exclude_levels` to hide noise tiers. By default, `Level.NONE` is excluded to skip
+    unscored checks; add `Level.INFO` or `Level.NOTABLE` to focus on actionable findings in
+    larger investigations. Pass an empty list (`exclude_levels=[]`) to show every check,
+    including unscored ones.
 
 !!! question "Where do exports live?"
     The docs assume you write to the project root, but automation pipelines typically point to `dist/` (JSON) and `reports/` (Markdown/PDF). Adjust paths to match your workflow.

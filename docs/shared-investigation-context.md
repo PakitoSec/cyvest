@@ -230,6 +230,9 @@ Returns a list of all check keys in the shared context.
 ##### `is_whitelisted() -> bool`
 Returns whether the underlying investigation has whitelist entries.
 
+##### `get_global_level() -> Level`
+Returns the global level of the underlying investigation.
+
 > Access merged results by reusing the original `Investigation` instance you passed to `SharedInvestigationContext`; reconciliation mutates it in place.
 
 ### Cyvest Updates

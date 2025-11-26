@@ -404,6 +404,15 @@ class SharedInvestigationContext:
         with self._lock:
             return self._main_investigation.is_whitelisted()
 
+    def get_global_level(self) -> Level:
+        """
+        Get the global level from the main investigation.
+
+        Thread-safe: Uses lock to ensure consistent read.
+        """
+        with self._lock:
+            return self._main_investigation.get_global_level()
+
     def list_observables(self) -> list[str]:
         """
         List all observable keys available for cross-task reference.

@@ -1022,6 +1022,21 @@ def test_is_whitelisted_reflects_main_investigation():
     assert shared.is_whitelisted() is True
 
 
+def test_get_global_level_reflects_main_investigation():
+    """Shared context exposes global level of underlying investigation."""
+    from cyvest.levels import Level
+
+    inv = Investigation({"test": "data"}, root_type="artifact")
+    shared = SharedInvestigationContext(inv)
+
+    assert shared.get_global_level() == Level.INFO
+
+    with shared.create_cyvest() as cy:
+        cy.check("c1", "s1", "desc").with_score(Decimal("10"))
+
+    assert shared.get_global_level() == Level.MALICIOUS
+
+
 def test_get_global_score_thread_safe():
     """Test that get_global_score is thread-safe."""
     inv = Investigation({"test": "data"}, root_type="artifact")

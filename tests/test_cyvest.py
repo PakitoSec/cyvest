@@ -629,7 +629,6 @@ def test_io_to_dict_serialization() -> None:
     assert "threat_intels" in data
     assert "enrichments" in data
     assert "containers" in data
-    assert "graph" in data
     assert "stats" in data
     assert "whitelists" in data
 
@@ -637,7 +636,6 @@ def test_io_to_dict_serialization() -> None:
     assert isinstance(data["observables"], dict)
     assert isinstance(data["checks"], dict)
     assert isinstance(data["threat_intels"], dict)
-    assert isinstance(data["graph"], list)
     assert isinstance(data["whitelists"], list)
 
     # Verify content

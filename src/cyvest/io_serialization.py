@@ -168,25 +168,6 @@ def serialize_investigation(cv: "Cyvest") -> dict[str, Any]:
             checks_by_level[level_name] = []
         checks_by_level[level_name].append(check.key)
 
-    # Build observable graph (root observables with their children)
-    def build_obs_tree(obs: Observable, visited: set[str]) -> dict[str, Any]:
-        if obs.key in visited:
-            return {}
-        visited.add(obs.key)
-
-        children = []
-        for rel in obs.relationships:
-            child_obs = cv.observable_get(rel.target_key)
-            if child_obs:
-                child_tree = build_obs_tree(child_obs, visited)
-                if child_tree:
-                    children.append(child_tree)
-
-        return {
-            **serialize_observable(obs),
-            "observables_children": children,
-        }
-
     root = cv.observable_get_root()
     root_type_value = None
     if root:
@@ -197,7 +178,6 @@ def serialize_investigation(cv: "Cyvest") -> dict[str, Any]:
     if score_mode and hasattr(score_mode, "_score_mode"):
         mode = score_mode._score_mode
         score_mode_value = mode.value if hasattr(mode, "value") else str(mode)
-    graph = [build_obs_tree(root, set())] if root else []
 
     return {
         "score": float(cv.get_global_score()),
@@ -217,7 +197,6 @@ def serialize_investigation(cv: "Cyvest") -> dict[str, Any]:
         "threat_intels": {key: serialize_threat_intel(ti) for key, ti in cv.get_all_threat_intels().items()},
         "enrichments": {key: serialize_enrichment(enr) for key, enr in cv.get_all_enrichments().items()},
         "containers": {key: serialize_container(ctr) for key, ctr in cv.get_all_containers().items()},
-        "graph": graph,
         "stats": cv.get_statistics(),
         "stats_checks": {
             "checks": len(cv.get_all_checks()),

@@ -89,7 +89,7 @@ class RuleExecutor:
         # Create main investigation and shared context
         from cyvest.investigation import Investigation
 
-        main_inv = Investigation(data, root_type="artifact", score_mode="sum")
+        main_inv = Investigation(data, root_type="artifact")
         shared = SharedInvestigationContext(main_inv)
 
         logger.info(f"Running {len(sorted_tasks)} tasks in parallel with {self.max_workers} workers")
@@ -188,7 +188,7 @@ class EmailFromBIS(BaseRule):
         logger.info(f"Analyzing email header FROM: {from_addr}")
 
         # Build observable chain with threat intel
-        obs = cy.observable(ObservableType.EMAIL_ADDR, from_addr).add_ti("PROOFPOINT", 2, "> test")
+        obs = cy.observable(ObservableType.EMAIL_ADDR, from_addr).add_ti("PROOFPOINT", 5, "> test")
 
         # Create check for header analysis
         (
@@ -570,7 +570,7 @@ def main(workers, browser, stats):
     logger.info(c.comment)
 
     # Display results
-    logger.info("Investigation complete - displaying summary")
+    logger.info("Investigation complete - displaying summary - score should be 36.1")
 
     cy.display_summary()
     if stats:

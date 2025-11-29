@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from decimal import Decimal
-from typing import TYPE_CHECKING, Any, Generic, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, Literal, TypeVar
 
 from cyvest.levels import Level, normalize_level
 from cyvest.model import (
@@ -398,7 +398,7 @@ class CheckProxy(_ReadOnlyProxy[Check]):
         comment: str | None = None,
         description: str | None = None,
         extra: dict[str, Any] | None = None,
-        score_policy: CheckScorePolicy | str | None = None,
+        score_policy: CheckScorePolicy | Literal["auto", "manual"] | None = None,
         merge_extra: bool = True,
     ) -> CheckProxy:
         """Update mutable metadata on the check."""
@@ -419,7 +419,7 @@ class CheckProxy(_ReadOnlyProxy[Check]):
         self._get_investigation().update_model_metadata("check", self.key, updates, dict_merge=dict_merge)
         return self
 
-    def set_score_policy(self, policy: CheckScorePolicy | str) -> CheckProxy:
+    def set_score_policy(self, policy: CheckScorePolicy | Literal["auto", "manual"]) -> CheckProxy:
         """Switch between AUTO (default) and MANUAL scoring behavior."""
         self.update_metadata(score_policy=policy)
         return self

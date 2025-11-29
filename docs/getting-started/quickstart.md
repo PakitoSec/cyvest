@@ -67,7 +67,7 @@ with Cyvest() as cv:
 **Why the fluent helpers?**
 
 - Deterministic keys let you merge multiple builders without collisions.
-- Relationships infer default directions from STIX2 semantics.
+- Relationships default to bidirectional; override direction when you need hierarchy.
 
 ---
 
@@ -79,32 +79,31 @@ from cyvest import ObservableType, RelationshipDirection, RelationshipType
 with Cyvest() as cv:
     url = cv.observable_create(ObservableType.URL, "http://c2-server.com")
     ip = cv.observable_create(ObservableType.IPV4_ADDR, "192.0.2.100", internal=False)
-    cv.observable_add_relationship(url, ip, RelationshipType.RESOLVES_TO)  # OUTBOUND
+    cv.observable_add_relationship(url, ip, RelationshipType.RELATED_TO)  # BIDIRECTIONAL
 
     domain = (
         cv.observable(ObservableType.DOMAIN_NAME, "c2-server.com", internal=False)
-        .relate_to(ip, RelationshipType.RESOLVES_TO)
+        .relate_to(ip, RelationshipType.RELATED_TO)
     )
 
     host1 = cv.observable_create(ObservableType.IPV4_ADDR, "10.0.1.10", internal=True)
     host2 = cv.observable_create(ObservableType.IPV4_ADDR, "10.0.1.20", internal=True)
-    cv.observable_add_relationship(host1, host2, RelationshipType.COMMUNICATES_WITH)  # BIDIRECTIONAL
+    cv.observable_add_relationship(host1, host2, RelationshipType.RELATED_TO)  # BIDIRECTIONAL
 
     malware = cv.observable_create(ObservableType.FILE, "payload.exe", internal=False)
-    cv.observable_add_relationship(malware.key, url.key, RelationshipType.DOWNLOADED)  # INBOUND
+    cv.observable_add_relationship(malware.key, url.key, RelationshipType.RELATED_TO)  # BIDIRECTIONAL
 
     cv.observable_add_relationship(
         url.key,
         ip.key,
-        RelationshipType.RESOLVES_TO,
+        RelationshipType.RELATED_TO,
         RelationshipDirection.INBOUND,  # explicit override
     )
 ```
 
 !!! info "Default directions"
-    - `RESOLVES_TO`: domain → IP (`OUTBOUND`)
-    - `DOWNLOADED`: file ← source (`INBOUND`)
-    - `COMMUNICATES_WITH`: symmetric (`BIDIRECTIONAL`)
+    - Default is `BIDIRECTIONAL` when no direction is provided.
+    - Use `OUTBOUND`/`INBOUND` to force hierarchy for score propagation.
 
 ---
 

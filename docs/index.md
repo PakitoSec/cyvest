@@ -23,7 +23,7 @@ Build, score, and narrate cybersecurity investigations with a single fluent Pyth
 
 | Area | Why it matters | What to look at |
 | --- | --- | --- |
-| **Structured objects** | Model observables, checks, TI, containers, and enrichments with STIX2-safe enums | `cyvest.model`, [Concepts](getting-started/concepts.md#observables) |
+| **Structured objects** | Model observables, checks, TI, containers, and enrichments with typed helpers | `cyvest.model`, [Concepts](getting-started/concepts.md#observables) |
 | **Deterministic scoring** | MAX/SUM propagation, full score history, and automatic level classification | `cyvest.score`, [Scoring System](getting-started/concepts.md#scoring-system) |
 | **Fluent helpers** | Builder-style methods with deterministic keys and safe merges | `cyvest.cyvest`, [Quick Start](getting-started/quickstart.md#using-the-fluent-api) |
 | **Shared context** | Thread-safe fragments that can reconcile into a single story | `cyvest.investigation.SharedInvestigationContext`, [Guide](shared-investigation-context.md) |
@@ -66,7 +66,7 @@ with Cyvest(data={"type": "email"}) as cv:
 ```
 Cyvest (facade + fluent proxies)
 └─ Investigation (core state)
-   ├─ Observables & relationships (STIX2)
+   ├─ Observables & relationships
    ├─ Checks and containers (workflow context)
    ├─ Threat intelligence (source, score, taxonomies)
    ├─ ScoreEngine (MAX/SUM propagation, history)
@@ -77,7 +77,7 @@ Cyvest (facade + fluent proxies)
 **Design principles**
 
 - Deterministic keys guarantee lossless merges from concurrent builders.
-- Relationship direction controls score propagation and keeps STIX semantics intact.
+- Relationship direction controls score propagation.
 - The fluent helper layer is thin—everything ultimately stores data inside a single `Investigation`.
 
 ---

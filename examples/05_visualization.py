@@ -14,7 +14,7 @@ The visualization uses the Rich color scheme:
 
 from logurich import logger
 
-from cyvest import Cyvest, ObservableType, RelationshipType
+from cyvest import Cyvest, ObservableType, RelationshipDirection, RelationshipType
 
 logger.enable("cyvest")
 
@@ -30,7 +30,7 @@ with Cyvest() as cv:
     malicious_ip = (
         cv.observable(ObservableType.IPV4_ADDR, "185.220.101.50")
         .add_ti("AbuseIPDB", score=9.5, comment="C2 server")
-        .relate_to(malicious_domain, RelationshipType.RESOLVES_TO)
+        .relate_to(malicious_domain, RelationshipType.RELATED_TO, RelationshipDirection.OUTBOUND)
     )
 
     # Suspicious infrastructure
@@ -39,7 +39,8 @@ with Cyvest() as cv:
         .add_ti("VirusTotal", score=4.5, comment="Some detections")
         .relate_to(
             cv.observable(ObservableType.IPV4_ADDR, "192.168.100.5").add_ti("Shodan", score=3.0),
-            RelationshipType.RESOLVES_TO,
+            RelationshipType.RELATED_TO,
+            RelationshipDirection.OUTBOUND,
         )
     )
 
@@ -57,8 +58,8 @@ with Cyvest() as cv:
     # Email message with multiple relationships
     email_message = (
         cv.observable(ObservableType.EMAIL_MESSAGE, "Phishing Email - Invoice #12345")
-        .relate_to(attacker_email, RelationshipType.FROM)
-        .relate_to(victim_email, RelationshipType.TO)
+        .relate_to(attacker_email, RelationshipType.RELATED_TO, RelationshipDirection.OUTBOUND)
+        .relate_to(victim_email, RelationshipType.RELATED_TO, RelationshipDirection.OUTBOUND)
         .add_ti("Email Gateway", score=7.0, comment="Flagged as suspicious")
     )
 
@@ -66,25 +67,25 @@ with Cyvest() as cv:
     phishing_url1 = (
         cv.observable(ObservableType.URL, "https://evil-phishing.com/login")
         .add_ti("URLhaus", score=9.0)
-        .relate_to(malicious_domain, RelationshipType.RESOLVES_TO)
+        .relate_to(malicious_domain, RelationshipType.RELATED_TO, RelationshipDirection.OUTBOUND)
     )
 
     phishing_url2 = (
         cv.observable(ObservableType.URL, "https://evil-phishing.com/verify")
         .add_ti("URLhaus", score=8.5)
-        .relate_to(malicious_domain, RelationshipType.RESOLVES_TO)
+        .relate_to(malicious_domain, RelationshipType.RELATED_TO, RelationshipDirection.OUTBOUND)
     )
 
     # Email contains URLs
-    email_message.relate_to(phishing_url1, RelationshipType.CONTAINS)
-    email_message.relate_to(phishing_url2, RelationshipType.CONTAINS)
+    email_message.relate_to(phishing_url1, RelationshipType.RELATED_TO, RelationshipDirection.OUTBOUND)
+    email_message.relate_to(phishing_url2, RelationshipType.RELATED_TO, RelationshipDirection.OUTBOUND)
 
     # Malware file dropped
     malware_file = (
         cv.observable(ObservableType.FILE, "invoice.exe")
         .add_ti("VirusTotal", score=10.0, comment="Detected by 45/70 engines")
-        .relate_to(phishing_url1, RelationshipType.DOWNLOADED)
-        .relate_to(malicious_ip, RelationshipType.COMMUNICATES_WITH)
+        .relate_to(phishing_url1, RelationshipType.RELATED_TO, RelationshipDirection.INBOUND)
+        .relate_to(malicious_ip, RelationshipType.RELATED_TO, RelationshipDirection.BIDIRECTIONAL)
     )
 
     # Safe/whitelisted observables for contrast

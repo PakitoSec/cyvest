@@ -1,4 +1,4 @@
-"""Tests for STIX2 Observable and Relationship type enums."""
+"""Tests for observable and relationship type enums."""
 
 from decimal import Decimal
 
@@ -6,7 +6,7 @@ from cyvest.model import Observable, ObservableType, Relationship, RelationshipT
 
 
 def test_observable_type_enum_values() -> None:
-    """Test that ObservableType enum has expected STIX2 values."""
+    """Test that ObservableType enum has expected values."""
     # Network types
     assert ObservableType.IPV4_ADDR.value == "ipv4-addr"
     assert ObservableType.IPV6_ADDR.value == "ipv6-addr"
@@ -28,34 +28,8 @@ def test_observable_type_enum_values() -> None:
 
 
 def test_relationship_type_enum_values() -> None:
-    """Test that RelationshipType enum has expected STIX2 values."""
-    expected_values = {
-        RelationshipType.RELATED_TO: "related-to",
-        RelationshipType.DERIVED_FROM: "derived-from",
-        RelationshipType.DUPLICATE_OF: "duplicate-of",
-        RelationshipType.INDICATES: "indicates",
-        RelationshipType.MITIGATES: "mitigates",
-        RelationshipType.INVESTIGATES: "investigates",
-        RelationshipType.USES: "uses",
-        RelationshipType.TARGETS: "targets",
-        RelationshipType.ATTRIBUTED_TO: "attributed-to",
-        RelationshipType.IMPERSONATES: "impersonates",
-        RelationshipType.LOCATED_AT: "located-at",
-        RelationshipType.ORIGINATES_FROM: "originates-from",
-        RelationshipType.OWNED_BY: "owned-by",
-        RelationshipType.COMMUNICATES_WITH: "communicates-with",
-        RelationshipType.DELIVERS: "delivers",
-        RelationshipType.EXPLOITS: "exploits",
-        RelationshipType.DROPS: "drops",
-        RelationshipType.BEACONS_TO: "beacons-to",
-        RelationshipType.COMPROMISES: "compromises",
-        RelationshipType.HOSTS: "hosts",
-        RelationshipType.AUTHORED_BY: "authored-by",
-        RelationshipType.VARIANT_OF: "variant-of",
-    }
-
-    for rel_type, value in expected_values.items():
-        assert rel_type.value == value
+    """Test that RelationshipType enum has expected values."""
+    assert RelationshipType.RELATED_TO.value == "related-to"
 
 
 def test_observable_with_enum_type() -> None:
@@ -80,13 +54,13 @@ def test_observable_with_string_type() -> None:
         score=Decimal("5.0"),
     )
 
-    # String should be normalized to enum if it's a valid STIX2 type
+    # String should be normalized to enum if it's a known type
     assert isinstance(obs.obs_type, ObservableType)
     assert obs.obs_type == ObservableType.IPV4_ADDR
 
 
 def test_observable_with_custom_type() -> None:
-    """Test creating observable with custom (non-STIX2) type."""
+    """Test creating observable with custom type."""
     obs = Observable(
         obs_type="custom-indicator",
         value="some-value",
@@ -130,13 +104,13 @@ def test_relationship_with_string_type() -> None:
         relationship_type="related-to",
     )
 
-    # String should be normalized to enum if it's a valid STIX2 type
+    # String should be normalized to enum if it's a known type
     assert isinstance(rel.relationship_type, RelationshipType)
     assert rel.relationship_type == RelationshipType.RELATED_TO
 
 
 def test_relationship_with_custom_type() -> None:
-    """Test creating relationship with custom (non-STIX2) type."""
+    """Test creating relationship with custom type."""
     rel = Relationship(
         target_key="obs:custom:value",
         relationship_type="custom-relationship",

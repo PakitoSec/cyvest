@@ -491,23 +491,21 @@ def test_explicit_direction_override() -> None:
 
     cv = Cyvest(score_mode=ScoreMode.MAX)
 
-    # INDICATES normally defaults to OUTBOUND, but we can override
     domain = cv.observable_create("domain", "override.com")
     cv.observable_add_threat_intel(domain.key, source="source1", score=Decimal("1.0"))
 
     ip = cv.observable_create("ip", "3.3.3.3")
     cv.observable_add_threat_intel(ip.key, source="source2", score=Decimal("8.0"))
 
-    # Override INDICATES to be BIDIRECTIONAL (no hierarchy)
-    cv.observable_add_relationship(domain.key, ip.key, RelationshipType.INDICATES, RelationshipDirection.BIDIRECTIONAL)
+    # Override default BIDIRECTIONAL to OUTBOUND to enable hierarchy
+    cv.observable_add_relationship(domain.key, ip.key, RelationshipType.RELATED_TO, RelationshipDirection.OUTBOUND)
 
-    # Bidirectional means no hierarchical propagation
-    # Each keeps only its own score
-    assert domain.score == Decimal("1.0")
+    # OUTBOUND means ip is a child; its score propagates to the domain
+    assert domain.score == Decimal("8.0")
     assert ip.score == Decimal("8.0")
 
-    # Verify the relationship has BIDIRECTIONAL direction
-    assert domain.relationships[0].direction == RelationshipDirection.BIDIRECTIONAL
+    # Verify the relationship has OUTBOUND direction
+    assert domain.relationships[0].direction == RelationshipDirection.OUTBOUND
 
 
 def test_sum_mode_with_direction_based_children() -> None:

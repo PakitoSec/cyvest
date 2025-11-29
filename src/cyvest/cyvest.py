@@ -354,7 +354,7 @@ class Cyvest:
         extra: dict[str, Any] | None = None,
         score: Decimal | float | None = None,
         level: Level | str | None = None,
-        score_policy: CheckScorePolicy | str | None = None,
+        score_policy: CheckScorePolicy | Literal["auto", "manual"] | None = None,
     ) -> CheckProxy:
         """
         Create a new check.
@@ -783,7 +783,7 @@ class Cyvest:
         extra: dict[str, Any] | None = None,
         score: Decimal | float | None = None,
         level: Level | str | None = None,
-        score_policy: CheckScorePolicy | str | None = None,
+        score_policy: CheckScorePolicy | Literal["auto", "manual"] | None = None,
     ) -> CheckProxy:
         """
         Create a check with fluent helper methods.

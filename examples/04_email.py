@@ -133,9 +133,11 @@ class EmailFrom(BaseRule):
         """Analyze email headers and build investigation fragment."""
         # Use shared context to create Cyvest with auto-reconcile
         data = cy.root().extra
-        from_addr = data.get("from_addr")
-        from_domain = data.get("from_domain")
-        from_ip = data.get("from_ip")
+        from_addr = data.get("from_addr")["address"]
+        from_domain = from_addr.split("@")[-1]
+        from_domain_score = data.get("from_addr")["score"]
+        from_ip = data.get("mx_ip")["ip"]
+        from_ip_score = data.get("mx_ip")["score"]
 
         logger.info(f"Analyzing email header FROM: {from_addr}")
 
@@ -145,19 +147,52 @@ class EmailFrom(BaseRule):
             .relate_to(cy.root(), relationship_type=RelationshipType.RELATED_TO, direction="inbound")
             .relate_to(
                 cy.observable(ObservableType.DOMAIN_NAME, from_domain)
-                .add_ti("VT", 2)
+                .add_ti("VT", from_domain_score)
                 .relate_to(
-                    cy.observable(ObservableType.IPV4_ADDR, from_ip).add_ti("SEKOIA", 0),
+                    cy.observable(ObservableType.IPV4_ADDR, from_ip).add_ti("ABUSEIPDB", from_ip_score),
                     RelationshipType.RELATED_TO,
+                    direction="outbound",
                 ),
                 RelationshipType.RELATED_TO,
+                direction="outbound",
             )
-            .add_ti("VT", 10, "test")
+            .add_ti("VT", 0, "> test")
         )
 
         # Create check for header analysis
         (
-            cy.check("from", "header", "test email vt 10", "> ok boys")
+            cy.check("from", "header", "test email vt 10", "> ok boys", score_policy="manual")
+            .link_observable(obs)
+            .with_score(obs.score)
+            .in_container(cy.container("emails"))
+        )
+
+        logger.info(f"Email header analysis complete: {obs.key}")
+
+
+class EmailFromBIS(BaseRule):
+    """
+    Analyzes email headers (FROM, SENDER, TO, CC, BCC).
+
+    Builds observable chain: EMAIL_ADDR -> DOMAIN_NAME -> IPV4_ADDR
+    """
+
+    _scope = "header"
+    order = 100
+
+    def run(self, cy: Cyvest) -> None:
+        """Analyze email headers and build investigation fragment."""
+        # Use shared context to create Cyvest with auto-reconcile
+        data = cy.root().extra
+        from_addr = data.get("from_addr")["address"]
+        logger.info(f"Analyzing email header FROM: {from_addr}")
+
+        # Build observable chain with threat intel
+        obs = cy.observable(ObservableType.EMAIL_ADDR, from_addr).add_ti("PROOFPOINT", 2, "> test")
+
+        # Create check for header analysis
+        (
+            cy.check("from-proofpoint", "header", "test email vt 10", "> ok boys")
             .link_observable(obs)
             .in_container(cy.container("emails"))
         )
@@ -489,9 +524,8 @@ def main(workers, browser, stats):
     # Prepare input data
     email_data = {
         "structured_email": {},
-        "from_addr": "noreply@dmalicious.com",
-        "from_domain": "dmalicious.com",
-        "from_ip": "8.1.2.3",
+        "from_addr": {"address": "noreply@dmalicious.com", "score": 1},
+        "mx_ip": {"ip": "8.1.2.3", "score": 2},
         "body_urls": [
             {"url": "https://virus.com/payload.exe", "score": 5},
             {"url": "https://virus.com/about", "score": 3},
@@ -515,6 +549,7 @@ def main(workers, browser, stats):
     # Create tasks
     tasks = [
         EmailFrom(),
+        EmailFromBIS(),
         EmailReciever(),
         BodiesUrlTask(),
         BodiesDomainTask(),

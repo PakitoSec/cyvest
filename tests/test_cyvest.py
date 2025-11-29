@@ -201,17 +201,17 @@ def test_relationship_with_direction() -> None:
     obs1 = cv.observable_create("url", "https://example.com")
     obs2 = cv.observable_create("ip", "192.168.1.1")
 
-    # Default direction (outbound)
-    cv.observable_add_relationship(obs1.key, obs2.key, "indicates")
-    assert obs1.relationships[0].direction == RelationshipDirection.OUTBOUND
+    # Default direction (bidirectional)
+    cv.observable_add_relationship(obs1.key, obs2.key, "related-to")
+    assert obs1.relationships[0].direction == RelationshipDirection.BIDIRECTIONAL
+
+    # Explicit outbound
+    cv.observable_add_relationship(obs1.key, obs2.key, "related-to", "outbound")
+    assert obs1.relationships[1].direction == RelationshipDirection.OUTBOUND
 
     # Explicit inbound
-    cv.observable_add_relationship(obs1.key, obs2.key, "owned-by", "inbound")
-    assert obs1.relationships[1].direction == RelationshipDirection.INBOUND
-
-    # Explicit bidirectional
-    cv.observable_add_relationship(obs1.key, obs2.key, "related-to", "bidirectional")
-    assert obs1.relationships[2].direction == RelationshipDirection.BIDIRECTIONAL
+    cv.observable_add_relationship(obs1.key, obs2.key, "related-to", "inbound")
+    assert obs1.relationships[2].direction == RelationshipDirection.INBOUND
 
 
 def test_relationship_semantic_defaults_via_api() -> None:
@@ -222,17 +222,9 @@ def test_relationship_semantic_defaults_via_api() -> None:
     obs1 = cv.observable_create("url", "https://example.com")
     obs2 = cv.observable_create("ip", "192.168.1.1")
 
-    # No direction specified - should use OUTBOUND for INDICATES
-    cv.observable_add_relationship(obs1.key, obs2.key, RelationshipType.INDICATES)
-    assert obs1.relationships[0].direction == RelationshipDirection.OUTBOUND
-
-    # No direction specified - should use INBOUND for DERIVED_FROM
-    cv.observable_add_relationship(obs1.key, obs2.key, RelationshipType.DERIVED_FROM)
-    assert obs1.relationships[1].direction == RelationshipDirection.INBOUND
-
-    # No direction specified - should use BIDIRECTIONAL for COMMUNICATES_WITH
-    cv.observable_add_relationship(obs1.key, obs2.key, RelationshipType.COMMUNICATES_WITH)
-    assert obs1.relationships[2].direction == RelationshipDirection.BIDIRECTIONAL
+    # No direction specified - uses BIDIRECTIONAL by default
+    cv.observable_add_relationship(obs1.key, obs2.key, RelationshipType.RELATED_TO)
+    assert obs1.relationships[0].direction == RelationshipDirection.BIDIRECTIONAL
 
 
 def test_finalize_relationships_single_orphan() -> None:

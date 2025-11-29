@@ -75,7 +75,7 @@ class BodiesUrlTask(InvestigationTask):
                 # Link URL to the shared domain observable
                 cy.observable(ObservableType.URL, data.get("url")).relate_to(
                     domain,
-                    RelationshipType.RESOLVES_TO
+                    RelationshipType.RELATED_TO
                 )
             return cy
 ```
@@ -141,7 +141,7 @@ domain = shared_context.get_observable("obs:domain-name:malicious.com")
 if domain:
     cy.observable(ObservableType.URL, "https://example.com").relate_to(
         domain,
-        RelationshipType.RESOLVES_TO
+        RelationshipType.RELATED_TO
     )
 ```
 

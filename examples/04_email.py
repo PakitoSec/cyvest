@@ -133,9 +133,11 @@ class EmailFrom(BaseRule):
         """Analyze email headers and build investigation fragment."""
         # Use shared context to create Cyvest with auto-reconcile
         data = cy.root().extra
-        from_addr = data.get("from_addr", "noreply@domainmalicious.com")
-        from_domain = data.get("from_domain", "domainmalicious.com")
-        from_ip = data.get("from_ip", "8.1.2.3")
+        from_addr = data.get("from_addr")["address"]
+        from_domain = from_addr.split("@")[-1]
+        from_domain_score = data.get("from_addr")["score"]
+        from_ip = data.get("mx_ip")["ip"]
+        from_ip_score = data.get("mx_ip")["score"]
 
         logger.info(f"Analyzing email header FROM: {from_addr}")
 
@@ -145,19 +147,52 @@ class EmailFrom(BaseRule):
             .relate_to(cy.root(), relationship_type=RelationshipType.RELATED_TO, direction="inbound")
             .relate_to(
                 cy.observable(ObservableType.DOMAIN_NAME, from_domain)
-                .add_ti("VT", 2)
+                .add_ti("VT", from_domain_score)
                 .relate_to(
-                    cy.observable(ObservableType.IPV4_ADDR, from_ip).add_ti("SEKOIA", 0),
+                    cy.observable(ObservableType.IPV4_ADDR, from_ip).add_ti("ABUSEIPDB", from_ip_score),
                     RelationshipType.RELATED_TO,
+                    direction="outbound",
                 ),
                 RelationshipType.RELATED_TO,
+                direction="outbound",
             )
-            .add_ti("VT", 10, "test")
+            .add_ti("VT", 0, "> test")
         )
 
         # Create check for header analysis
         (
-            cy.check("from", "header", "test email vt 10", "> ok boys")
+            cy.check("from", "header", "test email vt 10", "> ok boys", score_policy="manual")
+            .link_observable(obs)
+            .with_score(obs.score)
+            .in_container(cy.container("emails"))
+        )
+
+        logger.info(f"Email header analysis complete: {obs.key}")
+
+
+class EmailFromBIS(BaseRule):
+    """
+    Analyzes email headers (FROM, SENDER, TO, CC, BCC).
+
+    Builds observable chain: EMAIL_ADDR -> DOMAIN_NAME -> IPV4_ADDR
+    """
+
+    _scope = "header"
+    order = 100
+
+    def run(self, cy: Cyvest) -> None:
+        """Analyze email headers and build investigation fragment."""
+        # Use shared context to create Cyvest with auto-reconcile
+        data = cy.root().extra
+        from_addr = data.get("from_addr")["address"]
+        logger.info(f"Analyzing email header FROM: {from_addr}")
+
+        # Build observable chain with threat intel
+        obs = cy.observable(ObservableType.EMAIL_ADDR, from_addr).add_ti("PROOFPOINT", 5, "> test")
+
+        # Create check for header analysis
+        (
+            cy.check("from-proofpoint", "header", "test email vt 10", "> ok boys")
             .link_observable(obs)
             .in_container(cy.container("emails"))
         )
@@ -207,6 +242,8 @@ class BodiesUrlTask(BaseRule):
         # Extract URLs from data (stored in root observable)
         data = cy.root().extra
         urls_with_scores = data.get("body_urls")
+        domains_with_scores = data.get("body_domains")
+        all_domains = [d["domain"] for d in domains_with_scores]
 
         logger.info(f"Checking BODIES URLs: {len(urls_with_scores)}")
 
@@ -217,30 +254,21 @@ class BodiesUrlTask(BaseRule):
         for url_data in urls_with_scores:
             url = url_data["url"]
             score = url_data["score"]
-            link_malicious = url_data.get("link_malicious", True)
 
             logger.info(f"Analyzing URL: {url} (score: {score})")
 
             # Build URL observable with relationships
-            url_obs = (
-                cy.observable(ObservableType.URL, url)
-                .add_ti("VT", score)
-                .relate_to(
-                    cy.observable(ObservableType.FILE, "BODY/HTML").relate_to(
-                        cy.root(), RelationshipType.RELATED_TO, direction="inbound"
-                    ),
+            matching_domain = None
+            for domain in all_domains:
+                if domain in url:
+                    matching_domain = domain
+                    break
+            url_obs = cy.observable(ObservableType.URL, url).add_ti("VT", score)
+            if matching_domain:
+                url_obs.relate_to(
+                    cy.observable(ObservableType.DOMAIN_NAME, matching_domain),
                     RelationshipType.RELATED_TO,
                     direction="inbound",
-                )
-            )
-
-            # Link to malicious domain if applicable
-            # The merge system will automatically deduplicate with EmailFrom's domain observable
-            if link_malicious:
-                logger.info(f"Linking URL {url} to malicious domain")
-                url_obs = url_obs.relate_to(
-                    cy.observable(ObservableType.DOMAIN_NAME, "domainmalicious.com"),
-                    RelationshipType.RELATED_TO,
                 )
 
             # Create check and link to container
@@ -253,6 +281,61 @@ class BodiesUrlTask(BaseRule):
             logger.info("[bold red]Check Score: {}[/bold red]", chk.score)
 
         logger.info(f"Bodies URLs analysis complete: {len(urls_with_scores)} URLs processed")
+        logger.info("[bold red]Container Score: {}[/bold red]", container.get_aggregated_score())
+
+
+class BodiesDomainTask(BaseRule):
+    """
+    Analyzes URLs found in email bodies.
+
+    Similar to CortexBodiesURL - extracts URLs, performs threat intel checks,
+    and builds observable relationships.
+    """
+
+    _scope = "body"
+    order = 200
+
+    def run(self, cy: Cyvest) -> None:
+        """Analyze body URLs and build investigation fragment."""
+        # Extract URLs from data (stored in root observable)
+        data = cy.root().extra
+        domains_with_scores = data.get("body_domains")
+
+        logger.info(f"Checking BODIES DOMAINS: {len(domains_with_scores)}")
+
+        # Create container for domain checks
+        container = cy.container("bodies-domains", "Bodies Domains Analysis")
+
+        # Analyze each domain
+        for domain_data in domains_with_scores:
+            domain = domain_data["domain"]
+            score = domain_data["score"]
+
+            logger.info(f"Analyzing domain: {domain} (score: {score})")
+
+            # Build Domain observable with relationships
+            domain_obs = (
+                cy.observable(ObservableType.DOMAIN_NAME, domain)
+                .add_ti("VT", score)
+                .relate_to(
+                    cy.observable(ObservableType.FILE, "BODY/HTML").relate_to(
+                        cy.root(), RelationshipType.RELATED_TO, direction="inbound"
+                    ),
+                    RelationshipType.RELATED_TO,
+                    direction="inbound",
+                )
+            )
+
+            # Create check and link to container
+            chk = (
+                cy.check(f"body-domain-{domain}", "body", f"Domain analysis {domain}", comment=f"> score: {score}")
+                .link_observable(domain_obs)
+                .in_container(container)
+            )
+
+            logger.info("[bold red]Check Score: {}[/bold red]", chk.score)
+
+        logger.info(f"Bodies DOMAINS analysis complete: {len(domains_with_scores)} DOMAINS processed")
         logger.info("[bold red]Container Score: {}[/bold red]", container.get_aggregated_score())
 
 
@@ -441,12 +524,16 @@ def main(workers, browser, stats):
     # Prepare input data
     email_data = {
         "structured_email": {},
-        "from_addr": "noreply@domainmalicious.com",
-        "from_domain": "domainmalicious.com",
-        "from_ip": "8.1.2.3",
+        "from_addr": {"address": "noreply@dmalicious.com", "score": 1},
+        "mx_ip": {"ip": "8.1.2.3", "score": 2},
         "body_urls": [
-            {"url": "https://toto.domain.malicious.com", "score": 3, "link_malicious": True},
-            {"url": "https://domain.com/ok/toto", "score": -1, "link_malicious": False},
+            {"url": "https://virus.com/payload.exe", "score": 5},
+            {"url": "https://virus.com/about", "score": 3},
+            {"url": "https://domain.com/ok/toto", "score": -1},
+        ],
+        "body_domains": [
+            {"domain": "virus.com", "score": 3},
+            {"domain": "domain.com", "score": 0},
         ],
         "attachments": [
             {
@@ -460,7 +547,16 @@ def main(workers, browser, stats):
     }
 
     # Create tasks
-    tasks = [EmailFrom(), EmailReciever(), BodiesUrlTask(), AttachmentTask(), AggregatedRiskTask(), AI()]
+    tasks = [
+        EmailFrom(),
+        EmailFromBIS(),
+        EmailReciever(),
+        BodiesUrlTask(),
+        BodiesDomainTask(),
+        AttachmentTask(),
+        AggregatedRiskTask(),
+        AI(),
+    ]
 
     # Execute tasks in parallel
     executor = RuleExecutor(max_workers=workers)
@@ -474,7 +570,7 @@ def main(workers, browser, stats):
     logger.info(c.comment)
 
     # Display results
-    logger.info("Investigation complete - displaying summary")
+    logger.info("Investigation complete - displaying summary - score should be 36.1")
 
     cy.display_summary()
     if stats:

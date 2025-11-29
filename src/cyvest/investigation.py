@@ -18,7 +18,7 @@ from logurich import logger
 from cyvest import keys
 from cyvest.levels import Level, get_level_from_score, normalize_level
 from cyvest.model import Check, CheckScorePolicy, Container, Enrichment, Observable, ObservableType, ThreatIntel
-from cyvest.score import ScoreEngine, ScoreMode
+from cyvest.score import ScoreEngine, ScoreMode, normalize_score_mode
 from cyvest.stats import InvestigationStats
 
 if TYPE_CHECKING:
@@ -195,7 +195,7 @@ class SharedInvestigationContext:
 
         WRONG:
             >>> malicious_domain = shared_context.get_observable(ObservableType.DOMAIN_NAME, "evil.com")
-            >>> url_obs.relate_to(malicious_domain, RelationshipType.RESOLVES_TO)  # ERROR!
+            >>> url_obs.relate_to(malicious_domain, RelationshipType.RELATED_TO)  # ERROR!
 
         CORRECT:
             >>> # Inspect the shared observable's properties
@@ -204,7 +204,7 @@ class SharedInvestigationContext:
             >>>     # Create a NEW observable in your local investigation
             >>>     url_obs.relate_to(
             >>>         cy.observable(ObservableType.DOMAIN_NAME, "evil.com"),
-            >>>         RelationshipType.RESOLVES_TO
+            >>>         RelationshipType.RELATED_TO
             >>>     )
 
         Args:
@@ -627,7 +627,9 @@ class Investigation:
         },
     }
 
-    def __init__(self, data: Any, root_type: str = "file", score_mode: ScoreMode = ScoreMode.MAX) -> None:
+    def __init__(
+        self, data: Any, root_type: str = "file", score_mode: ScoreMode | Literal["max", "sum"] = ScoreMode.MAX
+    ) -> None:
         """
         Initialize a new investigation.
 
@@ -643,7 +645,8 @@ class Investigation:
         self._containers: dict[str, Container] = {}
 
         # Internal components
-        self._score_engine = ScoreEngine(score_mode=score_mode)
+        normalized_score_mode = normalize_score_mode(score_mode)
+        self._score_engine = ScoreEngine(score_mode=normalized_score_mode)
         self._stats = InvestigationStats()
         self._whitelists: dict[str, InvestigationWhitelist] = {}
 
@@ -1075,7 +1078,7 @@ class Investigation:
         Args:
             source: Source observable or its key
             target: Target observable or its key
-            relationship_type: Type of relationship (STIX2 convention)
+            relationship_type: Type of relationship
             direction: Direction of the relationship (None = use semantic default)
 
         Returns:

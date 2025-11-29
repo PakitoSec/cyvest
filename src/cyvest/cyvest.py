@@ -29,7 +29,7 @@ from cyvest.io_serialization import (
 from cyvest.levels import Level, normalize_level
 from cyvest.model import Check, CheckScorePolicy, Container, Enrichment, Observable, ThreatIntel
 from cyvest.proxies import CheckProxy, ContainerProxy, EnrichmentProxy, ObservableProxy, ThreatIntelProxy
-from cyvest.score import ScoreMode
+from cyvest.score import ScoreMode, normalize_score_mode
 
 
 class Cyvest:
@@ -44,7 +44,7 @@ class Cyvest:
         self,
         data: Any = None,
         root_type: Literal["file", "artifact"] = "file",
-        score_mode: ScoreMode = ScoreMode.MAX,
+        score_mode: ScoreMode | Literal["max", "sum"] = ScoreMode.MAX,
     ) -> None:
         """
         Initialize a new investigation.
@@ -54,7 +54,8 @@ class Cyvest:
             root_type: Type of root observable ("file" or "artifact")
             score_mode: Score calculation mode (MAX or SUM)
         """
-        self._investigation = Investigation(data, root_type=root_type, score_mode=score_mode)
+        normalized_score_mode = normalize_score_mode(score_mode)
+        self._investigation = Investigation(data, root_type=root_type, score_mode=normalized_score_mode)
 
     def __enter__(self) -> Cyvest:
         """Context manager entry."""
@@ -263,7 +264,7 @@ class Cyvest:
         Args:
             source: Source observable or its key
             target: Target observable or its key
-            relationship_type: Type of relationship (STIX2 convention)
+            relationship_type: Type of relationship
             direction: Direction of the relationship (None = use semantic default for relationship type)
 
         Returns:

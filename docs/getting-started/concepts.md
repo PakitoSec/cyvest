@@ -32,7 +32,7 @@ Whitelist entries are included in JSON/Markdown exports so downstream systems ca
 - Email addresses, hostnames
 - Any entity that can be analyzed
 
-Cyvest supports **STIX2-compliant observable types** with built-in enums for type safety and IDE autocomplete.
+Cyvest ships enums for common observable types to keep your investigations consistent.
 
 Each observable has:
 - **Type**: The kind of artifact (can use `ObservableType` enum or string)
@@ -56,7 +56,7 @@ Each observable has:
 >
 > Dictionary fields are merged by default; pass `merge_extra=False` (or `merge_data=False`) to overwrite them completely.
 
-**STIX2 Observable Types:**
+**Observable Types:**
 
 ```python
 from cyvest import ObservableType
@@ -329,7 +329,7 @@ ip = cv.observable_create("ip", "198.51.100.42")
 cv.observable_add_threat_intel(ip.key, "abuseipdb", score=Decimal("8.0"))
 
 # Domain resolves to IP (OUTBOUND by default)
-cv.observable_add_relationship(domain, ip, RelationshipType.RESOLVES_TO)
+cv.observable_add_relationship(domain, ip, RelationshipType.RELATED_TO, RelationshipDirection.OUTBOUND)
 
 # Result: domain score = max(2.0, 8.0) = 8.0 (includes child IP score)
 print(f"Domain score: {domain.score}")  # 8.0
@@ -344,7 +344,7 @@ url = cv.observable_create("url", "http://evil.com/payload")
 cv.observable_add_threat_intel(url.key, "urlscan", score=Decimal("3.0"))
 
 # File downloaded from URL (INBOUND by default for DOWNLOADED)
-cv.observable_add_relationship(malware, url, RelationshipType.DOWNLOADED)
+cv.observable_add_relationship(malware, url, RelationshipType.RELATED_TO, RelationshipDirection.INBOUND)
 
 # Result: URL is parent, gets file's score
 print(f"File score: {malware.score}")  # 9.0
@@ -359,7 +359,7 @@ host2 = cv.observable_create("ip", "10.0.1.20")
 cv.observable_add_threat_intel(host2.key, "ids", score=Decimal("2.0"))
 
 # Hosts communicate (BIDIRECTIONAL by default)
-cv.observable_add_relationship(host1, host2, RelationshipType.COMMUNICATES_WITH)
+cv.observable_add_relationship(host1, host2, RelationshipType.RELATED_TO)
 
 # Result: No hierarchical propagation, each keeps own score
 print(f"Host1 score: {host1.score}")  # 7.0
@@ -373,10 +373,10 @@ cv.observable_add_threat_intel(domain2.key, "source", score=Decimal("1.0"))
 ip2 = cv.observable_create("ip", "192.0.2.1")
 cv.observable_add_threat_intel(ip2.key, "source", score=Decimal("5.0"))
 
-# Override RESOLVES_TO to BIDIRECTIONAL (no hierarchy)
+# Override default to BIDIRECTIONAL (no hierarchy)
 cv.observable_add_relationship(
     domain2, ip2,  # Observable proxies
-    RelationshipType.RESOLVES_TO,
+    RelationshipType.RELATED_TO,
     RelationshipDirection.BIDIRECTIONAL
 )
 
@@ -400,8 +400,8 @@ cv.observable_add_threat_intel(parent.key, "source2", score=Decimal("2.0"))
 child = cv.observable_create("ip", "203.0.113.10")
 cv.observable_add_threat_intel(child.key, "source3", score=Decimal("9.0"))
 
-cv.observable_add_relationship(grandparent.key, parent.key, "resolves-to")
-cv.observable_add_relationship(parent.key, child.key, "resolves-to")
+cv.observable_add_relationship(grandparent.key, parent.key, "related-to", RelationshipDirection.OUTBOUND)
+cv.observable_add_relationship(parent.key, child.key, "related-to", RelationshipDirection.OUTBOUND)
 
 # Scores propagate all the way up:
 # child = 9.0
@@ -583,153 +583,35 @@ This propagation ensures that checks analyzing whitelisted/trusted assets are pr
 
 ## Relationships
 
-Relationships follow **STIX2 conventions** with built-in type support.
-
-**Important:** Relationships should be added via the Cyvest facade or proxy helpers (e.g., `cv.observable_add_relationship()` or `ObservableProxy.relate_to()`). This ensures:
-- **Validation**: Both source and target observables must exist in the investigation
-- **Centralized management**: All relationships are tracked in one place
-- **Data integrity**: No dangling references to non-existent observables
+Relationships let you link observables together. Use the Cyvest facade or proxy helpers (e.g., `cv.observable_add_relationship()` or `ObservableProxy.relate_to()`) so validation and score propagation stay consistent.
 
 ```python
-from cyvest import RelationshipType
+from cyvest import RelationshipDirection, RelationshipType
 
-# Network relationships
-RelationshipType.RESOLVES_TO           # DNS resolution
-RelationshipType.BELONGS_TO            # Network ownership
-RelationshipType.COMMUNICATES_WITH     # Network communication
-
-# File relationships
-RelationshipType.CONTAINS              # Containment
-RelationshipType.DOWNLOADED            # Download action
-RelationshipType.DROPPED               # File dropping
-
-# Email relationships
-RelationshipType.FROM                  # Email sender
-RelationshipType.TO                    # Email recipient
-RelationshipType.CC                    # Email CC
-RelationshipType.SENDER                # Email sender field
-
-# Process relationships
-RelationshipType.CREATED               # Creation
-RelationshipType.OPENED                # File opened
-RelationshipType.PARENT                # Parent process
-RelationshipType.CHILD                 # Child process
-
-# General relationships
-RelationshipType.RELATED_TO            # General association
-RelationshipType.DERIVED_FROM          # Derivation
-RelationshipType.DUPLICATE_OF          # Duplication
-```
-
-**Common Relationship Patterns:**
-
-| Relationship Type | Meaning | Example |
-|------------------|---------|---------|
-| `RELATED_TO` | General association | Email related to URL |
-| `RESOLVES_TO` | DNS resolution | Domain resolves to IP |
-| `CONTAINS` | Containment | Email contains attachment |
-| `COMMUNICATES_WITH` | Network communication | Host communicates with IP |
-| `DOWNLOADED` | Download action | URL downloaded file |
-| `CREATED` | Creation | Process created file |
-
-**Creating Relationships:**
-
-```python
 # Using observable proxies (recommended)
 cv.observable_add_relationship(
     source=url,  # Observable proxy
     target=ip,   # Observable proxy
-    relationship_type=RelationshipType.RESOLVES_TO
+    relationship_type=RelationshipType.RELATED_TO,
+)
+
+# Override direction to control score hierarchy
+cv.observable_add_relationship(
+    source=parent,
+    target=child,
+    relationship_type=RelationshipType.RELATED_TO,
+    direction=RelationshipDirection.OUTBOUND,  # child score flows to parent
 )
 
 # Using string keys (backward compatible)
 cv.observable_add_relationship(
     source=url.key,
     target=ip.key,
-    relationship_type=RelationshipType.RESOLVES_TO
-)
-
-# Mix observable proxies and keys
-cv.observable_add_relationship(
-    source=email,      # Observable proxy
-    target=url.key,    # String key
-    relationship_type="related-to"
-)
-
-# Custom relationship types
-cv.observable_add_relationship(
-    source=obs1,
-    target=obs2,
-    relationship_type="custom-relationship"
+    relationship_type="related-to",
 )
 ```
 
-### Relationship Direction
-
-Relationships support directional semantics with **automatic semantic defaults**:
-
-```python
-from cyvest import RelationshipType
-
-# Automatically gets OUTBOUND (domain → IP)
-# Accepts observable proxies directly
-cv.observable_add_relationship(domain, ip, RelationshipType.RESOLVES_TO)
-
-# Automatically gets INBOUND (file ← URL)
-cv.observable_add_relationship(malware_file, download_url, RelationshipType.DOWNLOADED)
-
-# Automatically gets BIDIRECTIONAL (host ↔ host)
-cv.observable_add_relationship(host1, host2, RelationshipType.COMMUNICATES_WITH)
-
-# Can still override semantic defaults if needed
-cv.observable_add_relationship(
-    domain, ip,  # Observable proxies
-    RelationshipType.RESOLVES_TO,
-    RelationshipDirection.INBOUND  # explicit override
-)
-
-# Using the fluent helpers (also uses semantic defaults)
-# Accepts observable proxies or string keys
-url.relate_to(domain, RelationshipType.RELATED_TO)  # auto: BIDIRECTIONAL
-```
-
-**Semantic Default Directions:**
-
-Each relationship type automatically gets the most appropriate direction:
-
-| Relationship Type | Default Direction | Symbol | Rationale |
-|-------------------|-------------------|--------|-----------|
-| `RESOLVES_TO` | OUTBOUND | → | Domain resolves to IP |
-| `BELONGS_TO` | OUTBOUND | → | IP belongs to network/AS |
-| `COMMUNICATES_WITH` | BIDIRECTIONAL | ↔ | Mutual communication |
-| `CONTAINS` | OUTBOUND | → | Container holds item |
-| `DOWNLOADED` | INBOUND | ← | File from source |
-| `DROPPED` | INBOUND | ← | File from dropper |
-| `FROM` | INBOUND | ← | Email from sender |
-| `SENDER` | INBOUND | ← | Email from sender |
-| `TO`, `CC`, `BCC` | OUTBOUND | → | Email to recipient |
-| `CREATED` | OUTBOUND | → | Creator to created |
-| `OPENED` | OUTBOUND | → | Opener to opened |
-| `PARENT` | OUTBOUND | → | Parent to child |
-| `CHILD` | INBOUND | ← | Child from parent |
-| `RELATED_TO` | BIDIRECTIONAL | ↔ | Symmetric association |
-| `DERIVED_FROM` | INBOUND | ← | Derived from source |
-| `DUPLICATE_OF` | BIDIRECTIONAL | ↔ | Symmetric duplication |
-
-**Visualization:**
-
-Direction symbols automatically appear in:
-- Terminal output with Rich formatting
-- Markdown exports for documentation
-- Investigation graphs and trees
-
-```markdown
-# Example markdown output
-- **Relationships:**
-  - resolves-to → obs:ipv4-addr:192.0.2.1
-  - downloaded ← obs:url:http://malware.com/payload
-  - communicates-with ↔ obs:ipv4-addr:10.0.1.50
-```
+`RELATED_TO` defaults to `BIDIRECTIONAL`. Choose `OUTBOUND` or `INBOUND` when you need explicit parent/child scoring.
 
 ## Key Generation
 

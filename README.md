@@ -10,8 +10,8 @@
 - 🔍 **Structured Investigation Modeling**: Model investigations with observables, checks, threat intelligence, and enrichments
 - 📊 **Automatic Scoring**: Dynamic score calculation and propagation through investigation hierarchy
 - 🎯 **Level Classification**: Automatic security level assignment (TRUSTED, INFO, SAFE, NOTABLE, SUSPICIOUS, MALICIOUS)
-- 🔗 **Relationship Tracking**: STIX2-compliant relationship modeling between observables
-- 🏷️ **STIX2 Type Support**: Built-in enums for STIX2 Observable and Relationship types with autocomplete
+- 🔗 **Relationship Tracking**: Lightweight relationship modeling between observables
+- 🏷️ **Typed Helpers**: Built-in enums for observable types and relationships with autocomplete
 - 📈 **Real-time Statistics**: Live metrics and aggregations throughout the investigation
 - 🔄 **Investigation Merging**: Combine investigations from multiple threads or processes
 - 🧵 **Multi-Threading Support**: Advanced thread-safe shared context available via `cyvest.investigation` module
@@ -55,7 +55,7 @@ from cyvest import Cyvest, Level, ObservableType, RelationshipType
 
 # Create an investigation
 with Cyvest(data={"type": "email"}) as cv:
-    # Create observables with STIX2 types
+    # Create observables
     url = (
         cv.observable(ObservableType.URL, "https://phishing-site.com", internal=False)
         .with_ti("virustotal", score=Decimal("8.5"), level=Level.MALICIOUS)
@@ -99,108 +99,30 @@ Dictionary fields merge by default; pass `merge_extra=False` (or `merge_data=Fal
 
 ### Observables
 
-Observables represent cyber artifacts (URLs, IPs, domains, hashes, files, etc.). Use STIX2-compliant types for standardization:
+Observables represent cyber artifacts (URLs, IPs, domains, hashes, files, etc.).
 
 ```python
-from cyvest import ObservableType, RelationshipType
+from cyvest import ObservableType, RelationshipType, RelationshipDirection
 
-# Create observable with STIX2 type enum
 url_obs = cv.observable_create(
     ObservableType.URL,
     "https://malicious.com",
     internal=False
 )
 
-# Or use strings (backward compatible)
 ip_obs = cv.observable_create("ipv4-addr", "192.0.2.1", internal=False)
 
-# Add threat intelligence
-cv.observable_add_threat_intel(
-    url_obs.key,
-    source="virustotal",
-    score=Decimal("9.0"),
-    level=Level.MALICIOUS,
-    comment="Detected as malware distribution site"
-)
-
-# Create relationships with STIX2 relationship types
-# Accepts observable proxies or string keys
 cv.observable_add_relationship(
     url_obs,  # Can pass ObservableProxy directly
     ip_obs,   # Or use .key for string keys
-    RelationshipType.RESOLVES_TO
+    RelationshipType.RELATED_TO,
+    RelationshipDirection.BIDIRECTIONAL,
 )
 ```
 
-**Available STIX2 Observable Types:**
-
-- Network: `IPV4_ADDR`, `IPV6_ADDR`, `DOMAIN_NAME`, `URL`, `MAC_ADDR`, `NETWORK_TRAFFIC`
-- Email: `EMAIL_ADDR`, `EMAIL_MESSAGE`, `EMAIL_MIME_PART`
-- File: `FILE`, `DIRECTORY`, `ARTIFACT`
-- System: `PROCESS`, `SOFTWARE`, `USER_ACCOUNT`, `WINDOWS_REGISTRY_KEY`
-- Other: `AUTONOMOUS_SYSTEM`, `MUTEX`, `X509_CERTIFICATE`
-
-**Available STIX2 Relationship Types:**
-
-- Network: `RESOLVES_TO`, `BELONGS_TO`, `COMMUNICATES_WITH`
-- File: `CONTAINS`, `DOWNLOADED`, `DROPPED`
-- Email: `FROM`, `SENDER`, `TO`, `CC`, `BCC`
-- Process: `CREATED`, `OPENED`, `PARENT`, `CHILD`
-- General: `RELATED_TO`, `DERIVED_FROM`, `DUPLICATE_OF`
-
-**Relationship Direction:**
-
-Relationships support directional semantics with **automatic semantic defaults** that determine **hierarchical score propagation**:
-
-```python
-from cyvest import RelationshipType, RelationshipDirection
-
-# Automatically gets OUTBOUND (domain → IP)
-# IP is a child of domain, IP's score propagates UP to domain
-# Accepts observable proxies directly
-cv.observable_add_relationship(domain, ip, RelationshipType.RESOLVES_TO)
-
-# Automatically gets INBOUND (file ← URL)
-# URL is parent of file, file's score propagates UP to URL
-cv.observable_add_relationship(malware, url, RelationshipType.DOWNLOADED)
-
-# Automatically gets BIDIRECTIONAL (host ↔ host)
-# No hierarchical propagation - scores remain independent
-cv.observable_add_relationship(host1, host2, RelationshipType.COMMUNICATES_WITH)
-
-# Can override semantic defaults if needed
-cv.observable_add_relationship(
-    domain, ip,  # Accepts observable proxies
-    RelationshipType.RESOLVES_TO,
-    RelationshipDirection.INBOUND  # explicit override
-)
-```
-
-**Direction-Based Hierarchical Scoring:**
-
-Relationship directions define parent-child hierarchies for score propagation:
-
-- **OUTBOUND (→)**: `source → target` — Target is a **child** of source
-  - Source's score includes child's score: `score = max(TI_scores, child_scores)`
-  - Example: `domain → IP` means IP score flows up to domain
-
-- **INBOUND (←)**: `source ← target` — Target is a **parent** of source
-  - Target's score includes source's score
-  - Example: `file ← URL` means file score flows up to URL
-
-- **BIDIRECTIONAL (↔)**: `source ↔ target` — **No hierarchy**
-  - Scores do NOT propagate between observables
-  - Each maintains independent score from its own threat intel
-  - Example: `host1 ↔ host2` keeps separate scores
-
-**Semantic Default Directions:**
-
-Each relationship type has an intuitive default direction:
-- **OUTBOUND (→)**: `RESOLVES_TO`, `BELONGS_TO`, `CONTAINS`, `TO`, `CC`, `BCC`, `CREATED`, `OPENED`, `PARENT`, `VALUES`
-- **INBOUND (←)**: `DOWNLOADED`, `DROPPED`, `FROM`, `SENDER`, `CHILD`, `DERIVED_FROM`
-- **BIDIRECTIONAL (↔)**: `COMMUNICATES_WITH`, `RELATED_TO`, `DUPLICATE_OF`
-
-Direction symbols appear in visualizations, markdown exports, and determine score flow.
+Cyvest ships enums for the most common observable types; you can still pass strings for custom types.
+Relationships are intentionally simple for now: use `RelationshipType.RELATED_TO` to link observables
+and optionally choose a direction (`OUTBOUND`, `INBOUND`, or `BIDIRECTIONAL`) to control score propagation.
 
 ### Checks
 
@@ -512,7 +434,6 @@ Cyvest is designed for:
 - **Deterministic Keys**: Same objects always generate same keys for merging
 - **Score Propagation**: Automatic hierarchical score calculation
 - **Flexible Export**: JSON for storage, Markdown for LLM analysis
-- **STIX2 Relationships**: Industry-standard relationship modeling
 - **Audit Trail**: Score change history for debugging
 
 ## Future Enhancements

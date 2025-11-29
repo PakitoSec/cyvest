@@ -17,7 +17,7 @@ from cyvest.levels import Level, get_level_from_score, normalize_level
 
 
 class ObservableType(str, Enum):
-    """STIX2 Cyber Observable types."""
+    """Cyber observable types."""
 
     # Network observables
     IPV4_ADDR = "ipv4-addr"
@@ -58,103 +58,15 @@ class ObservableType(str, Enum):
 
 
 class RelationshipType(str, Enum):
-    """
-    STIX 2.1 Relationship Object (SRO) relationship_type values.
-    Only SRO-level relationships, no SCO/cyber-observable links.
-    """
+    """Relationship types supported by Cyvest."""
 
-    # Common / generic
     RELATED_TO = "related-to"
-    DERIVED_FROM = "derived-from"
-    DUPLICATE_OF = "duplicate-of"
-
-    # Indicator / COA / general CTI semantics
-    INDICATES = "indicates"
-    MITIGATES = "mitigates"
-    INVESTIGATES = "investigates"
-    USES = "uses"
-    TARGETS = "targets"
-
-    # Attribution / identity
-    ATTRIBUTED_TO = "attributed-to"
-    IMPERSONATES = "impersonates"
-    LOCATED_AT = "located-at"
-    ORIGINATES_FROM = "originates-from"
-    OWNED_BY = "owned-by"
-
-    # Infrastructure / malware / tool
-    COMMUNICATES_WITH = "communicates-with"
-    DELIVERS = "delivers"
-    EXPLOITS = "exploits"
-    DROPS = "drops"
-    BEACONS_TO = "beacons-to"
-    COMPROMISES = "compromises"
-    HOSTS = "hosts"
-    AUTHORED_BY = "authored-by"
-    VARIANT_OF = "variant-of"
 
     def get_default_direction(self) -> RelationshipDirection:
         """
-        Get the semantically appropriate default direction for this SRO relationship type.
-
-        This is the *conceptual* direction, i.e. "source → target" meaning
-        "source has this effect on / relation to target".
+        Get the default direction for this relationship type.
         """
-
-        # Generic
-        if self == RelationshipType.RELATED_TO:
-            return RelationshipDirection.BIDIRECTIONAL  # symmetric
-        elif self == RelationshipType.DERIVED_FROM:
-            return RelationshipDirection.INBOUND  # derived ← source
-        elif self == RelationshipType.DUPLICATE_OF:
-            return RelationshipDirection.BIDIRECTIONAL  # symmetric
-
-        # Detection / response
-        elif self == RelationshipType.INDICATES:
-            return RelationshipDirection.OUTBOUND  # indicator → thing it indicates
-        elif self == RelationshipType.MITIGATES:
-            return RelationshipDirection.OUTBOUND  # COA → thing mitigated
-        elif self == RelationshipType.INVESTIGATES:
-            return RelationshipDirection.OUTBOUND  # COA → thing investigated
-        elif self == RelationshipType.USES:
-            return RelationshipDirection.OUTBOUND  # actor/pattern → thing used
-        elif self == RelationshipType.TARGETS:
-            return RelationshipDirection.OUTBOUND  # actor/campaign → target
-
-        # Attribution / identity / geo
-        elif self == RelationshipType.ATTRIBUTED_TO:
-            return RelationshipDirection.OUTBOUND  # campaign/intrusion-set → actor
-        elif self == RelationshipType.IMPERSONATES:
-            return RelationshipDirection.OUTBOUND  # actor → identity impersonated
-        elif self == RelationshipType.LOCATED_AT:
-            return RelationshipDirection.OUTBOUND  # thing → location
-        elif self == RelationshipType.ORIGINATES_FROM:
-            return RelationshipDirection.OUTBOUND  # campaign → location of origin
-        elif self == RelationshipType.OWNED_BY:
-            return RelationshipDirection.INBOUND  # owned object ← owner
-
-        # Infra / malware / tool
-        elif self == RelationshipType.COMMUNICATES_WITH:
-            return RelationshipDirection.BIDIRECTIONAL  # symmetric communication
-        elif self == RelationshipType.DELIVERS:
-            return RelationshipDirection.OUTBOUND  # infra/tool → malware
-        elif self == RelationshipType.EXPLOITS:
-            return RelationshipDirection.OUTBOUND  # malware/attack-pattern → vuln
-        elif self == RelationshipType.DROPS:
-            return RelationshipDirection.OUTBOUND  # dropper → dropped malware/file
-        elif self == RelationshipType.BEACONS_TO:
-            return RelationshipDirection.OUTBOUND  # malware → C2 infra
-        elif self == RelationshipType.COMPROMISES:
-            return RelationshipDirection.OUTBOUND  # actor/campaign → infra
-        elif self == RelationshipType.HOSTS:
-            return RelationshipDirection.OUTBOUND  # infra → hosted thing
-        elif self == RelationshipType.AUTHORED_BY:
-            return RelationshipDirection.INBOUND  # malware/tool ← author
-        elif self == RelationshipType.VARIANT_OF:
-            return RelationshipDirection.OUTBOUND  # variant → family
-
-        # Fallback
-        return RelationshipDirection.OUTBOUND
+        return RelationshipDirection.BIDIRECTIONAL
 
 
 class RelationshipDirection(str, Enum):
@@ -300,10 +212,10 @@ class Check:
 
 @dataclass
 class Relationship:
-    """Represents a relationship between observables following STIX2 conventions."""
+    """Represents a relationship between observables."""
 
     target_key: str  # Key of the target observable
-    relationship_type: RelationshipType | str  # STIX2 relationship type
+    relationship_type: RelationshipType | str  # Relationship type label
     direction: RelationshipDirection | str | None = None  # Relationship direction (None = auto-detect)
 
     def __post_init__(self) -> None:
@@ -313,7 +225,7 @@ class Relationship:
             try:
                 self.relationship_type = RelationshipType(self.relationship_type)
             except ValueError:
-                # Keep as string if not a standard STIX2 relationship type
+                # Keep as string if not a recognized relationship type
                 pass
 
         # Then handle direction with smart defaults
@@ -374,7 +286,7 @@ class Observable:
             try:
                 self.obs_type = ObservableType(self.obs_type)
             except ValueError:
-                # Keep as string if not a standard STIX2 observable type
+                # Keep as string if not a recognized observable type
                 pass
 
         if not self.key:
@@ -467,7 +379,7 @@ class Observable:
 
         Args:
             target_key: Key of the target observable
-            relationship_type: Type of relationship (STIX2 convention)
+            relationship_type: Type of relationship
             direction: Direction of the relationship (None = use semantic default for relationship type)
         """
         rel = Relationship(target_key=target_key, relationship_type=relationship_type, direction=direction)

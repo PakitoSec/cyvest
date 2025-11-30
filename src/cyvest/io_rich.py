@@ -72,12 +72,16 @@ def display_summary(
         f"Applied: {applied_checks}",
     ]
 
-    def sort_key_by_score(check: Any) -> Decimal:
+    def sort_key_by_score(check: Any) -> tuple[Decimal, str]:
         score = getattr(check, "score", 0)
         try:
-            return Decimal(score)
+            decimal_score = Decimal(score)
         except (TypeError, ValueError, InvalidOperation):
-            return Decimal(0)
+            decimal_score = Decimal(0)
+        
+        # Return tuple: (-score for descending, check_id for ascending alphabetically)
+        check_id = getattr(check, "check_id", "")
+        return (-decimal_score, check_id)
 
     table = Table(
         title="Investigation Report",
@@ -103,7 +107,7 @@ def display_summary(
     for scope_name, checks in checks_by_scope.items():
         scope_rule = Align(f"[bold magenta]{scope_name}[/bold magenta]", align="left")
         table.add_row(scope_rule, "-", "-")
-        checks = sorted(checks, key=sort_key_by_score, reverse=True)
+        checks = sorted(checks, key=sort_key_by_score)
         for check in checks:
             color_level = get_color_level(check.level)
             color_score = get_color_score(check.score)
@@ -140,7 +144,7 @@ def display_summary(
         checks = [
             c for c in cv.get_all_checks().values() if c.level == level_enum and c.level not in resolved_excluded_levels
         ]
-        checks = sorted(checks, key=sort_key_by_score, reverse=True)
+        checks = sorted(checks, key=sort_key_by_score)
         if checks:
             color_level = get_color_level(level_enum)
             level_rule = Align(

@@ -222,12 +222,18 @@ def save_investigation_json(cv: "Cyvest", filepath: str | Path) -> None:
         json.dump(data, f, indent=2, ensure_ascii=False, default=_decimal_to_float)
 
 
-def generate_markdown_report(cv: "Cyvest") -> str:
+def generate_markdown_report(
+    cv: "Cyvest",
+    include_containers: bool = False,
+    include_enrichments: bool = False,
+) -> str:
     """
     Generate a Markdown report of the investigation for LLM consumption.
 
     Args:
         cv: Cyvest investigation
+        include_containers: Include containers section in the report (default: False)
+        include_enrichments: Include enrichments section in the report (default: False)
 
     Returns:
         Markdown formatted report
@@ -269,15 +275,6 @@ def generate_markdown_report(cv: "Cyvest") -> str:
                 lines.append(f"  - Justification: {entry.justification}")
         lines.append("")
 
-    # Observables by Type and Level
-    lines.append("### Observables by Type and Level")
-    lines.append("")
-    for obs_type, levels in stats.get("observables_by_type_and_level", {}).items():
-        lines.append(f"**{obs_type.upper()}:**")
-        for level, count in levels.items():
-            lines.append(f"  - {level}: {count}")
-    lines.append("")
-
     # Checks by Scope
     lines.append("## Checks by Scope")
     lines.append("")
@@ -286,7 +283,7 @@ def generate_markdown_report(cv: "Cyvest") -> str:
         lines.append("")
         for check in cv.get_all_checks().values():
             if check.scope == scope and check.level != Level.NONE:
-                lines.append(f"- **{check.check_id}** (Score: {check.score}, Level: {check.level.name})")
+                lines.append(f"- **{check.check_id}**: Score: {check.score}, Level: {check.level.name}")
                 lines.append(f"  - Description: {check.description}")
                 if check.comment:
                     lines.append(f"  - Comment: {check.comment}")
@@ -322,7 +319,7 @@ def generate_markdown_report(cv: "Cyvest") -> str:
         lines.append("")
 
     # Enrichments
-    if cv.get_all_enrichments():
+    if include_enrichments and cv.get_all_enrichments():
         lines.append("## Enrichments")
         lines.append("")
         for enr in cv.get_all_enrichments().values():
@@ -333,7 +330,7 @@ def generate_markdown_report(cv: "Cyvest") -> str:
             lines.append("")
 
     # Containers
-    if cv.get_all_containers():
+    if include_containers and cv.get_all_containers():
         lines.append("## Containers")
         lines.append("")
         for ctr in cv.get_all_containers().values():
@@ -348,15 +345,22 @@ def generate_markdown_report(cv: "Cyvest") -> str:
     return "\n".join(lines)
 
 
-def save_investigation_markdown(cv: "Cyvest", filepath: str | Path) -> None:
+def save_investigation_markdown(
+    cv: "Cyvest",
+    filepath: str | Path,
+    include_containers: bool = False,
+    include_enrichments: bool = False,
+) -> None:
     """
     Save an investigation as a Markdown report.
 
     Args:
         cv: Cyvest investigation to save
         filepath: Path to save the Markdown file
+        include_containers: Include containers section in the report (default: False)
+        include_enrichments: Include enrichments section in the report (default: False)
     """
-    markdown = generate_markdown_report(cv)
+    markdown = generate_markdown_report(cv, include_containers, include_enrichments)
     with open(filepath, "w", encoding="utf-8") as f:
         f.write(markdown)
 

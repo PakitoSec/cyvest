@@ -642,9 +642,7 @@ class SharedInvestigationContext:
             # Create temporary Cyvest wrapper for compatibility with save_investigation_markdown
             temp_cy = Cyvest.__new__(Cyvest)
             temp_cy._investigation = self._main_investigation
-            save_investigation_markdown(
-                temp_cy, filepath, include_containers, include_enrichments, include_observables
-            )
+            save_investigation_markdown(temp_cy, filepath, include_containers, include_enrichments, include_observables)
             return str(Path(filepath).resolve())
 
     def io_to_dict(self) -> dict[str, Any]:

@@ -13,7 +13,7 @@ from cyvest.levels import Level
 from cyvest.model import CheckScorePolicy, ObservableType, RelationshipDirection, RelationshipType
 from cyvest.proxies import CheckProxy, ContainerProxy, EnrichmentProxy, ObservableProxy, ThreatIntelProxy
 
-__version__ = "1.0.4"
+__version__ = "1.0.5"
 
 logger.disable("cyvest")
 

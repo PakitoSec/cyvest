@@ -1,6 +1,7 @@
 from cyvest import Cyvest
-from cyvest.io_serialization import load_investigation_json, save_investigation_json
-from cyvest.model import ObservableType
+from cyvest.io_serialization import generate_markdown_report, load_investigation_json, save_investigation_json
+from cyvest.levels import Level
+from cyvest.model import Container, Enrichment, Observable, ObservableType
 from cyvest.score import ScoreMode
 
 
@@ -31,3 +32,138 @@ def test_serialization_preserves_whitelisted_flag(tmp_path) -> None:
     whitelists = loaded.investigation_get_whitelists()
     assert len(whitelists) == 2
     assert any(entry.identifier == "wl-1" and entry.justification == "FP justification" for entry in whitelists)
+
+
+def test_markdown_excludes_containers_by_default() -> None:
+    """Test that containers section is excluded by default in markdown report."""
+    cv = Cyvest()
+
+    # Add an observable
+    obs = Observable(obs_type=ObservableType.DOMAIN_NAME, value="example.com", level=Level.INFO)
+    cv._investigation.add_observable(obs)
+
+    # Add a container
+    container = Container(path="/test/container", description="Test container")
+    cv._investigation.add_container(container)
+
+    # Generate markdown without include_containers
+    markdown = generate_markdown_report(cv)
+
+    # Verify containers section is not present
+    assert "## Containers" not in markdown
+    assert "/test/container" not in markdown
+
+
+def test_markdown_includes_containers_when_enabled() -> None:
+    """Test that containers section is included when include_containers=True."""
+    cv = Cyvest()
+
+    # Add an observable
+    obs = Observable(obs_type=ObservableType.DOMAIN_NAME, value="example.com", level=Level.INFO)
+    cv._investigation.add_observable(obs)
+
+    # Add a container
+    container = Container(path="/test/container", description="Test container")
+    cv._investigation.add_container(container)
+
+    # Generate markdown with include_containers=True
+    markdown = generate_markdown_report(cv, include_containers=True)
+
+    # Verify containers section is present
+    assert "## Containers" in markdown
+    assert "/test/container" in markdown
+    assert "Test container" in markdown
+
+
+def test_markdown_excludes_enrichments_by_default() -> None:
+    """Test that enrichments section is excluded by default in markdown report."""
+    cv = Cyvest()
+
+    # Add an observable
+    obs = Observable(obs_type=ObservableType.DOMAIN_NAME, value="example.com", level=Level.INFO)
+    cv._investigation.add_observable(obs)
+
+    # Add an enrichment
+    enrichment = Enrichment(name="TestEnrichment", data={"key": "value"}, context="test context")
+    cv._investigation.add_enrichment(enrichment)
+
+    # Generate markdown without include_enrichments
+    markdown = generate_markdown_report(cv)
+
+    # Verify enrichments section is not present
+    assert "## Enrichments" not in markdown
+    assert "TestEnrichment" not in markdown
+
+
+def test_markdown_includes_enrichments_when_enabled() -> None:
+    """Test that enrichments section is included when include_enrichments=True."""
+    cv = Cyvest()
+
+    # Add an observable
+    obs = Observable(obs_type=ObservableType.DOMAIN_NAME, value="example.com", level=Level.INFO)
+    cv._investigation.add_observable(obs)
+
+    # Add an enrichment
+    enrichment = Enrichment(name="TestEnrichment", data={"key": "value"}, context="test context")
+    cv._investigation.add_enrichment(enrichment)
+
+    # Generate markdown with include_enrichments=True
+    markdown = generate_markdown_report(cv, include_enrichments=True)
+
+    # Verify enrichments section is present
+    assert "## Enrichments" in markdown
+    assert "TestEnrichment" in markdown
+    assert "test context" in markdown
+
+
+def test_markdown_removes_observables_by_type_and_level_section() -> None:
+    """Test that 'Observables by Type and Level' section is removed from markdown report."""
+    cv = Cyvest()
+
+    # Add observables with different types and levels
+    obs1 = Observable(obs_type=ObservableType.DOMAIN_NAME, value="example.com", level=Level.INFO)
+    obs2 = Observable(obs_type=ObservableType.IPV4_ADDR, value="192.168.1.1", level=Level.SUSPICIOUS)
+    cv._investigation.add_observable(obs1)
+    cv._investigation.add_observable(obs2)
+
+    # Generate markdown
+    markdown = generate_markdown_report(cv)
+
+    # Verify the section is not present
+    assert "Observables by Type and Level" not in markdown
+    assert "### Observables by Type and Level" not in markdown
+
+
+def test_markdown_wrapper_methods_support_optional_parameters() -> None:
+    """Test that Cyvest wrapper methods support optional parameters."""
+    cv = Cyvest()
+
+    # Add observable, container, and enrichment
+    obs = Observable(obs_type=ObservableType.DOMAIN_NAME, value="example.com", level=Level.INFO)
+    cv._investigation.add_observable(obs)
+
+    container = Container(path="/test", description="Test")
+    cv._investigation.add_container(container)
+
+    enrichment = Enrichment(name="Test", data={})
+    cv._investigation.add_enrichment(enrichment)
+
+    # Test default behavior (excludes both)
+    markdown_default = cv.io_to_markdown()
+    assert "## Containers" not in markdown_default
+    assert "## Enrichments" not in markdown_default
+
+    # Test with containers enabled
+    markdown_containers = cv.io_to_markdown(include_containers=True)
+    assert "## Containers" in markdown_containers
+    assert "## Enrichments" not in markdown_containers
+
+    # Test with enrichments enabled
+    markdown_enrichments = cv.io_to_markdown(include_enrichments=True)
+    assert "## Containers" not in markdown_enrichments
+    assert "## Enrichments" in markdown_enrichments
+
+    # Test with both enabled
+    markdown_both = cv.io_to_markdown(include_containers=True, include_enrichments=True)
+    assert "## Containers" in markdown_both
+    assert "## Enrichments" in markdown_both

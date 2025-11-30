@@ -182,3 +182,17 @@ with Cyvest() as cv:
 
     logger.info(f"[green]✓ Grouped visualization saved to: {grouped_path}[/green]")
     logger.info("[dim]This view groups observables by type using a hierarchical layout.[/dim]")
+
+    # Example: Export to markdown (with optional sections)
+    logger.info("[bold cyan]Exporting to Markdown...[/bold cyan]")
+
+    # Default export (excludes containers and enrichments)
+    markdown_path = cv.io_save_markdown("investigation_report.md")
+    logger.info(f"[green]✓ Markdown report saved to: {markdown_path}[/green]")
+
+    # Export with containers and enrichments included
+    markdown_full_path = cv.io_save_markdown(
+        "investigation_report_full.md", include_containers=True, include_enrichments=True
+    )
+    logger.info(f"[green]✓ Full markdown report saved to: {markdown_full_path}[/green]")
+    logger.info("[dim]Use include_containers=True and include_enrichments=True to include optional sections.[/dim]")

@@ -567,11 +567,19 @@ class SharedInvestigationContext:
         with self._lock:
             return key in self._check_registry
 
-    def io_to_markdown(self) -> str:
+    def io_to_markdown(
+        self,
+        include_containers: bool = False,
+        include_enrichments: bool = False,
+    ) -> str:
         """
         Generate a Markdown report of the shared investigation.
 
         Thread-safe: Uses lock to ensure consistent read of investigation state.
+
+        Args:
+            include_containers: Include containers section in the report (default: False)
+            include_enrichments: Include enrichments section in the report (default: False)
 
         Returns:
             Markdown formatted report as a string
@@ -590,9 +598,14 @@ class SharedInvestigationContext:
             # Create temporary Cyvest wrapper for compatibility with generate_markdown_report
             temp_cy = Cyvest.__new__(Cyvest)
             temp_cy._investigation = self._main_investigation
-            return generate_markdown_report(temp_cy)
+            return generate_markdown_report(temp_cy, include_containers, include_enrichments)
 
-    def io_save_markdown(self, filepath: str | Path) -> str:
+    def io_save_markdown(
+        self,
+        filepath: str | Path,
+        include_containers: bool = False,
+        include_enrichments: bool = False,
+    ) -> str:
         """
         Save the shared investigation as a Markdown report.
 
@@ -601,6 +614,8 @@ class SharedInvestigationContext:
 
         Args:
             filepath: Path to save the Markdown file (relative or absolute)
+            include_containers: Include containers section in the report (default: False)
+            include_enrichments: Include enrichments section in the report (default: False)
 
         Returns:
             Absolute path to the saved file as a string
@@ -623,7 +638,7 @@ class SharedInvestigationContext:
             # Create temporary Cyvest wrapper for compatibility with save_investigation_markdown
             temp_cy = Cyvest.__new__(Cyvest)
             temp_cy._investigation = self._main_investigation
-            save_investigation_markdown(temp_cy, filepath)
+            save_investigation_markdown(temp_cy, filepath, include_containers, include_enrichments)
             return str(Path(filepath).resolve())
 
     def io_to_dict(self) -> dict[str, Any]:

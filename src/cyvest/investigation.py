@@ -11,6 +11,7 @@ import threading
 from copy import deepcopy
 from dataclasses import dataclass
 from decimal import Decimal
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, overload
 
 from logurich import logger
@@ -565,6 +566,123 @@ class SharedInvestigationContext:
 
         with self._lock:
             return key in self._check_registry
+
+    def io_to_markdown(self) -> str:
+        """
+        Generate a Markdown report of the shared investigation.
+
+        Thread-safe: Uses lock to ensure consistent read of investigation state.
+
+        Returns:
+            Markdown formatted report as a string
+
+        Example:
+            >>> shared = SharedInvestigationContext(main_inv)
+            >>> markdown = shared.io_to_markdown()
+            >>> print(markdown)
+            # Cybersecurity Investigation Report
+            ...
+        """
+        from cyvest import Cyvest
+        from cyvest.io_serialization import generate_markdown_report
+
+        with self._lock:
+            # Create temporary Cyvest wrapper for compatibility with generate_markdown_report
+            temp_cy = Cyvest.__new__(Cyvest)
+            temp_cy._investigation = self._main_investigation
+            return generate_markdown_report(temp_cy)
+
+    def io_save_markdown(self, filepath: str | Path) -> str:
+        """
+        Save the shared investigation as a Markdown report.
+
+        Thread-safe: Uses lock to ensure consistent read of investigation state.
+        Relative paths are converted to absolute paths before saving.
+
+        Args:
+            filepath: Path to save the Markdown file (relative or absolute)
+
+        Returns:
+            Absolute path to the saved file as a string
+
+        Raises:
+            PermissionError: If the file cannot be written
+            OSError: If there are file system issues
+
+        Example:
+            >>> shared = SharedInvestigationContext(main_inv)
+            >>> path = shared.io_save_markdown("report.md")
+            >>> print(path)  # /absolute/path/to/report.md
+        """
+        from pathlib import Path
+
+        from cyvest import Cyvest
+        from cyvest.io_serialization import save_investigation_markdown
+
+        with self._lock:
+            # Create temporary Cyvest wrapper for compatibility with save_investigation_markdown
+            temp_cy = Cyvest.__new__(Cyvest)
+            temp_cy._investigation = self._main_investigation
+            save_investigation_markdown(temp_cy, filepath)
+            return str(Path(filepath).resolve())
+
+    def io_to_dict(self) -> dict[str, Any]:
+        """
+        Serialize the shared investigation to a dictionary.
+
+        Thread-safe: Uses lock to ensure consistent read of investigation state.
+
+        Returns:
+            Dictionary representation suitable for JSON export
+
+        Example:
+            >>> shared = SharedInvestigationContext(main_inv)
+            >>> data = shared.io_to_dict()
+            >>> print(data.keys())
+            dict_keys(['score', 'level', 'whitelisted', 'observables', 'checks', ...])
+        """
+        from cyvest import Cyvest
+        from cyvest.io_serialization import serialize_investigation
+
+        with self._lock:
+            # Create temporary Cyvest wrapper for compatibility with serialize_investigation
+            temp_cy = Cyvest.__new__(Cyvest)
+            temp_cy._investigation = self._main_investigation
+            return serialize_investigation(temp_cy)
+
+    def io_save_json(self, filepath: str | Path) -> str:
+        """
+        Save the shared investigation to a JSON file.
+
+        Thread-safe: Uses lock to ensure consistent read of investigation state.
+        Relative paths are converted to absolute paths before saving.
+
+        Args:
+            filepath: Path to save the JSON file (relative or absolute)
+
+        Returns:
+            Absolute path to the saved file as a string
+
+        Raises:
+            PermissionError: If the file cannot be written
+            OSError: If there are file system issues
+
+        Example:
+            >>> shared = SharedInvestigationContext(main_inv)
+            >>> path = shared.io_save_json("investigation.json")
+            >>> print(path)  # /absolute/path/to/investigation.json
+        """
+        from pathlib import Path
+
+        from cyvest import Cyvest
+        from cyvest.io_serialization import save_investigation_json
+
+        with self._lock:
+            # Create temporary Cyvest wrapper for compatibility with save_investigation_json
+            temp_cy = Cyvest.__new__(Cyvest)
+            temp_cy._investigation = self._main_investigation
+            save_investigation_json(temp_cy, filepath)
+            return str(Path(filepath).resolve())
 
 
 @dataclass

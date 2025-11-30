@@ -1254,8 +1254,8 @@ def test_export_with_enrichments(tmp_path):
         cy.enrichment_create("whois", {"registrar": "Test Registrar", "created": "2020-01-01"})
         cy.enrichment_create("dns", {"A": ["1.2.3.4"], "MX": ["mail.example.com"]})
 
-    # Test markdown export
-    markdown = shared.io_to_markdown()
+    # Test markdown export (with enrichments enabled)
+    markdown = shared.io_to_markdown(include_enrichments=True)
     assert "whois" in markdown
     assert "Test Registrar" in markdown
     assert "dns" in markdown
@@ -1344,13 +1344,13 @@ def test_export_comprehensive_investigation(tmp_path):
         cy.enrichment_create("geo", {"country": "Unknown", "city": "Unknown"})
 
     # Export to all formats
-    markdown = shared.io_to_markdown()
+    markdown = shared.io_to_markdown(include_enrichments=True)
     data = shared.io_to_dict()
 
     md_path = tmp_path / "comprehensive.md"
     json_path = tmp_path / "comprehensive.json"
 
-    shared.io_save_markdown(md_path)
+    shared.io_save_markdown(md_path, include_enrichments=True)
     shared.io_save_json(json_path)
 
     # Verify markdown content

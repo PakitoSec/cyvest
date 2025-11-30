@@ -233,6 +233,68 @@ Returns whether the underlying investigation has whitelist entries.
 ##### `get_global_level() -> Level`
 Returns the global level of the underlying investigation.
 
+##### `io_to_markdown() -> str`
+Generate a Markdown report of the shared investigation.
+
+Thread-safe: Uses lock to ensure consistent read of investigation state.
+
+**Returns:** Markdown formatted report as a string
+
+**Examples:**
+```python
+shared = SharedInvestigationContext(main_inv)
+markdown = shared.io_to_markdown()
+print(markdown)
+```
+
+##### `io_save_markdown(filepath: str | Path) -> str`
+Save the shared investigation as a Markdown report.
+
+Thread-safe: Uses lock to ensure consistent read. Relative paths are converted to absolute paths.
+
+**Parameters:**
+- `filepath`: Path to save the Markdown file (relative or absolute)
+
+**Returns:** Absolute path to the saved file as a string
+
+**Examples:**
+```python
+shared = SharedInvestigationContext(main_inv)
+path = shared.io_save_markdown("report.md")
+print(path)  # /absolute/path/to/report.md
+```
+
+##### `io_to_dict() -> dict[str, Any]`
+Serialize the shared investigation to a dictionary.
+
+Thread-safe: Uses lock to ensure consistent read of investigation state.
+
+**Returns:** Dictionary representation suitable for JSON export
+
+**Examples:**
+```python
+shared = SharedInvestigationContext(main_inv)
+data = shared.io_to_dict()
+print(data.keys())
+```
+
+##### `io_save_json(filepath: str | Path) -> str`
+Save the shared investigation to a JSON file.
+
+Thread-safe: Uses lock to ensure consistent read. Relative paths are converted to absolute paths.
+
+**Parameters:**
+- `filepath`: Path to save the JSON file (relative or absolute)
+
+**Returns:** Absolute path to the saved file as a string
+
+**Examples:**
+```python
+shared = SharedInvestigationContext(main_inv)
+path = shared.io_save_json("investigation.json")
+print(path)  # /absolute/path/to/investigation.json
+```
+
 > Access merged results by reusing the original `Investigation` instance you passed to `SharedInvestigationContext`; reconciliation mutates it in place.
 
 ### Cyvest Updates

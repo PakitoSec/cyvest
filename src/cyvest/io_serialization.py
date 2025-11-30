@@ -226,6 +226,7 @@ def generate_markdown_report(
     cv: "Cyvest",
     include_containers: bool = False,
     include_enrichments: bool = False,
+    include_observables: bool = True,
 ) -> str:
     """
     Generate a Markdown report of the investigation for LLM consumption.
@@ -234,6 +235,7 @@ def generate_markdown_report(
         cv: Cyvest investigation
         include_containers: Include containers section in the report (default: False)
         include_enrichments: Include enrichments section in the report (default: False)
+        include_observables: Include observables section in the report (default: True)
 
     Returns:
         Markdown formatted report
@@ -290,33 +292,34 @@ def generate_markdown_report(
         lines.append("")
 
     # Observables
-    lines.append("## Observables")
-    lines.append("")
-    for obs in cv.get_all_observables().values():
-        lines.append(f"### {obs.obs_type}: {obs.value}")
-        lines.append(f"- **Key:** {obs.key}")
-        lines.append(f"- **Score:** {obs.score}")
-        lines.append(f"- **Level:** {obs.level.name}")
-        lines.append(f"- **Internal:** {obs.internal}")
-        lines.append(f"- **Whitelisted:** {obs.whitelisted}")
-        if obs.comment:
-            lines.append(f"- **Comment:** {obs.comment}")
-        if obs.relationships:
-            lines.append("- **Relationships:**")
-            for rel in obs.relationships:
-                direction_symbol = {
-                    "outbound": "→",
-                    "inbound": "←",
-                    "bidirectional": "↔",
-                }.get(rel.direction if isinstance(rel.direction, str) else rel.direction.value, "→")
-                lines.append(f"  - {rel.relationship_type} {direction_symbol} {rel.target_key}")
-        if obs.threat_intels:
-            lines.append("- **Threat Intelligence:**")
-            for ti in obs.threat_intels:
-                lines.append(f"  - {ti.source}: Score {ti.score}, Level {ti.level.name}")
-                if ti.comment:
-                    lines.append(f"    - {ti.comment}")
+    if include_observables and cv.get_all_observables():
+        lines.append("## Observables")
         lines.append("")
+        for obs in cv.get_all_observables().values():
+            lines.append(f"### {obs.obs_type}: {obs.value}")
+            lines.append(f"- **Key:** {obs.key}")
+            lines.append(f"- **Score:** {obs.score}")
+            lines.append(f"- **Level:** {obs.level.name}")
+            lines.append(f"- **Internal:** {obs.internal}")
+            lines.append(f"- **Whitelisted:** {obs.whitelisted}")
+            if obs.comment:
+                lines.append(f"- **Comment:** {obs.comment}")
+            if obs.relationships:
+                lines.append("- **Relationships:**")
+                for rel in obs.relationships:
+                    direction_symbol = {
+                        "outbound": "→",
+                        "inbound": "←",
+                        "bidirectional": "↔",
+                    }.get(rel.direction if isinstance(rel.direction, str) else rel.direction.value, "→")
+                    lines.append(f"  - {rel.relationship_type} {direction_symbol} {rel.target_key}")
+            if obs.threat_intels:
+                lines.append("- **Threat Intelligence:**")
+                for ti in obs.threat_intels:
+                    lines.append(f"  - {ti.source}: Score {ti.score}, Level {ti.level.name}")
+                    if ti.comment:
+                        lines.append(f"    - {ti.comment}")
+            lines.append("")
 
     # Enrichments
     if include_enrichments and cv.get_all_enrichments():
@@ -350,6 +353,7 @@ def save_investigation_markdown(
     filepath: str | Path,
     include_containers: bool = False,
     include_enrichments: bool = False,
+    include_observables: bool = True,
 ) -> None:
     """
     Save an investigation as a Markdown report.
@@ -359,8 +363,9 @@ def save_investigation_markdown(
         filepath: Path to save the Markdown file
         include_containers: Include containers section in the report (default: False)
         include_enrichments: Include enrichments section in the report (default: False)
+        include_observables: Include observables section in the report (default: True)
     """
-    markdown = generate_markdown_report(cv, include_containers, include_enrichments)
+    markdown = generate_markdown_report(cv, include_containers, include_enrichments, include_observables)
     with open(filepath, "w", encoding="utf-8") as f:
         f.write(markdown)
 

@@ -572,6 +572,7 @@ class Cyvest:
         filepath: str | Path,
         include_containers: bool = False,
         include_enrichments: bool = False,
+        include_observables: bool = True,
     ) -> str:
         """
         Save the investigation as a Markdown report.
@@ -582,6 +583,7 @@ class Cyvest:
             filepath: Path to save the Markdown file (relative or absolute)
             include_containers: Include containers section in the report (default: False)
             include_enrichments: Include enrichments section in the report (default: False)
+            include_observables: Include observables section in the report (default: True)
 
         Returns:
             Absolute path to the saved file as a string
@@ -595,13 +597,14 @@ class Cyvest:
             >>> path = cv.io_save_markdown("report.md")
             >>> print(path)  # /absolute/path/to/report.md
         """
-        save_investigation_markdown(self, filepath, include_containers, include_enrichments)
+        save_investigation_markdown(self, filepath, include_containers, include_enrichments, include_observables)
         return str(Path(filepath).resolve())
 
     def io_to_markdown(
         self,
         include_containers: bool = False,
         include_enrichments: bool = False,
+        include_observables: bool = True,
     ) -> str:
         """
         Generate a Markdown report of the investigation.
@@ -609,6 +612,7 @@ class Cyvest:
         Args:
             include_containers: Include containers section in the report (default: False)
             include_enrichments: Include enrichments section in the report (default: False)
+            include_observables: Include observables section in the report (default: True)
 
         Returns:
             Markdown formatted report as a string
@@ -620,7 +624,7 @@ class Cyvest:
             # Cybersecurity Investigation Report
             ...
         """
-        return generate_markdown_report(self, include_containers, include_enrichments)
+        return generate_markdown_report(self, include_containers, include_enrichments, include_observables)
 
     def io_to_dict(self) -> dict[str, Any]:
         """

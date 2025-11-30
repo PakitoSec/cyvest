@@ -195,4 +195,7 @@ with Cyvest() as cv:
         "investigation_report_full.md", include_containers=True, include_enrichments=True
     )
     logger.info(f"[green]✓ Full markdown report saved to: {markdown_full_path}[/green]")
-    logger.info("[dim]Use include_containers=True and include_enrichments=True to include optional sections.[/dim]")
+    logger.info(
+        "[dim]Use include_containers=True and include_enrichments=True to include optional sections; "
+        "set include_observables=False to produce a redacted report.[/dim]"
+    )

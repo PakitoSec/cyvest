@@ -116,6 +116,32 @@ def test_markdown_includes_enrichments_when_enabled() -> None:
     assert "test context" in markdown
 
 
+def test_markdown_includes_observables_by_default() -> None:
+    """Test that observables section is included by default in markdown report."""
+    cv = Cyvest()
+
+    obs = Observable(obs_type=ObservableType.DOMAIN_NAME, value="example.com", level=Level.INFO)
+    cv._investigation.add_observable(obs)
+
+    markdown = generate_markdown_report(cv)
+
+    assert "## Observables" in markdown
+    assert "example.com" in markdown
+
+
+def test_markdown_excludes_observables_when_disabled() -> None:
+    """Test that observables section is excluded when include_observables=False."""
+    cv = Cyvest()
+
+    obs = Observable(obs_type=ObservableType.DOMAIN_NAME, value="example.com", level=Level.INFO)
+    cv._investigation.add_observable(obs)
+
+    markdown = generate_markdown_report(cv, include_observables=False)
+
+    assert "## Observables" not in markdown
+    assert "example.com" not in markdown
+
+
 def test_markdown_removes_observables_by_type_and_level_section() -> None:
     """Test that 'Observables by Type and Level' section is removed from markdown report."""
     cv = Cyvest()
@@ -150,6 +176,7 @@ def test_markdown_wrapper_methods_support_optional_parameters() -> None:
 
     # Test default behavior (excludes both)
     markdown_default = cv.io_to_markdown()
+    assert "## Observables" in markdown_default
     assert "## Containers" not in markdown_default
     assert "## Enrichments" not in markdown_default
 
@@ -167,3 +194,8 @@ def test_markdown_wrapper_methods_support_optional_parameters() -> None:
     markdown_both = cv.io_to_markdown(include_containers=True, include_enrichments=True)
     assert "## Containers" in markdown_both
     assert "## Enrichments" in markdown_both
+
+    # Test with observables disabled
+    markdown_no_observables = cv.io_to_markdown(include_observables=False)
+    assert "## Observables" not in markdown_no_observables
+    assert "example.com" not in markdown_no_observables

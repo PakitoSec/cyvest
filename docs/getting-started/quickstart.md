@@ -158,6 +158,8 @@ with Cyvest() as cv:
 
     save_investigation_json(cv, "investigation.json")
     save_investigation_markdown(cv, "report.md")
+    # Hide observables while keeping aggregate stats/whitelists
+    save_investigation_markdown(cv, "redacted_report.md", include_observables=False)
 ```
 
 !!! tip "Filtering checks by severity"

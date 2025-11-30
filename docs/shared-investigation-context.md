@@ -233,10 +233,15 @@ Returns whether the underlying investigation has whitelist entries.
 ##### `get_global_level() -> Level`
 Returns the global level of the underlying investigation.
 
-##### `io_to_markdown() -> str`
-Generate a Markdown report of the shared investigation.
+##### `io_to_markdown(include_containers: bool = False, include_enrichments: bool = False, include_observables: bool = True) -> str`
+Generate a Markdown report of the shared investigation with optional sections.
 
 Thread-safe: Uses lock to ensure consistent read of investigation state.
+
+**Parameters:**
+- `include_containers`: Include containers section in the report (default: `False`)
+- `include_enrichments`: Include enrichments section in the report (default: `False`)
+- `include_observables`: Include observables section in the report (default: `True`)
 
 **Returns:** Markdown formatted report as a string
 
@@ -247,13 +252,16 @@ markdown = shared.io_to_markdown()
 print(markdown)
 ```
 
-##### `io_save_markdown(filepath: str | Path) -> str`
+##### `io_save_markdown(filepath: str | Path, include_containers: bool = False, include_enrichments: bool = False, include_observables: bool = True) -> str`
 Save the shared investigation as a Markdown report.
 
 Thread-safe: Uses lock to ensure consistent read. Relative paths are converted to absolute paths.
 
 **Parameters:**
 - `filepath`: Path to save the Markdown file (relative or absolute)
+- `include_containers`: Include containers section in the report (default: `False`)
+- `include_enrichments`: Include enrichments section in the report (default: `False`)
+- `include_observables`: Include observables section in the report (default: `True`)
 
 **Returns:** Absolute path to the saved file as a string
 
@@ -262,6 +270,8 @@ Thread-safe: Uses lock to ensure consistent read. Relative paths are converted t
 shared = SharedInvestigationContext(main_inv)
 path = shared.io_save_markdown("report.md")
 print(path)  # /absolute/path/to/report.md
+
+path_no_obs = shared.io_save_markdown("report_redacted.md", include_observables=False)
 ```
 
 ##### `io_to_dict() -> dict[str, Any]`

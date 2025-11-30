@@ -78,7 +78,7 @@ def display_summary(
             decimal_score = Decimal(score)
         except (TypeError, ValueError, InvalidOperation):
             decimal_score = Decimal(0)
-        
+
         # Return tuple: (-score for descending, check_id for ascending alphabetically)
         check_id = getattr(check, "check_id", "")
         return (-decimal_score, check_id)

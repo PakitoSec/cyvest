@@ -1053,3 +1053,383 @@ def test_get_global_score_thread_safe():
     # All reads should return the same score and be Decimal type
     assert all(isinstance(s, Decimal) for s in scores)
     assert all(s == scores[0] for s in scores)
+
+
+# ==============================================================================
+# Tests for export methods (io_to_markdown, io_save_markdown, io_to_dict, io_save_json)
+# ==============================================================================
+
+
+def test_io_to_markdown_basic(tmp_path):
+    """Test basic markdown generation from shared context."""
+    inv = Investigation({"test": "data"}, root_type="artifact")
+    shared = SharedInvestigationContext(inv)
+
+    with shared.create_cyvest() as cy:
+        obs = cy.observable(ObservableType.EMAIL_ADDR, "malicious@evil.com")
+        obs.add_ti("VT", Decimal("8.5"))
+        cy.check("email_reputation", "header", "Check sender reputation").link_observable(obs).with_score(
+            Decimal("7.0")
+        )
+
+    markdown = shared.io_to_markdown()
+
+    assert isinstance(markdown, str)
+    assert "# Cybersecurity Investigation Report" in markdown
+    assert "malicious@evil.com" in markdown
+    assert "email_reputation" in markdown
+    assert "Global Score:" in markdown
+    assert "Global Level:" in markdown
+
+
+def test_io_save_markdown_creates_file(tmp_path):
+    """Test that io_save_markdown creates a markdown file."""
+    inv = Investigation({"test": "data"}, root_type="artifact")
+    shared = SharedInvestigationContext(inv)
+
+    with shared.create_cyvest() as cy:
+        cy.observable(ObservableType.DOMAIN_NAME, "malicious.com").add_ti("VT", Decimal("9.0"))
+
+    filepath = tmp_path / "shared_report.md"
+    result_path = shared.io_save_markdown(filepath)
+
+    assert filepath.exists()
+    assert result_path == str(filepath.resolve())
+
+    content = filepath.read_text()
+    assert "# Cybersecurity Investigation Report" in content
+    assert "malicious.com" in content
+
+
+def test_io_save_markdown_relative_path(tmp_path, monkeypatch):
+    """Test io_save_markdown with relative path."""
+    inv = Investigation({"test": "data"}, root_type="artifact")
+    shared = SharedInvestigationContext(inv)
+
+    with shared.create_cyvest() as cy:
+        cy.check("test", "scope", "desc")
+
+    # Change to temp directory
+    monkeypatch.chdir(tmp_path)
+
+    result_path = shared.io_save_markdown("relative_report.md")
+
+    expected_path = tmp_path / "relative_report.md"
+    assert expected_path.exists()
+    assert result_path == str(expected_path.resolve())
+
+
+def test_io_to_dict_basic():
+    """Test basic dictionary serialization from shared context."""
+    inv = Investigation({"test": "data"}, root_type="artifact")
+    shared = SharedInvestigationContext(inv)
+
+    with shared.create_cyvest() as cy:
+        cy.observable(ObservableType.IPV4_ADDR, "192.168.1.1").add_ti("SEKOIA", Decimal("6.0"))
+        cy.check("ip_reputation", "network", "Check IP reputation").with_score(Decimal("5.0"))
+
+    data = shared.io_to_dict()
+
+    assert isinstance(data, dict)
+    assert "score" in data
+    assert "level" in data
+    assert "observables" in data
+    assert "checks" in data
+    assert "stats" in data
+    assert "obs:ipv4-addr:192.168.1.1" in data["observables"]
+    assert "network" in data["checks"]  # checks are grouped by scope
+
+
+def test_io_save_json_creates_file(tmp_path):
+    """Test that io_save_json creates a JSON file."""
+    inv = Investigation({"email": "test@example.com"}, root_type="artifact")
+    shared = SharedInvestigationContext(inv)
+
+    with shared.create_cyvest() as cy:
+        cy.observable(ObservableType.URL, "https://malicious.com/payload").add_ti("VT", Decimal("10.0"))
+        cy.check("url_check", "body", "Analyze URL")
+
+    filepath = tmp_path / "shared_investigation.json"
+    result_path = shared.io_save_json(filepath)
+
+    assert filepath.exists()
+    assert result_path == str(filepath.resolve())
+
+    # Verify JSON is valid and contains expected data
+    import json
+
+    with open(filepath) as f:
+        loaded = json.load(f)
+
+    assert "score" in loaded
+    assert "observables" in loaded
+    assert "obs:url:https://malicious.com/payload" in loaded["observables"]
+
+
+def test_io_save_json_relative_path(tmp_path, monkeypatch):
+    """Test io_save_json with relative path."""
+    inv = Investigation({"test": "data"}, root_type="artifact")
+    shared = SharedInvestigationContext(inv)
+
+    with shared.create_cyvest() as cy:
+        cy.check("test", "scope", "desc")
+
+    monkeypatch.chdir(tmp_path)
+
+    result_path = shared.io_save_json("relative_investigation.json")
+
+    expected_path = tmp_path / "relative_investigation.json"
+    assert expected_path.exists()
+    assert result_path == str(expected_path.resolve())
+
+
+def test_export_methods_thread_safe():
+    """Test that export methods are thread-safe."""
+    inv = Investigation({"test": "data"}, root_type="artifact")
+    shared = SharedInvestigationContext(inv)
+
+    with shared.create_cyvest() as cy:
+        cy.observable(ObservableType.DOMAIN_NAME, "test.com")
+        cy.check("test", "scope", "desc")
+
+    # Multiple threads calling export methods concurrently
+    def export_markdown():
+        return shared.io_to_markdown()
+
+    def export_dict():
+        return shared.io_to_dict()
+
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        md_futures = [executor.submit(export_markdown) for _ in range(5)]
+        dict_futures = [executor.submit(export_dict) for _ in range(5)]
+
+        md_results = [f.result() for f in md_futures]
+        dict_results = [f.result() for f in dict_futures]
+
+    # All markdown exports should be identical
+    assert all(md == md_results[0] for md in md_results)
+
+    # All dict exports should contain same data
+    assert all(d["score"] == dict_results[0]["score"] for d in dict_results)
+    assert all(len(d["observables"]) == len(dict_results[0]["observables"]) for d in dict_results)
+
+
+def test_export_methods_capture_latest_state(tmp_path):
+    """Test that export methods capture the latest investigation state."""
+    inv = Investigation({"test": "data"}, root_type="artifact")
+    shared = SharedInvestigationContext(inv)
+
+    # Initial state
+    with shared.create_cyvest() as cy:
+        cy.observable(ObservableType.EMAIL_ADDR, "first@example.com")
+
+    markdown1 = shared.io_to_markdown()
+    assert "first@example.com" in markdown1
+    assert "second@example.com" not in markdown1
+
+    # Update state
+    with shared.create_cyvest() as cy:
+        cy.observable(ObservableType.EMAIL_ADDR, "second@example.com")
+
+    markdown2 = shared.io_to_markdown()
+    assert "first@example.com" in markdown2
+    assert "second@example.com" in markdown2
+
+    # Save to files and verify
+    path1 = tmp_path / "state1.md"
+
+    # Simulate time passing
+    shared.io_save_markdown(path1)
+
+    content1 = path1.read_text()
+    assert "second@example.com" in content1
+
+
+def test_export_with_enrichments(tmp_path):
+    """Test that export methods include enrichments."""
+    inv = Investigation({"test": "data"}, root_type="artifact")
+    shared = SharedInvestigationContext(inv)
+
+    with shared.create_cyvest() as cy:
+        cy.enrichment_create("whois", {"registrar": "Test Registrar", "created": "2020-01-01"})
+        cy.enrichment_create("dns", {"A": ["1.2.3.4"], "MX": ["mail.example.com"]})
+
+    # Test markdown export
+    markdown = shared.io_to_markdown()
+    assert "whois" in markdown
+    assert "Test Registrar" in markdown
+    assert "dns" in markdown
+
+    # Test dict export
+    data = shared.io_to_dict()
+    assert "enrichments" in data
+    assert len(data["enrichments"]) == 2
+    assert "enr:whois" in data["enrichments"]
+    assert "enr:dns" in data["enrichments"]
+
+    # Test JSON export
+    json_path = tmp_path / "with_enrichments.json"
+    shared.io_save_json(json_path)
+
+    import json
+
+    with open(json_path) as f:
+        loaded = json.load(f)
+    assert "enrichments" in loaded
+    assert len(loaded["enrichments"]) == 2
+
+
+def test_export_with_whitelists(tmp_path):
+    """Test that export methods include whitelist information."""
+    inv = Investigation({"test": "data"}, root_type="artifact")
+    inv.add_whitelist("wl-001", "Known safe domain", "Verified by security team")
+    shared = SharedInvestigationContext(inv)
+
+    with shared.create_cyvest() as cy:
+        cy.observable(ObservableType.DOMAIN_NAME, "safe.com")
+
+    # Test markdown export
+    markdown = shared.io_to_markdown()
+    assert "Whitelisted Investigation: Yes" in markdown or "Whitelist" in markdown
+
+    # Test dict export
+    data = shared.io_to_dict()
+    assert data["whitelisted"] is True
+    assert "whitelists" in data
+    assert len(data["whitelists"]) == 1
+    assert data["whitelists"][0]["identifier"] == "wl-001"
+    assert data["whitelists"][0]["name"] == "Known safe domain"
+
+    # Test JSON export
+    json_path = tmp_path / "with_whitelists.json"
+    shared.io_save_json(json_path)
+
+    import json
+
+    with open(json_path) as f:
+        loaded = json.load(f)
+    assert loaded["whitelisted"] is True
+    assert len(loaded["whitelists"]) == 1
+
+
+def test_export_comprehensive_investigation(tmp_path):
+    """Test export of a comprehensive investigation with all features."""
+    inv = Investigation({"email_subject": "Phishing attempt", "sender": "attacker@evil.com"}, root_type="artifact")
+    shared = SharedInvestigationContext(inv)
+
+    # Build comprehensive investigation
+    with shared.create_cyvest() as cy:
+        # Observables
+        email_obs = cy.observable(ObservableType.EMAIL_ADDR, "attacker@evil.com")
+        email_obs.add_ti("EmailRep", Decimal("9.5"))
+
+        domain_obs = cy.observable(ObservableType.DOMAIN_NAME, "evil.com")
+        domain_obs.add_ti("VT", Decimal("8.0"))
+
+        url_obs = cy.observable(ObservableType.URL, "https://evil.com/phishing")
+        url_obs.add_ti("URLhaus", Decimal("10.0"))
+
+        # Relationships
+        email_obs.relate_to(domain_obs, RelationshipType.RELATED_TO)
+        url_obs.relate_to(domain_obs, RelationshipType.RELATED_TO)
+
+        # Checks
+        cy.check("sender_reputation", "header", "High risk sender detected").link_observable(email_obs).with_score(
+            Decimal("8.5")
+        )
+        cy.check("url_analysis", "body", "Malicious URL detected").link_observable(url_obs).with_score(Decimal("9.0"))
+
+        # Enrichments
+        cy.enrichment_create("whois", {"registrar": "Evil Registrar", "created": "2024-01-01"}, context="evil.com")
+        cy.enrichment_create("geo", {"country": "Unknown", "city": "Unknown"})
+
+    # Export to all formats
+    markdown = shared.io_to_markdown()
+    data = shared.io_to_dict()
+
+    md_path = tmp_path / "comprehensive.md"
+    json_path = tmp_path / "comprehensive.json"
+
+    shared.io_save_markdown(md_path)
+    shared.io_save_json(json_path)
+
+    # Verify markdown content
+    assert "attacker@evil.com" in markdown
+    assert "evil.com" in markdown
+    assert "sender_reputation" in markdown
+    assert "url_analysis" in markdown
+    assert "whois" in markdown
+
+    # Verify dict structure
+    assert len(data["observables"]) >= 4  # 3 created + 1 root
+    assert "header" in data["checks"]  # checks grouped by scope
+    assert "body" in data["checks"]
+    assert len(data["enrichments"]) == 2
+
+    # Verify files exist and are valid
+    assert md_path.exists()
+    assert json_path.exists()
+
+    import json
+
+    with open(json_path) as f:
+        loaded = json.load(f)
+    assert loaded["score"] == data["score"]
+    assert len(loaded["observables"]) == len(data["observables"])
+
+
+def test_export_empty_investigation(tmp_path):
+    """Test exporting an investigation with only root observable."""
+    inv = Investigation({"test": "empty"}, root_type="artifact")
+    shared = SharedInvestigationContext(inv)
+
+    # No tasks run, only root observable exists
+
+    markdown = shared.io_to_markdown()
+    assert "# Cybersecurity Investigation Report" in markdown
+    assert "Global Score: 0" in markdown or "Global Score:** 0" in markdown
+
+    data = shared.io_to_dict()
+    assert data["score"] == 0.0
+    assert len(data["observables"]) == 1  # Just root
+
+    json_path = tmp_path / "empty.json"
+    md_path = tmp_path / "empty.md"
+
+    shared.io_save_json(json_path)
+    shared.io_save_markdown(md_path)
+
+    assert json_path.exists()
+    assert md_path.exists()
+
+
+def test_export_parallel_updates(tmp_path):
+    """Test that exports are consistent even with parallel task execution."""
+    inv = Investigation({"test": "data"}, root_type="artifact")
+    shared = SharedInvestigationContext(inv)
+
+    # Multiple tasks updating investigation in parallel
+    def create_observable(index: int):
+        with shared.create_cyvest() as cy:
+            cy.observable(ObservableType.IPV4_ADDR, f"10.0.0.{index}")
+            cy.check(f"check_{index}", "scope", f"Check {index}")
+
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        futures = [executor.submit(create_observable, i) for i in range(10)]
+        for f in futures:
+            f.result()
+
+    # Export should capture all observables and checks
+    data = shared.io_to_dict()
+    assert len(data["observables"]) == 11  # 10 created + 1 root
+    assert data["stats"]["checks_by_scope"]["scope"] == 10
+
+    # Save and verify
+    json_path = tmp_path / "parallel.json"
+    shared.io_save_json(json_path)
+
+    import json
+
+    with open(json_path) as f:
+        loaded = json.load(f)
+    assert len(loaded["observables"]) == 11

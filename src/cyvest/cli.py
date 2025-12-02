@@ -12,11 +12,12 @@ from pathlib import Path
 from typing import Any
 
 import click
-from logurich import init_logger, logger
+from logurich import logger
 from logurich.opt_click import click_logger_params
 from rich.console import Console
 
 from cyvest import __version__
+from cyvest.io_schema import get_investigation_schema
 from cyvest.io_serialization import load_investigation_json
 from cyvest.io_visualization import VisualizationDependencyMissingError
 
@@ -69,7 +70,6 @@ def _write_markdown(data: dict[str, Any], output_path: Path) -> None:
 @click.version_option(__version__, prog_name="Cyvest")
 def cli() -> None:
     """Cyvest - Cybersecurity Investigation Framework."""
-    init_logger("INFO")
     logger.enable("cyvest")
     logger.info("> [green bold]CYVEST[/green bold]")
 
@@ -219,6 +219,28 @@ def export(input: Path, output: Path, export_format: str) -> None:
 
     _write_markdown(data, output_path)
     logger.info(f"[green]Exported to Markdown: {output_path}[/green]")
+
+
+@cli.command(name="schema")
+@click.option(
+    "-o",
+    "--output",
+    type=click.Path(dir_okay=False, path_type=Path),
+    help="Write the JSON Schema to a file instead of stdout.",
+)
+def schema_cmd(output: Path | None) -> None:
+    """
+    Emit the JSON Schema describing serialized investigations.
+    """
+    schema = get_investigation_schema()
+    if output:
+        output_path = output.resolve()
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(json.dumps(schema, indent=2), encoding="utf-8")
+        logger.info(f"[green]Schema written to: {output_path}[/green]")
+        return
+
+    logger.rich("INFO", json.dumps(schema, indent=2), prefix=False)
 
 
 @cli.command()

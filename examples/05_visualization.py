@@ -12,6 +12,9 @@ The visualization uses the Rich color scheme:
 - Edge labels show the relationship type
 """
 
+import tempfile
+from pathlib import Path
+
 from logurich import logger
 
 from cyvest import Cyvest, ObservableType, RelationshipDirection, RelationshipType
@@ -138,64 +141,21 @@ with Cyvest() as cv:
     logger.info("[bold green]Investigation Summary[/bold green]")
     cv.display_summary(show_graph=True)
 
+    # Generate json
+    logger.info("[bold cyan]Generating json...[/bold cyan]")
+    tmp_path = Path(tempfile.gettempdir()) / "cyvest_investigation.json"
+    json_path = cv.io_save_json(tmp_path)
+    logger.info(f"[green]✓ Full json saved to: {tmp_path}[/green]")
+
     # Generate and open network visualization
     logger.info("[bold cyan]Generating Network Visualization...[/bold cyan]")
-    html_path = cv.display_network(
-        open_browser=True,  # Automatically open in browser
-    )
-
-    logger.info(f"[green]✓ Network visualization saved to: {html_path}[/green]")
-    logger.info("[cyan]The visualization should open in your browser automatically.[/cyan]")
-    logger.info("[cyan]You can navigate the graph by dragging nodes and zooming in/out.[/cyan]")
-    logger.info("")
-    logger.info("[bold]Color Legend:[/bold]")
-    logger.info("  🔴 Red = Malicious")
-    logger.info("  🟠 Orange = Suspicious")
-    logger.info("  🟡 Yellow = Notable")
-    logger.info("  🟢 Green = Safe/Trusted")
-    logger.info("  🔵 Cyan = Info")
-    logger.info("")
-    logger.info("[bold]Edge Colors:[/bold]")
-    logger.info("  Blue = Outbound relationship")
-    logger.info("  Pink = Inbound relationship")
-    logger.info("  Purple = Bidirectional relationship")
-
-    # Example: Generate filtered visualization (only malicious/suspicious)
-    logger.info("[bold cyan]Generating Filtered View (SUSPICIOUS and above)...[/bold cyan]")
-    from cyvest.levels import Level
-
-    filtered_path = cv.display_network(
-        min_level=Level.SUSPICIOUS,
-        open_browser=True,  # Don't auto-open this one
-    )
-
-    logger.info(f"[green]✓ Filtered visualization saved to: {filtered_path}[/green]")
-    logger.info("[dim]This filtered view only shows SUSPICIOUS and MALICIOUS observables.[/dim]")
-
-    # Example: Generate grouped visualization (observables grouped by type)
-    logger.info("[bold cyan]Generating Grouped View (by observable type)...[/bold cyan]")
-
-    grouped_path = cv.display_network(
-        group_by_type=False,  # Enable type-based grouping with hierarchical layout
-        open_browser=True,  # Don't auto-open this one
-    )
-
-    logger.info(f"[green]✓ Grouped visualization saved to: {grouped_path}[/green]")
-    logger.info("[dim]This view groups observables by type using a hierarchical layout.[/dim]")
+    html_path = cv.display_network(open_browser=False)
+    logger.info(f"[green]✓ Full html visualization saved to: {html_path}[/green]")
 
     # Example: Export to markdown (with optional sections)
     logger.info("[bold cyan]Exporting to Markdown...[/bold cyan]")
-
-    # Default export (excludes containers and enrichments)
-    markdown_path = cv.io_save_markdown("investigation_report.md")
-    logger.info(f"[green]✓ Markdown report saved to: {markdown_path}[/green]")
-
     # Export with containers and enrichments included
     markdown_full_path = cv.io_save_markdown(
         "investigation_report_full.md", include_containers=True, include_enrichments=True
     )
     logger.info(f"[green]✓ Full markdown report saved to: {markdown_full_path}[/green]")
-    logger.info(
-        "[dim]Use include_containers=True and include_enrichments=True to include optional sections; "
-        "set include_observables=False to produce a redacted report.[/dim]"
-    )

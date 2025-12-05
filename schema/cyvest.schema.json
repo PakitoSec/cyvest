@@ -24,16 +24,7 @@
       "type": "number"
     },
     "level": {
-      "type": "string",
-      "enum": [
-        "NONE",
-        "TRUSTED",
-        "INFO",
-        "SAFE",
-        "NOTABLE",
-        "SUSPICIOUS",
-        "MALICIOUS"
-      ]
+      "$ref": "#/$defs/level"
     },
     "whitelisted": {
       "type": "boolean"
@@ -106,6 +97,44 @@
     }
   },
   "$defs": {
+    "level": {
+      "type": "string",
+      "enum": [
+        "NONE",
+        "TRUSTED",
+        "INFO",
+        "SAFE",
+        "NOTABLE",
+        "SUSPICIOUS",
+        "MALICIOUS"
+      ],
+      "description": "Security level classification from NONE (lowest) to MALICIOUS (highest)."
+    },
+    "relationship_direction": {
+      "type": "string",
+      "enum": [
+        "outbound",
+        "inbound",
+        "bidirectional"
+      ],
+      "description": "Direction of a relationship between observables."
+    },
+    "score_policy": {
+      "type": "string",
+      "enum": [
+        "auto",
+        "manual"
+      ],
+      "description": "Score computation policy: 'auto' calculates from level, 'manual' uses explicit score."
+    },
+    "score_mode": {
+      "type": "string",
+      "enum": [
+        "max",
+        "sum"
+      ],
+      "description": "Score aggregation mode: 'max' takes highest score, 'sum' adds all scores."
+    },
     "whitelist": {
       "type": "object",
       "required": [
@@ -147,12 +176,7 @@
           ]
         },
         "direction": {
-          "type": "string",
-          "enum": [
-            "outbound",
-            "inbound",
-            "bidirectional"
-          ]
+          "$ref": "#/$defs/relationship_direction"
         }
       },
       "additionalProperties": false
@@ -225,16 +249,7 @@
           "type": "number"
         },
         "level": {
-          "type": "string",
-          "enum": [
-            "NONE",
-            "TRUSTED",
-            "INFO",
-            "SAFE",
-            "NOTABLE",
-            "SUSPICIOUS",
-            "MALICIOUS"
-          ]
+          "$ref": "#/$defs/level"
         },
         "relationships": {
           "type": "array",
@@ -301,23 +316,10 @@
           "type": "number"
         },
         "level": {
-          "type": "string",
-          "enum": [
-            "NONE",
-            "TRUSTED",
-            "INFO",
-            "SAFE",
-            "NOTABLE",
-            "SUSPICIOUS",
-            "MALICIOUS"
-          ]
+          "$ref": "#/$defs/level"
         },
         "score_policy": {
-          "type": "string",
-          "enum": [
-            "auto",
-            "manual"
-          ]
+          "$ref": "#/$defs/score_policy"
         },
         "observables": {
           "type": "array",
@@ -365,16 +367,7 @@
           "type": "number"
         },
         "level": {
-          "type": "string",
-          "enum": [
-            "NONE",
-            "TRUSTED",
-            "INFO",
-            "SAFE",
-            "NOTABLE",
-            "SUSPICIOUS",
-            "MALICIOUS"
-          ]
+          "$ref": "#/$defs/level"
         },
         "taxonomies": {
           "type": "array",
@@ -449,16 +442,7 @@
           "type": "number"
         },
         "aggregated_level": {
-          "type": "string",
-          "enum": [
-            "NONE",
-            "TRUSTED",
-            "INFO",
-            "SAFE",
-            "NOTABLE",
-            "SUSPICIOUS",
-            "MALICIOUS"
-          ]
+          "$ref": "#/$defs/level"
         }
       },
       "additionalProperties": false
@@ -632,11 +616,7 @@
           ]
         },
         "score_mode": {
-          "type": "string",
-          "enum": [
-            "max",
-            "sum"
-          ]
+          "$ref": "#/$defs/score_mode"
         }
       },
       "additionalProperties": false

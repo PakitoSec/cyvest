@@ -1,5 +1,5 @@
 import Ajv, { type ValidateFunction } from "ajv";
-import schema from "../../../../schemas/cyvest.schema.json" assert { type: "json" };
+import schema from "../../../../schema/cyvest.schema.json" assert { type: "json" };
 import type { CyvestInvestigation } from "./types.generated";
 
 const ajv = new Ajv({ allErrors: true, strict: true });

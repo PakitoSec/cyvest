@@ -207,3 +207,4 @@ marimo/_lsp/
 __marimo__/
 AGENTS.md
 node_modules
+.DS_Store

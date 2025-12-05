@@ -1,8 +1,32 @@
 // AUTO-GENERATED FROM cyvest.schema.json — DO NOT EDIT
 
+/**
+ * Security level classification from NONE (lowest) to MALICIOUS (highest).
+ */
+export type Level =
+  | "NONE"
+  | "TRUSTED"
+  | "INFO"
+  | "SAFE"
+  | "NOTABLE"
+  | "SUSPICIOUS"
+  | "MALICIOUS";
+/**
+ * Direction of a relationship between observables.
+ */
+export type RelationshipDirection = "outbound" | "inbound" | "bidirectional";
+/**
+ * Score computation policy: 'auto' calculates from level, 'manual' uses explicit score.
+ */
+export type ScorePolicy = "auto" | "manual";
+/**
+ * Score aggregation mode: 'max' takes highest score, 'sum' adds all scores.
+ */
+export type ScoreMode = "max" | "sum";
+
 export interface CyvestInvestigation {
   score: number;
-  level: "NONE" | "TRUSTED" | "INFO" | "SAFE" | "NOTABLE" | "SUSPICIOUS" | "MALICIOUS";
+  level: Level;
   whitelisted: boolean;
   whitelists: Whitelist[];
   observables: {
@@ -46,7 +70,7 @@ export interface Observable {
     [k: string]: unknown;
   } | null;
   score: number;
-  level: "NONE" | "TRUSTED" | "INFO" | "SAFE" | "NOTABLE" | "SUSPICIOUS" | "MALICIOUS";
+  level: Level;
   relationships: Relationship[];
   threat_intels: string[];
   generated_by_checks: string[];
@@ -57,7 +81,7 @@ export interface Relationship {
    * Relationship label; defaults to related-to.
    */
   relationship_type: string;
-  direction: "outbound" | "inbound" | "bidirectional";
+  direction: RelationshipDirection;
 }
 export interface Check {
   key: string;
@@ -69,8 +93,8 @@ export interface Check {
     [k: string]: unknown;
   } | null;
   score: number;
-  level: "NONE" | "TRUSTED" | "INFO" | "SAFE" | "NOTABLE" | "SUSPICIOUS" | "MALICIOUS";
-  score_policy: "auto" | "manual";
+  level: Level;
+  score_policy: ScorePolicy;
   observables: string[];
 }
 export interface ThreatIntel {
@@ -82,7 +106,7 @@ export interface ThreatIntel {
     [k: string]: unknown;
   } | null;
   score: number;
-  level: "NONE" | "TRUSTED" | "INFO" | "SAFE" | "NOTABLE" | "SUSPICIOUS" | "MALICIOUS";
+  level: Level;
   taxonomies: {
     [k: string]: unknown;
   }[];
@@ -104,7 +128,7 @@ export interface Container {
     [k: string]: Container;
   };
   aggregated_score: number;
-  aggregated_level: "NONE" | "TRUSTED" | "INFO" | "SAFE" | "NOTABLE" | "SUSPICIOUS" | "MALICIOUS";
+  aggregated_level: Level;
 }
 export interface Statistics {
   total_observables: number;
@@ -148,5 +172,5 @@ export interface DataExtraction {
    * Root observable type used during data extraction.
    */
   root_type: string | null;
-  score_mode: "max" | "sum";
+  score_mode: ScoreMode;
 }

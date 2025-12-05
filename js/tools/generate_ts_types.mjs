@@ -6,8 +6,8 @@ import { fileURLToPath } from "node:url";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 async function main() {
-  // schema is at repo root: /.../cyvest/schemas/cyvest.schema.json
-  const schemaPath = resolve(__dirname, "..", "..", "schemas", "cyvest.schema.json");
+  // schema is at repo root: /.../cyvest/schema/cyvest.schema.json
+  const schemaPath = resolve(__dirname, "..", "..", "schema", "cyvest.schema.json");
 
   // output types into cyvest-js package:
   // /.../cyvest/js/packages/cyvest-js/src/types.generated.ts

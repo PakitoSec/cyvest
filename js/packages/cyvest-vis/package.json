@@ -6,7 +6,7 @@
   "types": "dist/index.d.ts",
   "sideEffects": false,
   "scripts": {
-    "build": "tsup src/index.ts --dts --format cjs,esm",
+    "build": "tsup src/index.ts --dts --format cjs,esm --external react --external react-dom",
     "test": "vitest"
   },
   "peerDependencies": {
@@ -14,9 +14,13 @@
     "react-dom": "^18.0.0"
   },
   "dependencies": {
-    "@cyvest/cyvest-js": "workspace:*"
+    "@cyvest/cyvest-js": "workspace:*",
+    "@dagrejs/dagre": "^1.1.4",
+    "@xyflow/react": "^12.5.0",
+    "d3-force": "^3.0.0"
   },
   "devDependencies": {
+    "@types/d3-force": "^3.0.10",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
     "tsup": "^8.0.0",

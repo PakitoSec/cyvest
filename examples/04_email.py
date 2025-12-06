@@ -5,8 +5,10 @@ Demonstrates using ThreadPoolExecutor to run investigation tasks in parallel,
 with each task building a Cyvest fragment that merges into the main investigation.
 """
 
+import tempfile
 from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
 from typing import Any
 
 import click
@@ -518,7 +520,8 @@ class AI(BaseRule):
 @click.option("-w", "--workers", type=int, default=1)
 @click.option("--browser", "browser", is_flag=True, default=False)
 @click.option("--stats", "stats", is_flag=True, default=False)
-def main(workers, browser, stats):
+@click.option("-o", "--output", is_flag=True, default=False)
+def main(workers, browser, stats, output):
     """Main execution demonstrating multi-threaded investigation."""
 
     # Prepare input data
@@ -576,6 +579,13 @@ def main(workers, browser, stats):
     if stats:
         cy.display_statistics()
     cy.display_network(open_browser=browser)
+
+    if output:
+        logger.info("[bold cyan]Generating json...[/bold cyan]")
+        tmp_path = Path(tempfile.gettempdir()) / "cyvest_investigation.json"
+        json_path = cy.io_save_json(tmp_path)
+        size_kb = Path(json_path).stat().st_size / 1024
+        logger.info("[green]✓ Full json saved to: {} ({:.2f} KB)[/green]", json_path, size_kb)
 
 
 if __name__ == "__main__":

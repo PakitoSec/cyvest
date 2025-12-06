@@ -145,7 +145,8 @@ with Cyvest() as cv:
     logger.info("[bold cyan]Generating json...[/bold cyan]")
     tmp_path = Path(tempfile.gettempdir()) / "cyvest_investigation.json"
     json_path = cv.io_save_json(tmp_path)
-    logger.info(f"[green]✓ Full json saved to: {tmp_path}[/green]")
+    size_kb = Path(json_path).stat().st_size / 1024
+    logger.info("[green]✓ Full json saved to: {} ({:.2f} KB)[/green]", json_path, size_kb)
 
     # Generate and open network visualization
     logger.info("[bold cyan]Generating Network Visualization...[/bold cyan]")
@@ -155,7 +156,6 @@ with Cyvest() as cv:
     # Example: Export to markdown (with optional sections)
     logger.info("[bold cyan]Exporting to Markdown...[/bold cyan]")
     # Export with containers and enrichments included
-    markdown_full_path = cv.io_save_markdown(
-        "investigation_report_full.md", include_containers=True, include_enrichments=True
-    )
+    tmp_path = Path(tempfile.gettempdir()) / "investigation_report_full.md"
+    markdown_full_path = cv.io_save_markdown(tmp_path, include_containers=True, include_enrichments=True)
     logger.info(f"[green]✓ Full markdown report saved to: {markdown_full_path}[/green]")

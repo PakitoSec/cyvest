@@ -11,12 +11,13 @@
     "test": "vitest"
   },
   "dependencies": {
-    "ajv": "^8.17.1"
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1"
   },
   "devDependencies": {
+    "json-schema-to-typescript": "^13.1.1",
     "tsup": "^8.0.0",
     "typescript": "^5.6.0",
-    "vitest": "^2.0.0",
-    "json-schema-to-typescript": "^13.1.1"
+    "vitest": "^2.0.0"
   }
 }

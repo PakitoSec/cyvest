@@ -17,6 +17,6 @@ export async function loadInvestigation(
   key: InvestigationKey = "cyvest_visual"
 ): Promise<CyvestInvestigation> {
   await new Promise((resolve) => setTimeout(resolve, 50));
-  // Skip validation and cast directly - the JSON is trusted
-  return INVESTIGATIONS[key].data as unknown as CyvestInvestigation;
+  // Validate and parse using the schema validator
+  return parseCyvest(INVESTIGATIONS[key].data);
 }

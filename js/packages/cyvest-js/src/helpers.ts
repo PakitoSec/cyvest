@@ -1,8 +1,11 @@
-import Ajv, { type ValidateFunction } from "ajv";
+import Ajv2020, { type ValidateFunction } from "ajv/dist/2020";
+import addFormats from "ajv-formats";
 import schema from "../../../../schema/cyvest.schema.json" assert { type: "json" };
 import type { CyvestInvestigation } from "./types.generated";
 
-const ajv = new Ajv({ allErrors: true, strict: true });
+// Use Ajv2020 for draft 2020-12 schema support
+const ajv = new Ajv2020({ allErrors: true });
+addFormats(ajv);
 
 let validateFn: ValidateFunction | null = null;
 

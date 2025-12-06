@@ -94,6 +94,16 @@ Cyvest (facade + fluent proxies)
 
 ---
 
+## JavaScript Packages
+
+- `@cyvest/cyvest-js`: TypeScript types, schema validation, and graph helpers for Cyvest investigations.
+- `@cyvest/cyvest-vis`: React components (XYFlow + D3) to visualize investigations.
+- `@cyvest/cyvest-app`: Vite demo bundling the JS packages with sample investigations.
+
+[See JavaScript packages guide](js-packages.md) for install and workspace commands.
+
+---
+
 ## Community
 
 - :octicons-logo-github-16: [github.com/PakitoSec/cyvest](https://github.com/PakitoSec/cyvest)

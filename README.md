@@ -382,6 +382,16 @@ mkdocs serve
 mkdocs build
 ```
 
+## JavaScript packages
+
+The repo includes a PNPM workspace under `js/` with three packages:
+
+- `@cyvest/cyvest-js`: TypeScript types, schema validation, and helpers for Cyvest investigations.
+- `@cyvest/cyvest-vis`: React components for graph visualization (depends on `@cyvest/cyvest-js`).
+- `@cyvest/cyvest-app`: Vite demo that bundles the JS packages with sample investigations.
+
+See `docs/js-packages.md` for workspace commands and usage snippets.
+
 ## Project Structure
 
 ```

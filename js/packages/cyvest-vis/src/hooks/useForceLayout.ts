@@ -88,7 +88,7 @@ export function useForceLayout(
     const simNodes: SimNode[] = nodes.map((node) => {
       // Check if this node already exists in the simulation
       const existingNode = simulationRef.current?.nodes().find((n) => n.id === node.id);
-      
+
       return {
         id: node.id,
         // Use existing simulation position or node position

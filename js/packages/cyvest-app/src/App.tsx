@@ -27,11 +27,11 @@ export const App: React.FC = () => {
   if (error) return <div style={{ padding: 16, color: "red" }}>{error}</div>;
 
   return (
-    <div style={{ 
-      height: "100%", 
-      display: "flex", 
+    <div style={{
+      height: "100%",
+      display: "flex",
       flexDirection: "column",
-      fontFamily: "system-ui, sans-serif" 
+      fontFamily: "system-ui, sans-serif"
     }}>
       <div style={{ display: "flex", alignItems: "center", gap: 16, padding: 16 }}>
         <h1 style={{ margin: 0 }}>Cyvest Demo</h1>

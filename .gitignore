@@ -205,5 +205,6 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
-*.json
 AGENTS.md
+node_modules
+.DS_Store

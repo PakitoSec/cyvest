@@ -1,0 +1,625 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cyvest.io/schema/investigation.json",
+  "title": "Cyvest Investigation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "score",
+    "level",
+    "whitelisted",
+    "whitelists",
+    "observables",
+    "checks",
+    "checks_by_level",
+    "threat_intels",
+    "enrichments",
+    "containers",
+    "stats",
+    "stats_checks",
+    "data_extraction"
+  ],
+  "properties": {
+    "score": {
+      "type": "number"
+    },
+    "level": {
+      "$ref": "#/$defs/level"
+    },
+    "whitelisted": {
+      "type": "boolean"
+    },
+    "whitelists": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/whitelist"
+      },
+      "default": []
+    },
+    "observables": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/observable"
+      },
+      "default": {}
+    },
+    "checks": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "$ref": "#/$defs/check"
+        },
+        "default": []
+      },
+      "default": {}
+    },
+    "checks_by_level": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "default": []
+      },
+      "default": {}
+    },
+    "threat_intels": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/threat_intel"
+      },
+      "default": {}
+    },
+    "enrichments": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/enrichment"
+      },
+      "default": {}
+    },
+    "containers": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/container"
+      },
+      "default": {}
+    },
+    "stats": {
+      "$ref": "#/$defs/statistics"
+    },
+    "stats_checks": {
+      "$ref": "#/$defs/stats_checks"
+    },
+    "data_extraction": {
+      "$ref": "#/$defs/data_extraction"
+    }
+  },
+  "$defs": {
+    "level": {
+      "type": "string",
+      "enum": [
+        "NONE",
+        "TRUSTED",
+        "INFO",
+        "SAFE",
+        "NOTABLE",
+        "SUSPICIOUS",
+        "MALICIOUS"
+      ],
+      "description": "Security level classification from NONE (lowest) to MALICIOUS (highest)."
+    },
+    "relationship_direction": {
+      "type": "string",
+      "enum": [
+        "outbound",
+        "inbound",
+        "bidirectional"
+      ],
+      "description": "Direction of a relationship between observables."
+    },
+    "score_policy": {
+      "type": "string",
+      "enum": [
+        "auto",
+        "manual"
+      ],
+      "description": "Score computation policy: 'auto' calculates from level, 'manual' uses explicit score."
+    },
+    "score_mode": {
+      "type": "string",
+      "enum": [
+        "max",
+        "sum"
+      ],
+      "description": "Score aggregation mode: 'max' takes highest score, 'sum' adds all scores."
+    },
+    "whitelist": {
+      "type": "object",
+      "required": [
+        "identifier",
+        "name"
+      ],
+      "properties": {
+        "identifier": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "justification": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "relationship": {
+      "type": "object",
+      "required": [
+        "target_key",
+        "relationship_type",
+        "direction"
+      ],
+      "properties": {
+        "target_key": {
+          "type": "string"
+        },
+        "relationship_type": {
+          "type": "string",
+          "description": "Relationship label; defaults to related-to.",
+          "examples": [
+            "related-to"
+          ]
+        },
+        "direction": {
+          "$ref": "#/$defs/relationship_direction"
+        }
+      },
+      "additionalProperties": false
+    },
+    "observable": {
+      "type": "object",
+      "required": [
+        "key",
+        "type",
+        "value",
+        "internal",
+        "whitelisted",
+        "comment",
+        "extra",
+        "score",
+        "level",
+        "relationships",
+        "threat_intels",
+        "generated_by_checks"
+      ],
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "description": "Observable type (e.g., ipv4-addr, url). Custom values are allowed.",
+          "examples": [
+            "ipv4-addr",
+            "ipv6-addr",
+            "domain-name",
+            "url",
+            "network-traffic",
+            "mac-addr",
+            "file",
+            "directory",
+            "email-addr",
+            "email-message",
+            "email-mime-part",
+            "user-account",
+            "process",
+            "software",
+            "windows-registry-key",
+            "artifact",
+            "autonomous-system",
+            "mutex",
+            "x509-certificate"
+          ]
+        },
+        "value": {
+          "type": "string"
+        },
+        "internal": {
+          "type": "boolean"
+        },
+        "whitelisted": {
+          "type": "boolean"
+        },
+        "comment": {
+          "type": "string"
+        },
+        "extra": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "default": {}
+        },
+        "score": {
+          "type": "number"
+        },
+        "level": {
+          "$ref": "#/$defs/level"
+        },
+        "relationships": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/relationship"
+          },
+          "default": []
+        },
+        "threat_intels": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "generated_by_checks": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        }
+      },
+      "additionalProperties": false
+    },
+    "check": {
+      "type": "object",
+      "required": [
+        "key",
+        "check_id",
+        "scope",
+        "description",
+        "comment",
+        "extra",
+        "score",
+        "level",
+        "score_policy",
+        "observables"
+      ],
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "check_id": {
+          "type": "string"
+        },
+        "scope": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "comment": {
+          "type": "string"
+        },
+        "extra": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "default": {}
+        },
+        "score": {
+          "type": "number"
+        },
+        "level": {
+          "$ref": "#/$defs/level"
+        },
+        "score_policy": {
+          "$ref": "#/$defs/score_policy"
+        },
+        "observables": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        }
+      },
+      "additionalProperties": false
+    },
+    "threat_intel": {
+      "type": "object",
+      "required": [
+        "key",
+        "source",
+        "observable_key",
+        "comment",
+        "extra",
+        "score",
+        "level",
+        "taxonomies"
+      ],
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "observable_key": {
+          "type": "string"
+        },
+        "comment": {
+          "type": "string"
+        },
+        "extra": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "default": {}
+        },
+        "score": {
+          "type": "number"
+        },
+        "level": {
+          "$ref": "#/$defs/level"
+        },
+        "taxonomies": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          },
+          "default": []
+        }
+      },
+      "additionalProperties": false
+    },
+    "enrichment": {
+      "type": "object",
+      "required": [
+        "key",
+        "name",
+        "data",
+        "context"
+      ],
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "data": {
+          "type": "object"
+        },
+        "context": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "container": {
+      "type": "object",
+      "required": [
+        "key",
+        "path",
+        "description",
+        "checks",
+        "sub_containers",
+        "aggregated_score",
+        "aggregated_level"
+      ],
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "checks": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "sub_containers": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/container"
+          },
+          "default": {}
+        },
+        "aggregated_score": {
+          "type": "number"
+        },
+        "aggregated_level": {
+          "$ref": "#/$defs/level"
+        }
+      },
+      "additionalProperties": false
+    },
+    "statistics": {
+      "type": "object",
+      "required": [
+        "total_observables",
+        "internal_observables",
+        "external_observables",
+        "whitelisted_observables",
+        "observables_by_type",
+        "observables_by_level",
+        "observables_by_type_and_level",
+        "total_checks",
+        "applied_checks",
+        "checks_by_scope",
+        "checks_by_level",
+        "total_threat_intel",
+        "threat_intel_by_source",
+        "threat_intel_by_level",
+        "total_containers"
+      ],
+      "properties": {
+        "total_observables": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "internal_observables": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "external_observables": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "whitelisted_observables": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "observables_by_type": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "default": {}
+        },
+        "observables_by_level": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "default": {}
+        },
+        "observables_by_type_and_level": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "default": {}
+          },
+          "default": {}
+        },
+        "total_checks": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "applied_checks": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "checks_by_scope": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "default": {}
+        },
+        "checks_by_level": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "default": {}
+        },
+        "total_threat_intel": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "threat_intel_by_source": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "default": {}
+        },
+        "threat_intel_by_level": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "default": {}
+        },
+        "total_containers": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "stats_checks": {
+      "type": "object",
+      "required": [
+        "checks",
+        "applied"
+      ],
+      "properties": {
+        "checks": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "applied": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "data_extraction": {
+      "type": "object",
+      "required": [
+        "root_type",
+        "score_mode"
+      ],
+      "properties": {
+        "root_type": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Root observable type used during data extraction.",
+          "examples": [
+            "ipv4-addr",
+            "ipv6-addr",
+            "domain-name",
+            "url",
+            "network-traffic",
+            "mac-addr",
+            "file",
+            "directory",
+            "email-addr",
+            "email-message",
+            "email-mime-part",
+            "user-account",
+            "process",
+            "software",
+            "windows-registry-key",
+            "artifact",
+            "autonomous-system",
+            "mutex",
+            "x509-certificate"
+          ]
+        },
+        "score_mode": {
+          "$ref": "#/$defs/score_mode"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

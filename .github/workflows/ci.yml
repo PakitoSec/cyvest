@@ -27,9 +27,109 @@ jobs:
       - name: Run tests
         run: uv run pytest -q
 
-  build_publish:
+  js_tests:
+    name: JS test suite (node${{ matrix.node-version }})
     runs-on: ubuntu-latest
-    needs: tests
+    permissions:
+      contents: read
+    strategy:
+      matrix:
+        node-version: [20, 22]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+          run_install: false
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          registry-url: https://registry.npmjs.org
+          scope: "@cyvest"
+          cache: pnpm
+          cache-dependency-path: js/pnpm-lock.yaml
+      - name: Install dependencies
+        run: pnpm -C js install --frozen-lockfile
+      - name: Run tests
+        run: pnpm -C js -r run test:ci
+
+  check_versions:
+    name: Check tag vs project versions
+    needs: [tests, js_tests]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract version from tag
+        id: tag
+        run: |
+          TAG_REF="${GITHUB_REF#refs/tags/}"   # e.g. v1.2.3
+          VERSION="${TAG_REF#v}"               # strip leading 'v'
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Check Python version (pyproject.toml)
+        run: |
+          TAG_VERSION="${{ steps.tag.outputs.version }}"
+          echo "Tag version: $TAG_VERSION"
+
+          python -m pip install tomli >/dev/null 2>&1
+
+          PY_VERSION=$(python - << 'PY'
+          import tomli
+          from pathlib import Path
+
+          data = tomli.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
+          try:
+              print(data["project"]["version"])
+          except KeyError:
+              # If you use dynamic versioning, adapt this logic
+              raise SystemExit("No [project].version found in pyproject.toml")
+          PY
+          )
+
+          echo "pyproject.toml version: $PY_VERSION"
+
+          if [ "$TAG_VERSION" != "$PY_VERSION" ]; then
+            echo "::error::Tag version ($TAG_VERSION) != pyproject.toml version ($PY_VERSION)"
+            exit 1
+          fi
+
+      - name: Check JS package versions
+        run: |
+          TAG_VERSION="${{ steps.tag.outputs.version }}"
+          echo "Tag version: $TAG_VERSION"
+
+          # Adjust these paths to your actual packages:
+          PACKAGES=(
+            "js/packages/cyvest-js/package.json"
+            "js/packages/cyvest-vis/package.json"
+          )
+
+          for pkg in "${PACKAGES[@]}"; do
+            if [ ! -f "$pkg" ]; then
+              echo "::warning::Package file $pkg not found, skipping"
+              continue
+            fi
+
+            PKG_VERSION=$(jq -r '.version' "$pkg")
+            echo "$pkg version: $PKG_VERSION"
+
+            if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
+              echo "::error::Tag version ($TAG_VERSION) != $pkg version ($PKG_VERSION)"
+              exit 1
+            fi
+          done
+
+  publish_pypi:
+    runs-on: ubuntu-latest
+    needs: [check_versions]
     if: startsWith(github.ref, 'refs/tags/') # only on tag pushes
     environment: pypi
     permissions:
@@ -53,3 +153,40 @@ jobs:
           skip-existing: true
           verbose: true
           attestations: true
+
+  publish_npm:
+    name: Publish npm packages
+    runs-on: ubuntu-latest
+    needs: [check_versions]
+    if: startsWith(github.ref, 'refs/tags/') # only on tag pushes
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+          run_install: false
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+          scope: "@cyvest"
+          cache: pnpm
+          cache-dependency-path: js/pnpm-lock.yaml
+      - name: Install dependencies
+        run: pnpm -C js install --frozen-lockfile
+      - name: Build packages
+        run: pnpm -C js -r run build
+      - name: Publish @cyvest/cyvest-js
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: pnpm -C js --filter @cyvest/cyvest-js publish --access public --no-git-checks
+      - name: Publish @cyvest/cyvest-vis
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: pnpm -C js --filter @cyvest/cyvest-vis publish --access public --no-git-checks

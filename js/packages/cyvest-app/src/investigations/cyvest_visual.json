@@ -1,0 +1,643 @@
+{
+  "score": 39.5,
+  "level": "MALICIOUS",
+  "whitelisted": false,
+  "whitelists": [],
+  "observables": {
+    "obs:file:input-data": {
+      "key": "obs:file:input-data",
+      "type": "file",
+      "value": "input-data",
+      "internal": false,
+      "whitelisted": false,
+      "comment": "Root observable for investigation",
+      "extra": null,
+      "score": 0.0,
+      "level": "INFO",
+      "relationships": [
+        {
+          "target_key": "obs:email-message:phishing email - invoice #12345",
+          "relationship_type": "related-to",
+          "direction": "bidirectional"
+        },
+        {
+          "target_key": "obs:domain-name:sketchy-site.net",
+          "relationship_type": "related-to",
+          "direction": "bidirectional"
+        },
+        {
+          "target_key": "obs:domain-name:google.com",
+          "relationship_type": "related-to",
+          "direction": "bidirectional"
+        },
+        {
+          "target_key": "obs:domain-name:new-service.cloud",
+          "relationship_type": "related-to",
+          "direction": "bidirectional"
+        }
+      ],
+      "threat_intels": [],
+      "generated_by_checks": []
+    },
+    "obs:domain-name:evil-phishing.com": {
+      "key": "obs:domain-name:evil-phishing.com",
+      "type": "domain-name",
+      "value": "evil-phishing.com",
+      "internal": false,
+      "whitelisted": false,
+      "comment": "",
+      "extra": {},
+      "score": 9.0,
+      "level": "MALICIOUS",
+      "relationships": [],
+      "threat_intels": [
+        "ti:virustotal:obs:domain-name:evil-phishing.com",
+        "ti:alienvault otx:obs:domain-name:evil-phishing.com"
+      ],
+      "generated_by_checks": [
+        "chk:infrastructure:network"
+      ]
+    },
+    "obs:ipv4-addr:185.220.101.50": {
+      "key": "obs:ipv4-addr:185.220.101.50",
+      "type": "ipv4-addr",
+      "value": "185.220.101.50",
+      "internal": false,
+      "whitelisted": false,
+      "comment": "",
+      "extra": {},
+      "score": 9.5,
+      "level": "MALICIOUS",
+      "relationships": [
+        {
+          "target_key": "obs:domain-name:evil-phishing.com",
+          "relationship_type": "related-to",
+          "direction": "outbound"
+        }
+      ],
+      "threat_intels": [
+        "ti:abuseipdb:obs:ipv4-addr:185.220.101.50"
+      ],
+      "generated_by_checks": [
+        "chk:infrastructure:network"
+      ]
+    },
+    "obs:domain-name:sketchy-site.net": {
+      "key": "obs:domain-name:sketchy-site.net",
+      "type": "domain-name",
+      "value": "sketchy-site.net",
+      "internal": false,
+      "whitelisted": false,
+      "comment": "",
+      "extra": {},
+      "score": 4.5,
+      "level": "SUSPICIOUS",
+      "relationships": [
+        {
+          "target_key": "obs:ipv4-addr:192.168.100.5",
+          "relationship_type": "related-to",
+          "direction": "outbound"
+        }
+      ],
+      "threat_intels": [
+        "ti:virustotal:obs:domain-name:sketchy-site.net"
+      ],
+      "generated_by_checks": []
+    },
+    "obs:ipv4-addr:192.168.100.5": {
+      "key": "obs:ipv4-addr:192.168.100.5",
+      "type": "ipv4-addr",
+      "value": "192.168.100.5",
+      "internal": false,
+      "whitelisted": false,
+      "comment": "",
+      "extra": {},
+      "score": 3.0,
+      "level": "SUSPICIOUS",
+      "relationships": [],
+      "threat_intels": [
+        "ti:shodan:obs:ipv4-addr:192.168.100.5"
+      ],
+      "generated_by_checks": []
+    },
+    "obs:email-addr:attacker@evil-phishing.com": {
+      "key": "obs:email-addr:attacker@evil-phishing.com",
+      "type": "email-addr",
+      "value": "attacker@evil-phishing.com",
+      "internal": false,
+      "whitelisted": false,
+      "comment": "",
+      "extra": {},
+      "score": 8.0,
+      "level": "MALICIOUS",
+      "relationships": [
+        {
+          "target_key": "obs:domain-name:evil-phishing.com",
+          "relationship_type": "related-to",
+          "direction": "bidirectional"
+        }
+      ],
+      "threat_intels": [
+        "ti:emailrep:obs:email-addr:attacker@evil-phishing.com"
+      ],
+      "generated_by_checks": [
+        "chk:email_analysis:email"
+      ]
+    },
+    "obs:email-addr:victim@company.com": {
+      "key": "obs:email-addr:victim@company.com",
+      "type": "email-addr",
+      "value": "victim@company.com",
+      "internal": true,
+      "whitelisted": false,
+      "comment": "",
+      "extra": {},
+      "score": -1.0,
+      "level": "TRUSTED",
+      "relationships": [],
+      "threat_intels": [
+        "ti:internal whitelist:obs:email-addr:victim@company.com"
+      ],
+      "generated_by_checks": [
+        "chk:email_analysis:email"
+      ]
+    },
+    "obs:email-message:phishing email - invoice #12345": {
+      "key": "obs:email-message:phishing email - invoice #12345",
+      "type": "email-message",
+      "value": "Phishing Email - Invoice #12345",
+      "internal": false,
+      "whitelisted": false,
+      "comment": "",
+      "extra": {},
+      "score": 10.0,
+      "level": "MALICIOUS",
+      "relationships": [
+        {
+          "target_key": "obs:email-addr:attacker@evil-phishing.com",
+          "relationship_type": "related-to",
+          "direction": "outbound"
+        },
+        {
+          "target_key": "obs:email-addr:victim@company.com",
+          "relationship_type": "related-to",
+          "direction": "outbound"
+        },
+        {
+          "target_key": "obs:url:https://evil-phishing.com/login",
+          "relationship_type": "related-to",
+          "direction": "outbound"
+        },
+        {
+          "target_key": "obs:url:https://evil-phishing.com/verify",
+          "relationship_type": "related-to",
+          "direction": "outbound"
+        }
+      ],
+      "threat_intels": [
+        "ti:email gateway:obs:email-message:phishing email - invoice #12345"
+      ],
+      "generated_by_checks": [
+        "chk:email_analysis:email"
+      ]
+    },
+    "obs:url:https://evil-phishing.com/login": {
+      "key": "obs:url:https://evil-phishing.com/login",
+      "type": "url",
+      "value": "https://evil-phishing.com/login",
+      "internal": false,
+      "whitelisted": false,
+      "comment": "",
+      "extra": {},
+      "score": 10.0,
+      "level": "MALICIOUS",
+      "relationships": [
+        {
+          "target_key": "obs:domain-name:evil-phishing.com",
+          "relationship_type": "related-to",
+          "direction": "outbound"
+        }
+      ],
+      "threat_intels": [
+        "ti:urlhaus:obs:url:https://evil-phishing.com/login"
+      ],
+      "generated_by_checks": [
+        "chk:url_analysis:network"
+      ]
+    },
+    "obs:url:https://evil-phishing.com/verify": {
+      "key": "obs:url:https://evil-phishing.com/verify",
+      "type": "url",
+      "value": "https://evil-phishing.com/verify",
+      "internal": false,
+      "whitelisted": false,
+      "comment": "",
+      "extra": {},
+      "score": 9.0,
+      "level": "MALICIOUS",
+      "relationships": [
+        {
+          "target_key": "obs:domain-name:evil-phishing.com",
+          "relationship_type": "related-to",
+          "direction": "outbound"
+        }
+      ],
+      "threat_intels": [
+        "ti:urlhaus:obs:url:https://evil-phishing.com/verify"
+      ],
+      "generated_by_checks": [
+        "chk:url_analysis:network"
+      ]
+    },
+    "obs:file:invoice.exe": {
+      "key": "obs:file:invoice.exe",
+      "type": "file",
+      "value": "invoice.exe",
+      "internal": false,
+      "whitelisted": false,
+      "comment": "",
+      "extra": {},
+      "score": 10.0,
+      "level": "MALICIOUS",
+      "relationships": [
+        {
+          "target_key": "obs:url:https://evil-phishing.com/login",
+          "relationship_type": "related-to",
+          "direction": "inbound"
+        },
+        {
+          "target_key": "obs:ipv4-addr:185.220.101.50",
+          "relationship_type": "related-to",
+          "direction": "bidirectional"
+        }
+      ],
+      "threat_intels": [
+        "ti:virustotal:obs:file:invoice.exe"
+      ],
+      "generated_by_checks": [
+        "chk:malware_detection:file"
+      ]
+    },
+    "obs:domain-name:google.com": {
+      "key": "obs:domain-name:google.com",
+      "type": "domain-name",
+      "value": "google.com",
+      "internal": false,
+      "whitelisted": true,
+      "comment": "",
+      "extra": {},
+      "score": -2.0,
+      "level": "TRUSTED",
+      "relationships": [],
+      "threat_intels": [
+        "ti:internal whitelist:obs:domain-name:google.com"
+      ],
+      "generated_by_checks": []
+    },
+    "obs:domain-name:new-service.cloud": {
+      "key": "obs:domain-name:new-service.cloud",
+      "type": "domain-name",
+      "value": "new-service.cloud",
+      "internal": false,
+      "whitelisted": false,
+      "comment": "",
+      "extra": {},
+      "score": 2.0,
+      "level": "NOTABLE",
+      "relationships": [],
+      "threat_intels": [
+        "ti:passive dns:obs:domain-name:new-service.cloud"
+      ],
+      "generated_by_checks": []
+    }
+  },
+  "checks": {
+    "email": [
+      {
+        "key": "chk:email_analysis:email",
+        "check_id": "email_analysis",
+        "scope": "email",
+        "description": "Phishing email analysis",
+        "comment": "",
+        "extra": {},
+        "score": 10.0,
+        "level": "MALICIOUS",
+        "score_policy": "auto",
+        "observables": [
+          "obs:email-message:phishing email - invoice #12345",
+          "obs:email-addr:attacker@evil-phishing.com",
+          "obs:email-addr:victim@company.com"
+        ]
+      }
+    ],
+    "network": [
+      {
+        "key": "chk:url_analysis:network",
+        "check_id": "url_analysis",
+        "scope": "network",
+        "description": "Malicious URLs found in email",
+        "comment": "",
+        "extra": {},
+        "score": 10.0,
+        "level": "MALICIOUS",
+        "score_policy": "auto",
+        "observables": [
+          "obs:url:https://evil-phishing.com/login",
+          "obs:url:https://evil-phishing.com/verify"
+        ]
+      },
+      {
+        "key": "chk:infrastructure:network",
+        "check_id": "infrastructure",
+        "scope": "network",
+        "description": "Malicious infrastructure identified",
+        "comment": "",
+        "extra": {},
+        "score": 9.5,
+        "level": "MALICIOUS",
+        "score_policy": "auto",
+        "observables": [
+          "obs:domain-name:evil-phishing.com",
+          "obs:ipv4-addr:185.220.101.50"
+        ]
+      }
+    ],
+    "file": [
+      {
+        "key": "chk:malware_detection:file",
+        "check_id": "malware_detection",
+        "scope": "file",
+        "description": "Malware file analysis",
+        "comment": "",
+        "extra": {},
+        "score": 10.0,
+        "level": "MALICIOUS",
+        "score_policy": "auto",
+        "observables": [
+          "obs:file:invoice.exe"
+        ]
+      }
+    ]
+  },
+  "checks_by_level": {
+    "MALICIOUS": [
+      "chk:email_analysis:email",
+      "chk:url_analysis:network",
+      "chk:infrastructure:network",
+      "chk:malware_detection:file"
+    ]
+  },
+  "threat_intels": {
+    "ti:virustotal:obs:domain-name:evil-phishing.com": {
+      "key": "ti:virustotal:obs:domain-name:evil-phishing.com",
+      "source": "VirusTotal",
+      "observable_key": "obs:domain-name:evil-phishing.com",
+      "comment": "Known phishing domain",
+      "extra": {},
+      "score": 9.0,
+      "level": "MALICIOUS",
+      "taxonomies": []
+    },
+    "ti:alienvault otx:obs:domain-name:evil-phishing.com": {
+      "key": "ti:alienvault otx:obs:domain-name:evil-phishing.com",
+      "source": "AlienVault OTX",
+      "observable_key": "obs:domain-name:evil-phishing.com",
+      "comment": "Recently reported",
+      "extra": {},
+      "score": 8.5,
+      "level": "MALICIOUS",
+      "taxonomies": []
+    },
+    "ti:abuseipdb:obs:ipv4-addr:185.220.101.50": {
+      "key": "ti:abuseipdb:obs:ipv4-addr:185.220.101.50",
+      "source": "AbuseIPDB",
+      "observable_key": "obs:ipv4-addr:185.220.101.50",
+      "comment": "C2 server",
+      "extra": {},
+      "score": 9.5,
+      "level": "MALICIOUS",
+      "taxonomies": []
+    },
+    "ti:virustotal:obs:domain-name:sketchy-site.net": {
+      "key": "ti:virustotal:obs:domain-name:sketchy-site.net",
+      "source": "VirusTotal",
+      "observable_key": "obs:domain-name:sketchy-site.net",
+      "comment": "Some detections",
+      "extra": {},
+      "score": 4.5,
+      "level": "SUSPICIOUS",
+      "taxonomies": []
+    },
+    "ti:shodan:obs:ipv4-addr:192.168.100.5": {
+      "key": "ti:shodan:obs:ipv4-addr:192.168.100.5",
+      "source": "Shodan",
+      "observable_key": "obs:ipv4-addr:192.168.100.5",
+      "comment": "",
+      "extra": {},
+      "score": 3.0,
+      "level": "SUSPICIOUS",
+      "taxonomies": []
+    },
+    "ti:emailrep:obs:email-addr:attacker@evil-phishing.com": {
+      "key": "ti:emailrep:obs:email-addr:attacker@evil-phishing.com",
+      "source": "EmailRep",
+      "observable_key": "obs:email-addr:attacker@evil-phishing.com",
+      "comment": "Suspicious sender",
+      "extra": {},
+      "score": 8.0,
+      "level": "MALICIOUS",
+      "taxonomies": []
+    },
+    "ti:internal whitelist:obs:email-addr:victim@company.com": {
+      "key": "ti:internal whitelist:obs:email-addr:victim@company.com",
+      "source": "Internal Whitelist",
+      "observable_key": "obs:email-addr:victim@company.com",
+      "comment": "Known employee",
+      "extra": {},
+      "score": -1.0,
+      "level": "TRUSTED",
+      "taxonomies": []
+    },
+    "ti:email gateway:obs:email-message:phishing email - invoice #12345": {
+      "key": "ti:email gateway:obs:email-message:phishing email - invoice #12345",
+      "source": "Email Gateway",
+      "observable_key": "obs:email-message:phishing email - invoice #12345",
+      "comment": "Flagged as suspicious",
+      "extra": {},
+      "score": 7.0,
+      "level": "MALICIOUS",
+      "taxonomies": []
+    },
+    "ti:urlhaus:obs:url:https://evil-phishing.com/login": {
+      "key": "ti:urlhaus:obs:url:https://evil-phishing.com/login",
+      "source": "URLhaus",
+      "observable_key": "obs:url:https://evil-phishing.com/login",
+      "comment": "",
+      "extra": {},
+      "score": 9.0,
+      "level": "MALICIOUS",
+      "taxonomies": []
+    },
+    "ti:urlhaus:obs:url:https://evil-phishing.com/verify": {
+      "key": "ti:urlhaus:obs:url:https://evil-phishing.com/verify",
+      "source": "URLhaus",
+      "observable_key": "obs:url:https://evil-phishing.com/verify",
+      "comment": "",
+      "extra": {},
+      "score": 8.5,
+      "level": "MALICIOUS",
+      "taxonomies": []
+    },
+    "ti:virustotal:obs:file:invoice.exe": {
+      "key": "ti:virustotal:obs:file:invoice.exe",
+      "source": "VirusTotal",
+      "observable_key": "obs:file:invoice.exe",
+      "comment": "Detected by 45/70 engines",
+      "extra": {},
+      "score": 10.0,
+      "level": "MALICIOUS",
+      "taxonomies": []
+    },
+    "ti:internal whitelist:obs:domain-name:google.com": {
+      "key": "ti:internal whitelist:obs:domain-name:google.com",
+      "source": "Internal Whitelist",
+      "observable_key": "obs:domain-name:google.com",
+      "comment": "Known good domain",
+      "extra": {},
+      "score": -2.0,
+      "level": "TRUSTED",
+      "taxonomies": []
+    },
+    "ti:passive dns:obs:domain-name:new-service.cloud": {
+      "key": "ti:passive dns:obs:domain-name:new-service.cloud",
+      "source": "Passive DNS",
+      "observable_key": "obs:domain-name:new-service.cloud",
+      "comment": "Recently registered domain",
+      "extra": {},
+      "score": 2.0,
+      "level": "NOTABLE",
+      "taxonomies": []
+    }
+  },
+  "enrichments": {},
+  "containers": {
+    "ctr:phishing_investigation/email": {
+      "key": "ctr:phishing_investigation/email",
+      "path": "phishing_investigation/email",
+      "description": "",
+      "checks": [
+        "chk:email_analysis:email"
+      ],
+      "sub_containers": {},
+      "aggregated_score": 10.0,
+      "aggregated_level": "MALICIOUS"
+    },
+    "ctr:phishing_investigation/network": {
+      "key": "ctr:phishing_investigation/network",
+      "path": "phishing_investigation/network",
+      "description": "",
+      "checks": [
+        "chk:url_analysis:network",
+        "chk:infrastructure:network"
+      ],
+      "sub_containers": {},
+      "aggregated_score": 19.5,
+      "aggregated_level": "MALICIOUS"
+    },
+    "ctr:phishing_investigation/malware": {
+      "key": "ctr:phishing_investigation/malware",
+      "path": "phishing_investigation/malware",
+      "description": "",
+      "checks": [
+        "chk:malware_detection:file"
+      ],
+      "sub_containers": {},
+      "aggregated_score": 10.0,
+      "aggregated_level": "MALICIOUS"
+    }
+  },
+  "stats": {
+    "total_observables": 13,
+    "internal_observables": 1,
+    "external_observables": 12,
+    "whitelisted_observables": 1,
+    "observables_by_type": {
+      "file": 2,
+      "domain-name": 4,
+      "ipv4-addr": 2,
+      "email-addr": 2,
+      "email-message": 1,
+      "url": 2
+    },
+    "observables_by_level": {
+      "INFO": 1,
+      "MALICIOUS": 7,
+      "SUSPICIOUS": 2,
+      "TRUSTED": 2,
+      "NOTABLE": 1
+    },
+    "observables_by_type_and_level": {
+      "file": {
+        "INFO": 1,
+        "MALICIOUS": 1
+      },
+      "domain-name": {
+        "MALICIOUS": 1,
+        "SUSPICIOUS": 1,
+        "TRUSTED": 1,
+        "NOTABLE": 1
+      },
+      "ipv4-addr": {
+        "MALICIOUS": 1,
+        "SUSPICIOUS": 1
+      },
+      "email-addr": {
+        "MALICIOUS": 1,
+        "TRUSTED": 1
+      },
+      "email-message": {
+        "MALICIOUS": 1
+      },
+      "url": {
+        "MALICIOUS": 2
+      }
+    },
+    "total_checks": 4,
+    "applied_checks": 4,
+    "checks_by_scope": {
+      "email": 1,
+      "network": 2,
+      "file": 1
+    },
+    "checks_by_level": {
+      "MALICIOUS": 4
+    },
+    "total_threat_intel": 13,
+    "threat_intel_by_source": {
+      "VirusTotal": 3,
+      "AlienVault OTX": 1,
+      "AbuseIPDB": 1,
+      "Shodan": 1,
+      "EmailRep": 1,
+      "Internal Whitelist": 2,
+      "Email Gateway": 1,
+      "URLhaus": 2,
+      "Passive DNS": 1
+    },
+    "threat_intel_by_level": {
+      "MALICIOUS": 8,
+      "SUSPICIOUS": 2,
+      "TRUSTED": 2,
+      "NOTABLE": 1
+    },
+    "total_containers": 3
+  },
+  "stats_checks": {
+    "checks": 4,
+    "applied": 4
+  },
+  "data_extraction": {
+    "root_type": "file",
+    "score_mode": "max"
+  }
+}

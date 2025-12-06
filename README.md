@@ -382,29 +382,15 @@ mkdocs serve
 mkdocs build
 ```
 
-## Project Structure
+## JavaScript packages
 
-```
-cyvest/
-├── src/cyvest/
-│   ├── __init__.py          # Package initialization
-│   ├── cyvest.py            # High-level API facade
-│   ├── investigation.py     # Core state management with merge-on-create
-│   ├── proxies.py           # Read-only proxies + fluent helper methods
-│   ├── levels.py            # Level enum and scoring logic
-│   ├── keys.py              # Key generation utilities
-│   ├── model.py             # Core data models
-│   ├── score.py             # Scoring and propagation engine
-│   ├── stats.py             # Statistics and aggregations
-│   ├── io_serialization.py  # JSON and Markdown export
-│   ├── io_rich.py           # Rich console output
-│   └── cli.py               # CLI interface
-├── examples/                # Example scripts
-├── tests/                   # Test suite
-├── docs/                    # Documentation
-├── pyproject.toml           # Project configuration
-└── README.md                # This file
-```
+The repo includes a PNPM workspace under `js/` with three packages:
+
+- `@cyvest/cyvest-js`: TypeScript types, schema validation, and helpers for Cyvest investigations.
+- `@cyvest/cyvest-vis`: React components for graph visualization (depends on `@cyvest/cyvest-js`).
+- `@cyvest/cyvest-app`: Vite demo that bundles the JS packages with sample investigations.
+
+See `docs/js-packages.md` for workspace commands and usage snippets.
 
 ## Contributing
 

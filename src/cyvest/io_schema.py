@@ -52,7 +52,7 @@ def get_investigation_schema() -> dict[str, Any]:
         ],
         "properties": {
             "score": {"type": "number"},
-            "level": {"type": "string", "enum": level_names},
+            "level": {"$ref": "#/$defs/level"},
             "whitelisted": {"type": "boolean"},
             "whitelists": {
                 "type": "array",
@@ -102,6 +102,28 @@ def get_investigation_schema() -> dict[str, Any]:
             "data_extraction": {"$ref": "#/$defs/data_extraction"},
         },
         "$defs": {
+            # Reusable enum types
+            "level": {
+                "type": "string",
+                "enum": level_names,
+                "description": "Security level classification from NONE (lowest) to MALICIOUS (highest).",
+            },
+            "relationship_direction": {
+                "type": "string",
+                "enum": relationship_directions,
+                "description": "Direction of a relationship between observables.",
+            },
+            "score_policy": {
+                "type": "string",
+                "enum": score_policies,
+                "description": "Score computation policy: 'auto' calculates from level, 'manual' uses explicit score.",
+            },
+            "score_mode": {
+                "type": "string",
+                "enum": score_modes,
+                "description": "Score aggregation mode: 'max' takes highest score, 'sum' adds all scores.",
+            },
+            # Complex types
             "whitelist": {
                 "type": "object",
                 "required": ["identifier", "name"],
@@ -122,7 +144,7 @@ def get_investigation_schema() -> dict[str, Any]:
                         "description": "Relationship label; defaults to related-to.",
                         "examples": relationship_types,
                     },
-                    "direction": {"type": "string", "enum": relationship_directions},
+                    "direction": {"$ref": "#/$defs/relationship_direction"},
                 },
                 "additionalProperties": False,
             },
@@ -155,7 +177,7 @@ def get_investigation_schema() -> dict[str, Any]:
                     "comment": {"type": "string"},
                     "extra": {"type": ["object", "null"], "default": {}},
                     "score": {"type": "number"},
-                    "level": {"type": "string", "enum": level_names},
+                    "level": {"$ref": "#/$defs/level"},
                     "relationships": {
                         "type": "array",
                         "items": {"$ref": "#/$defs/relationship"},
@@ -196,8 +218,8 @@ def get_investigation_schema() -> dict[str, Any]:
                     "comment": {"type": "string"},
                     "extra": {"type": ["object", "null"], "default": {}},
                     "score": {"type": "number"},
-                    "level": {"type": "string", "enum": level_names},
-                    "score_policy": {"type": "string", "enum": score_policies},
+                    "level": {"$ref": "#/$defs/level"},
+                    "score_policy": {"$ref": "#/$defs/score_policy"},
                     "observables": {
                         "type": "array",
                         "items": {"type": "string"},
@@ -225,7 +247,7 @@ def get_investigation_schema() -> dict[str, Any]:
                     "comment": {"type": "string"},
                     "extra": {"type": ["object", "null"], "default": {}},
                     "score": {"type": "number"},
-                    "level": {"type": "string", "enum": level_names},
+                    "level": {"$ref": "#/$defs/level"},
                     "taxonomies": {
                         "type": "array",
                         "items": {"type": "object"},
@@ -271,7 +293,7 @@ def get_investigation_schema() -> dict[str, Any]:
                         "default": {},
                     },
                     "aggregated_score": {"type": "number"},
-                    "aggregated_level": {"type": "string", "enum": level_names},
+                    "aggregated_level": {"$ref": "#/$defs/level"},
                 },
                 "additionalProperties": False,
             },
@@ -363,7 +385,7 @@ def get_investigation_schema() -> dict[str, Any]:
                         "description": "Root observable type used during data extraction.",
                         "examples": observable_types,
                     },
-                    "score_mode": {"type": "string", "enum": score_modes},
+                    "score_mode": {"$ref": "#/$defs/score_mode"},
                 },
                 "additionalProperties": False,
             },

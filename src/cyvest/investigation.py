@@ -156,15 +156,16 @@ class SharedInvestigationContext:
             # Refresh registries from canonical, post-merge investigation state
             self._observable_registry = {}
             for obs in self._main_investigation.get_all_observables().values():
-                copy = deepcopy(obs)
+                copy = obs.model_copy(deep=True)
                 copy._from_shared_context = True
                 self._observable_registry[obs.key] = copy
 
             self._check_registry = {
-                check.key: deepcopy(check) for check in self._main_investigation.get_all_checks().values()
+                check.key: check.model_copy(deep=True)
+                for check in self._main_investigation.get_all_checks().values()
             }
             self._enrichment_registry = {
-                enrichment.key: deepcopy(enrichment)
+                enrichment.key: enrichment.model_copy(deep=True)
                 for enrichment in self._main_investigation.get_all_enrichments().values()
             }
 
@@ -252,7 +253,7 @@ class SharedInvestigationContext:
         with self._lock:
             obs = self._observable_registry.get(key)
             if obs:
-                copy = deepcopy(obs)
+                copy = obs.model_copy(deep=True)
                 # Mark this as a copy from shared context to prevent misuse in relationships
                 copy._from_shared_context = True
                 return copy
@@ -310,7 +311,7 @@ class SharedInvestigationContext:
         with self._lock:
             check = self._check_registry.get(key)
             if check:
-                return deepcopy(check)
+                return check.model_copy(deep=True)
             return None
 
     @overload
@@ -376,7 +377,7 @@ class SharedInvestigationContext:
         with self._lock:
             enrichment = self._enrichment_registry.get(key)
             if enrichment:
-                return deepcopy(enrichment)
+                return enrichment.model_copy(deep=True)
             return None
 
     def get_global_score(self) -> Decimal:
@@ -461,7 +462,7 @@ class SharedInvestigationContext:
             matches = []
             for obs in self._observable_registry.values():
                 if obs.obs_type == obs_type:
-                    matches.append(deepcopy(obs))
+                    matches.append(obs.model_copy(deep=True))
             return matches
 
     def find_observables_by_value(self, value: str) -> list[Observable]:
@@ -478,7 +479,7 @@ class SharedInvestigationContext:
             matches = []
             for obs in self._observable_registry.values():
                 if obs.value == value:
-                    matches.append(deepcopy(obs))
+                    matches.append(obs.model_copy(deep=True))
             return matches
 
     @overload

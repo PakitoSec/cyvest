@@ -6,7 +6,6 @@ Defines the base classes for Check, Observable, ThreatIntel, Enrichment, and Con
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
 from enum import Enum
@@ -14,6 +13,7 @@ from typing import Any
 
 from cyvest import keys
 from cyvest.levels import Level, get_level_from_score, normalize_level
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, field_validator, model_validator
 
 
 class ObservableType(str, Enum):
@@ -77,9 +77,10 @@ class RelationshipDirection(str, Enum):
     BIDIRECTIONAL = "bidirectional"  # Source ↔ Target
 
 
-@dataclass
-class ScoreChange:
+class ScoreChange(BaseModel):
     """Record of a score change for audit trail."""
+
+    model_config = ConfigDict(validate_assignment=True)
 
     timestamp: datetime
     old_score: Decimal
@@ -87,6 +88,16 @@ class ScoreChange:
     old_level: Level
     new_level: Level
     reason: str
+
+    @field_validator("old_score", "new_score", mode="before")
+    @classmethod
+    def _coerce_decimal(cls, value: Any) -> Decimal:
+        return value if isinstance(value, Decimal) else Decimal(str(value))
+
+    @field_validator("old_level", "new_level", mode="before")
+    @classmethod
+    def _normalize_level(cls, value: Level | str) -> Level:
+        return normalize_level(value)
 
 
 class CheckScorePolicy(str, Enum):
@@ -96,8 +107,7 @@ class CheckScorePolicy(str, Enum):
     MANUAL = "manual"  # Score/level only change via explicit check updates
 
 
-@dataclass
-class Check:
+class Check(BaseModel):
     """
     Represents a verification step in the investigation.
 
@@ -105,28 +115,42 @@ class Check:
     and contributes to the overall investigation score.
     """
 
+    model_config = ConfigDict(validate_assignment=True)
+
     check_id: str
     scope: str
     description: str
     comment: str = ""
-    extra: dict[str, Any] = field(default_factory=dict)
-    score: Decimal = field(default_factory=lambda: Decimal("0"))
+    extra: dict[str, Any] = Field(default_factory=dict)
+    score: Decimal = Field(default_factory=lambda: Decimal("0"))
     level: Level = Level.NONE
-    observables: list[Observable] = field(default_factory=list)
+    observables: list["Observable"] = Field(default_factory=list)
     score_policy: CheckScorePolicy = CheckScorePolicy.AUTO
-    key: str = field(default="", init=False)
-    _explicit_level: bool = field(default=False, init=False)
-    _score_history: list[ScoreChange] = field(default_factory=list, init=False)
+    key: str = ""
 
-    def __post_init__(self) -> None:
-        """Generate key and normalize types."""
+    _explicit_level: bool = PrivateAttr(default=False)
+    _score_history: list[ScoreChange] = PrivateAttr(default_factory=list)
+
+    @field_validator("score", mode="before")
+    @classmethod
+    def _coerce_score(cls, value: Any) -> Decimal:
+        return value if isinstance(value, Decimal) else Decimal(str(value))
+
+    @field_validator("level", mode="before")
+    @classmethod
+    def _normalize_level(cls, value: Level | str) -> Level:
+        return normalize_level(value)
+
+    @field_validator("score_policy", mode="before")
+    @classmethod
+    def _normalize_policy(cls, value: CheckScorePolicy | str) -> CheckScorePolicy:
+        return CheckScorePolicy(value)
+
+    @model_validator(mode="after")
+    def _finalize(self) -> "Check":
         if not self.key:
             self.key = keys.generate_check_key(self.check_id, self.scope)
-        if not isinstance(self.score, Decimal):
-            self.score = Decimal(str(self.score))
-        self.level = normalize_level(self.level)
-        if isinstance(self.score_policy, str):
-            self.score_policy = CheckScorePolicy(self.score_policy)
+        return self
 
     def update_score(self, new_score: Decimal, reason: str = "") -> None:
         """
@@ -210,41 +234,52 @@ class Check:
         return self._score_history
 
 
-@dataclass
-class Relationship:
+class Relationship(BaseModel):
     """Represents a relationship between observables."""
 
     target_key: str  # Key of the target observable
     relationship_type: RelationshipType | str  # Relationship type label
     direction: RelationshipDirection | str | None = None  # Relationship direction (None = auto-detect)
 
-    def __post_init__(self) -> None:
-        """Normalize relationship type and direction to enum if possible."""
-        # First normalize relationship type
-        if isinstance(self.relationship_type, str):
-            try:
-                self.relationship_type = RelationshipType(self.relationship_type)
-            except ValueError:
-                # Keep as string if not a recognized relationship type
-                pass
+    model_config = ConfigDict(validate_assignment=True)
 
-        # Then handle direction with smart defaults
+    @field_validator("relationship_type", mode="before")
+    @classmethod
+    def _normalize_relationship_type(cls, value: RelationshipType | str) -> RelationshipType | str:
+        if isinstance(value, RelationshipType):
+            return value
+        try:
+            return RelationshipType(value)
+        except ValueError:
+            return value
+
+    @field_validator("direction", mode="before")
+    @classmethod
+    def _normalize_direction(cls, value: RelationshipDirection | str | None) -> RelationshipDirection | str | None:
+        if value is None or isinstance(value, RelationshipDirection):
+            return value
+        try:
+            return RelationshipDirection(value)
+        except ValueError:
+            return value
+
+    @model_validator(mode="after")
+    def _finalize_direction(self) -> "Relationship":
         if self.direction is None:
-            # No direction specified - use semantic default based on relationship type
             if isinstance(self.relationship_type, RelationshipType):
                 self.direction = self.relationship_type.get_default_direction()
             else:
-                # Custom relationship type - default to OUTBOUND
                 self.direction = RelationshipDirection.OUTBOUND
         elif isinstance(self.direction, str):
             try:
                 self.direction = RelationshipDirection(self.direction)
             except ValueError:
-                # Invalid direction string - use semantic default or OUTBOUND
-                if isinstance(self.relationship_type, RelationshipType):
-                    self.direction = self.relationship_type.get_default_direction()
-                else:
-                    self.direction = RelationshipDirection.OUTBOUND
+                self.direction = (
+                    self.relationship_type.get_default_direction()
+                    if isinstance(self.relationship_type, RelationshipType)
+                    else RelationshipDirection.OUTBOUND
+                )
+        return self
 
     @property
     def relationship_type_name(self):
@@ -255,8 +290,7 @@ class Relationship:
         )
 
 
-@dataclass
-class Observable:
+class Observable(BaseModel):
     """
     Represents a cyber observable (IP, URL, domain, hash, etc.).
 
@@ -264,46 +298,55 @@ class Observable:
     through relationships.
     """
 
+    model_config = ConfigDict(validate_assignment=True)
+
     obs_type: ObservableType | str
     value: str
     internal: bool = True
     whitelisted: bool = False
     comment: str = ""
-    extra: dict[str, Any] = field(default_factory=dict)
-    score: Decimal = field(default_factory=lambda: Decimal("0"))
+    extra: dict[str, Any] = Field(default_factory=dict)
+    score: Decimal = Field(default_factory=lambda: Decimal("0"))
     level: Level = Level.INFO
-    threat_intels: list[ThreatIntel] = field(default_factory=list)
-    relationships: list[Relationship] = field(default_factory=list)
-    key: str = field(default="", init=False)
-    _explicit_level: bool = field(default=False, init=False)
-    _score_history: list[ScoreChange] = field(default_factory=list, init=False)
-    _generated_by_checks: list[str] = field(default_factory=list, init=False)  # Check keys
+    threat_intels: list[ThreatIntel] = Field(default_factory=list)
+    relationships: list[Relationship] = Field(default_factory=list)
+    key: str = ""
 
-    def __post_init__(self) -> None:
-        """Generate key and normalize types."""
-        # Normalize obs_type to enum if possible
-        if isinstance(self.obs_type, str):
-            try:
-                self.obs_type = ObservableType(self.obs_type)
-            except ValueError:
-                # Keep as string if not a recognized observable type
-                pass
+    _explicit_level: bool = PrivateAttr(default=False)
+    _score_history: list[ScoreChange] = PrivateAttr(default_factory=list)
+    _generated_by_checks: list[str] = PrivateAttr(default_factory=list)
+    _from_shared_context: bool = PrivateAttr(default=False)
 
+    @field_validator("obs_type", mode="before")
+    @classmethod
+    def _normalize_obs_type(cls, value: ObservableType | str) -> ObservableType | str:
+        if isinstance(value, ObservableType):
+            return value
+        try:
+            return ObservableType(value)
+        except ValueError:
+            return value
+
+    @field_validator("score", mode="before")
+    @classmethod
+    def _coerce_score(cls, value: Any) -> Decimal:
+        return value if isinstance(value, Decimal) else Decimal(str(value))
+
+    @field_validator("level", mode="before")
+    @classmethod
+    def _normalize_level(cls, value: Level | str) -> Level:
+        return normalize_level(value)
+
+    @model_validator(mode="after")
+    def _finalize(self) -> "Observable":
         if not self.key:
-            # Use string value of obs_type for key generation
             obs_type_str = self.obs_type.value if isinstance(self.obs_type, ObservableType) else self.obs_type
             self.key = keys.generate_observable_key(obs_type_str, self.value)
-        if not isinstance(self.score, Decimal):
-            self.score = Decimal(str(self.score))
-        self.level = normalize_level(self.level)
 
-        # If level is explicitly set to SAFE, mark it as explicit to prevent downgrades
         if self.level == Level.SAFE:
             self.set_level(Level.SAFE)
 
-        # Initialize shared context marker (will be set to True for copies from registry)
-        if not hasattr(self, "_from_shared_context"):
-            self._from_shared_context = False
+        return self
 
     def update_score(self, new_score: Decimal, reason: str = "") -> None:
         """
@@ -409,8 +452,7 @@ class Observable:
         return self._score_history
 
 
-@dataclass
-class ThreatIntel:
+class ThreatIntel(BaseModel):
     """
     Represents threat intelligence from an external source.
 
@@ -418,28 +460,40 @@ class ThreatIntel:
     like VirusTotal, URLScan.io, etc.
     """
 
+    model_config = ConfigDict(validate_assignment=True)
+
     source: str
     observable_key: str
     comment: str = ""
-    extra: dict[str, Any] = field(default_factory=dict)
-    score: Decimal = field(default_factory=lambda: Decimal("0"))
+    extra: dict[str, Any] = Field(default_factory=dict)
+    score: Decimal = Field(default_factory=lambda: Decimal("0"))
     level: Level = Level.INFO
-    taxonomies: list[dict[str, Any]] = field(default_factory=list)
-    key: str = field(default="", init=False)
-    _explicit_level: bool = field(default=False, init=False)
+    taxonomies: list[dict[str, Any]] = Field(default_factory=list)
+    key: str = ""
 
-    def __post_init__(self) -> None:
-        """Generate key and normalize types."""
+    _explicit_level: bool = PrivateAttr(default=False)
+
+    @field_validator("score", mode="before")
+    @classmethod
+    def _coerce_score(cls, value: Any) -> Decimal:
+        return value if isinstance(value, Decimal) else Decimal(str(value))
+
+    @field_validator("level", mode="before")
+    @classmethod
+    def _normalize_level(cls, value: Level | str) -> Level:
+        return normalize_level(value)
+
+    @model_validator(mode="after")
+    def _finalize(self) -> "ThreatIntel":
         if not self.key:
             self.key = keys.generate_threat_intel_key(self.source, self.observable_key)
-        if not isinstance(self.score, Decimal):
-            self.score = Decimal(str(self.score))
-        self.level = normalize_level(self.level)
-        # Recalculate level from score if not explicitly set
+
         if not self._explicit_level and self.level == Level.INFO:
             calculated_level = get_level_from_score(self.score)
             if calculated_level != Level.NONE:
                 self.level = calculated_level
+
+        return self
 
     def set_level(self, level: Level | str) -> None:
         """
@@ -452,8 +506,7 @@ class ThreatIntel:
         self._explicit_level = True
 
 
-@dataclass
-class Enrichment:
+class Enrichment(BaseModel):
     """
     Represents structured data enrichment for the investigation.
 
@@ -461,19 +514,21 @@ class Enrichment:
     context but doesn't directly contribute to scoring.
     """
 
-    name: str
-    data: dict[str, Any] = field(default_factory=dict)
-    context: str = ""
-    key: str = field(default="", init=False)
+    model_config = ConfigDict(validate_assignment=True)
 
-    def __post_init__(self) -> None:
-        """Generate key."""
+    name: str
+    data: dict[str, Any] = Field(default_factory=dict)
+    context: str = ""
+    key: str = ""
+
+    @model_validator(mode="after")
+    def _finalize(self) -> "Enrichment":
         if not self.key:
             self.key = keys.generate_enrichment_key(self.name, self.context)
+        return self
 
 
-@dataclass
-class Container:
+class Container(BaseModel):
     """
     Groups checks and sub-containers for hierarchical organization.
 
@@ -481,16 +536,19 @@ class Container:
     with aggregated scores and levels.
     """
 
+    model_config = ConfigDict(validate_assignment=True)
+
     path: str
     description: str = ""
-    checks: list[Check] = field(default_factory=list)
-    sub_containers: dict[str, Container] = field(default_factory=dict)
-    key: str = field(default="", init=False)
+    checks: list[Check] = Field(default_factory=list)
+    sub_containers: dict[str, "Container"] = Field(default_factory=dict)
+    key: str = ""
 
-    def __post_init__(self) -> None:
-        """Generate key."""
+    @model_validator(mode="after")
+    def _finalize(self) -> "Container":
         if not self.key:
             self.key = keys.generate_container_key(self.path)
+        return self
 
     def add_check(self, check: Check) -> None:
         """
@@ -535,3 +593,11 @@ class Container:
             Level based on aggregated score
         """
         return get_level_from_score(self.get_aggregated_score())
+
+
+# Resolve forward references for models that reference each other
+Check.model_rebuild()
+Observable.model_rebuild()
+ThreatIntel.model_rebuild()
+Enrichment.model_rebuild()
+Container.model_rebuild()

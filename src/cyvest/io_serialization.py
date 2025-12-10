@@ -9,19 +9,24 @@ from decimal import Decimal
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from cyvest.levels import Level, normalize_level
-from cyvest.model import Check, CheckScorePolicy, Container, Enrichment, Observable, Relationship, ThreatIntel
+from cyvest.levels import Level
+from cyvest.model import Check, Container, Enrichment, Observable, Relationship, ThreatIntel
 from cyvest.score import ScoreMode
 
 if TYPE_CHECKING:
     from cyvest.cyvest import Cyvest
 
 
-def _decimal_to_float(obj: Any) -> Any:
-    """Convert Decimal objects to float for JSON serialization."""
-    if isinstance(obj, Decimal):
-        return float(obj)
-    raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
+def _resolve_proxy(obj: Any) -> Any:
+    """
+    Resolve a proxy object to its underlying model.
+
+    If the object has a _resolve method (proxy), call it to get the actual model.
+    Otherwise, return the object as-is.
+    """
+    if hasattr(obj, "_resolve"):
+        return obj._resolve()
+    return obj
 
 
 def serialize_observable(obs: Observable) -> dict[str, Any]:
@@ -29,32 +34,15 @@ def serialize_observable(obs: Observable) -> dict[str, Any]:
     Serialize an observable to a dictionary.
 
     Args:
-        obs: Observable to serialize
+        obs: Observable or ObservableProxy to serialize
 
     Returns:
         Dictionary representation
     """
-    return {
-        "key": obs.key,
-        "type": obs.obs_type,
-        "value": obs.value,
-        "internal": obs.internal,
-        "whitelisted": obs.whitelisted,
-        "comment": obs.comment,
-        "extra": obs.extra,
-        "score": float(obs.score),
-        "level": obs.level.name,
-        "relationships": [
-            {
-                "target_key": rel.target_key,
-                "relationship_type": rel.relationship_type,
-                "direction": rel.direction if isinstance(rel.direction, str) else rel.direction.value,
-            }
-            for rel in obs.relationships
-        ],
-        "threat_intels": [ti.key for ti in obs.threat_intels],
-        "generated_by_checks": obs._generated_by_checks,
-    }
+    obs = _resolve_proxy(obs)
+    # Use by_alias=True to get 'type' instead of 'obs_type'
+    # Field serializers handle threat_intels, relationships, and generated_by_checks
+    return obs.model_dump(by_alias=True)
 
 
 def serialize_check(check: Check) -> dict[str, Any]:
@@ -62,23 +50,14 @@ def serialize_check(check: Check) -> dict[str, Any]:
     Serialize a check to a dictionary.
 
     Args:
-        check: Check to serialize
+        check: Check or CheckProxy to serialize
 
     Returns:
         Dictionary representation
     """
-    return {
-        "key": check.key,
-        "check_id": check.check_id,
-        "scope": check.scope,
-        "description": check.description,
-        "comment": check.comment,
-        "extra": check.extra,
-        "score": float(check.score),
-        "level": check.level.name,
-        "score_policy": check.score_policy.value,
-        "observables": [obs.key for obs in check.observables],
-    }
+    check = _resolve_proxy(check)
+    # Field serializer handles observables as keys
+    return check.model_dump()
 
 
 def serialize_threat_intel(ti: ThreatIntel) -> dict[str, Any]:
@@ -86,21 +65,13 @@ def serialize_threat_intel(ti: ThreatIntel) -> dict[str, Any]:
     Serialize threat intel to a dictionary.
 
     Args:
-        ti: Threat intel to serialize
+        ti: ThreatIntel or ThreatIntelProxy to serialize
 
     Returns:
         Dictionary representation
     """
-    return {
-        "key": ti.key,
-        "source": ti.source,
-        "observable_key": ti.observable_key,
-        "comment": ti.comment,
-        "extra": ti.extra,
-        "score": float(ti.score),
-        "level": ti.level.name,
-        "taxonomies": ti.taxonomies,
-    }
+    ti = _resolve_proxy(ti)
+    return ti.model_dump()
 
 
 def serialize_enrichment(enrichment: Enrichment) -> dict[str, Any]:
@@ -108,17 +79,13 @@ def serialize_enrichment(enrichment: Enrichment) -> dict[str, Any]:
     Serialize an enrichment to a dictionary.
 
     Args:
-        enrichment: Enrichment to serialize
+        enrichment: Enrichment or EnrichmentProxy to serialize
 
     Returns:
         Dictionary representation
     """
-    return {
-        "key": enrichment.key,
-        "name": enrichment.name,
-        "data": enrichment.data,
-        "context": enrichment.context,
-    }
+    enrichment = _resolve_proxy(enrichment)
+    return enrichment.model_dump()
 
 
 def serialize_container(container: Container) -> dict[str, Any]:
@@ -126,20 +93,14 @@ def serialize_container(container: Container) -> dict[str, Any]:
     Serialize a container to a dictionary.
 
     Args:
-        container: Container to serialize
+        container: Container or ContainerProxy to serialize
 
     Returns:
         Dictionary representation
     """
-    return {
-        "key": container.key,
-        "path": container.path,
-        "description": container.description,
-        "checks": [check.key for check in container.checks],
-        "sub_containers": {key: serialize_container(sub) for key, sub in container.sub_containers.items()},
-        "aggregated_score": float(container.get_aggregated_score()),
-        "aggregated_level": container.get_aggregated_level().name,
-    }
+    container = _resolve_proxy(container)
+    # field_serializer handles sub_containers recursively, checks as keys, aggregated_score/level
+    return container.model_dump()
 
 
 def serialize_investigation(cv: "Cyvest") -> dict[str, Any]:
@@ -183,14 +144,7 @@ def serialize_investigation(cv: "Cyvest") -> dict[str, Any]:
         "score": float(cv.get_global_score()),
         "level": cv.get_global_level().name,
         "whitelisted": cv.investigation_is_whitelisted(),
-        "whitelists": [
-            {
-                "identifier": entry.identifier,
-                "name": entry.name,
-                "justification": entry.justification,
-            }
-            for entry in cv.investigation_get_whitelists()
-        ],
+        "whitelists": [entry.model_dump() for entry in cv.investigation_get_whitelists()],
         "observables": {key: serialize_observable(obs) for key, obs in cv.get_all_observables().items()},
         "checks": checks_by_scope,
         "checks_by_level": checks_by_level,
@@ -219,7 +173,7 @@ def save_investigation_json(cv: "Cyvest", filepath: str | Path) -> None:
     """
     data = serialize_investigation(cv)
     with open(filepath, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2, ensure_ascii=False, default=_decimal_to_float)
+        json.dump(data, f, indent=2, ensure_ascii=False)
 
 
 def generate_markdown_report(
@@ -406,82 +360,79 @@ def load_investigation_json(filepath: str | Path) -> "Cyvest":
 
     # Reset internal state to avoid default root pollution
     cv._investigation = Investigation(data_payload, root_type=root_type, score_mode=score_mode)
+
+    # Load whitelists using Pydantic validation
     whitelists = data.get("whitelists") or []
     for whitelist_info in whitelists:
         try:
-            cv._investigation.add_whitelist(
-                whitelist_info.get("identifier", ""),
-                whitelist_info.get("name", ""),
-                whitelist_info.get("justification"),
-            )
+            # Use model_validate for Pydantic models, with fallback for backward compatibility
+            identifier = str(whitelist_info.get("identifier", "")).strip()
+            name = str(whitelist_info.get("name", "")).strip()
+            if identifier and name:
+                cv._investigation.add_whitelist(
+                    identifier,
+                    name,
+                    whitelist_info.get("justification"),
+                )
         except ValueError:
             continue
+
     # Backward compatibility for older exports
     if data.get("whitelisted") and not cv._investigation.is_whitelisted():
         cv._investigation.add_whitelist("default", "Whitelisted", data.get("whitelisted_reason"))
 
-    def _level_from_name(name: str | None, default: Level) -> Level:
-        if not name:
-            return default
-        try:
-            return normalize_level(name)
-        except (TypeError, ValueError):
-            return default
-
-    # Observables
+    # Observables - leverage Pydantic model_validate
     for obs_info in data.get("observables", {}).values():
-        obs = Observable(
-            obs_type=obs_info.get("type", "unknown"),
-            value=obs_info.get("value", ""),
-            internal=obs_info.get("internal", True),
-            whitelisted=obs_info.get("whitelisted", False),
-            comment=obs_info.get("comment", ""),
-            extra=obs_info.get("extra", {}),
-            score=Decimal(str(obs_info.get("score", 0))),
-            level=_level_from_name(obs_info.get("level"), Level.INFO),
-        )
-        obs.key = obs_info.get("key", obs.key)
-        obs.relationships = [
-            Relationship(
-                target_key=rel.get("target_key", ""),
-                relationship_type=rel.get("relationship_type", "related-to"),
-                direction=rel.get("direction", "outbound"),
-            )
-            for rel in obs_info.get("relationships", [])
-        ]
+        # Prepare data for Pydantic validation
+        obs_data = {
+            "obs_type": obs_info.get("type", "unknown"),
+            "value": obs_info.get("value", ""),
+            "internal": obs_info.get("internal", True),
+            "whitelisted": obs_info.get("whitelisted", False),
+            "comment": obs_info.get("comment", ""),
+            "extra": obs_info.get("extra", {}),
+            "score": Decimal(str(obs_info.get("score", 0))),
+            "level": obs_info.get("level", "INFO"),
+            "key": obs_info.get("key", ""),
+            "relationships": [Relationship.model_validate(rel) for rel in obs_info.get("relationships", [])],
+        }
+        obs = Observable.model_validate(obs_data)
+        # Restore private attribute
         obs._generated_by_checks = obs_info.get("generated_by_checks", [])
         cv._investigation.add_observable(obs)
 
-    # Threat intel
+    # Threat intel - leverage Pydantic model_validate
     for ti_info in data.get("threat_intels", {}).values():
-        ti = ThreatIntel(
-            source=ti_info.get("source", ""),
-            observable_key=ti_info.get("observable_key", ""),
-            comment=ti_info.get("comment", ""),
-            extra=ti_info.get("extra", {}),
-            score=Decimal(str(ti_info.get("score", 0))),
-            level=_level_from_name(ti_info.get("level"), Level.INFO),
-            taxonomies=ti_info.get("taxonomies", []),
-        )
-        ti.key = ti_info.get("key", ti.key)
+        ti_data = {
+            "source": ti_info.get("source", ""),
+            "observable_key": ti_info.get("observable_key", ""),
+            "comment": ti_info.get("comment", ""),
+            "extra": ti_info.get("extra", {}),
+            "score": Decimal(str(ti_info.get("score", 0))),
+            "level": ti_info.get("level", "INFO"),
+            "taxonomies": ti_info.get("taxonomies", []),
+            "key": ti_info.get("key", ""),
+        }
+        ti = ThreatIntel.model_validate(ti_data)
         observable = cv._investigation.get_observable(ti.observable_key)
         if observable:
             cv._investigation.add_threat_intel(ti, observable)
 
-    # Checks
+    # Checks - leverage Pydantic model_validate
     for scope_checks in data.get("checks", {}).values():
         for check_info in scope_checks:
-            check = Check(
-                check_id=check_info.get("check_id", ""),
-                scope=check_info.get("scope", ""),
-                description=check_info.get("description", ""),
-                comment=check_info.get("comment", ""),
-                extra=check_info.get("extra", {}),
-                score=Decimal(str(check_info.get("score", 0))),
-                level=_level_from_name(check_info.get("level"), Level.NONE),
-                score_policy=check_info.get("score_policy", CheckScorePolicy.AUTO),
-            )
-            check.key = check_info.get("key", check.key)
+            check_data = {
+                "check_id": check_info.get("check_id", ""),
+                "scope": check_info.get("scope", ""),
+                "description": check_info.get("description", ""),
+                "comment": check_info.get("comment", ""),
+                "extra": check_info.get("extra", {}),
+                "score": Decimal(str(check_info.get("score", 0))),
+                "level": check_info.get("level", "NONE"),
+                "score_policy": check_info.get("score_policy", "auto"),
+                "key": check_info.get("key", ""),
+            }
+            check = Check.model_validate(check_data)
             observable_keys = check_info.get("observables", [])
             for obs_key in observable_keys:
                 observable = cv._investigation.get_observable(obs_key)
@@ -489,19 +440,25 @@ def load_investigation_json(filepath: str | Path) -> "Cyvest":
                     check.add_observable(observable)
             cv._investigation.add_check(check)
 
-    # Enrichments
+    # Enrichments - leverage Pydantic model_validate
     for enr_info in data.get("enrichments", {}).values():
-        enrichment = Enrichment(
-            name=enr_info.get("name", ""), data=enr_info.get("data", {}), context=enr_info.get("context", "")
-        )
-        enrichment.key = enr_info.get("key", enrichment.key)
+        enr_data = {
+            "name": enr_info.get("name", ""),
+            "data": enr_info.get("data", {}),
+            "context": enr_info.get("context", ""),
+            "key": enr_info.get("key", ""),
+        }
+        enrichment = Enrichment.model_validate(enr_data)
         cv._investigation.add_enrichment(enrichment)
 
     # Containers
     def build_container(container_info: dict[str, Any]) -> Container:
-        container = Container(path=container_info.get("path", ""), description=container_info.get("description", ""))
-        container.key = container_info.get("key", container.key)
-
+        container_data = {
+            "path": container_info.get("path", ""),
+            "description": container_info.get("description", ""),
+            "key": container_info.get("key", ""),
+        }
+        container = Container.model_validate(container_data)
         container = cv._investigation.add_container(container)
 
         for check_key in container_info.get("checks", []):

@@ -40,8 +40,6 @@ class _ReadOnlyProxy(Generic[_T]):
     """Base helper for wrapping model objects."""
 
     __slots__ = ("__investigation", "__key")
-    _PUBLIC_FIELDS: tuple[str, ...] = ()
-    _COMPUTED_FIELDS: tuple[str, ...] = ()
 
     def __init__(self, investigation: Investigation, key: str) -> None:
         object.__setattr__(self, "_ReadOnlyProxy__investigation", investigation)
@@ -57,18 +55,6 @@ class _ReadOnlyProxy(Generic[_T]):
 
     def _resolve(self) -> _T:  # pragma: no cover - overridden in subclasses
         raise NotImplementedError
-
-    def _public_attributes(self) -> set[str]:
-        """
-        Allowed readable attributes for IDE auto-completion.
-
-        Includes the proxy key plus the dataclass fields surfaced by
-        subclasses and any computed helpers.
-        """
-        attrs: set[str] = set(self._PUBLIC_FIELDS)
-        attrs.update(self._COMPUTED_FIELDS)
-        attrs.add("key")
-        return attrs
 
     def _read_attr(self, name: str):
         """Resolve and deep-copy a public attribute from the model."""
@@ -89,17 +75,6 @@ class _ReadOnlyProxy(Generic[_T]):
     def __delattr__(self, name: str) -> None:
         raise AttributeError(f"{self.__class__.__name__} is read-only. Use Cyvest APIs to modify investigation data.")
 
-    def __getattr__(self, item: str):
-        """
-        Provide attribute access for simple data fields.
-
-        Methods on the underlying dataclasses (like ``update_score``) are
-        intentionally blocked to ensure all mutations flow through the façade.
-        """
-        if item not in self._public_attributes():
-            raise AttributeError(f"{self.__class__.__name__} exposes no attribute '{item}'")
-        return self._read_attr(item)
-
     def _call_readonly(self, method: str, *args, **kwargs):
         """Invoke a model method in read-only mode and deepcopy the result."""
         model = self._resolve()
@@ -112,31 +87,9 @@ class _ReadOnlyProxy(Generic[_T]):
         model = self._resolve()
         return f"{self.__class__.__name__}(key={self.key!r}, type={model.__class__.__name__})"
 
-    def __dir__(self) -> list[str]:
-        """Expose allowed readable fields alongside proxy helpers."""
-        base_dir = set(super().__dir__())
-        return sorted(base_dir | self._public_attributes())
-
 
 class ObservableProxy(_ReadOnlyProxy[Observable]):
     """Read-only proxy over an observable."""
-
-    _PUBLIC_FIELDS = (
-        "obs_type",
-        "value",
-        "internal",
-        "whitelisted",
-        "comment",
-        "extra",
-        "score",
-        "level",
-        "threat_intels",
-        "relationships",
-        "_generated_by_checks",
-        "_explicit_level",
-        "key",
-    )
-    _COMPUTED_FIELDS = ("generated_by_checks", "explicit_level")
 
     def _resolve(self):
         observable = self._get_investigation().get_observable(self.key)
@@ -321,21 +274,6 @@ class ObservableProxy(_ReadOnlyProxy[Observable]):
 class CheckProxy(_ReadOnlyProxy[Check]):
     """Read-only proxy over a check."""
 
-    _PUBLIC_FIELDS = (
-        "check_id",
-        "scope",
-        "description",
-        "comment",
-        "extra",
-        "score",
-        "level",
-        "observables",
-        "score_policy",
-        "_explicit_level",
-        "key",
-    )
-    _COMPUTED_FIELDS = ("explicit_level",)
-
     def _resolve(self):
         check = self._get_investigation().get_check(self.key)
         if check is None:
@@ -470,8 +408,6 @@ class CheckProxy(_ReadOnlyProxy[Check]):
 class ContainerProxy(_ReadOnlyProxy[Container]):
     """Read-only proxy over a container."""
 
-    _PUBLIC_FIELDS = ("path", "description", "checks", "sub_containers", "key")
-
     def _resolve(self):
         container = self._get_investigation().get_container(self.key)
         if container is None:
@@ -544,9 +480,6 @@ class ContainerProxy(_ReadOnlyProxy[Container]):
 class ThreatIntelProxy(_ReadOnlyProxy[ThreatIntel]):
     """Read-only proxy over a threat intel entry."""
 
-    _PUBLIC_FIELDS = ("source", "observable_key", "comment", "extra", "score", "level", "taxonomies", "key")
-    _COMPUTED_FIELDS = ("explicit_level",)
-
     def _resolve(self):
         ti = self._get_investigation().get_threat_intel(self.key)
         if ti is None:
@@ -617,8 +550,6 @@ class ThreatIntelProxy(_ReadOnlyProxy[ThreatIntel]):
 
 class EnrichmentProxy(_ReadOnlyProxy[Enrichment]):
     """Read-only proxy over an enrichment."""
-
-    _PUBLIC_FIELDS = ("name", "data", "context", "key")
 
     def _resolve(self):
         enrichment = self._get_investigation().get_enrichment(self.key)

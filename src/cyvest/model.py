@@ -1,19 +1,33 @@
 """
 Core data models for Cyvest investigation framework.
 
-Defines the base classes for Check, Observable, ThreatIntel, Enrichment, and Container.
+Defines the base classes for Check, Observable, ThreatIntel, Enrichment, Container,
+and InvestigationWhitelist using Pydantic BaseModel.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
 from enum import Enum
-from typing import Any
+from typing import TYPE_CHECKING, Annotated, Any, Self
+
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    PrivateAttr,
+    computed_field,
+    field_serializer,
+    field_validator,
+    model_validator,
+)
 
 from cyvest import keys
 from cyvest.levels import Level, get_level_from_score, normalize_level
+
+if TYPE_CHECKING:
+    pass
 
 
 class ObservableType(str, Enum):
@@ -77,9 +91,17 @@ class RelationshipDirection(str, Enum):
     BIDIRECTIONAL = "bidirectional"  # Source ↔ Target
 
 
-@dataclass
-class ScoreChange:
+class CheckScorePolicy(str, Enum):
+    """Controls how a check reacts to linked observables."""
+
+    AUTO = "auto"  # Default: observables can update the check score/level
+    MANUAL = "manual"  # Score/level only change via explicit check updates
+
+
+class ScoreChange(BaseModel):
     """Record of a score change for audit trail."""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     timestamp: datetime
     old_score: Decimal
@@ -88,84 +110,151 @@ class ScoreChange:
     new_level: Level
     reason: str
 
+    @field_serializer("old_score", "new_score")
+    def serialize_decimal(self, v: Decimal) -> float:
+        return float(v)
 
-class CheckScorePolicy(str, Enum):
-    """Controls how a check reacts to linked observables."""
-
-    AUTO = "auto"  # Default: observables can update the check score/level
-    MANUAL = "manual"  # Score/level only change via explicit check updates
+    @field_serializer("old_level", "new_level")
+    def serialize_level(self, v: Level) -> str:
+        return v.name
 
 
-@dataclass
-class Check:
-    """
-    Represents a verification step in the investigation.
+class InvestigationWhitelist(BaseModel):
+    """Represents a whitelist entry on an investigation."""
 
-    A check validates a specific aspect of the data under investigation
-    and contributes to the overall investigation score.
-    """
+    model_config = ConfigDict(str_strip_whitespace=True)
 
-    check_id: str
-    scope: str
-    description: str
-    comment: str = ""
-    extra: dict[str, Any] = field(default_factory=dict)
-    score: Decimal = field(default_factory=lambda: Decimal("0"))
-    level: Level = Level.NONE
-    observables: list[Observable] = field(default_factory=list)
-    score_policy: CheckScorePolicy = CheckScorePolicy.AUTO
-    key: str = field(default="", init=False)
-    _explicit_level: bool = field(default=False, init=False)
-    _score_history: list[ScoreChange] = field(default_factory=list, init=False)
+    identifier: Annotated[str, Field(min_length=1)]
+    name: Annotated[str, Field(min_length=1)]
+    justification: str | None = None
 
-    def __post_init__(self) -> None:
-        """Generate key and normalize types."""
-        if not self.key:
-            self.key = keys.generate_check_key(self.check_id, self.scope)
-        if not isinstance(self.score, Decimal):
-            self.score = Decimal(str(self.score))
-        self.level = normalize_level(self.level)
-        if isinstance(self.score_policy, str):
-            self.score_policy = CheckScorePolicy(self.score_policy)
 
-    def update_score(self, new_score: Decimal, reason: str = "") -> None:
-        """
-        Update the check's score and recalculate level if needed.
+class Relationship(BaseModel):
+    """Represents a relationship between observables."""
 
-        Args:
-            new_score: The new score value
-            reason: Reason for the score change
-        """
-        if not isinstance(new_score, Decimal):
-            new_score = Decimal(str(new_score))
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
-        old_score = self.score
-        old_level = self.level
+    target_key: str
+    relationship_type: RelationshipType | str
+    direction: RelationshipDirection | str | None = None
 
-        self.score = new_score
+    @field_validator("relationship_type", mode="before")
+    @classmethod
+    def coerce_relationship_type(cls, v: Any) -> RelationshipType | str:
+        """Normalize relationship type to enum if possible."""
+        if isinstance(v, RelationshipType):
+            return v
+        if isinstance(v, str):
+            try:
+                return RelationshipType(v)
+            except ValueError:
+                # Keep as string if not a recognized relationship type
+                return v
+        return v
 
-        # Calculate new level from score if not explicitly set or if new level is higher
-        calculated_level = get_level_from_score(self.score)
+    @model_validator(mode="after")
+    def normalize_direction(self) -> Self:
+        """Normalize direction with smart defaults."""
+        if self.direction is None:
+            # No direction specified - use semantic default based on relationship type
+            if isinstance(self.relationship_type, RelationshipType):
+                object.__setattr__(self, "direction", self.relationship_type.get_default_direction())
+            else:
+                # Custom relationship type - default to OUTBOUND
+                object.__setattr__(self, "direction", RelationshipDirection.OUTBOUND)
+        elif isinstance(self.direction, str):
+            try:
+                object.__setattr__(self, "direction", RelationshipDirection(self.direction))
+            except ValueError:
+                # Invalid direction string - use semantic default or OUTBOUND
+                if isinstance(self.relationship_type, RelationshipType):
+                    object.__setattr__(self, "direction", self.relationship_type.get_default_direction())
+                else:
+                    object.__setattr__(self, "direction", RelationshipDirection.OUTBOUND)
 
-        # Special case: if score was 0 and level was NONE, and something happened, set to INFO
-        if old_score == Decimal("0") and old_level == Level.NONE and new_score != Decimal("0"):
-            if calculated_level == Level.INFO or calculated_level == Level.NONE:
-                calculated_level = Level.INFO
+        return self
 
-        # Update level only if calculated is higher or level wasn't explicitly set
-        if not self._explicit_level or calculated_level > self.level:
-            self.level = calculated_level
+    @field_serializer("relationship_type")
+    def serialize_relationship_type(self, v: RelationshipType | str) -> str:
+        return v.value if isinstance(v, RelationshipType) else v
 
-        # Record the change
-        change = ScoreChange(
-            timestamp=datetime.now(),
-            old_score=old_score,
-            new_score=new_score,
-            old_level=old_level,
-            new_level=self.level,
-            reason=reason,
+    @field_serializer("direction")
+    def serialize_direction(self, v: RelationshipDirection | str | None) -> str | None:
+        if v is None:
+            return None
+        return v.value if isinstance(v, RelationshipDirection) else v
+
+    @property
+    def relationship_type_name(self) -> str:
+        return (
+            self.relationship_type.value
+            if isinstance(self.relationship_type, RelationshipType)
+            else self.relationship_type
         )
-        self._score_history.append(change)
+
+
+# Forward references for type hints
+class ThreatIntel(BaseModel):
+    """
+    Represents threat intelligence from an external source.
+
+    Threat intelligence provides verdicts about observables from sources
+    like VirusTotal, URLScan.io, etc.
+    """
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    source: str
+    observable_key: str
+    comment: str = ""
+    extra: dict[str, Any] = Field(default_factory=dict)
+    score: Decimal = Field(default_factory=lambda: Decimal("0"))
+    level: Level = Level.INFO
+    taxonomies: list[dict[str, Any]] = Field(default_factory=list)
+    key: str = ""
+
+    _explicit_level: bool = PrivateAttr(default=False)
+
+    @field_validator("extra", mode="before")
+    @classmethod
+    def coerce_extra(cls, v: Any) -> dict[str, Any]:
+        if v is None:
+            return {}
+        return v
+
+    @field_validator("score", mode="before")
+    @classmethod
+    def coerce_score(cls, v: Any) -> Decimal:
+        if isinstance(v, Decimal):
+            return v
+        return Decimal(str(v))
+
+    @field_validator("level", mode="before")
+    @classmethod
+    def coerce_level(cls, v: Any) -> Level:
+        return normalize_level(v)
+
+    @model_validator(mode="after")
+    def generate_key_and_level(self) -> Self:
+        """Generate key and recalculate level from score if needed."""
+        if not self.key:
+            self.key = keys.generate_threat_intel_key(self.source, self.observable_key)
+
+        # Recalculate level from score if not explicitly set
+        if not self._explicit_level and self.level == Level.INFO:
+            calculated_level = get_level_from_score(self.score)
+            if calculated_level != Level.NONE:
+                self.level = calculated_level
+
+        return self
+
+    @field_serializer("score")
+    def serialize_score(self, v: Decimal) -> float:
+        return float(v)
+
+    @field_serializer("level")
+    def serialize_level(self, v: Level) -> str:
+        return v.name
 
     def set_level(self, level: Level | str) -> None:
         """
@@ -177,86 +266,8 @@ class Check:
         self.level = normalize_level(level)
         self._explicit_level = True
 
-    def set_score_policy(self, policy: CheckScorePolicy | str) -> None:
-        """
-        Control whether observables can update this check's score/level.
-        """
-        self.score_policy = CheckScorePolicy(policy)
 
-    def add_observable(self, observable: Observable) -> None:
-        """
-        Add an observable to this check.
-
-        When an observable is added to a check with level NONE, the check's level
-        is automatically upgraded to INFO to indicate that the check is now classified.
-
-        Args:
-            observable: The observable to link
-        """
-        if observable not in self.observables:
-            self.observables.append(observable)
-
-            # Auto-upgrade level from NONE to INFO when first observable is added
-            if self.level == Level.NONE:
-                self.set_level(Level.INFO)
-
-    def get_score_history(self) -> list[ScoreChange]:
-        """
-        Get the score history for this check.
-
-        Returns:
-            List of score changes with timestamps, old/new scores and levels, and reasons
-        """
-        return self._score_history
-
-
-@dataclass
-class Relationship:
-    """Represents a relationship between observables."""
-
-    target_key: str  # Key of the target observable
-    relationship_type: RelationshipType | str  # Relationship type label
-    direction: RelationshipDirection | str | None = None  # Relationship direction (None = auto-detect)
-
-    def __post_init__(self) -> None:
-        """Normalize relationship type and direction to enum if possible."""
-        # First normalize relationship type
-        if isinstance(self.relationship_type, str):
-            try:
-                self.relationship_type = RelationshipType(self.relationship_type)
-            except ValueError:
-                # Keep as string if not a recognized relationship type
-                pass
-
-        # Then handle direction with smart defaults
-        if self.direction is None:
-            # No direction specified - use semantic default based on relationship type
-            if isinstance(self.relationship_type, RelationshipType):
-                self.direction = self.relationship_type.get_default_direction()
-            else:
-                # Custom relationship type - default to OUTBOUND
-                self.direction = RelationshipDirection.OUTBOUND
-        elif isinstance(self.direction, str):
-            try:
-                self.direction = RelationshipDirection(self.direction)
-            except ValueError:
-                # Invalid direction string - use semantic default or OUTBOUND
-                if isinstance(self.relationship_type, RelationshipType):
-                    self.direction = self.relationship_type.get_default_direction()
-                else:
-                    self.direction = RelationshipDirection.OUTBOUND
-
-    @property
-    def relationship_type_name(self):
-        return (
-            self.relationship_type.value
-            if isinstance(self.relationship_type, RelationshipType)
-            else self.relationship_type
-        )
-
-
-@dataclass
-class Observable:
+class Observable(BaseModel):
     """
     Represents a cyber observable (IP, URL, domain, hash, etc.).
 
@@ -264,46 +275,99 @@ class Observable:
     through relationships.
     """
 
-    obs_type: ObservableType | str
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    obs_type: ObservableType | str = Field(serialization_alias="type")
     value: str
     internal: bool = True
     whitelisted: bool = False
     comment: str = ""
-    extra: dict[str, Any] = field(default_factory=dict)
-    score: Decimal = field(default_factory=lambda: Decimal("0"))
+    extra: dict[str, Any] = Field(default_factory=dict)
+    score: Decimal = Field(default_factory=lambda: Decimal("0"))
     level: Level = Level.INFO
-    threat_intels: list[ThreatIntel] = field(default_factory=list)
-    relationships: list[Relationship] = field(default_factory=list)
-    key: str = field(default="", init=False)
-    _explicit_level: bool = field(default=False, init=False)
-    _score_history: list[ScoreChange] = field(default_factory=list, init=False)
-    _generated_by_checks: list[str] = field(default_factory=list, init=False)  # Check keys
+    threat_intels: list[ThreatIntel] = Field(default_factory=list)
+    relationships: list[Relationship] = Field(default_factory=list)
+    key: str = ""
 
-    def __post_init__(self) -> None:
-        """Generate key and normalize types."""
-        # Normalize obs_type to enum if possible
-        if isinstance(self.obs_type, str):
+    _explicit_level: bool = PrivateAttr(default=False)
+    _score_history: list[ScoreChange] = PrivateAttr(default_factory=list)
+    _generated_by_checks: list[str] = PrivateAttr(default_factory=list)
+    _from_shared_context: bool = PrivateAttr(default=False)
+
+    @field_validator("obs_type", mode="before")
+    @classmethod
+    def coerce_obs_type(cls, v: Any) -> ObservableType | str:
+        if isinstance(v, ObservableType):
+            return v
+        if isinstance(v, str):
             try:
-                self.obs_type = ObservableType(self.obs_type)
+                # Try case-insensitive match first
+                return ObservableType(v.lower())
             except ValueError:
                 # Keep as string if not a recognized observable type
-                pass
+                return v
+        return v
 
+    @field_validator("extra", mode="before")
+    @classmethod
+    def coerce_extra(cls, v: Any) -> dict[str, Any]:
+        if v is None:
+            return {}
+        return v
+
+    @field_validator("score", mode="before")
+    @classmethod
+    def coerce_score(cls, v: Any) -> Decimal:
+        if isinstance(v, Decimal):
+            return v
+        return Decimal(str(v))
+
+    @field_validator("level", mode="before")
+    @classmethod
+    def coerce_level(cls, v: Any) -> Level:
+        return normalize_level(v)
+
+    @model_validator(mode="after")
+    def generate_key_and_mark_safe(self) -> Self:
+        """Generate key and handle SAFE level marking."""
         if not self.key:
             # Use string value of obs_type for key generation
             obs_type_str = self.obs_type.value if isinstance(self.obs_type, ObservableType) else self.obs_type
             self.key = keys.generate_observable_key(obs_type_str, self.value)
-        if not isinstance(self.score, Decimal):
-            self.score = Decimal(str(self.score))
-        self.level = normalize_level(self.level)
 
         # If level is explicitly set to SAFE, mark it as explicit to prevent downgrades
         if self.level == Level.SAFE:
-            self.set_level(Level.SAFE)
+            self._explicit_level = True
 
-        # Initialize shared context marker (will be set to True for copies from registry)
-        if not hasattr(self, "_from_shared_context"):
-            self._from_shared_context = False
+        return self
+
+    @field_serializer("obs_type")
+    def serialize_obs_type(self, v: ObservableType | str) -> str:
+        return v.value if isinstance(v, ObservableType) else v
+
+    @field_serializer("score")
+    def serialize_score(self, v: Decimal) -> float:
+        return float(v)
+
+    @field_serializer("level")
+    def serialize_level(self, v: Level) -> str:
+        return v.name
+
+    @field_serializer("threat_intels")
+    def serialize_threat_intels(self, value: list[ThreatIntel]) -> list[str]:
+        """Serialize threat intels as keys only."""
+        return [ti.key for ti in value]
+
+    @field_serializer("relationships")
+    def serialize_relationships(self, value: list[Relationship]) -> list[dict[str, Any]]:
+        """Serialize relationships with proper structure."""
+        return [rel.model_dump() for rel in value]
+
+    @computed_field
+    @property
+    def generated_by_checks(self) -> list[str]:
+        """Checks that generated this observable."""
+        return self._generated_by_checks
 
     def update_score(self, new_score: Decimal, reason: str = "") -> None:
         """
@@ -409,37 +473,118 @@ class Observable:
         return self._score_history
 
 
-@dataclass
-class ThreatIntel:
+class Check(BaseModel):
     """
-    Represents threat intelligence from an external source.
+    Represents a verification step in the investigation.
 
-    Threat intelligence provides verdicts about observables from sources
-    like VirusTotal, URLScan.io, etc.
+    A check validates a specific aspect of the data under investigation
+    and contributes to the overall investigation score.
     """
 
-    source: str
-    observable_key: str
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    check_id: str
+    scope: str
+    description: str
     comment: str = ""
-    extra: dict[str, Any] = field(default_factory=dict)
-    score: Decimal = field(default_factory=lambda: Decimal("0"))
-    level: Level = Level.INFO
-    taxonomies: list[dict[str, Any]] = field(default_factory=list)
-    key: str = field(default="", init=False)
-    _explicit_level: bool = field(default=False, init=False)
+    extra: dict[str, Any] = Field(default_factory=dict)
+    score: Decimal = Field(default_factory=lambda: Decimal("0"))
+    level: Level = Level.NONE
+    observables: list[Observable] = Field(default_factory=list)
+    score_policy: CheckScorePolicy = CheckScorePolicy.AUTO
+    key: str = ""
 
-    def __post_init__(self) -> None:
-        """Generate key and normalize types."""
+    _explicit_level: bool = PrivateAttr(default=False)
+    _score_history: list[ScoreChange] = PrivateAttr(default_factory=list)
+
+    @field_validator("extra", mode="before")
+    @classmethod
+    def coerce_extra(cls, v: Any) -> dict[str, Any]:
+        if v is None:
+            return {}
+        return v
+
+    @field_validator("score", mode="before")
+    @classmethod
+    def coerce_score(cls, v: Any) -> Decimal:
+        if isinstance(v, Decimal):
+            return v
+        return Decimal(str(v))
+
+    @field_validator("level", mode="before")
+    @classmethod
+    def coerce_level(cls, v: Any) -> Level:
+        return normalize_level(v)
+
+    @field_validator("score_policy", mode="before")
+    @classmethod
+    def coerce_score_policy(cls, v: Any) -> CheckScorePolicy:
+        if isinstance(v, CheckScorePolicy):
+            return v
+        return CheckScorePolicy(v)
+
+    @model_validator(mode="after")
+    def generate_key(self) -> Self:
+        """Generate key."""
         if not self.key:
-            self.key = keys.generate_threat_intel_key(self.source, self.observable_key)
-        if not isinstance(self.score, Decimal):
-            self.score = Decimal(str(self.score))
-        self.level = normalize_level(self.level)
-        # Recalculate level from score if not explicitly set
-        if not self._explicit_level and self.level == Level.INFO:
-            calculated_level = get_level_from_score(self.score)
-            if calculated_level != Level.NONE:
-                self.level = calculated_level
+            self.key = keys.generate_check_key(self.check_id, self.scope)
+        return self
+
+    @field_serializer("score")
+    def serialize_score(self, v: Decimal) -> float:
+        return float(v)
+
+    @field_serializer("level")
+    def serialize_level(self, v: Level) -> str:
+        return v.name
+
+    @field_serializer("score_policy")
+    def serialize_score_policy(self, v: CheckScorePolicy) -> str:
+        return v.value
+
+    @field_serializer("observables")
+    def serialize_observables(self, value: list[Observable]) -> list[str]:
+        """Serialize observables as keys only."""
+        return [obs.key for obs in value]
+
+    def update_score(self, new_score: Decimal, reason: str = "") -> None:
+        """
+        Update the check's score and recalculate level if needed.
+
+        Args:
+            new_score: The new score value
+            reason: Reason for the score change
+        """
+        if not isinstance(new_score, Decimal):
+            new_score = Decimal(str(new_score))
+
+        old_score = self.score
+        old_level = self.level
+
+        self.score = new_score
+
+        # Calculate new level from score if not explicitly set or if new level is higher
+        calculated_level = get_level_from_score(self.score)
+
+        # Special case: if score was 0 and level was NONE, and something happened, set to INFO
+        if old_score == Decimal("0") and old_level == Level.NONE and new_score != Decimal("0"):
+            if calculated_level == Level.INFO or calculated_level == Level.NONE:
+                calculated_level = Level.INFO
+
+        # Update level only if calculated is higher or level wasn't explicitly set
+        if not self._explicit_level or calculated_level > self.level:
+            self.level = calculated_level
+
+        # Record the change
+        change = ScoreChange(
+            timestamp=datetime.now(),
+            old_score=old_score,
+            new_score=new_score,
+            old_level=old_level,
+            new_level=self.level,
+            reason=reason,
+        )
+        self._score_history.append(change)
 
     def set_level(self, level: Level | str) -> None:
         """
@@ -451,9 +596,40 @@ class ThreatIntel:
         self.level = normalize_level(level)
         self._explicit_level = True
 
+    def set_score_policy(self, policy: CheckScorePolicy | str) -> None:
+        """
+        Control whether observables can update this check's score/level.
+        """
+        self.score_policy = CheckScorePolicy(policy)
 
-@dataclass
-class Enrichment:
+    def add_observable(self, observable: Observable) -> None:
+        """
+        Add an observable to this check.
+
+        When an observable is added to a check with level NONE, the check's level
+        is automatically upgraded to INFO to indicate that the check is now classified.
+
+        Args:
+            observable: The observable to link
+        """
+        if observable not in self.observables:
+            self.observables.append(observable)
+
+            # Auto-upgrade level from NONE to INFO when first observable is added
+            if self.level == Level.NONE:
+                self.set_level(Level.INFO)
+
+    def get_score_history(self) -> list[ScoreChange]:
+        """
+        Get the score history for this check.
+
+        Returns:
+            List of score changes with timestamps, old/new scores and levels, and reasons
+        """
+        return self._score_history
+
+
+class Enrichment(BaseModel):
     """
     Represents structured data enrichment for the investigation.
 
@@ -461,19 +637,22 @@ class Enrichment:
     context but doesn't directly contribute to scoring.
     """
 
-    name: str
-    data: dict[str, Any] = field(default_factory=dict)
-    context: str = ""
-    key: str = field(default="", init=False)
+    model_config = ConfigDict()
 
-    def __post_init__(self) -> None:
+    name: str
+    data: dict[str, Any] = Field(default_factory=dict)
+    context: str = ""
+    key: str = ""
+
+    @model_validator(mode="after")
+    def generate_key(self) -> Self:
         """Generate key."""
         if not self.key:
             self.key = keys.generate_enrichment_key(self.name, self.context)
+        return self
 
 
-@dataclass
-class Container:
+class Container(BaseModel):
     """
     Groups checks and sub-containers for hierarchical organization.
 
@@ -481,16 +660,20 @@ class Container:
     with aggregated scores and levels.
     """
 
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     path: str
     description: str = ""
-    checks: list[Check] = field(default_factory=list)
-    sub_containers: dict[str, Container] = field(default_factory=dict)
-    key: str = field(default="", init=False)
+    checks: list[Check] = Field(default_factory=list)
+    sub_containers: dict[str, Container] = Field(default_factory=dict)
+    key: str = ""
 
-    def __post_init__(self) -> None:
+    @model_validator(mode="after")
+    def generate_key(self) -> Self:
         """Generate key."""
         if not self.key:
             self.key = keys.generate_container_key(self.path)
+        return self
 
     def add_check(self, check: Check) -> None:
         """
@@ -511,6 +694,17 @@ class Container:
         """
         self.sub_containers[container.key] = container
 
+    @computed_field
+    @property
+    def aggregated_score(self) -> Decimal:
+        """
+        Calculate the aggregated score from all checks and sub-containers.
+
+        Returns:
+            Total aggregated score
+        """
+        return self.get_aggregated_score()
+
     def get_aggregated_score(self) -> Decimal:
         """
         Calculate the aggregated score from all checks and sub-containers.
@@ -526,6 +720,35 @@ class Container:
         for sub in self.sub_containers.values():
             total += sub.get_aggregated_score()
         return total
+
+    @computed_field
+    @property
+    def aggregated_level(self) -> Level:
+        """
+        Calculate the aggregated level from the aggregated score.
+
+        Returns:
+            Level based on aggregated score
+        """
+        return self.get_aggregated_level()
+
+    @field_serializer("aggregated_score")
+    def serialize_aggregated_score(self, v: Decimal) -> float:
+        return float(v)
+
+    @field_serializer("aggregated_level")
+    def serialize_aggregated_level(self, v: Level) -> str:
+        return v.name
+
+    @field_serializer("checks")
+    def serialize_checks(self, value: list[Check]) -> list[str]:
+        """Serialize checks as keys only."""
+        return [check.key for check in value]
+
+    @field_serializer("sub_containers")
+    def serialize_sub_containers(self, value: dict[str, Container]) -> dict[str, Any]:
+        """Serialize sub-containers recursively."""
+        return {key: sub.model_dump() for key, sub in value.items()}
 
     def get_aggregated_level(self) -> Level:
         """

@@ -45,25 +45,28 @@ class ScoreMode(Enum):
     MAX = "max"  # Score = max(all TI scores, all child scores)
     SUM = "sum"  # Score = max(TI scores) + sum(child scores)
 
+    @classmethod
+    def normalize(cls, value: "ScoreMode" | Literal["max", "sum"] | str | None) -> "ScoreMode":
+        """
+        Normalize a score mode value to ScoreMode enum.
+
+        Accepts enum instances or strings "max"/"sum" (case-insensitive).
+        Returns MAX as default for None.
+        """
+        if value is None:
+            return cls.MAX
+        if isinstance(value, cls):
+            return value
+        if isinstance(value, str):
+            try:
+                return cls(value.lower())
+            except ValueError as exc:
+                raise ValueError(f"Invalid score_mode: {value}. Must be 'max' or 'sum'.") from exc
+        raise TypeError(f"score_mode must be ScoreMode, str, or None, got {type(value)}")
+
 
 if TYPE_CHECKING:
     from cyvest.model import Check, Observable, ThreatIntel
-
-
-def normalize_score_mode(score_mode: ScoreMode | Literal["max", "sum"] | str | None) -> ScoreMode:
-    """
-    Ensure a score_mode value is a ScoreMode enum.
-
-    Accepts enum instances or the literal strings "max"/"sum" and raises on invalid values.
-    """
-    if score_mode is None:
-        return ScoreMode.MAX
-    if isinstance(score_mode, ScoreMode):
-        return score_mode
-    try:
-        return ScoreMode(score_mode)
-    except Exception as exc:  # pragma: no cover - defensive for unexpected types
-        raise ValueError(f"Invalid score_mode: {score_mode}") from exc
 
 
 class ScoreEngine:
@@ -106,7 +109,7 @@ class ScoreEngine:
         """
         self._observables: dict[str, Observable] = {}
         self._checks: dict[str, Check] = {}
-        self._score_mode = normalize_score_mode(score_mode)
+        self._score_mode = ScoreMode.normalize(score_mode)
 
     def register_observable(self, observable: "Observable") -> None:
         """

@@ -134,11 +134,7 @@ def serialize_investigation(cv: "Cyvest") -> dict[str, Any]:
     if root:
         root_type_value = root.obs_type.value if hasattr(root.obs_type, "value") else str(root.obs_type)
 
-    score_mode_value = ScoreMode.MAX.value
-    score_mode = getattr(getattr(cv, "_investigation", None), "_score_engine", None)
-    if score_mode and hasattr(score_mode, "_score_mode"):
-        mode = score_mode._score_mode
-        score_mode_value = mode.value if hasattr(mode, "value") else str(mode)
+    score_mode_value = cv._investigation._score_engine._score_mode.value
 
     return {
         "score": float(cv.get_global_score()),

@@ -294,9 +294,9 @@ class Observable(BaseModel):
     through relationships.
     """
 
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+    model_config = ConfigDict(arbitrary_types_allowed=True, populate_by_name=True)
 
-    obs_type: ObservableType | str = Field(serialization_alias="type")
+    obs_type: ObservableType | str = Field(..., alias="type")
     value: str
     internal: bool = Field(...)
     whitelisted: bool = Field(...)

@@ -236,7 +236,7 @@ def schema_cmd(output: Path | None) -> None:
     if output:
         output_path = output.resolve()
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        output_path.write_text(json.dumps(schema, indent=2), encoding="utf-8")
+        output_path.write_text(json.dumps(schema, indent=2) + "\n", encoding="utf-8")
         logger.info(f"[green]Schema written to: {output_path}[/green]")
         return
 

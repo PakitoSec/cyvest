@@ -159,9 +159,7 @@
           "type": "string"
         },
         "data": {
-          "additionalProperties": true,
-          "title": "Data",
-          "type": "object"
+          "title": "Data"
         },
         "context": {
           "title": "Context",

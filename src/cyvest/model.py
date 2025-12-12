@@ -686,7 +686,7 @@ class Enrichment(BaseModel):
     model_config = ConfigDict()
 
     name: str
-    data: dict[str, Any] = Field(...)
+    data: Any = Field(...)
     context: str = Field(...)
     key: str = Field(...)
 

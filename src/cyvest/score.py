@@ -31,6 +31,8 @@ Root Observable Barrier:
         - Result: domain and ip remain isolated despite shared root connection
 """
 
+from __future__ import annotations
+
 from decimal import Decimal
 from enum import Enum
 from typing import TYPE_CHECKING, Literal
@@ -45,25 +47,28 @@ class ScoreMode(Enum):
     MAX = "max"  # Score = max(all TI scores, all child scores)
     SUM = "sum"  # Score = max(TI scores) + sum(child scores)
 
+    @classmethod
+    def normalize(cls, value: ScoreMode | Literal["max", "sum"] | str | None) -> ScoreMode:
+        """
+        Normalize a score mode value to ScoreMode enum.
+
+        Accepts enum instances or strings "max"/"sum" (case-insensitive).
+        Returns MAX as default for None.
+        """
+        if value is None:
+            return cls.MAX
+        if isinstance(value, cls):
+            return value
+        if isinstance(value, str):
+            try:
+                return cls(value.lower())
+            except ValueError as exc:
+                raise ValueError(f"Invalid score_mode: {value}. Must be 'max' or 'sum'.") from exc
+        raise TypeError(f"score_mode must be ScoreMode, str, or None, got {type(value)}")
+
 
 if TYPE_CHECKING:
     from cyvest.model import Check, Observable, ThreatIntel
-
-
-def normalize_score_mode(score_mode: ScoreMode | Literal["max", "sum"] | str | None) -> ScoreMode:
-    """
-    Ensure a score_mode value is a ScoreMode enum.
-
-    Accepts enum instances or the literal strings "max"/"sum" and raises on invalid values.
-    """
-    if score_mode is None:
-        return ScoreMode.MAX
-    if isinstance(score_mode, ScoreMode):
-        return score_mode
-    try:
-        return ScoreMode(score_mode)
-    except Exception as exc:  # pragma: no cover - defensive for unexpected types
-        raise ValueError(f"Invalid score_mode: {score_mode}") from exc
 
 
 class ScoreEngine:
@@ -106,9 +111,9 @@ class ScoreEngine:
         """
         self._observables: dict[str, Observable] = {}
         self._checks: dict[str, Check] = {}
-        self._score_mode = normalize_score_mode(score_mode)
+        self._score_mode = ScoreMode.normalize(score_mode)
 
-    def register_observable(self, observable: "Observable") -> None:
+    def register_observable(self, observable: Observable) -> None:
         """
         Register an observable for score tracking.
 
@@ -117,7 +122,7 @@ class ScoreEngine:
         """
         self._observables[observable.key] = observable
 
-    def register_check(self, check: "Check") -> None:
+    def register_check(self, check: Check) -> None:
         """
         Register a check for score tracking.
 
@@ -126,7 +131,7 @@ class ScoreEngine:
         """
         self._checks[check.key] = check
 
-    def propagate_threat_intel_to_observable(self, ti: "ThreatIntel", observable: "Observable") -> None:
+    def propagate_threat_intel_to_observable(self, ti: ThreatIntel, observable: Observable) -> None:
         """
         Propagate threat intel score to its observable.
 
@@ -158,7 +163,7 @@ class ScoreEngine:
             # Propagate to linked checks
             self._propagate_observable_to_checks(observable)
 
-    def _calculate_observable_score(self, observable: "Observable", visited: set[str] | None = None) -> Decimal:
+    def _calculate_observable_score(self, observable: Observable, visited: set[str] | None = None) -> Decimal:
         """
         Calculate the complete observable score based on threat intel and hierarchical relationships.
 
@@ -248,7 +253,7 @@ class ScoreEngine:
             sum_children = sum(child_scores, Decimal("0"))
             return max_ti_score + sum_children
 
-    def _propagate_to_parent_observables(self, observable: "Observable") -> None:
+    def _propagate_to_parent_observables(self, observable: Observable) -> None:
         """
         Propagate score changes up to parent observables.
 
@@ -276,7 +281,7 @@ class ScoreEngine:
         """
         processed_parents: set[str] = set()
 
-        def _update_parent(parent_obs: "Observable") -> None:
+        def _update_parent(parent_obs: Observable) -> None:
             """Helper to update a parent and optionally propagate beyond it."""
             # Avoid double-processing the same parent when reached via both methods
             if parent_obs.key in processed_parents:
@@ -314,7 +319,7 @@ class ScoreEngine:
                 if rel.direction == RelationshipDirection.OUTBOUND and rel.target_key == observable.key:
                     _update_parent(parent_obs)
 
-    def _propagate_observable_to_checks(self, observable: "Observable") -> None:
+    def _propagate_observable_to_checks(self, observable: Observable) -> None:
         """
         Propagate observable score to linked checks.
 
@@ -358,7 +363,7 @@ class ScoreEngine:
                     if has_safe and all_lower_or_safe and check.level < Level.SAFE:
                         check.set_level(Level.SAFE)
 
-    def _is_observable_linked_to_check(self, observable: "Observable", check: "Check", indirect: bool = False) -> bool:
+    def _is_observable_linked_to_check(self, observable: Observable, check: Check, indirect: bool = False) -> bool:
         """
         Check if an observable is linked to a check (directly or indirectly).
 
@@ -383,7 +388,7 @@ class ScoreEngine:
 
         return False
 
-    def _is_related(self, obs1: "Observable", obs2: "Observable", visited: set[str] | None = None) -> bool:
+    def _is_related(self, obs1: Observable, obs2: Observable, visited: set[str] | None = None) -> bool:
         """
         Check if two observables are related through relationships.
 

@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import threading
 from copy import deepcopy
-from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, overload
@@ -18,12 +17,22 @@ from logurich import logger
 
 from cyvest import keys
 from cyvest.levels import Level, get_level_from_score, normalize_level
-from cyvest.model import Check, CheckScorePolicy, Container, Enrichment, Observable, ObservableType, ThreatIntel
-from cyvest.score import ScoreEngine, ScoreMode, normalize_score_mode
+from cyvest.model import (
+    Check,
+    CheckScorePolicy,
+    Container,
+    Enrichment,
+    InvestigationWhitelist,
+    Observable,
+    ObservableType,
+    ThreatIntel,
+)
+from cyvest.score import ScoreEngine, ScoreMode
 from cyvest.stats import InvestigationStats
 
 if TYPE_CHECKING:
     from cyvest import Cyvest
+    from cyvest.model_schema import InvestigationSchema, StatisticsSchema
 
 
 class SharedInvestigationContext:
@@ -156,15 +165,15 @@ class SharedInvestigationContext:
             # Refresh registries from canonical, post-merge investigation state
             self._observable_registry = {}
             for obs in self._main_investigation.get_all_observables().values():
-                copy = deepcopy(obs)
+                copy = obs.model_copy(deep=True)
                 copy._from_shared_context = True
                 self._observable_registry[obs.key] = copy
 
             self._check_registry = {
-                check.key: deepcopy(check) for check in self._main_investigation.get_all_checks().values()
+                check.key: check.model_copy(deep=True) for check in self._main_investigation.get_all_checks().values()
             }
             self._enrichment_registry = {
-                enrichment.key: deepcopy(enrichment)
+                enrichment.key: enrichment.model_copy(deep=True)
                 for enrichment in self._main_investigation.get_all_enrichments().values()
             }
 
@@ -252,7 +261,7 @@ class SharedInvestigationContext:
         with self._lock:
             obs = self._observable_registry.get(key)
             if obs:
-                copy = deepcopy(obs)
+                copy = obs.model_copy(deep=True)
                 # Mark this as a copy from shared context to prevent misuse in relationships
                 copy._from_shared_context = True
                 return copy
@@ -310,7 +319,7 @@ class SharedInvestigationContext:
         with self._lock:
             check = self._check_registry.get(key)
             if check:
-                return deepcopy(check)
+                return check.model_copy(deep=True)
             return None
 
     @overload
@@ -376,7 +385,7 @@ class SharedInvestigationContext:
         with self._lock:
             enrichment = self._enrichment_registry.get(key)
             if enrichment:
-                return deepcopy(enrichment)
+                return enrichment.model_copy(deep=True)
             return None
 
     def get_global_score(self) -> Decimal:
@@ -461,7 +470,7 @@ class SharedInvestigationContext:
             matches = []
             for obs in self._observable_registry.values():
                 if obs.obs_type == obs_type:
-                    matches.append(deepcopy(obs))
+                    matches.append(obs.model_copy(deep=True))
             return matches
 
     def find_observables_by_value(self, value: str) -> list[Observable]:
@@ -478,7 +487,7 @@ class SharedInvestigationContext:
             matches = []
             for obs in self._observable_registry.values():
                 if obs.value == value:
-                    matches.append(deepcopy(obs))
+                    matches.append(obs.model_copy(deep=True))
             return matches
 
     @overload
@@ -645,20 +654,19 @@ class SharedInvestigationContext:
             save_investigation_markdown(temp_cy, filepath, include_containers, include_enrichments, include_observables)
             return str(Path(filepath).resolve())
 
-    def io_to_dict(self) -> dict[str, Any]:
+    def io_to_dict(self) -> InvestigationSchema:
         """
-        Serialize the shared investigation to a dictionary.
+        Serialize the shared investigation to an InvestigationSchema.
 
         Thread-safe: Uses lock to ensure consistent read of investigation state.
 
         Returns:
-            Dictionary representation suitable for JSON export
+            InvestigationSchema instance (use .model_dump() for dict)
 
         Example:
             >>> shared = SharedInvestigationContext(main_inv)
-            >>> data = shared.io_to_dict()
-            >>> print(data.keys())
-            dict_keys(['score', 'level', 'whitelisted', 'observables', 'checks', ...])
+            >>> schema = shared.io_to_dict()
+            >>> dict_data = schema.model_dump(by_alias=True)
         """
         from cyvest import Cyvest
         from cyvest.io_serialization import serialize_investigation
@@ -702,35 +710,6 @@ class SharedInvestigationContext:
             temp_cy._investigation = self._main_investigation
             save_investigation_json(temp_cy, filepath)
             return str(Path(filepath).resolve())
-
-
-@dataclass
-class InvestigationWhitelist:
-    """Represents a whitelist entry on an investigation."""
-
-    identifier: str
-    name: str
-    justification: str | None = None
-
-    def to_dict(self) -> dict[str, str | None]:
-        """Serialize whitelist entry to a dictionary."""
-        return {
-            "identifier": self.identifier,
-            "name": self.name,
-            "justification": self.justification,
-        }
-
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> InvestigationWhitelist:
-        """Construct a whitelist entry from a dictionary."""
-        justification = data.get("justification")
-        if justification is not None:
-            justification = str(justification)
-        return cls(
-            identifier=str(data.get("identifier", "")).strip(),
-            name=str(data.get("name", "")).strip(),
-            justification=justification,
-        )
 
 
 class Investigation:
@@ -782,7 +761,7 @@ class Investigation:
         self._containers: dict[str, Container] = {}
 
         # Internal components
-        normalized_score_mode = normalize_score_mode(score_mode)
+        normalized_score_mode = ScoreMode.normalize(score_mode)
         self._score_engine = ScoreEngine(score_mode=normalized_score_mode)
         self._stats = InvestigationStats()
         self._whitelists: dict[str, InvestigationWhitelist] = {}
@@ -843,7 +822,7 @@ class Investigation:
         if existing.extra:
             existing.extra.update(incoming.extra)
         elif incoming.extra:
-            existing.extra = dict().update(incoming.extra)
+            existing.extra = dict(incoming.extra)
 
         # Concatenate comments
         if incoming.comment:
@@ -1578,9 +1557,9 @@ class Investigation:
 
     def get_whitelists(self) -> list[InvestigationWhitelist]:
         """Return a copy of all whitelist entries."""
-        return deepcopy(list(self._whitelists.values()))
+        return [w.model_copy(deep=True) for w in self._whitelists.values()]
 
-    def get_statistics(self) -> dict[str, Any]:
+    def get_statistics(self) -> StatisticsSchema:
         """Get comprehensive investigation statistics."""
         return self._stats.get_summary()
 

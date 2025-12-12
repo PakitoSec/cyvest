@@ -326,8 +326,8 @@ cyvest merge inv1.json inv2.json -o merged.json -f rich --stats
 # Generate an interactive visualization (requires visualization extra)
 cyvest visualize investigation.json --min-level SUSPICIOUS --group-by-type
 
-# Output the JSON Schema describing serialized investigations
-cyvest schema > schema.json
+# Output the JSON Schema describing serialized investigations and generate types
+uv run cyvest schema -o ./schema/cyvest.schema.json && pnpm -C js/packages/cyvest-js run generate:types
 ```
 
 ## Development

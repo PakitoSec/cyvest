@@ -5,48 +5,74 @@ This module defines the security level classification system and the algorithm
 for determining levels from scores.
 """
 
+from __future__ import annotations
+
 from decimal import Decimal
 from enum import Enum
-from functools import total_ordering
+
+# Ordering mapping for Level comparisons
+_LEVEL_ORDER = {
+    "NONE": 0,
+    "TRUSTED": 1,
+    "INFO": 2,
+    "SAFE": 3,
+    "NOTABLE": 4,
+    "SUSPICIOUS": 5,
+    "MALICIOUS": 6,
+}
 
 
-@total_ordering
-class Level(Enum):
+class Level(str, Enum):
     """
     Security level classification for checks, observables, and threat intelligence.
 
     Levels are ordered from lowest (NONE) to highest (MALICIOUS) severity.
     """
 
-    NONE = 0  # No classification applied
-    TRUSTED = 1  # Trusted by a check
-    INFO = 2  # Informational
-    SAFE = 3  # Whitelisted by a trusted knowledge base
-    NOTABLE = 4  # Notable activity
-    SUSPICIOUS = 5  # Suspicious activity
-    MALICIOUS = 6  # Malicious activity
+    NONE = "NONE"
+    TRUSTED = "TRUSTED"
+    INFO = "INFO"
+    SAFE = "SAFE"
+    NOTABLE = "NOTABLE"
+    SUSPICIOUS = "SUSPICIOUS"
+    MALICIOUS = "MALICIOUS"
 
     def __lt__(self, other: object) -> bool:
         if not isinstance(other, Level):
             return NotImplemented
-        return self.value < other.value
+        return _LEVEL_ORDER[self.value] < _LEVEL_ORDER[other.value]
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Level):
             return NotImplemented
         return self.value == other.value
 
+    def __le__(self, other: object) -> bool:
+        if not isinstance(other, Level):
+            return NotImplemented
+        return _LEVEL_ORDER[self.value] <= _LEVEL_ORDER[other.value]
+
+    def __gt__(self, other: object) -> bool:
+        if not isinstance(other, Level):
+            return NotImplemented
+        return _LEVEL_ORDER[self.value] > _LEVEL_ORDER[other.value]
+
+    def __ge__(self, other: object) -> bool:
+        if not isinstance(other, Level):
+            return NotImplemented
+        return _LEVEL_ORDER[self.value] >= _LEVEL_ORDER[other.value]
+
     def __hash__(self) -> int:
         return hash(self.value)
 
     def __str__(self) -> str:
-        return self.name
+        return self.value
 
     def __repr__(self) -> str:
         return f"Level.{self.name}"
 
 
-def normalize_level(level: "Level | str") -> Level:
+def normalize_level(level: Level | str) -> Level:
     """
     Normalize a level input to the Level enum.
 

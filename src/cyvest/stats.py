@@ -5,11 +5,13 @@ Provides live counters and aggregations for observables, checks, threat intel,
 and other investigation metrics.
 """
 
+from __future__ import annotations
+
 from collections import defaultdict
-from typing import Any
 
 from cyvest.levels import Level, normalize_level
 from cyvest.model import Check, Container, Observable, ThreatIntel
+from cyvest.model_schema import StatisticsSchema
 
 
 class InvestigationStats:
@@ -262,30 +264,31 @@ class InvestigationStats:
         """
         return [obs for obs in self._observables.values() if obs.obs_type == obs_type]
 
-    def get_summary(self) -> dict[str, Any]:
+    def get_summary(self) -> StatisticsSchema:
         """
         Get a comprehensive summary of all statistics.
 
         Returns:
-            Dictionary containing all statistics
+            StatisticsSchema instance with all statistics
         """
-        return {
-            "total_observables": self.get_total_observable_count(),
-            "internal_observables": self.get_internal_observable_count(),
-            "external_observables": self.get_external_observable_count(),
-            "whitelisted_observables": self.get_whitelisted_observable_count(),
-            "observables_by_type": self.get_observable_count_by_type(),
-            "observables_by_level": {str(k): v for k, v in self.get_observable_count_by_level().items()},
-            "observables_by_type_and_level": {
+
+        return StatisticsSchema(
+            total_observables=self.get_total_observable_count(),
+            internal_observables=self.get_internal_observable_count(),
+            external_observables=self.get_external_observable_count(),
+            whitelisted_observables=self.get_whitelisted_observable_count(),
+            observables_by_type=self.get_observable_count_by_type(),
+            observables_by_level={str(k): v for k, v in self.get_observable_count_by_level().items()},
+            observables_by_type_and_level={
                 obs_type: {str(lvl): count for lvl, count in levels.items()}
                 for obs_type, levels in self.get_observable_count_by_type_and_level().items()
             },
-            "total_checks": self.get_total_check_count(),
-            "applied_checks": self.get_applied_check_count(),
-            "checks_by_scope": self.get_check_count_by_scope(),
-            "checks_by_level": {str(k): v for k, v in self.get_check_count_by_level().items()},
-            "total_threat_intel": self.get_threat_intel_count(),
-            "threat_intel_by_source": self.get_threat_intel_count_by_source(),
-            "threat_intel_by_level": {str(k): v for k, v in self.get_threat_intel_count_by_level().items()},
-            "total_containers": self.get_container_count(),
-        }
+            total_checks=self.get_total_check_count(),
+            applied_checks=self.get_applied_check_count(),
+            checks_by_scope=self.get_check_count_by_scope(),
+            checks_by_level={str(k): v for k, v in self.get_check_count_by_level().items()},
+            total_threat_intel=self.get_threat_intel_count(),
+            threat_intel_by_source=self.get_threat_intel_count_by_source(),
+            threat_intel_by_level={str(k): v for k, v in self.get_threat_intel_count_by_level().items()},
+            total_containers=self.get_container_count(),
+        )

@@ -136,8 +136,8 @@ def test_statistics() -> None:
     cv.observable_create("ip", "192.168.1.1")
     cv.check_create("c1", "network", "desc")
     stats = cv.get_statistics()
-    assert stats["total_observables"] >= 2  # Plus root
-    assert stats["total_checks"] == 1
+    assert stats.total_observables >= 2  # Plus root
+    assert stats.total_checks == 1
 
 
 def test_investigation_whitelisting_flag() -> None:
@@ -605,24 +605,33 @@ def test_io_save_markdown_returns_absolute_path() -> None:
 
 
 def test_io_to_dict_serialization() -> None:
-    """Test dictionary serialization contains expected keys."""
+    """Test InvestigationSchema serialization contains expected fields."""
     cv = Cyvest()
     obs = cv.observable_create("url", "https://malicious.com")
     cv.observable_add_threat_intel(obs.key, source="virustotal", score=Decimal("6.0"))
     cv.check_create("url_check", "network", "URL analysis")
 
-    data = cv.io_to_dict()
+    schema = cv.io_to_dict()
 
-    # Verify all expected top-level keys exist
+    # Verify all expected fields exist via attribute access
+    assert hasattr(schema, "score")
+    assert hasattr(schema, "level")
+    assert hasattr(schema, "observables")
+    assert hasattr(schema, "checks")
+    assert hasattr(schema, "threat_intels")
+    assert hasattr(schema, "enrichments")
+    assert hasattr(schema, "containers")
+    assert hasattr(schema, "stats")
+    assert hasattr(schema, "whitelists")
+
+    # Verify values
+    assert schema.score >= 0
+    assert schema.level in Level
+
+    # Test model_dump() for dict compatibility
+    data = schema.model_dump(by_alias=True)
     assert "score" in data
-    assert "level" in data
     assert "observables" in data
-    assert "checks" in data
-    assert "threat_intels" in data
-    assert "enrichments" in data
-    assert "containers" in data
-    assert "stats" in data
-    assert "whitelists" in data
 
     # Verify data structure
     assert isinstance(data["observables"], dict)

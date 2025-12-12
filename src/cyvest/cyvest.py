@@ -26,10 +26,11 @@ from cyvest.io_serialization import (
     save_investigation_markdown,
     serialize_investigation,
 )
-from cyvest.levels import Level, normalize_level
+from cyvest.levels import Level
 from cyvest.model import Check, CheckScorePolicy, Container, Enrichment, Observable, ThreatIntel
+from cyvest.model_schema import InvestigationSchema, StatisticsSchema
 from cyvest.proxies import CheckProxy, ContainerProxy, EnrichmentProxy, ObservableProxy, ThreatIntelProxy
-from cyvest.score import ScoreMode, normalize_score_mode
+from cyvest.score import ScoreMode
 
 
 class Cyvest:
@@ -54,7 +55,7 @@ class Cyvest:
             root_type: Type of root observable ("file" or "artifact")
             score_mode: Score calculation mode (MAX or SUM)
         """
-        normalized_score_mode = normalize_score_mode(score_mode)
+        normalized_score_mode = ScoreMode.normalize(score_mode)
         self._investigation = Investigation(data, root_type=root_type, score_mode=normalized_score_mode)
 
     def __enter__(self) -> Cyvest:
@@ -214,8 +215,6 @@ class Cyvest:
         Returns:
             The created or existing observable
         """
-        resolved_level = normalize_level(level) if level is not None else Level.INFO
-
         obs = Observable(
             obs_type=obs_type,
             value=value,
@@ -224,7 +223,7 @@ class Cyvest:
             comment=comment,
             extra=extra or {},
             score=Decimal(str(score)) if score is not None else Decimal("0"),
-            level=resolved_level,
+            level=level if level is not None else Level.INFO,
         )
         # Unwrap tuple - facade returns only Observable, discards deferred relationships
         obs_result, _ = self._investigation.add_observable(obs)
@@ -304,15 +303,13 @@ class Cyvest:
         if not observable:
             return None
 
-        resolved_level = normalize_level(level) if level is not None else Level.INFO
-
         ti = ThreatIntel(
             source=source,
             observable_key=observable_key,
             comment=comment,
             extra=extra or {},
             score=Decimal(str(score)),
-            level=resolved_level,
+            level=level if level is not None else Level.INFO,
             taxonomies=taxonomies or [],
         )
         result = self._investigation.add_threat_intel(ti, observable)
@@ -332,7 +329,7 @@ class Cyvest:
         observable = self._investigation.get_observable(observable_key)
         if not observable:
             return None
-        observable.set_level(normalize_level(level))
+        observable.set_level(level)
         return self._observable_proxy(observable)
 
     def observable_finalize_relationships(self) -> None:
@@ -372,9 +369,6 @@ class Cyvest:
         Returns:
             The created check
         """
-        resolved_level = normalize_level(level) if level is not None else Level.NONE
-        resolved_policy = CheckScorePolicy(score_policy) if score_policy is not None else CheckScorePolicy.AUTO
-
         check = Check(
             check_id=check_id,
             scope=scope,
@@ -382,8 +376,8 @@ class Cyvest:
             comment=comment,
             extra=extra or {},
             score=Decimal(str(score)) if score is not None else Decimal("0"),
-            level=resolved_level,
-            score_policy=resolved_policy,
+            level=level if level is not None else Level.NONE,
+            score_policy=score_policy if score_policy is not None else CheckScorePolicy.AUTO,
         )
         return self._check_proxy(self._investigation.add_check(check))
 
@@ -532,12 +526,12 @@ class Cyvest:
         """
         return self._investigation.get_global_level()
 
-    def get_statistics(self) -> dict[str, Any]:
+    def get_statistics(self) -> StatisticsSchema:
         """
         Get comprehensive investigation statistics.
 
         Returns:
-            Statistics dictionary
+            Statistics schema with typed fields
         """
         return self._investigation.get_statistics()
 
@@ -626,18 +620,18 @@ class Cyvest:
         """
         return generate_markdown_report(self, include_containers, include_enrichments, include_observables)
 
-    def io_to_dict(self) -> dict[str, Any]:
+    def io_to_dict(self) -> InvestigationSchema:
         """
-        Serialize the investigation to a dictionary.
+        Serialize the investigation to an InvestigationSchema.
 
         Returns:
-            Dictionary representation suitable for JSON export
+            InvestigationSchema instance (use .model_dump() for dict)
 
         Examples:
             >>> cv = Cyvest()
-            >>> data = cv.io_to_dict()
-            >>> print(data.keys())
-            dict_keys(['score', 'level', 'observables', 'checks', ...])
+            >>> schema = cv.io_to_dict()
+            >>> print(schema.score, schema.level)
+            >>> dict_data = schema.model_dump(by_alias=True)
         """
         return serialize_investigation(self)
 
@@ -748,13 +742,11 @@ class Cyvest:
         if observable_types is not None:
             obs_types_enum = [ObservableType(t) for t in observable_types]
 
-        normalized_min_level = normalize_level(min_level) if min_level is not None else None
-
         return generate_network_graph(
             self,
             output_dir=output_dir,
             open_browser=open_browser,
-            min_level=normalized_min_level,
+            min_level=min_level,
             observable_types=obs_types_enum,
             physics=physics,
             group_by_type=group_by_type,

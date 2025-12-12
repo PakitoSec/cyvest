@@ -1128,16 +1128,16 @@ def test_io_to_dict_basic():
         cy.observable(ObservableType.IPV4_ADDR, "192.168.1.1").add_ti("SEKOIA", Decimal("6.0"))
         cy.check("ip_reputation", "network", "Check IP reputation").with_score(Decimal("5.0"))
 
-    data = shared.io_to_dict()
+    schema = shared.io_to_dict()
 
-    assert isinstance(data, dict)
-    assert "score" in data
-    assert "level" in data
-    assert "observables" in data
-    assert "checks" in data
-    assert "stats" in data
-    assert "obs:ipv4-addr:192.168.1.1" in data["observables"]
-    assert "network" in data["checks"]  # checks are grouped by scope
+    # Verify schema attributes
+    assert hasattr(schema, "score")
+    assert hasattr(schema, "level")
+    assert hasattr(schema, "observables")
+    assert hasattr(schema, "checks")
+    assert hasattr(schema, "stats")
+    assert "obs:ipv4-addr:192.168.1.1" in schema.observables
+    assert "network" in schema.checks  # checks are grouped by scope
 
 
 def test_io_save_json_creates_file(tmp_path):
@@ -1209,9 +1209,9 @@ def test_export_methods_thread_safe():
     # All markdown exports should be identical
     assert all(md == md_results[0] for md in md_results)
 
-    # All dict exports should contain same data
-    assert all(d["score"] == dict_results[0]["score"] for d in dict_results)
-    assert all(len(d["observables"]) == len(dict_results[0]["observables"]) for d in dict_results)
+    # All schema exports should contain same data
+    assert all(d.score == dict_results[0].score for d in dict_results)
+    assert all(len(d.observables) == len(dict_results[0].observables) for d in dict_results)
 
 
 def test_export_methods_capture_latest_state(tmp_path):
@@ -1260,12 +1260,11 @@ def test_export_with_enrichments(tmp_path):
     assert "Test Registrar" in markdown
     assert "dns" in markdown
 
-    # Test dict export
-    data = shared.io_to_dict()
-    assert "enrichments" in data
-    assert len(data["enrichments"]) == 2
-    assert "enr:whois" in data["enrichments"]
-    assert "enr:dns" in data["enrichments"]
+    # Test schema export
+    schema = shared.io_to_dict()
+    assert len(schema.enrichments) == 2
+    assert "enr:whois" in schema.enrichments
+    assert "enr:dns" in schema.enrichments
 
     # Test JSON export
     json_path = tmp_path / "with_enrichments.json"
@@ -1292,13 +1291,12 @@ def test_export_with_whitelists(tmp_path):
     markdown = shared.io_to_markdown()
     assert "Whitelisted Investigation: Yes" in markdown or "Whitelist" in markdown
 
-    # Test dict export
-    data = shared.io_to_dict()
-    assert data["whitelisted"] is True
-    assert "whitelists" in data
-    assert len(data["whitelists"]) == 1
-    assert data["whitelists"][0]["identifier"] == "wl-001"
-    assert data["whitelists"][0]["name"] == "Known safe domain"
+    # Test schema export
+    schema = shared.io_to_dict()
+    assert schema.whitelisted is True
+    assert len(schema.whitelists) == 1
+    assert schema.whitelists[0].identifier == "wl-001"
+    assert schema.whitelists[0].name == "Known safe domain"
 
     # Test JSON export
     json_path = tmp_path / "with_whitelists.json"
@@ -1345,7 +1343,7 @@ def test_export_comprehensive_investigation(tmp_path):
 
     # Export to all formats
     markdown = shared.io_to_markdown(include_enrichments=True)
-    data = shared.io_to_dict()
+    schema = shared.io_to_dict()
 
     md_path = tmp_path / "comprehensive.md"
     json_path = tmp_path / "comprehensive.json"
@@ -1360,11 +1358,14 @@ def test_export_comprehensive_investigation(tmp_path):
     assert "url_analysis" in markdown
     assert "whois" in markdown
 
-    # Verify dict structure
-    assert len(data["observables"]) >= 4  # 3 created + 1 root
-    assert "header" in data["checks"]  # checks grouped by scope
-    assert "body" in data["checks"]
-    assert len(data["enrichments"]) == 2
+    # Verify schema content
+    assert "obs:email-addr:attacker@evil.com" in schema.observables
+
+    # Verify schema structure
+    assert len(schema.observables) >= 4  # 3 created + 1 root
+    assert "header" in schema.checks  # checks grouped by scope
+    assert "body" in schema.checks
+    assert len(schema.enrichments) == 2
 
     # Verify files exist and are valid
     assert md_path.exists()
@@ -1374,8 +1375,8 @@ def test_export_comprehensive_investigation(tmp_path):
 
     with open(json_path) as f:
         loaded = json.load(f)
-    assert loaded["score"] == data["score"]
-    assert len(loaded["observables"]) == len(data["observables"])
+    assert loaded["score"] == schema.score
+    assert len(loaded["observables"]) == len(schema.observables)
 
 
 def test_export_empty_investigation(tmp_path):
@@ -1389,9 +1390,9 @@ def test_export_empty_investigation(tmp_path):
     assert "# Cybersecurity Investigation Report" in markdown
     assert "Global Score: 0" in markdown or "Global Score:** 0" in markdown
 
-    data = shared.io_to_dict()
-    assert data["score"] == 0.0
-    assert len(data["observables"]) == 1  # Just root
+    schema = shared.io_to_dict()
+    assert schema.score == 0.0
+    assert len(schema.observables) == 1  # Just root
 
     json_path = tmp_path / "empty.json"
     md_path = tmp_path / "empty.md"
@@ -1420,9 +1421,9 @@ def test_export_parallel_updates(tmp_path):
             f.result()
 
     # Export should capture all observables and checks
-    data = shared.io_to_dict()
-    assert len(data["observables"]) == 11  # 10 created + 1 root
-    assert data["stats"]["checks_by_scope"]["scope"] == 10
+    schema = shared.io_to_dict()
+    assert len(schema.observables) == 11  # 10 created + 1 root
+    assert schema.stats.checks_by_scope["scope"] == 10
 
     # Save and verify
     json_path = tmp_path / "parallel.json"

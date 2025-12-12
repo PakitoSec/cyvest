@@ -32,6 +32,7 @@ from cyvest.stats import InvestigationStats
 
 if TYPE_CHECKING:
     from cyvest import Cyvest
+    from cyvest.model_schema import InvestigationSchema, StatisticsSchema
 
 
 class SharedInvestigationContext:
@@ -653,20 +654,19 @@ class SharedInvestigationContext:
             save_investigation_markdown(temp_cy, filepath, include_containers, include_enrichments, include_observables)
             return str(Path(filepath).resolve())
 
-    def io_to_dict(self) -> dict[str, Any]:
+    def io_to_dict(self) -> InvestigationSchema:
         """
-        Serialize the shared investigation to a dictionary.
+        Serialize the shared investigation to an InvestigationSchema.
 
         Thread-safe: Uses lock to ensure consistent read of investigation state.
 
         Returns:
-            Dictionary representation suitable for JSON export
+            InvestigationSchema instance (use .model_dump() for dict)
 
         Example:
             >>> shared = SharedInvestigationContext(main_inv)
-            >>> data = shared.io_to_dict()
-            >>> print(data.keys())
-            dict_keys(['score', 'level', 'whitelisted', 'observables', 'checks', ...])
+            >>> schema = shared.io_to_dict()
+            >>> dict_data = schema.model_dump(by_alias=True)
         """
         from cyvest import Cyvest
         from cyvest.io_serialization import serialize_investigation
@@ -1559,7 +1559,7 @@ class Investigation:
         """Return a copy of all whitelist entries."""
         return [w.model_copy(deep=True) for w in self._whitelists.values()]
 
-    def get_statistics(self) -> dict[str, Any]:
+    def get_statistics(self) -> StatisticsSchema:
         """Get comprehensive investigation statistics."""
         return self._stats.get_summary()
 

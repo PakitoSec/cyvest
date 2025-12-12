@@ -28,6 +28,7 @@ from cyvest.io_serialization import (
 )
 from cyvest.levels import Level
 from cyvest.model import Check, CheckScorePolicy, Container, Enrichment, Observable, ThreatIntel
+from cyvest.model_schema import InvestigationSchema, StatisticsSchema
 from cyvest.proxies import CheckProxy, ContainerProxy, EnrichmentProxy, ObservableProxy, ThreatIntelProxy
 from cyvest.score import ScoreMode
 
@@ -525,12 +526,12 @@ class Cyvest:
         """
         return self._investigation.get_global_level()
 
-    def get_statistics(self) -> dict[str, Any]:
+    def get_statistics(self) -> StatisticsSchema:
         """
         Get comprehensive investigation statistics.
 
         Returns:
-            Statistics dictionary
+            Statistics schema with typed fields
         """
         return self._investigation.get_statistics()
 
@@ -619,18 +620,18 @@ class Cyvest:
         """
         return generate_markdown_report(self, include_containers, include_enrichments, include_observables)
 
-    def io_to_dict(self) -> dict[str, Any]:
+    def io_to_dict(self) -> InvestigationSchema:
         """
-        Serialize the investigation to a dictionary.
+        Serialize the investigation to an InvestigationSchema.
 
         Returns:
-            Dictionary representation suitable for JSON export
+            InvestigationSchema instance (use .model_dump() for dict)
 
         Examples:
             >>> cv = Cyvest()
-            >>> data = cv.io_to_dict()
-            >>> print(data.keys())
-            dict_keys(['score', 'level', 'observables', 'checks', ...])
+            >>> schema = cv.io_to_dict()
+            >>> print(schema.score, schema.level)
+            >>> dict_data = schema.model_dump(by_alias=True)
         """
         return serialize_investigation(self)
 

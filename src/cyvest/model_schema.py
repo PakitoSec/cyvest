@@ -12,9 +12,9 @@ and produces schemas matching the actual model_dump() output.
 
 from __future__ import annotations
 
-from typing import Annotated, Literal
+from typing import Annotated, Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from cyvest.levels import Level
 from cyvest.model import (
@@ -27,10 +27,6 @@ from cyvest.model import (
 )
 from cyvest.score import ScoreMode
 
-# Type aliases for serialized enum values (enum.name for Level, enum.value for ScoreMode)
-LevelName = Literal["NONE", "TRUSTED", "INFO", "SAFE", "NOTABLE", "SUSPICIOUS", "MALICIOUS"]
-ScoreModeValue = Literal["max", "sum"]
-
 
 class StatisticsSchema(BaseModel):
     """
@@ -39,7 +35,7 @@ class StatisticsSchema(BaseModel):
     Mirrors the output of `InvestigationStats.get_summary()`.
     """
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
     total_observables: Annotated[int, Field(ge=0)]
     internal_observables: Annotated[int, Field(ge=0)]
@@ -47,9 +43,7 @@ class StatisticsSchema(BaseModel):
     whitelisted_observables: Annotated[int, Field(ge=0)]
     observables_by_type: dict[str, Annotated[int, Field(ge=0)]] = Field(default_factory=dict)
     observables_by_level: dict[str, Annotated[int, Field(ge=0)]] = Field(default_factory=dict)
-    observables_by_type_and_level: dict[str, dict[str, Annotated[int, Field(ge=0)]]] = Field(
-        default_factory=dict
-    )
+    observables_by_type_and_level: dict[str, dict[str, Annotated[int, Field(ge=0)]]] = Field(default_factory=dict)
     total_checks: Annotated[int, Field(ge=0)]
     applied_checks: Annotated[int, Field(ge=0)]
     checks_by_scope: dict[str, Annotated[int, Field(ge=0)]] = Field(default_factory=dict)
@@ -63,7 +57,7 @@ class StatisticsSchema(BaseModel):
 class StatsChecksSchema(BaseModel):
     """Schema for check statistics summary."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
     checks: Annotated[int, Field(ge=0)]
     applied: Annotated[int, Field(ge=0)]
@@ -72,13 +66,13 @@ class StatsChecksSchema(BaseModel):
 class DataExtractionSchema(BaseModel):
     """Schema for data extraction metadata."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
     root_type: str | None = Field(
         default=None,
         description="Root observable type used during data extraction.",
     )
-    score_mode: ScoreModeValue = Field(
+    score_mode: ScoreMode = Field(
         description="Score aggregation mode: 'max' takes highest score, 'sum' adds all scores.",
     )
 
@@ -97,6 +91,7 @@ class InvestigationSchema(BaseModel):
 
     model_config = ConfigDict(
         extra="forbid",
+        frozen=True,
         json_schema_extra={
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "$id": "https://cyvest.io/schema/investigation.json",
@@ -104,42 +99,60 @@ class InvestigationSchema(BaseModel):
         },
     )
 
-    score: float = Field(description="Global investigation score.")
-    level: LevelName = Field(
+    score: float = Field(..., description="Global investigation score.")
+    level: Level = Field(
+        ...,
         description="Security level classification from NONE (lowest) to MALICIOUS (highest).",
     )
     whitelisted: bool = Field(description="Whether the investigation is whitelisted.")
     whitelists: list[InvestigationWhitelist] = Field(
-        default_factory=list,
+        ...,
         description="List of whitelist entries applied to this investigation.",
     )
     observables: dict[str, Observable] = Field(
-        default_factory=dict,
+        ...,
         description="Observables keyed by their unique key.",
     )
     checks: dict[str, list[Check]] = Field(
-        default_factory=dict,
+        ...,
         description="Checks organized by scope.",
     )
     checks_by_level: dict[str, list[str]] = Field(
-        default_factory=dict,
+        ...,
         description="Check keys organized by level name.",
     )
     threat_intels: dict[str, ThreatIntel] = Field(
-        default_factory=dict,
+        ...,
         description="Threat intelligence entries keyed by their unique key.",
     )
     enrichments: dict[str, Enrichment] = Field(
-        default_factory=dict,
+        ...,
         description="Enrichment entries keyed by their unique key.",
     )
     containers: dict[str, Container] = Field(
-        default_factory=dict,
+        ...,
         description="Containers keyed by their unique key.",
     )
     stats: StatisticsSchema = Field(description="Investigation statistics summary.")
     stats_checks: StatsChecksSchema = Field(description="Check statistics summary.")
     data_extraction: DataExtractionSchema = Field(description="Data extraction metadata.")
+
+    @model_validator(mode="before")
+    @classmethod
+    def ensure_defaults(cls, v: Any) -> Any:
+        if not isinstance(v, dict):
+            return v
+
+        v.setdefault("level", Level.NONE)
+        v.setdefault("whitelists", [])
+        v.setdefault("observables", {})
+        v.setdefault("checks", {})
+        v.setdefault("checks_by_level", {})
+        v.setdefault("threat_intels", {})
+        v.setdefault("enrichments", {})
+        v.setdefault("containers", {})
+
+        return v
 
 
 # Export model references for schema generation
@@ -148,8 +161,6 @@ __all__ = [
     "StatisticsSchema",
     "StatsChecksSchema",
     "DataExtractionSchema",
-    "LevelName",
-    "ScoreModeValue",
     # Re-export from model.py for convenience
     "Observable",
     "Check",

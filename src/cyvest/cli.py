@@ -166,10 +166,10 @@ def merge(inputs: tuple[Path, ...], output: Path, output_format: str, stats: boo
     if stats:
         logger.info("[bold]Merged Investigation Statistics:[/bold]")
         investigation_stats = main_investigation.get_statistics()
-        logger.info(f"  Total Observables: {investigation_stats.get('total_observables', 0)}")
-        logger.info(f"  Total Checks: {investigation_stats.get('total_checks', 0)}")
-        logger.info(f"  Total Threat Intel: {investigation_stats.get('total_threat_intel', 0)}")
-        logger.info(f"  Total Containers: {investigation_stats.get('total_containers', 0)}")
+        logger.info(f"  Total Observables: {investigation_stats.total_observables}")
+        logger.info(f"  Total Checks: {investigation_stats.total_checks}")
+        logger.info(f"  Total Threat Intel: {investigation_stats.total_threat_intel}")
+        logger.info(f"  Total Containers: {investigation_stats.total_containers}")
         logger.info(f"  Global Score: {main_investigation.get_global_score()}")
         logger.info(f"  Global Level: {main_investigation.get_global_level()}\n")
 

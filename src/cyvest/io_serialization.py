@@ -4,6 +4,8 @@ Serialization and deserialization for Cyvest investigations.
 Provides JSON export/import and Markdown generation for LLM consumption.
 """
 
+from __future__ import annotations
+
 import json
 from decimal import Decimal
 from pathlib import Path
@@ -11,155 +13,87 @@ from typing import TYPE_CHECKING, Any
 
 from cyvest.levels import Level
 from cyvest.model import Check, Container, Enrichment, Observable, Relationship, ThreatIntel
+from cyvest.model_schema import InvestigationSchema, StatsChecksSchema
 from cyvest.score import ScoreMode
 
 if TYPE_CHECKING:
     from cyvest.cyvest import Cyvest
 
 
-def _resolve_proxy(obj: Any) -> Any:
+def serialize_investigation(cv: Cyvest) -> InvestigationSchema:
     """
-    Resolve a proxy object to its underlying model.
+    Serialize a complete investigation to an InvestigationSchema.
 
-    If the object has a _resolve method (proxy), call it to get the actual model.
-    Otherwise, return the object as-is.
-    """
-    if hasattr(obj, "_resolve"):
-        return obj._resolve()
-    return obj
-
-
-def serialize_observable(obs: Observable) -> dict[str, Any]:
-    """
-    Serialize an observable to a dictionary.
-
-    Args:
-        obs: Observable or ObservableProxy to serialize
-
-    Returns:
-        Dictionary representation
-    """
-    obs = _resolve_proxy(obs)
-    # Use by_alias=True to get 'type' instead of 'obs_type'
-    # Field serializers handle threat_intels, relationships, and generated_by_checks
-    return obs.model_dump(by_alias=True)
-
-
-def serialize_check(check: Check) -> dict[str, Any]:
-    """
-    Serialize a check to a dictionary.
-
-    Args:
-        check: Check or CheckProxy to serialize
-
-    Returns:
-        Dictionary representation
-    """
-    check = _resolve_proxy(check)
-    # Field serializer handles observables as keys
-    return check.model_dump()
-
-
-def serialize_threat_intel(ti: ThreatIntel) -> dict[str, Any]:
-    """
-    Serialize threat intel to a dictionary.
-
-    Args:
-        ti: ThreatIntel or ThreatIntelProxy to serialize
-
-    Returns:
-        Dictionary representation
-    """
-    ti = _resolve_proxy(ti)
-    return ti.model_dump()
-
-
-def serialize_enrichment(enrichment: Enrichment) -> dict[str, Any]:
-    """
-    Serialize an enrichment to a dictionary.
-
-    Args:
-        enrichment: Enrichment or EnrichmentProxy to serialize
-
-    Returns:
-        Dictionary representation
-    """
-    enrichment = _resolve_proxy(enrichment)
-    return enrichment.model_dump()
-
-
-def serialize_container(container: Container) -> dict[str, Any]:
-    """
-    Serialize a container to a dictionary.
-
-    Args:
-        container: Container or ContainerProxy to serialize
-
-    Returns:
-        Dictionary representation
-    """
-    container = _resolve_proxy(container)
-    # field_serializer handles sub_containers recursively, checks as keys, aggregated_score/level
-    return container.model_dump()
-
-
-def serialize_investigation(cv: "Cyvest") -> dict[str, Any]:
-    """
-    Serialize a complete investigation to a dictionary.
+    Uses InvestigationSchema for validation and automatic serialization via
+    Pydantic's field_serializer decorators.
 
     Args:
         cv: Cyvest investigation to serialize
 
     Returns:
-        Dictionary representation suitable for JSON export
+        InvestigationSchema instance (use .model_dump() for dict)
     """
-    # Build checks organized by scope and containers
-    checks_by_scope: dict[str, list[dict[str, Any]]] = {}
+
+    # Helper to resolve proxies
+    def resolve(obj: Any) -> Any:
+        return obj._resolve() if hasattr(obj, "_resolve") else obj
+
+    # Resolve all observables, checks, threat intels, enrichments, containers
+    observables = {key: resolve(obs) for key, obs in cv.get_all_observables().items()}
+    threat_intels = {key: resolve(ti) for key, ti in cv.get_all_threat_intels().items()}
+    enrichments = {key: resolve(enr) for key, enr in cv.get_all_enrichments().items()}
+    containers = {key: resolve(ctr) for key, ctr in cv.get_all_containers().items()}
+
+    # Build checks organized by scope (resolve proxies)
+    checks_by_scope: dict[str, list[Check]] = {}
     for check in cv.get_all_checks().values():
-        scope = check.scope
-        if scope not in checks_by_scope:
-            checks_by_scope[scope] = []
-        checks_by_scope[scope].append(serialize_check(check))
+        check = resolve(check)
+        if check.scope not in checks_by_scope:
+            checks_by_scope[check.scope] = []
+        checks_by_scope[check.scope].append(check)
 
     # Build checks organized by level
     checks_by_level: dict[str, list[str]] = {}
     for check in cv.get_all_checks().values():
-        level_name = check.level.name
-        if level_name not in checks_by_level:
-            checks_by_level[level_name] = []
-        checks_by_level[level_name].append(check.key)
+        check = resolve(check)
+        if check.level.name not in checks_by_level:
+            checks_by_level[check.level.name] = []
+        checks_by_level[check.level.name].append(check.key)
 
+    # Get root type
     root = cv.observable_get_root()
     root_type_value = None
     if root:
+        root = resolve(root)
         root_type_value = root.obs_type.value if hasattr(root.obs_type, "value") else str(root.obs_type)
 
-    score_mode_value = cv._investigation._score_engine._score_mode.value
-
-    return {
-        "score": float(cv.get_global_score()),
-        "level": cv.get_global_level().name,
-        "whitelisted": cv.investigation_is_whitelisted(),
-        "whitelists": [entry.model_dump() for entry in cv.investigation_get_whitelists()],
-        "observables": {key: serialize_observable(obs) for key, obs in cv.get_all_observables().items()},
-        "checks": checks_by_scope,
-        "checks_by_level": checks_by_level,
-        "threat_intels": {key: serialize_threat_intel(ti) for key, ti in cv.get_all_threat_intels().items()},
-        "enrichments": {key: serialize_enrichment(enr) for key, enr in cv.get_all_enrichments().items()},
-        "containers": {key: serialize_container(ctr) for key, ctr in cv.get_all_containers().items()},
-        "stats": cv.get_statistics(),
-        "stats_checks": {
-            "checks": len(cv.get_all_checks()),
-            "applied": sum(1 for c in cv.get_all_checks().values() if c.level != Level.NONE),
-        },
-        "data_extraction": {
+    # Build and validate using Pydantic model
+    investigation = InvestigationSchema(
+        score=float(cv.get_global_score()),
+        level=cv.get_global_level(),
+        whitelisted=cv.investigation_is_whitelisted(),
+        whitelists=list(cv.investigation_get_whitelists()),
+        observables=observables,
+        checks=checks_by_scope,
+        checks_by_level=checks_by_level,
+        threat_intels=threat_intels,
+        enrichments=enrichments,
+        containers=containers,
+        stats=cv.get_statistics(),
+        stats_checks=StatsChecksSchema(
+            checks=len(cv.get_all_checks()),
+            applied=sum(1 for c in cv.get_all_checks().values() if c.level != Level.NONE),
+        ),
+        data_extraction={
             "root_type": root_type_value,
-            "score_mode": score_mode_value,
+            "score_mode": cv._investigation._score_engine._score_mode.value,
         },
-    }
+    )
+
+    return investigation
 
 
-def save_investigation_json(cv: "Cyvest", filepath: str | Path) -> None:
+def save_investigation_json(cv: Cyvest, filepath: str | Path) -> None:
     """
     Save an investigation to a JSON file.
 
@@ -169,11 +103,11 @@ def save_investigation_json(cv: "Cyvest", filepath: str | Path) -> None:
     """
     data = serialize_investigation(cv)
     with open(filepath, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
+        f.write(data.model_dump_json(indent=2, by_alias=True))
 
 
 def generate_markdown_report(
-    cv: "Cyvest",
+    cv: Cyvest,
     include_containers: bool = False,
     include_enrichments: bool = False,
     include_observables: bool = True,
@@ -208,13 +142,13 @@ def generate_markdown_report(
     lines.append("## Statistics")
     lines.append("")
     stats = cv.get_statistics()
-    lines.append(f"- **Total Observables:** {stats['total_observables']}")
-    lines.append(f"- **Internal Observables:** {stats['internal_observables']}")
-    lines.append(f"- **External Observables:** {stats['external_observables']}")
-    lines.append(f"- **Whitelisted Observables:** {stats['whitelisted_observables']}")
-    lines.append(f"- **Total Checks:** {stats['total_checks']}")
-    lines.append(f"- **Applied Checks:** {stats['applied_checks']}")
-    lines.append(f"- **Total Threat Intel:** {stats['total_threat_intel']}")
+    lines.append(f"- **Total Observables:** {stats.total_observables}")
+    lines.append(f"- **Internal Observables:** {stats.internal_observables}")
+    lines.append(f"- **External Observables:** {stats.external_observables}")
+    lines.append(f"- **Whitelisted Observables:** {stats.whitelisted_observables}")
+    lines.append(f"- **Total Checks:** {stats.total_checks}")
+    lines.append(f"- **Applied Checks:** {stats.applied_checks}")
+    lines.append(f"- **Total Threat Intel:** {stats.total_threat_intel}")
     lines.append("")
 
     # Whitelists
@@ -230,7 +164,7 @@ def generate_markdown_report(
     # Checks by Scope
     lines.append("## Checks by Scope")
     lines.append("")
-    for scope, _count in cv.get_statistics().get("checks_by_scope", {}).items():
+    for scope, _count in cv.get_statistics().checks_by_scope.items():
         lines.append(f"### {scope}")
         lines.append("")
         for check in cv.get_all_checks().values():
@@ -299,7 +233,7 @@ def generate_markdown_report(
 
 
 def save_investigation_markdown(
-    cv: "Cyvest",
+    cv: Cyvest,
     filepath: str | Path,
     include_containers: bool = False,
     include_enrichments: bool = False,
@@ -320,7 +254,7 @@ def save_investigation_markdown(
         f.write(markdown)
 
 
-def load_investigation_json(filepath: str | Path) -> "Cyvest":
+def load_investigation_json(filepath: str | Path) -> Cyvest:
     """
     Load an investigation from a JSON file into a Cyvest object.
 

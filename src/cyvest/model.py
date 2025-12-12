@@ -114,15 +114,11 @@ class ScoreChange(BaseModel):
     def serialize_decimal(self, v: Decimal) -> float:
         return float(v)
 
-    @field_serializer("old_level", "new_level")
-    def serialize_level(self, v: Level) -> str:
-        return v.name
-
 
 class InvestigationWhitelist(BaseModel):
     """Represents a whitelist entry on an investigation."""
 
-    model_config = ConfigDict(str_strip_whitespace=True)
+    model_config = ConfigDict(str_strip_whitespace=True, frozen=True)
 
     identifier: Annotated[str, Field(min_length=1)]
     name: Annotated[str, Field(min_length=1)]
@@ -132,11 +128,35 @@ class InvestigationWhitelist(BaseModel):
 class Relationship(BaseModel):
     """Represents a relationship between observables."""
 
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+    model_config = ConfigDict(arbitrary_types_allowed=True, frozen=True)
 
-    target_key: str
-    relationship_type: RelationshipType | str
-    direction: RelationshipDirection | str | None = None
+    target_key: str = Field(...)
+    relationship_type: RelationshipType | str = Field(...)
+    direction: RelationshipDirection = Field(...)
+
+    @model_validator(mode="before")
+    @classmethod
+    def ensure_defaults(cls, values: Any) -> Any:
+        if not isinstance(values, dict):
+            return values
+        if values.get("direction") is None:
+            rel_type = values.get("relationship_type")
+
+            # Use semantic default when relationship type is known, otherwise fall back to outbound.
+            default_direction = RelationshipDirection.OUTBOUND
+            if isinstance(rel_type, RelationshipType):
+                default_direction = rel_type.get_default_direction()
+            else:
+                try:
+                    rel_enum = RelationshipType(rel_type)
+                    default_direction = rel_enum.get_default_direction()
+                    values["relationship_type"] = rel_enum
+                except Exception:
+                    # Unknown type: keep fallback outbound
+                    pass
+
+            values["direction"] = default_direction
+        return values
 
     @field_validator("relationship_type", mode="before")
     @classmethod
@@ -152,37 +172,20 @@ class Relationship(BaseModel):
                 return v
         return v
 
-    @model_validator(mode="after")
-    def normalize_direction(self) -> Self:
-        """Normalize direction with smart defaults."""
-        if self.direction is None:
-            # No direction specified - use semantic default based on relationship type
-            if isinstance(self.relationship_type, RelationshipType):
-                object.__setattr__(self, "direction", self.relationship_type.get_default_direction())
-            else:
-                # Custom relationship type - default to OUTBOUND
-                object.__setattr__(self, "direction", RelationshipDirection.OUTBOUND)
-        elif isinstance(self.direction, str):
-            try:
-                object.__setattr__(self, "direction", RelationshipDirection(self.direction))
-            except ValueError:
-                # Invalid direction string - use semantic default or OUTBOUND
-                if isinstance(self.relationship_type, RelationshipType):
-                    object.__setattr__(self, "direction", self.relationship_type.get_default_direction())
-                else:
-                    object.__setattr__(self, "direction", RelationshipDirection.OUTBOUND)
-
-        return self
-
     @field_serializer("relationship_type")
     def serialize_relationship_type(self, v: RelationshipType | str) -> str:
         return v.value if isinstance(v, RelationshipType) else v
 
-    @field_serializer("direction")
-    def serialize_direction(self, v: RelationshipDirection | str | None) -> str | None:
+    @field_validator("direction", mode="before")
+    @classmethod
+    def coerce_direction(cls, v: Any) -> RelationshipDirection:
         if v is None:
-            return None
-        return v.value if isinstance(v, RelationshipDirection) else v
+            return RelationshipDirection.OUTBOUND
+        if isinstance(v, RelationshipDirection):
+            return v
+        if isinstance(v, str):
+            return RelationshipDirection(v)
+        raise TypeError("Invalid direction type")
 
     @property
     def relationship_type_name(self) -> str:
@@ -206,12 +209,12 @@ class ThreatIntel(BaseModel):
 
     source: str
     observable_key: str
-    comment: str = ""
-    extra: dict[str, Any] = Field(default_factory=dict)
-    score: Decimal = Field(default_factory=lambda: Decimal("0"))
-    level: Level = Level.INFO
-    taxonomies: list[dict[str, Any]] = Field(default_factory=list)
-    key: str = ""
+    comment: str = Field(...)
+    extra: dict[str, Any] = Field(...)
+    score: Decimal = Field(...)
+    level: Level = Field(...)
+    taxonomies: list[dict[str, Any]] = Field(...)
+    key: str = Field(...)
 
     _explicit_level: bool = PrivateAttr(default=False)
 
@@ -234,6 +237,25 @@ class ThreatIntel(BaseModel):
     def coerce_level(cls, v: Any) -> Level:
         return normalize_level(v)
 
+    @model_validator(mode="before")
+    @classmethod
+    def ensure_defaults(cls, values: Any) -> Any:
+        if not isinstance(values, dict):
+            return values
+        if "extra" not in values:
+            values["extra"] = {}
+        if "comment" not in values:
+            values["comment"] = ""
+        if "score" not in values:
+            values["score"] = Decimal("0")
+        if "level" not in values:
+            values["level"] = Level.INFO
+        if "taxonomies" not in values:
+            values["taxonomies"] = []
+        if "key" not in values:
+            values["key"] = ""
+        return values
+
     @model_validator(mode="after")
     def generate_key_and_level(self) -> Self:
         """Generate key and recalculate level from score if needed."""
@@ -251,10 +273,6 @@ class ThreatIntel(BaseModel):
     @field_serializer("score")
     def serialize_score(self, v: Decimal) -> float:
         return float(v)
-
-    @field_serializer("level")
-    def serialize_level(self, v: Level) -> str:
-        return v.name
 
     def set_level(self, level: Level | str) -> None:
         """
@@ -279,15 +297,15 @@ class Observable(BaseModel):
 
     obs_type: ObservableType | str = Field(serialization_alias="type")
     value: str
-    internal: bool = True
-    whitelisted: bool = False
-    comment: str = ""
-    extra: dict[str, Any] = Field(default_factory=dict)
-    score: Decimal = Field(default_factory=lambda: Decimal("0"))
-    level: Level = Level.INFO
-    threat_intels: list[ThreatIntel] = Field(default_factory=list)
-    relationships: list[Relationship] = Field(default_factory=list)
-    key: str = ""
+    internal: bool = Field(...)
+    whitelisted: bool = Field(...)
+    comment: str = Field(...)
+    extra: dict[str, Any] = Field(...)
+    score: Decimal = Field(...)
+    level: Level = Field(...)
+    threat_intels: list[ThreatIntel] = Field(...)
+    relationships: list[Relationship] = Field(...)
+    key: str = Field(...)
 
     _explicit_level: bool = PrivateAttr(default=False)
     _score_history: list[ScoreChange] = PrivateAttr(default_factory=list)
@@ -327,6 +345,31 @@ class Observable(BaseModel):
     def coerce_level(cls, v: Any) -> Level:
         return normalize_level(v)
 
+    @model_validator(mode="before")
+    @classmethod
+    def ensure_defaults(cls, values: Any) -> Any:
+        if not isinstance(values, dict):
+            return values
+        if "extra" not in values:
+            values["extra"] = {}
+        if "comment" not in values:
+            values["comment"] = ""
+        if "internal" not in values:
+            values["internal"] = True
+        if "whitelisted" not in values:
+            values["whitelisted"] = False
+        if "level" not in values:
+            values["level"] = Level.INFO
+        if "score" not in values:
+            values["score"] = Decimal("0")
+        if "threat_intels" not in values:
+            values["threat_intels"] = []
+        if "relationships" not in values:
+            values["relationships"] = []
+        if "key" not in values:
+            values["key"] = ""
+        return values
+
     @model_validator(mode="after")
     def generate_key_and_mark_safe(self) -> Self:
         """Generate key and handle SAFE level marking."""
@@ -349,19 +392,10 @@ class Observable(BaseModel):
     def serialize_score(self, v: Decimal) -> float:
         return float(v)
 
-    @field_serializer("level")
-    def serialize_level(self, v: Level) -> str:
-        return v.name
-
     @field_serializer("threat_intels")
     def serialize_threat_intels(self, value: list[ThreatIntel]) -> list[str]:
         """Serialize threat intels as keys only."""
         return [ti.key for ti in value]
-
-    @field_serializer("relationships")
-    def serialize_relationships(self, value: list[Relationship]) -> list[dict[str, Any]]:
-        """Serialize relationships with proper structure."""
-        return [rel.model_dump() for rel in value]
 
     @computed_field
     @property
@@ -486,13 +520,13 @@ class Check(BaseModel):
     check_id: str
     scope: str
     description: str
-    comment: str = ""
-    extra: dict[str, Any] = Field(default_factory=dict)
-    score: Decimal = Field(default_factory=lambda: Decimal("0"))
-    level: Level = Level.NONE
-    observables: list[Observable] = Field(default_factory=list)
+    comment: str = Field(...)
+    extra: dict[str, Any] = Field(...)
+    score: Decimal = Field(...)
+    level: Level = Field(...)
+    observables: list[Observable] = Field(...)
     score_policy: CheckScorePolicy = CheckScorePolicy.AUTO
-    key: str = ""
+    key: str = Field(...)
 
     _explicit_level: bool = PrivateAttr(default=False)
     _score_history: list[ScoreChange] = PrivateAttr(default_factory=list)
@@ -516,6 +550,25 @@ class Check(BaseModel):
     def coerce_level(cls, v: Any) -> Level:
         return normalize_level(v)
 
+    @model_validator(mode="before")
+    @classmethod
+    def ensure_defaults(cls, values: Any) -> Any:
+        if not isinstance(values, dict):
+            return values
+        if "extra" not in values:
+            values["extra"] = {}
+        if "comment" not in values:
+            values["comment"] = ""
+        if "level" not in values:
+            values["level"] = Level.NONE
+        if "score" not in values:
+            values["score"] = Decimal("0")
+        if "observables" not in values:
+            values["observables"] = []
+        if "key" not in values:
+            values["key"] = ""
+        return values
+
     @field_validator("score_policy", mode="before")
     @classmethod
     def coerce_score_policy(cls, v: Any) -> CheckScorePolicy:
@@ -533,14 +586,6 @@ class Check(BaseModel):
     @field_serializer("score")
     def serialize_score(self, v: Decimal) -> float:
         return float(v)
-
-    @field_serializer("level")
-    def serialize_level(self, v: Level) -> str:
-        return v.name
-
-    @field_serializer("score_policy")
-    def serialize_score_policy(self, v: CheckScorePolicy) -> str:
-        return v.value
 
     @field_serializer("observables")
     def serialize_observables(self, value: list[Observable]) -> list[str]:
@@ -640,9 +685,9 @@ class Enrichment(BaseModel):
     model_config = ConfigDict()
 
     name: str
-    data: dict[str, Any] = Field(default_factory=dict)
-    context: str = ""
-    key: str = ""
+    data: dict[str, Any] = Field(...)
+    context: str = Field(...)
+    key: str = Field(...)
 
     @model_validator(mode="after")
     def generate_key(self) -> Self:
@@ -650,6 +695,19 @@ class Enrichment(BaseModel):
         if not self.key:
             self.key = keys.generate_enrichment_key(self.name, self.context)
         return self
+
+    @model_validator(mode="before")
+    @classmethod
+    def ensure_defaults(cls, values: Any) -> Any:
+        if not isinstance(values, dict):
+            return values
+        if "data" not in values:
+            values["data"] = {}
+        if "context" not in values:
+            values["context"] = ""
+        if "key" not in values:
+            values["key"] = ""
+        return values
 
 
 class Container(BaseModel):
@@ -660,13 +718,13 @@ class Container(BaseModel):
     with aggregated scores and levels.
     """
 
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+    model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
 
     path: str
     description: str = ""
-    checks: list[Check] = Field(default_factory=list)
-    sub_containers: dict[str, Container] = Field(default_factory=dict)
-    key: str = ""
+    checks: list[Check] = Field(...)
+    sub_containers: dict[str, Container] = Field(...)
+    key: str = Field(...)
 
     @model_validator(mode="after")
     def generate_key(self) -> Self:
@@ -674,6 +732,19 @@ class Container(BaseModel):
         if not self.key:
             self.key = keys.generate_container_key(self.path)
         return self
+
+    @model_validator(mode="before")
+    @classmethod
+    def ensure_defaults(cls, values: Any) -> Any:
+        if not isinstance(values, dict):
+            return values
+        if "checks" not in values:
+            values["checks"] = []
+        if "sub_containers" not in values:
+            values["sub_containers"] = {}
+        if "key" not in values:
+            values["key"] = ""
+        return values
 
     def add_check(self, check: Check) -> None:
         """
@@ -694,16 +765,14 @@ class Container(BaseModel):
         """
         self.sub_containers[container.key] = container
 
-    @computed_field
+    @computed_field(return_type=Decimal)
     @property
     def aggregated_score(self) -> Decimal:
-        """
-        Calculate the aggregated score from all checks and sub-containers.
-
-        Returns:
-            Total aggregated score
-        """
         return self.get_aggregated_score()
+
+    @field_serializer("aggregated_score")
+    def serialize_aggregated_score(self, v: Decimal) -> float:
+        return float(v)
 
     def get_aggregated_score(self) -> Decimal:
         """
@@ -721,7 +790,7 @@ class Container(BaseModel):
             total += sub.get_aggregated_score()
         return total
 
-    @computed_field
+    @computed_field(return_type=Level)
     @property
     def aggregated_level(self) -> Level:
         """
@@ -732,21 +801,13 @@ class Container(BaseModel):
         """
         return self.get_aggregated_level()
 
-    @field_serializer("aggregated_score")
-    def serialize_aggregated_score(self, v: Decimal) -> float:
-        return float(v)
-
-    @field_serializer("aggregated_level")
-    def serialize_aggregated_level(self, v: Level) -> str:
-        return v.name
-
     @field_serializer("checks")
     def serialize_checks(self, value: list[Check]) -> list[str]:
         """Serialize checks as keys only."""
         return [check.key for check in value]
 
     @field_serializer("sub_containers")
-    def serialize_sub_containers(self, value: dict[str, Container]) -> dict[str, Any]:
+    def serialize_sub_containers(self, value: dict[str, Container]) -> dict[str, Container]:
         """Serialize sub-containers recursively."""
         return {key: sub.model_dump() for key, sub in value.items()}
 

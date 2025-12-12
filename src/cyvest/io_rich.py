@@ -176,11 +176,11 @@ def display_summary(
 
     stats = cv.get_statistics()
     stat_items = [
-        ("Total Observables", stats.get("total_observables", 0)),
-        ("Internal Observables", stats.get("internal_observables", 0)),
-        ("External Observables", stats.get("external_observables", 0)),
-        ("Whitelisted Observables", stats.get("whitelisted_observables", 0)),
-        ("Total Threat Intel", stats.get("total_threat_intel", 0)),
+        ("Total Observables", stats.total_observables),
+        ("Internal Observables", stats.internal_observables),
+        ("External Observables", stats.external_observables),
+        ("Whitelisted Observables", stats.whitelisted_observables),
+        ("Total Threat Intel", stats.total_threat_intel),
     ]
 
     for stat_name, stat_value in stat_items:
@@ -301,8 +301,8 @@ def display_statistics(cv: Cyvest, rich_print: Callable[[Any], None]) -> None:
     obs_table.add_column("SUSPICIOUS", justify="right", style="orange3")
     obs_table.add_column("MALICIOUS", justify="right", style="red")
 
-    obs_by_type_level = stats.get("observables_by_type_and_level", {})
-    for obs_type, count in stats.get("observables_by_type", {}).items():
+    obs_by_type_level = stats.observables_by_type_and_level
+    for obs_type, count in stats.observables_by_type.items():
         levels = obs_by_type_level.get(obs_type, {})
         obs_table.add_row(
             obs_type.upper(),
@@ -321,19 +321,19 @@ def display_statistics(cv: Cyvest, rich_print: Callable[[Any], None]) -> None:
     check_table.add_column("Scope", style="cyan")
     check_table.add_column("Count", justify="right")
 
-    for scope, count in stats.get("checks_by_scope", {}).items():
+    for scope, count in stats.checks_by_scope.items():
         check_table.add_row(scope, str(count))
 
     rich_print(check_table)
 
     # Threat intel statistics
-    if stats.get("total_threat_intel", 0) > 0:
+    if stats.total_threat_intel > 0:
         rich_print("")
         ti_table = Table(title="Threat Intelligence Statistics")
         ti_table.add_column("Source", style="cyan")
         ti_table.add_column("Count", justify="right")
 
-        for source, count in stats.get("threat_intel_by_source", {}).items():
+        for source, count in stats.threat_intel_by_source.items():
             ti_table.add_row(source, str(count))
 
         rich_print(ti_table)

@@ -5,7 +5,13 @@
  * for determining levels from scores.
  */
 
-import type { Observable, Check, ThreatIntel, Container, Level } from "./types.generated";
+import type {
+  Observable,
+  Check,
+  ThreatIntel,
+  Container,
+  Level,
+} from "./types.generated";
 
 // Re-export Level type from types.generated for convenience
 export type { Level } from "./types.generated";
@@ -237,9 +243,7 @@ export function getColorForScore(score: number): string {
 /**
  * Type guard to check if an object has a level property.
  */
-export function hasLevel(
-  obj: unknown
-): obj is { level: Level } {
+export function hasLevel(obj: unknown): obj is { level: Level } {
   return (
     typeof obj === "object" &&
     obj !== null &&
@@ -256,7 +260,13 @@ export function getEntityLevel(
   entity: Observable | Check | ThreatIntel | Container
 ): Level {
   if ("aggregated_level" in entity) {
-    return entity.aggregated_level;
+    const aggregatedLevel = entity.aggregated_level;
+    if (typeof aggregatedLevel === "string" && isValidLevel(aggregatedLevel)) {
+      return aggregatedLevel;
+    }
   }
-  return entity.level;
+  if ("level" in entity && isValidLevel(entity.level)) {
+    return entity.level;
+  }
+  throw new Error("Entity does not have a valid level.");
 }

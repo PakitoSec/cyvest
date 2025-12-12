@@ -13,6 +13,7 @@ dependencies = [
     "logurich[click]>=0.1",
     "pydantic>=2.12.5",
     "rich>=13",
+    "typing-extensions>=4.15",
 ]
 keywords = ["cybersecurity", "investigation", "threat-intel", "security-analysis"]
 classifiers = [

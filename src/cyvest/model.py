@@ -10,7 +10,7 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 from enum import Enum
-from typing import TYPE_CHECKING, Annotated, Any, Self
+from typing import TYPE_CHECKING, Annotated, Any
 
 from pydantic import (
     BaseModel,
@@ -22,6 +22,7 @@ from pydantic import (
     field_validator,
     model_validator,
 )
+from typing_extensions import Self
 
 from cyvest import keys
 from cyvest.levels import Level, get_level_from_score, normalize_level

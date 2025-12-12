@@ -24,6 +24,7 @@ rich==14.2.0
     #   logurich
 typing-extensions==4.15.0
     # via
+    #   cyvest (pyproject.toml)
     #   pydantic
     #   pydantic-core
     #   typing-inspection

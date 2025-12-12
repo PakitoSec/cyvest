@@ -18,7 +18,7 @@ from cyvest.model import (
 )
 from cyvest.proxies import CheckProxy, ContainerProxy, EnrichmentProxy, ObservableProxy, ThreatIntelProxy
 
-__version__ = "3.0.0"
+__version__ = "3.0.1"
 
 logger.disable("cyvest")
 

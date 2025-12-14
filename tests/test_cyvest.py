@@ -377,7 +377,6 @@ def test_merge_safe_observable_preserves_safe_with_low_score() -> None:
     # Create SAFE observable in first investigation
     obs1 = cv1.observable_create("domain", "trusted.example.com", score=0, level=Level.SAFE)
     assert obs1.level == Level.SAFE
-    assert obs1._explicit_level is True
 
     cv2 = Cyvest()
     # Create same observable with INFO level (score=0) in second investigation
@@ -459,9 +458,9 @@ def test_merge_safe_observable_upgrades_with_malicious() -> None:
 
 
 def test_merge_non_safe_explicit_level_normal_behavior() -> None:
-    """Test that merging non-SAFE explicit levels behaves normally."""
+    """Test that merging keeps the highest score/derived level."""
     cv1 = Cyvest()
-    # Create observable with explicit SUSPICIOUS level
+    # Create observable and raise its score to SUSPICIOUS.
     obs1 = cv1.observable_create("domain", "test.example.com")
     cv1.observable_set_level(obs1.key, Level.SUSPICIOUS)
     cv1.observable_add_threat_intel(obs1.key, source="source1", score=Decimal("4.0"))
@@ -474,11 +473,10 @@ def test_merge_non_safe_explicit_level_normal_behavior() -> None:
     # Merge cv2 into cv1
     cv1.merge_investigation(cv2)
 
-    # For non-SAFE levels, normal merge logic applies
     merged_obs = cv1.observable_get(obs1.key)
     # Score should be max(4.0, 2.0) = 4.0
     assert merged_obs.score == Decimal("4.0")
-    # Level stays SUSPICIOUS (explicit level > calculated NOTABLE)
+    # Level stays SUSPICIOUS (score=4.0 => SUSPICIOUS)
     assert merged_obs.level == Level.SUSPICIOUS
 
 

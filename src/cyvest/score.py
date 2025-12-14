@@ -38,7 +38,7 @@ from enum import Enum
 from typing import TYPE_CHECKING, Literal
 
 from cyvest.levels import Level, get_level_from_score
-from cyvest.model import CheckScorePolicy, RelationshipDirection
+from cyvest.model_enums import CheckScorePolicy, RelationshipDirection
 
 
 class ScoreMode(Enum):

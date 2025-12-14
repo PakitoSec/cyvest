@@ -215,16 +215,19 @@ class Cyvest:
         Returns:
             The created or existing observable
         """
-        obs = Observable(
-            obs_type=obs_type,
-            value=value,
-            internal=internal,
-            whitelisted=whitelisted,
-            comment=comment,
-            extra=extra or {},
-            score=Decimal(str(score)) if score is not None else Decimal("0"),
-            level=level if level is not None else Level.INFO,
-        )
+        obs_kwargs: dict[str, Any] = {
+            "obs_type": obs_type,
+            "value": value,
+            "internal": internal,
+            "whitelisted": whitelisted,
+            "comment": comment,
+            "extra": extra or {},
+        }
+        if score is not None:
+            obs_kwargs["score"] = Decimal(str(score))
+        if level is not None:
+            obs_kwargs["level"] = level
+        obs = Observable(**obs_kwargs)
         # Unwrap tuple - facade returns only Observable, discards deferred relationships
         obs_result, _ = self._investigation.add_observable(obs)
         return self._observable_proxy(obs_result)
@@ -303,15 +306,17 @@ class Cyvest:
         if not observable:
             return None
 
-        ti = ThreatIntel(
-            source=source,
-            observable_key=observable_key,
-            comment=comment,
-            extra=extra or {},
-            score=Decimal(str(score)),
-            level=level if level is not None else Level.INFO,
-            taxonomies=taxonomies or [],
-        )
+        ti_kwargs: dict[str, Any] = {
+            "source": source,
+            "observable_key": observable_key,
+            "comment": comment,
+            "extra": extra or {},
+            "score": Decimal(str(score)),
+            "taxonomies": taxonomies or [],
+        }
+        if level is not None:
+            ti_kwargs["level"] = level
+        ti = ThreatIntel(**ti_kwargs)
         result = self._investigation.add_threat_intel(ti, observable)
         return self._threat_intel_proxy(result)
 
@@ -369,16 +374,20 @@ class Cyvest:
         Returns:
             The created check
         """
-        check = Check(
-            check_id=check_id,
-            scope=scope,
-            description=description,
-            comment=comment,
-            extra=extra or {},
-            score=Decimal(str(score)) if score is not None else Decimal("0"),
-            level=level if level is not None else Level.NONE,
-            score_policy=score_policy if score_policy is not None else CheckScorePolicy.AUTO,
-        )
+        check_kwargs: dict[str, Any] = {
+            "check_id": check_id,
+            "scope": scope,
+            "description": description,
+            "comment": comment,
+            "extra": extra or {},
+        }
+        if score is not None:
+            check_kwargs["score"] = Decimal(str(score))
+        if level is not None:
+            check_kwargs["level"] = level
+        if score_policy is not None:
+            check_kwargs["score_policy"] = score_policy
+        check = Check(**check_kwargs)
         return self._check_proxy(self._investigation.add_check(check))
 
     def check_get(self, key: str) -> CheckProxy | None:

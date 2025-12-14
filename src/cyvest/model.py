@@ -7,7 +7,7 @@ and InvestigationWhitelist using Pydantic BaseModel.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Annotated, Any
 
@@ -320,7 +320,7 @@ class Observable(BaseModel):
         """Checks that generated this observable."""
         return self._generated_by_checks
 
-    def update_score(self, new_score: Decimal, reason: str = "") -> None:
+    def update_score(self, new_score: Decimal, reason: str = "", *, record_history: bool = True) -> None:
         """
         Update the observable's score and recalculate level.
 
@@ -337,16 +337,16 @@ class Observable(BaseModel):
         self.score = new_score
         self.level = recalculate_level_for_score(old_level, new_score)
 
-        # Record the change
-        change = ScoreChange(
-            timestamp=datetime.now(),
-            old_score=old_score,
-            new_score=new_score,
-            old_level=old_level,
-            new_level=self.level,
-            reason=reason,
-        )
-        self._score_history.append(change)
+        if record_history:
+            change = ScoreChange(
+                timestamp=datetime.now(timezone.utc),
+                old_score=old_score,
+                new_score=new_score,
+                old_level=old_level,
+                new_level=self.level,
+                reason=reason,
+            )
+            self._score_history.append(change)
 
     def set_level(self, level: Level | str) -> None:
         """
@@ -492,7 +492,7 @@ class Check(BaseModel):
         """Serialize observables as keys only."""
         return [obs.key for obs in value]
 
-    def update_score(self, new_score: Decimal, reason: str = "") -> None:
+    def update_score(self, new_score: Decimal, reason: str = "", *, record_history: bool = True) -> None:
         """
         Update the check's score and recalculate level.
 
@@ -509,16 +509,16 @@ class Check(BaseModel):
         self.score = new_score
         self.level = recalculate_level_for_score(old_level, new_score)
 
-        # Record the change
-        change = ScoreChange(
-            timestamp=datetime.now(),
-            old_score=old_score,
-            new_score=new_score,
-            old_level=old_level,
-            new_level=self.level,
-            reason=reason,
-        )
-        self._score_history.append(change)
+        if record_history:
+            change = ScoreChange(
+                timestamp=datetime.now(timezone.utc),
+                old_score=old_score,
+                new_score=new_score,
+                old_level=old_level,
+                new_level=self.level,
+                reason=reason,
+            )
+            self._score_history.append(change)
 
     def set_level(self, level: Level | str) -> None:
         """

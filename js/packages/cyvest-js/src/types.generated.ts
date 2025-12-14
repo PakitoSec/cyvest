@@ -1,6 +1,10 @@
 // AUTO-GENERATED FROM cyvest.schema.json — DO NOT EDIT
 
 /**
+ * Investigation start time (UTC).
+ */
+export type StartedAt = string;
+/**
  * Global investigation score.
  */
 export type Score = number;
@@ -97,6 +101,7 @@ export type ScoreMode = "max" | "sum";
  * schemas matching the actual model_dump() output.
  */
 export interface CyvestInvestigation {
+  started_at: StartedAt;
   score: Score;
   level: Level;
   whitelisted: Whitelisted;

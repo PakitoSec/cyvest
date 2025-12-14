@@ -271,7 +271,8 @@ SAFE checks:
 
 **Root Observable Barrier:**
 
-The root observable (the investigation's entry point with `value="input-data"`) acts as a special barrier to prevent cross-contamination:
+The root observable (the investigation's entry point with `value="root"`) acts as a special barrier to prevent cross-contamination:
+Its key is derived from type + value (e.g. `obs:file:root` or `obs:artifact:root`).
 
 **Barrier as Child** - When root appears as a child of other observables, it is **skipped** in their score calculations.
 

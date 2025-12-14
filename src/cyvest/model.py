@@ -9,8 +9,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
-from enum import Enum
-from typing import TYPE_CHECKING, Annotated, Any
+from typing import Annotated, Any
 
 from pydantic import (
     BaseModel,
@@ -25,78 +24,14 @@ from pydantic import (
 from typing_extensions import Self
 
 from cyvest import keys
+from cyvest.level_score_rules import apply_creation_score_level_defaults, recalculate_level_for_score
 from cyvest.levels import Level, get_level_from_score, normalize_level
-
-if TYPE_CHECKING:
-    pass
-
-
-class ObservableType(str, Enum):
-    """Cyber observable types."""
-
-    # Network observables
-    IPV4_ADDR = "ipv4-addr"
-    IPV6_ADDR = "ipv6-addr"
-    DOMAIN_NAME = "domain-name"
-    URL = "url"
-    NETWORK_TRAFFIC = "network-traffic"
-    MAC_ADDR = "mac-addr"
-
-    # File observables
-    FILE = "file"
-    DIRECTORY = "directory"
-
-    # Email observables
-    EMAIL_ADDR = "email-addr"
-    EMAIL_MESSAGE = "email-message"
-    EMAIL_MIME_PART = "email-mime-part"
-
-    # Identity and account
-    USER_ACCOUNT = "user-account"
-
-    # System observables
-    PROCESS = "process"
-    SOFTWARE = "software"
-    WINDOWS_REGISTRY_KEY = "windows-registry-key"
-
-    # Artifact observables
-    ARTIFACT = "artifact"
-
-    # Autonomous System
-    AUTONOMOUS_SYSTEM = "autonomous-system"
-
-    # Mutex
-    MUTEX = "mutex"
-
-    # X509 Certificate
-    X509_CERTIFICATE = "x509-certificate"
-
-
-class RelationshipType(str, Enum):
-    """Relationship types supported by Cyvest."""
-
-    RELATED_TO = "related-to"
-
-    def get_default_direction(self) -> RelationshipDirection:
-        """
-        Get the default direction for this relationship type.
-        """
-        return RelationshipDirection.BIDIRECTIONAL
-
-
-class RelationshipDirection(str, Enum):
-    """Direction of a relationship between observables."""
-
-    OUTBOUND = "outbound"  # Source → Target
-    INBOUND = "inbound"  # Source ← Target
-    BIDIRECTIONAL = "bidirectional"  # Source ↔ Target
-
-
-class CheckScorePolicy(str, Enum):
-    """Controls how a check reacts to linked observables."""
-
-    AUTO = "auto"  # Default: observables can update the check score/level
-    MANUAL = "manual"  # Score/level only change via explicit check updates
+from cyvest.model_enums import (
+    CheckScorePolicy,
+    ObservableType,
+    RelationshipDirection,
+    RelationshipType,
+)
 
 
 class ScoreChange(BaseModel):
@@ -217,8 +152,6 @@ class ThreatIntel(BaseModel):
     taxonomies: list[dict[str, Any]] = Field(...)
     key: str = Field(...)
 
-    _explicit_level: bool = PrivateAttr(default=False)
-
     @field_validator("extra", mode="before")
     @classmethod
     def coerce_extra(cls, v: Any) -> dict[str, Any]:
@@ -241,16 +174,14 @@ class ThreatIntel(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def ensure_defaults(cls, values: Any) -> Any:
+        values = apply_creation_score_level_defaults(values, default_level_no_score=Level.INFO)
         if not isinstance(values, dict):
             return values
+
         if "extra" not in values:
             values["extra"] = {}
         if "comment" not in values:
             values["comment"] = ""
-        if "score" not in values:
-            values["score"] = Decimal("0")
-        if "level" not in values:
-            values["level"] = Level.INFO
         if "taxonomies" not in values:
             values["taxonomies"] = []
         if "key" not in values:
@@ -258,16 +189,10 @@ class ThreatIntel(BaseModel):
         return values
 
     @model_validator(mode="after")
-    def generate_key_and_level(self) -> Self:
-        """Generate key and recalculate level from score if needed."""
+    def generate_key(self) -> Self:
+        """Generate key."""
         if not self.key:
             self.key = keys.generate_threat_intel_key(self.source, self.observable_key)
-
-        # Recalculate level from score if not explicitly set
-        if not self._explicit_level and self.level == Level.INFO:
-            calculated_level = get_level_from_score(self.score)
-            if calculated_level != Level.NONE:
-                self.level = calculated_level
 
         return self
 
@@ -277,13 +202,12 @@ class ThreatIntel(BaseModel):
 
     def set_level(self, level: Level | str) -> None:
         """
-        Explicitly set the level (overrides automatic calculation).
+        Set the level.
 
         Args:
             level: The level to set
         """
         self.level = normalize_level(level)
-        self._explicit_level = True
 
 
 class Observable(BaseModel):
@@ -307,8 +231,6 @@ class Observable(BaseModel):
     threat_intels: list[ThreatIntel] = Field(...)
     relationships: list[Relationship] = Field(...)
     key: str = Field(...)
-
-    _explicit_level: bool = PrivateAttr(default=False)
     _score_history: list[ScoreChange] = PrivateAttr(default_factory=list)
     _generated_by_checks: list[str] = PrivateAttr(default_factory=list)
     _from_shared_context: bool = PrivateAttr(default=False)
@@ -349,8 +271,10 @@ class Observable(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def ensure_defaults(cls, values: Any) -> Any:
+        values = apply_creation_score_level_defaults(values, default_level_no_score=Level.INFO)
         if not isinstance(values, dict):
             return values
+
         if "extra" not in values:
             values["extra"] = {}
         if "comment" not in values:
@@ -359,10 +283,6 @@ class Observable(BaseModel):
             values["internal"] = True
         if "whitelisted" not in values:
             values["whitelisted"] = False
-        if "level" not in values:
-            values["level"] = Level.INFO
-        if "score" not in values:
-            values["score"] = Decimal("0")
         if "threat_intels" not in values:
             values["threat_intels"] = []
         if "relationships" not in values:
@@ -372,16 +292,12 @@ class Observable(BaseModel):
         return values
 
     @model_validator(mode="after")
-    def generate_key_and_mark_safe(self) -> Self:
-        """Generate key and handle SAFE level marking."""
+    def generate_key(self) -> Self:
+        """Generate key."""
         if not self.key:
             # Use string value of obs_type for key generation
             obs_type_str = self.obs_type.value if isinstance(self.obs_type, ObservableType) else self.obs_type
             self.key = keys.generate_observable_key(obs_type_str, self.value)
-
-        # If level is explicitly set to SAFE, mark it as explicit to prevent downgrades
-        if self.level == Level.SAFE:
-            self._explicit_level = True
 
         return self
 
@@ -406,7 +322,7 @@ class Observable(BaseModel):
 
     def update_score(self, new_score: Decimal, reason: str = "") -> None:
         """
-        Update the observable's score and recalculate level if needed.
+        Update the observable's score and recalculate level.
 
         Args:
             new_score: The new score value
@@ -419,19 +335,7 @@ class Observable(BaseModel):
         old_level = self.level
 
         self.score = new_score
-
-        # Calculate new level from score
-        calculated_level = get_level_from_score(self.score)
-
-        # Special protection for SAFE level: only allow upgrades, not downgrades
-        if self._explicit_level and self.level == Level.SAFE:
-            # SAFE can only be upgraded to higher levels (NOTABLE, SUSPICIOUS, MALICIOUS)
-            if calculated_level >= Level.SAFE:
-                self.level = calculated_level
-            # Otherwise keep SAFE level even if score suggests lower level
-        # Update level only if calculated is higher or level wasn't explicitly set
-        elif not self._explicit_level or calculated_level > self.level:
-            self.level = calculated_level
+        self.level = recalculate_level_for_score(old_level, new_score)
 
         # Record the change
         change = ScoreChange(
@@ -446,13 +350,12 @@ class Observable(BaseModel):
 
     def set_level(self, level: Level | str) -> None:
         """
-        Explicitly set the level (overrides automatic calculation).
+        Set the level.
 
         Args:
             level: The level to set
         """
         self.level = normalize_level(level)
-        self._explicit_level = True
 
     def add_threat_intel(self, ti: ThreatIntel) -> None:
         """
@@ -528,8 +431,6 @@ class Check(BaseModel):
     observables: list[Observable] = Field(...)
     score_policy: CheckScorePolicy = CheckScorePolicy.AUTO
     key: str = Field(...)
-
-    _explicit_level: bool = PrivateAttr(default=False)
     _score_history: list[ScoreChange] = PrivateAttr(default_factory=list)
 
     @field_validator("extra", mode="before")
@@ -554,16 +455,14 @@ class Check(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def ensure_defaults(cls, values: Any) -> Any:
+        values = apply_creation_score_level_defaults(values, default_level_no_score=Level.NONE)
         if not isinstance(values, dict):
             return values
+
         if "extra" not in values:
             values["extra"] = {}
         if "comment" not in values:
             values["comment"] = ""
-        if "level" not in values:
-            values["level"] = Level.NONE
-        if "score" not in values:
-            values["score"] = Decimal("0")
         if "observables" not in values:
             values["observables"] = []
         if "key" not in values:
@@ -595,7 +494,7 @@ class Check(BaseModel):
 
     def update_score(self, new_score: Decimal, reason: str = "") -> None:
         """
-        Update the check's score and recalculate level if needed.
+        Update the check's score and recalculate level.
 
         Args:
             new_score: The new score value
@@ -608,18 +507,7 @@ class Check(BaseModel):
         old_level = self.level
 
         self.score = new_score
-
-        # Calculate new level from score if not explicitly set or if new level is higher
-        calculated_level = get_level_from_score(self.score)
-
-        # Special case: if score was 0 and level was NONE, and something happened, set to INFO
-        if old_score == Decimal("0") and old_level == Level.NONE and new_score != Decimal("0"):
-            if calculated_level == Level.INFO or calculated_level == Level.NONE:
-                calculated_level = Level.INFO
-
-        # Update level only if calculated is higher or level wasn't explicitly set
-        if not self._explicit_level or calculated_level > self.level:
-            self.level = calculated_level
+        self.level = recalculate_level_for_score(old_level, new_score)
 
         # Record the change
         change = ScoreChange(
@@ -634,13 +522,12 @@ class Check(BaseModel):
 
     def set_level(self, level: Level | str) -> None:
         """
-        Explicitly set the level (overrides automatic calculation).
+        Set the level.
 
         Args:
             level: The level to set
         """
         self.level = normalize_level(level)
-        self._explicit_level = True
 
     def set_score_policy(self, policy: CheckScorePolicy | str) -> None:
         """

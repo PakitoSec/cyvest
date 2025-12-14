@@ -540,13 +540,12 @@ def test_sum_mode_with_direction_based_children() -> None:
 
 
 def test_safe_level_explicit_creation() -> None:
-    """Test that observable created with level=SAFE has _explicit_level=True."""
+    """Test that observable created with level=SAFE is SAFE."""
     cv = Cyvest()
     obs = cv.observable_create("domain", "trusted.example.com", score=0, level=Level.SAFE)
 
     assert obs.score == Decimal("0")
     assert obs.level == Level.SAFE
-    assert obs._explicit_level is True
 
 
 def test_safe_level_prevents_info_downgrade() -> None:
@@ -635,24 +634,21 @@ def test_safe_level_score_updates_with_frozen_level() -> None:
     assert len(history) > 0
 
 
-def test_non_safe_explicit_levels_allow_downgrades() -> None:
-    """Test that explicit levels other than SAFE still allow downgrades."""
+def test_non_safe_levels_recalculate_and_can_downgrade() -> None:
+    """Non-SAFE levels are recalculated from score and can downgrade."""
     cv = Cyvest()
     obs = cv.observable_create("domain", "test.example.com")
 
     # Manually set to SUSPICIOUS through Cyvest service layer
     cv.observable_set_level(obs.key, Level.SUSPICIOUS)
-    assert obs._explicit_level is True
     assert obs.level == Level.SUSPICIOUS
 
     # Add threat intel with lower score (NOTABLE)
     cv.observable_add_threat_intel(obs.key, source="ti_source", score=Decimal("2.0"))
 
-    # For non-SAFE levels, the existing logic still applies
-    # (level only upgrades if calculated > current)
-    # Score=2.0 gives NOTABLE which is < SUSPICIOUS, so level stays SUSPICIOUS
+    # Score=2.0 gives NOTABLE which is < SUSPICIOUS, so level downgrades to NOTABLE.
     assert obs.score == Decimal("2.0")
-    assert obs.level == Level.SUSPICIOUS
+    assert obs.level == Level.NOTABLE
 
 
 def test_threat_intel_with_safe_level_upgrades_info_observable() -> None:
@@ -668,7 +664,6 @@ def test_threat_intel_with_safe_level_upgrades_info_observable() -> None:
 
     # Observable should now be SAFE
     assert obs.level == Level.SAFE
-    assert obs._explicit_level is True
 
 
 def test_threat_intel_with_safe_level_upgrades_trusted_observable() -> None:
@@ -685,7 +680,6 @@ def test_threat_intel_with_safe_level_upgrades_trusted_observable() -> None:
 
     # Observable should now be SAFE
     assert obs.level == Level.SAFE
-    assert obs._explicit_level is True
 
 
 def test_threat_intel_with_safe_level_does_not_downgrade_notable() -> None:

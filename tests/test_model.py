@@ -20,6 +20,18 @@ def test_observable_creation() -> None:
     assert obs.key.startswith("obs:")
 
 
+def test_observable_creation_with_score() -> None:
+    """Test creating an observable."""
+    obs = Observable(obs_type="url", value="https://example.com", score=0.3)
+    assert obs.obs_type == "url"
+    assert obs.value == "https://example.com"
+    assert obs.score == Decimal("0.3")
+    assert obs.level == Level.NOTABLE
+    assert obs.internal is True
+    assert obs.whitelisted is False
+    assert obs.key.startswith("obs:")
+
+
 def test_observable_score_update() -> None:
     """Test updating observable score."""
     obs = Observable(obs_type="ip", value="192.168.1.1")
@@ -49,6 +61,17 @@ def test_check_creation() -> None:
     assert check.description == "Test description"
     assert check.score == Decimal("0")
     assert check.level == Level.NONE
+    assert check.key.startswith("chk:")
+
+
+def test_check_creation_with_score() -> None:
+    """Test creating a check."""
+    check = Check(check_id="test_check", scope="network", description="Test description", score=0.3)
+    assert check.check_id == "test_check"
+    assert check.scope == "network"
+    assert check.description == "Test description"
+    assert check.score == Decimal("0.3")
+    assert check.level == Level.NOTABLE
     assert check.key.startswith("chk:")
 
 
@@ -151,13 +174,11 @@ def test_container_nested_aggregation() -> None:
 
 
 def test_explicit_level_setting() -> None:
-    """Test explicit level setting overrides calculation."""
+    """Test SAFE level stays sticky unless upgraded by score."""
     obs = Observable(obs_type="url", value="test.com")
     obs.set_level(Level.SAFE)
     assert obs.level == Level.SAFE
-    assert obs._explicit_level is True
-    # Updating score to high value shouldn't change explicitly set level
-    # unless new calculated level is higher
+    # Updating score to high value should upgrade SAFE.
     obs.update_score(Decimal("6.0"))
     assert obs.level == Level.MALICIOUS  # Higher level wins
 

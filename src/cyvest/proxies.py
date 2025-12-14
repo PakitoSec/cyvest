@@ -146,15 +146,6 @@ class ObservableProxy(_ReadOnlyProxy[Observable]):
         """Alias for generated-by checks with a stable public name."""
         return deepcopy(self._generated_by_checks)
 
-    @property
-    def _explicit_level(self) -> bool:
-        return self._read_attr("_explicit_level")
-
-    @property
-    def explicit_level(self) -> bool:
-        """Whether level was explicitly set on the observable."""
-        return bool(self._explicit_level)
-
     def get_score_history(self) -> tuple:
         """Return a copy of the score change history."""
         history = self._call_readonly("get_score_history")
@@ -199,7 +190,7 @@ class ObservableProxy(_ReadOnlyProxy[Observable]):
     def with_ti(
         self,
         source: str,
-        score: Decimal | float = 0,
+        score: Decimal | float | None = None,
         comment: str = "",
         extra: dict[str, Any] | None = None,
         level: Level | str | None = None,
@@ -212,16 +203,18 @@ class ObservableProxy(_ReadOnlyProxy[Observable]):
         under the proxy wrapper.
         """
         observable = self._resolve()
-        resolved_level = normalize_level(level) if level is not None else Level.INFO
-        ti = ThreatIntel(
-            source=source,
-            observable_key=self.key,
-            comment=comment,
-            extra=extra or {},
-            score=Decimal(str(score)),
-            level=resolved_level,
-            taxonomies=taxonomies or [],
-        )
+        ti_kwargs: dict[str, Any] = {
+            "source": source,
+            "observable_key": self.key,
+            "comment": comment,
+            "extra": extra or {},
+            "taxonomies": taxonomies or [],
+        }
+        if score is not None:
+            ti_kwargs["score"] = Decimal(str(score))
+        if level is not None:
+            ti_kwargs["level"] = normalize_level(level)
+        ti = ThreatIntel(**ti_kwargs)
         self._get_investigation().add_threat_intel(ti, observable)
         return self
 
@@ -315,15 +308,6 @@ class CheckProxy(_ReadOnlyProxy[Check]):
     @property
     def score_policy(self) -> CheckScorePolicy:
         return self._read_attr("score_policy")
-
-    @property
-    def _explicit_level(self) -> bool:
-        return self._read_attr("_explicit_level")
-
-    @property
-    def explicit_level(self) -> bool:
-        """Whether level was explicitly set on the check."""
-        return bool(self._explicit_level)
 
     def get_score_history(self) -> tuple:
         """Return a copy of the score change history."""
@@ -513,15 +497,6 @@ class ThreatIntelProxy(_ReadOnlyProxy[ThreatIntel]):
     @property
     def taxonomies(self) -> list[dict[str, Any]]:
         return self._read_attr("taxonomies")
-
-    @property
-    def _explicit_level(self) -> bool:
-        return self._read_attr("_explicit_level")
-
-    @property
-    def explicit_level(self) -> bool:
-        """Whether level was explicitly set on the threat intel entry."""
-        return bool(self._explicit_level)
 
     def update_metadata(
         self,

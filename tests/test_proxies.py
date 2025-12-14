@@ -113,8 +113,6 @@ def test_proxy_dir_exposes_public_fields() -> None:
             "level",
             "_generated_by_checks",
             "generated_by_checks",
-            "_explicit_level",
-            "explicit_level",
             "key",
         },
         check: {
@@ -126,8 +124,6 @@ def test_proxy_dir_exposes_public_fields() -> None:
             "score",
             "level",
             "score_policy",
-            "_explicit_level",
-            "explicit_level",
             "key",
         },
         container: {"path", "description", "checks", "sub_containers", "key"},
@@ -139,8 +135,6 @@ def test_proxy_dir_exposes_public_fields() -> None:
             "score",
             "level",
             "taxonomies",
-            "_explicit_level",
-            "explicit_level",
             "key",
         },
         enrichment: {"name", "data", "context", "key"},
@@ -196,10 +190,3 @@ def test_proxy_public_fields_are_deep_copied() -> None:
     assert check.key in generated_copy
     generated_copy.append("another-check")
     assert obs.generated_by_checks == [check.key]
-
-    assert isinstance(obs._explicit_level, bool)
-    assert obs.explicit_level is obs._explicit_level
-    assert isinstance(check._explicit_level, bool)
-    assert check.explicit_level is check._explicit_level
-    assert isinstance(ti._explicit_level, bool)
-    assert ti.explicit_level is ti._explicit_level

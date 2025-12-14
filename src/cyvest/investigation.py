@@ -16,7 +16,8 @@ from typing import TYPE_CHECKING, Any, Literal, overload
 from logurich import logger
 
 from cyvest import keys
-from cyvest.levels import Level, get_level_from_score, normalize_level
+from cyvest.level_score_rules import recalculate_level_for_score
+from cyvest.levels import Level, normalize_level
 from cyvest.model import (
     Check,
     CheckScorePolicy,
@@ -962,11 +963,8 @@ class Investigation:
         # Take the higher score
         if incoming.score > existing.score:
             existing.score = incoming.score
-            # Recalculate level
-            if not existing._explicit_level:
-                calculated_level = get_level_from_score(existing.score)
-                if calculated_level > existing.level:
-                    existing.level = calculated_level
+            # Recalculate level from new score (SAFE remains sticky against downgrades)
+            existing.level = recalculate_level_for_score(existing.level, existing.score)
 
         # Take the higher level
         if incoming.level > existing.level:

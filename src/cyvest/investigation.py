@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import threading
 from copy import deepcopy
+from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, overload
@@ -754,6 +755,8 @@ class Investigation:
             root_type: Type of root observable ("file" or "artifact")
             score_mode: Score calculation mode (MAX or SUM)
         """
+        self._started_at = datetime.now(timezone.utc)
+
         # Object collections
         self._observables: dict[str, Observable] = {}
         self._checks: dict[str, Check] = {}
@@ -776,7 +779,7 @@ class Investigation:
 
         self._root_observable = Observable(
             obs_type=obj_type,
-            value="input-data",
+            value="root",
             internal=False,
             whitelisted=False,
             comment="Root observable for investigation",

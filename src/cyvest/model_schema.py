@@ -12,6 +12,7 @@ and produces schemas matching the actual model_dump() output.
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Annotated, Any
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -99,6 +100,7 @@ class InvestigationSchema(BaseModel):
         },
     )
 
+    started_at: datetime = Field(..., description="Investigation start time (UTC).")
     score: float = Field(..., description="Global investigation score.")
     level: Level = Field(
         ...,

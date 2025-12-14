@@ -88,6 +88,7 @@ def test_investigation_schema_level_required_and_defaults() -> None:
 
     required = set(schema.get("required", []))
     assert {
+        "started_at",
         "level",
         "whitelists",
         "observables",
@@ -100,6 +101,7 @@ def test_investigation_schema_level_required_and_defaults() -> None:
 
     inst = InvestigationSchema.model_validate(
         {
+            "started_at": "2020-01-01T00:00:00+00:00",
             "score": 0.0,
             "whitelisted": False,
             "stats": {

@@ -4,10 +4,10 @@
   "whitelisted": false,
   "whitelists": [],
   "observables": {
-    "obs:artifact:input-data": {
-      "key": "obs:artifact:input-data",
+    "obs:artifact:root": {
+      "key": "obs:artifact:root",
       "type": "artifact",
-      "value": "input-data",
+      "value": "root",
       "internal": false,
       "whitelisted": false,
       "comment": "Root observable for investigation\n\nRoot observable for investigation\n\nRoot observable for investigation\n\nRoot observable for investigation\n\nRoot observable for investigation\n\nRoot observable for investigation\n\nRoot observable for investigation\n\nRoot observable for investigation\n\nRoot observable for investigation",
@@ -73,7 +73,7 @@
       "level": "MALICIOUS",
       "relationships": [
         {
-          "target_key": "obs:artifact:input-data",
+          "target_key": "obs:artifact:root",
           "relationship_type": "related-to",
           "direction": "inbound"
         },
@@ -142,7 +142,7 @@
       "level": "INFO",
       "relationships": [
         {
-          "target_key": "obs:artifact:input-data",
+          "target_key": "obs:artifact:root",
           "relationship_type": "related-to",
           "direction": "inbound"
         }
@@ -284,7 +284,7 @@
       "level": "MALICIOUS",
       "relationships": [
         {
-          "target_key": "obs:artifact:input-data",
+          "target_key": "obs:artifact:root",
           "relationship_type": "related-to",
           "direction": "inbound"
         }
@@ -304,7 +304,7 @@
       "level": "MALICIOUS",
       "relationships": [
         {
-          "target_key": "obs:artifact:input-data",
+          "target_key": "obs:artifact:root",
           "relationship_type": "related-to",
           "direction": "inbound"
         },

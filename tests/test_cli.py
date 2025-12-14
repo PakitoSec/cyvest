@@ -151,3 +151,29 @@ def test_display_summary_exclude_levels() -> None:
     assert "suspicious_check" in output_all
     assert "info_check" in output_all
     assert "none_check" in output_all
+
+
+def test_display_summary_score_history_table() -> None:
+    """display_summary shows observable score history when requested."""
+    from decimal import Decimal
+    from io import StringIO
+
+    from rich.console import Console
+
+    from cyvest.io_rich import display_summary
+
+    cv = Cyvest()
+    obs = cv.observable("url", "https://example.com", internal=False)
+    obs.with_ti("virustotal", score=Decimal("6.0"), level=Level.MALICIOUS)
+    cv.check("score-check", "test", "Score check").with_score(Decimal("1.0"), reason="initial").with_score(
+        Decimal("2.0"), reason="bump"
+    )
+
+    output = StringIO()
+    console = Console(file=output, width=140)
+    display_summary(cv, console.print, show_graph=False, show_score_history=True)
+    rendered = output.getvalue()
+
+    assert "Score History" in rendered
+    assert "Threat intel update from virustotal" in rendered
+    assert "bump" in rendered

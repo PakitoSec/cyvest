@@ -4,10 +4,10 @@
   "whitelisted": false,
   "whitelists": [],
   "observables": {
-    "obs:file:input-data": {
-      "key": "obs:file:input-data",
+    "obs:file:root": {
+      "key": "obs:file:root",
       "type": "file",
-      "value": "input-data",
+      "value": "root",
       "internal": false,
       "whitelisted": false,
       "comment": "Root observable for investigation",

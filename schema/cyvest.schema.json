@@ -546,6 +546,12 @@
   "additionalProperties": false,
   "description": "Schema for a complete serialized investigation.\n\nThis model describes the output of `serialize_investigation()` from\n`cyvest.io_serialization`. It is the top-level schema for exported investigations.\n\nEntity types reference the runtime models directly. When generating schemas with\n`mode='serialization'`, Pydantic respects field_serializer decorators and produces\nschemas matching the actual model_dump() output.",
   "properties": {
+    "started_at": {
+      "description": "Investigation start time (UTC).",
+      "format": "date-time",
+      "title": "Started At",
+      "type": "string"
+    },
     "score": {
       "description": "Global investigation score.",
       "title": "Score",
@@ -636,6 +642,7 @@
     }
   },
   "required": [
+    "started_at",
     "score",
     "level",
     "whitelisted",

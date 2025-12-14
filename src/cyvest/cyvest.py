@@ -694,13 +694,17 @@ class Cyvest:
         }
 
     def display_summary(
-        self, show_graph: bool = True, exclude_levels: Level | str | Iterable[Level | str] = Level.NONE
+        self,
+        show_graph: bool = True,
+        exclude_levels: Level | str | Iterable[Level | str] = Level.NONE,
+        show_score_history: bool = False,
     ) -> None:
         display_summary(
             self,
             lambda renderables: logger.rich("INFO", renderables),
             show_graph=show_graph,
             exclude_levels=exclude_levels,
+            show_score_history=show_score_history,
         )
 
     def display_statistics(self) -> None:

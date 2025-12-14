@@ -575,7 +575,7 @@ def main(workers, browser, stats, output):
     # Display results
     logger.info("Investigation complete - displaying summary - score should be 36.1")
 
-    cy.display_summary()
+    cy.display_summary(show_score_history=True)
     if stats:
         cy.display_statistics()
     cy.display_network(open_browser=browser)

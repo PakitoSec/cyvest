@@ -254,7 +254,7 @@ score = max(threat-intel-scores) + sum(child-observable-scores)
 
 #### Root Observable Barrier
 
-The **root observable** (identified by `value="input-data"`) acts as a special barrier to prevent cross-contamination between observables while maintaining normal score aggregation. The barrier has two components:
+The **root observable** (identified by `value="root"`) acts as a special barrier to prevent cross-contamination between observables while maintaining normal score aggregation. The barrier has two components:
 
 **1. Calculation Phase Barrier (Root as Child)**
 
@@ -639,7 +639,8 @@ root = cv.root()  # or cv.observable_get_root()
 
 The root observable is automatically created with:
 - **Type**: `ObservableType.FILE` (default) or `ObservableType.ARTIFACT` if `root_type="artifact"`
-- **Value**: `"input-data"` (fixed identifier)
+- **Value**: `"root"` (fixed identifier)
+- **Key**: `obs:file:root` or `obs:artifact:root` (derived from type + value)
 - **Purpose**: Entry point for the investigation
 
 ### Root Observable Barrier

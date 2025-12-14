@@ -7,6 +7,7 @@ Provides JSON export/import and Markdown generation for LLM consumption.
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -68,7 +69,16 @@ def serialize_investigation(cv: Cyvest) -> InvestigationSchema:
         root_type_value = root.obs_type.value if hasattr(root.obs_type, "value") else str(root.obs_type)
 
     # Build and validate using Pydantic model
+    started_at = getattr(getattr(cv, "_investigation", None), "_started_at", None)
+    if not isinstance(started_at, datetime):
+        started_at = datetime.now(timezone.utc)
+    elif started_at.tzinfo is None:
+        started_at = started_at.replace(tzinfo=timezone.utc)
+    else:
+        started_at = started_at.astimezone(timezone.utc)
+
     investigation = InvestigationSchema(
+        started_at=started_at,
         score=float(cv.get_global_score()),
         level=cv.get_global_level(),
         whitelisted=cv.investigation_is_whitelisted(),
@@ -291,11 +301,26 @@ def load_investigation_json(filepath: str | Path) -> Cyvest:
     # Reset internal state to avoid default root pollution
     cv._investigation = Investigation(data_payload, root_type=root_type, score_mode=score_mode)
 
+    started_at_raw = data.get("started_at")
+    if isinstance(started_at_raw, str) and started_at_raw.strip():
+        started_at_candidate = started_at_raw.strip()
+        if started_at_candidate.endswith("Z"):
+            started_at_candidate = started_at_candidate[:-1] + "+00:00"
+        try:
+            started_at = datetime.fromisoformat(started_at_candidate)
+        except ValueError:
+            started_at = None
+        if isinstance(started_at, datetime):
+            if started_at.tzinfo is None:
+                started_at = started_at.replace(tzinfo=timezone.utc)
+            else:
+                started_at = started_at.astimezone(timezone.utc)
+            cv._investigation._started_at = started_at
+
     # Load whitelists using Pydantic validation
     whitelists = data.get("whitelists") or []
     for whitelist_info in whitelists:
         try:
-            # Use model_validate for Pydantic models, with fallback for backward compatibility
             identifier = str(whitelist_info.get("identifier", "")).strip()
             name = str(whitelist_info.get("name", "")).strip()
             if identifier and name:
@@ -307,12 +332,18 @@ def load_investigation_json(filepath: str | Path) -> Cyvest:
         except ValueError:
             continue
 
-    # Backward compatibility for older exports
-    if data.get("whitelisted") and not cv._investigation.is_whitelisted():
-        cv._investigation.add_whitelist("default", "Whitelisted", data.get("whitelisted_reason"))
-
-    # Observables - leverage Pydantic model_validate
+    # Observables - leverage Pydantic model_validate (two-pass so root can merge after others exist)
+    new_root_key = cv._investigation.get_root().key
+    root_obs_info: dict[str, Any] | None = None
+    other_obs_infos: list[dict[str, Any]] = []
     for obs_info in data.get("observables", {}).values():
+        obs_key = obs_info.get("key", "")
+        if obs_key == new_root_key:
+            root_obs_info = obs_info
+            continue
+        other_obs_infos.append(obs_info)
+
+    for obs_info in other_obs_infos:
         # Prepare data for Pydantic validation
         obs_data = {
             "obs_type": obs_info.get("type", "unknown"),
@@ -330,6 +361,24 @@ def load_investigation_json(filepath: str | Path) -> Cyvest:
         # Restore private attribute
         obs._generated_by_checks = obs_info.get("generated_by_checks", [])
         cv._investigation.add_observable(obs)
+
+    if root_obs_info is not None:
+        # Merge serialized root into the live root (preserves relationships, etc.).
+        root_data = {
+            "obs_type": root_obs_info.get("type", root_type),
+            "value": "root",
+            "internal": root_obs_info.get("internal", False),
+            "whitelisted": root_obs_info.get("whitelisted", False),
+            "comment": root_obs_info.get("comment", ""),
+            "extra": root_obs_info.get("extra", data_payload),
+            "score": Decimal(str(root_obs_info.get("score", 0))),
+            "level": root_obs_info.get("level", "INFO"),
+            "key": new_root_key,
+            "relationships": [Relationship.model_validate(rel) for rel in root_obs_info.get("relationships", [])],
+        }
+        root_obs = Observable.model_validate(root_data)
+        root_obs._generated_by_checks = root_obs_info.get("generated_by_checks", [])
+        cv._investigation.add_observable(root_obs)
 
     # Threat intel - leverage Pydantic model_validate
     for ti_info in data.get("threat_intels", {}).values():

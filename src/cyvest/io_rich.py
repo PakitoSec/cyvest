@@ -7,10 +7,12 @@ Provides formatted display of investigation results using the Rich library.
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable
+from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 from typing import TYPE_CHECKING, Any
 
 from rich.align import Align
+from rich.markup import escape
 from rich.rule import Rule
 from rich.table import Table
 from rich.tree import Tree
@@ -22,11 +24,216 @@ if TYPE_CHECKING:
     from cyvest.cyvest import Cyvest
 
 
+def _normalize_exclude_levels(levels: Level | str | Iterable[Level | str]) -> set[Level]:
+    base_excluded: set[Level] = {Level.NONE}
+    if levels is None:
+        return base_excluded
+    if isinstance(levels, (Level, str)):
+        normalized_level = normalize_level(levels) if isinstance(levels, str) else levels
+        return base_excluded | {normalized_level}
+
+    collected = list(levels)
+    if not collected:
+        return set()
+
+    normalized: set[Level] = set()
+    for level in collected:
+        normalized.add(normalize_level(level) if isinstance(level, str) else level)
+    return base_excluded | normalized
+
+
+def _sort_key_by_score(item: Any) -> tuple[Decimal, str]:
+    score = getattr(item, "score", 0)
+    try:
+        decimal_score = Decimal(score)
+    except (TypeError, ValueError, InvalidOperation):
+        decimal_score = Decimal(0)
+
+    item_id = getattr(item, "check_id", "")
+    return (-decimal_score, item_id)
+
+
+def _get_direction_symbol(rel: Relationship, reversed_edge: bool) -> str:
+    """Return an arrow indicating direction relative to traversal."""
+    direction = rel.direction
+    if isinstance(direction, str):
+        try:
+            direction = RelationshipDirection(direction)
+        except ValueError:
+            direction = RelationshipDirection.OUTBOUND
+
+    symbol_map = {
+        RelationshipDirection.OUTBOUND: "→",
+        RelationshipDirection.INBOUND: "←",
+        RelationshipDirection.BIDIRECTIONAL: "↔",
+    }
+    symbol = symbol_map.get(direction, "→")
+    if reversed_edge and direction != RelationshipDirection.BIDIRECTIONAL:
+        symbol = "←" if direction == RelationshipDirection.OUTBOUND else "→"
+    return symbol
+
+
+def _build_observable_tree(
+    parent_tree: Tree,
+    obs: Any,
+    *,
+    all_observables: dict[str, Any],
+    reverse_relationships: dict[str, list[tuple[Any, Relationship]]],
+    visited: set[str],
+    rel_info: str = "",
+) -> None:
+    if obs.key in visited:
+        return
+    visited.add(obs.key)
+
+    color_level = get_color_level(obs.level)
+    color_score = get_color_score(obs.score)
+
+    generated_by = ""
+    if obs.generated_by_checks:
+        checks_str = "[cyan], [/cyan]".join(escape(check_id) for check_id in obs.generated_by_checks)
+        generated_by = f"[cyan][[/cyan]{checks_str}[cyan]][/cyan] "
+
+    whitelisted_str = " [green]WHITELISTED[/green]" if obs.whitelisted else ""
+
+    obs_info = (
+        f"{rel_info}{generated_by}[bold]{obs.key}[/bold] "
+        f"[{color_score}]{obs.score}[/{color_score}] "
+        f"[{color_level}]{obs.level.name}[/{color_level}]"
+        f"{whitelisted_str}"
+    )
+
+    child_tree = parent_tree.add(obs_info)
+
+    # Add outbound children
+    for rel in obs.relationships:
+        child_obs = all_observables.get(rel.target_key)
+        if child_obs:
+            direction_symbol = _get_direction_symbol(rel, reversed_edge=False)
+            rel_label = f"[dim]{rel.relationship_type_name}[/dim] {direction_symbol} "
+            _build_observable_tree(
+                child_tree,
+                child_obs,
+                all_observables=all_observables,
+                reverse_relationships=reverse_relationships,
+                visited=visited,
+                rel_info=rel_label,
+            )
+
+    # Add inbound children (observables pointing to this one)
+    for source_obs, rel in reverse_relationships.get(obs.key, []):
+        if source_obs.key == obs.key:
+            continue
+        direction_symbol = _get_direction_symbol(rel, reversed_edge=True)
+        rel_label = f"[dim]{rel.relationship_type_name}[/dim] {direction_symbol} "
+        _build_observable_tree(
+            child_tree,
+            source_obs,
+            all_observables=all_observables,
+            reverse_relationships=reverse_relationships,
+            visited=visited,
+            rel_info=rel_label,
+        )
+
+
+def _render_score_history_table(
+    *,
+    rich_print: Callable[[Any], None],
+    title: str,
+    groups: Iterable[tuple[str, Iterable[Any]]],
+    started_at: datetime | None,
+) -> None:
+    materialized_groups: list[tuple[str, list[Any]]] = [(name, list(items)) for name, items in groups]
+
+    def _coerce_utc(value: datetime) -> datetime:
+        if value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc)
+
+    def _format_elapsed(total_seconds: float) -> str:
+        total_ms = int(round(total_seconds * 1000))
+        if total_ms < 0:
+            total_ms = 0
+        hours, rem_ms = divmod(total_ms, 3_600_000)
+        minutes, rem_ms = divmod(rem_ms, 60_000)
+        seconds, ms = divmod(rem_ms, 1000)
+        return f"{hours:02d}:{minutes:02d}:{seconds:02d}.{ms:03d}"
+
+    table = Table(title=title, show_lines=False)
+    table.add_column("Item")
+    table.add_column("#", justify="right")
+    table.add_column("Elapsed", style="dim")
+    table.add_column("Score", justify="center")
+    table.add_column("Level", justify="center")
+    table.add_column("Reason")
+
+    effective_start = _coerce_utc(started_at) if started_at is not None else None
+    if effective_start is None:
+        earliest: datetime | None = None
+        for _group_name, items in materialized_groups:
+            for item in items:
+                for change in item.get_score_history():
+                    ts = _coerce_utc(change.timestamp)
+                    if earliest is None or ts < earliest:
+                        earliest = ts
+        effective_start = earliest
+
+    has_history = False
+    for group_name, items in materialized_groups:
+        item_color = "cyan" if group_name.lower() == "observable" else "magenta"
+        for item in items:
+            score_history = sorted(item.get_score_history(), key=lambda change: change.timestamp)
+            if not score_history:
+                continue
+
+            if has_history:
+                table.add_section()
+
+            for idx, change in enumerate(score_history, start=1):
+                has_history = True
+
+                change_timestamp = _coerce_utc(change.timestamp)
+                old_score_color = get_color_score(change.old_score)
+                new_score_color = get_color_score(change.new_score)
+                score_str = (
+                    f"[{old_score_color}]{change.old_score}[/{old_score_color}] "
+                    f"→ "
+                    f"[{new_score_color}]{change.new_score}[/{new_score_color}]"
+                )
+
+                old_level_color = get_color_level(change.old_level)
+                new_level_color = get_color_level(change.new_level)
+                level_str = (
+                    f"[{old_level_color}]{change.old_level.name}[/{old_level_color}] "
+                    f"→ "
+                    f"[{new_level_color}]{change.new_level.name}[/{new_level_color}]"
+                )
+
+                reason = escape(change.reason) if change.reason else "[dim]-[/dim]"
+                elapsed = ""
+                if effective_start is not None:
+                    elapsed = _format_elapsed((change_timestamp - effective_start).total_seconds())
+
+                item_cell = f"[{item_color}]{escape(item.key)}[/{item_color}]"
+                table.add_row(
+                    item_cell,
+                    str(idx),
+                    elapsed,
+                    score_str,
+                    level_str,
+                    reason,
+                )
+
+    table.caption = "No score changes recorded." if not has_history else ""
+    rich_print(table)
+
+
 def display_summary(
     cv: Cyvest,
     rich_print: Callable[[Any], None],
     show_graph: bool = True,
     exclude_levels: Level | str | Iterable[Level | str] = Level.NONE,
+    show_score_history: bool = False,
 ) -> None:
     """
     Display a comprehensive summary of the investigation using Rich.
@@ -36,26 +243,10 @@ def display_summary(
         rich_print: A rich renderable handler that is called with renderables for output
         show_graph: Whether to display the observable graph
         exclude_levels: Level(s) to omit from the report (default: Level.NONE)
+        show_score_history: Whether to display score change history for observables and checks (default: False)
     """
 
-    def _normalize_exclude(levels: Level | str | Iterable[Level | str]) -> set[Level]:
-        base_excluded: set[Level] = {Level.NONE}
-        if levels is None:
-            return base_excluded
-        if isinstance(levels, (Level, str)):
-            normalized_level = normalize_level(levels) if isinstance(levels, str) else levels
-            return base_excluded | {normalized_level}
-
-        collected = list(levels)
-        if not collected:
-            return set()
-
-        normalized: set[Level] = set()
-        for level in collected:
-            normalized.add(normalize_level(level) if isinstance(level, str) else level)
-        return base_excluded | normalized
-
-    resolved_excluded_levels = _normalize_exclude(exclude_levels)
+    resolved_excluded_levels = _normalize_exclude_levels(exclude_levels)
 
     all_checks = cv.get_all_checks().values()
     filtered_checks = [c for c in all_checks if c.level not in resolved_excluded_levels]
@@ -71,17 +262,6 @@ def display_summary(
         f"Displayed: {len(filtered_checks)}{excluded_caption}",
         f"Applied: {applied_checks}",
     ]
-
-    def sort_key_by_score(check: Any) -> tuple[Decimal, str]:
-        score = getattr(check, "score", 0)
-        try:
-            decimal_score = Decimal(score)
-        except (TypeError, ValueError, InvalidOperation):
-            decimal_score = Decimal(0)
-
-        # Return tuple: (-score for descending, check_id for ascending alphabetically)
-        check_id = getattr(check, "check_id", "")
-        return (-decimal_score, check_id)
 
     table = Table(
         title="Investigation Report",
@@ -107,7 +287,7 @@ def display_summary(
     for scope_name, checks in checks_by_scope.items():
         scope_rule = Align(f"[bold magenta]{scope_name}[/bold magenta]", align="left")
         table.add_row(scope_rule, "-", "-")
-        checks = sorted(checks, key=sort_key_by_score)
+        checks = sorted(checks, key=_sort_key_by_score)
         for check in checks:
             color_level = get_color_level(check.level)
             color_score = get_color_score(check.score)
@@ -144,7 +324,7 @@ def display_summary(
         checks = [
             c for c in cv.get_all_checks().values() if c.level == level_enum and c.level not in resolved_excluded_levels
         ]
-        checks = sorted(checks, key=sort_key_by_score)
+        checks = sorted(checks, key=_sort_key_by_score)
         if checks:
             color_level = get_color_level(level_enum)
             level_rule = Align(
@@ -214,72 +394,33 @@ def display_summary(
             for rel in source_obs.relationships:
                 reverse_relationships.setdefault(rel.target_key, []).append((source_obs, rel))
 
-        def get_direction_symbol(rel: Relationship, reversed_edge: bool) -> str:
-            """Return an arrow indicating direction relative to traversal."""
-            direction = rel.direction
-            if isinstance(direction, str):
-                try:
-                    direction = RelationshipDirection(direction)
-                except ValueError:
-                    direction = RelationshipDirection.OUTBOUND
-
-            symbol_map = {
-                RelationshipDirection.OUTBOUND: "→",
-                RelationshipDirection.INBOUND: "←",
-                RelationshipDirection.BIDIRECTIONAL: "↔",
-            }
-            symbol = symbol_map.get(direction, "→")
-            if reversed_edge and direction != RelationshipDirection.BIDIRECTIONAL:
-                symbol = "←" if direction == RelationshipDirection.OUTBOUND else "→"
-            return symbol
-
-        def build_tree(parent_tree: Tree, obs: Observable, visited: set[str], rel_info: str = "") -> None:
-            if obs.key in visited:
-                return
-            visited.add(obs.key)
-
-            # Format observable info
-            color_level = get_color_level(obs.level)
-            color_score = get_color_score(obs.score)
-
-            generated_by = ""
-            if obs._generated_by_checks:
-                checks_str = "][cyan], [/cyan][cyan]".join(obs._generated_by_checks)
-                generated_by = f"[cyan][[/cyan]{checks_str}[cyan]][/cyan] "
-
-            whitelisted_str = " [green]WHITELISTED[/green]" if obs.whitelisted else ""
-
-            obs_info = (
-                f"{rel_info}{generated_by}[bold]{obs.key}[/bold] "
-                f"[{color_score}]{obs.score}[/{color_score}] "
-                f"[{color_level}]{obs.level.name}[/{color_level}]"
-                f"{whitelisted_str}"
-            )
-
-            child_tree = parent_tree.add(obs_info)
-
-            # Add outbound children
-            for rel in obs.relationships:
-                child_obs = all_observables.get(rel.target_key)
-                if child_obs:
-                    direction_symbol = get_direction_symbol(rel, reversed_edge=False)
-                    rel_label = f"[dim]{rel.relationship_type_name}[/dim] {direction_symbol} "
-                    build_tree(child_tree, child_obs, visited, rel_label)
-
-            # Add inbound children (observables pointing to this one)
-            for source_obs, rel in reverse_relationships.get(obs.key, []):
-                if source_obs.key == obs.key:
-                    continue
-                direction_symbol = get_direction_symbol(rel, reversed_edge=True)
-                rel_label = f"[dim]{rel.relationship_type_name}[/dim] {direction_symbol} "
-                build_tree(child_tree, source_obs, visited, rel_label)
-
         # Start from root
         root = cv.observable_get_root()
         if root:
-            build_tree(tree, root, set())
+            _build_observable_tree(
+                tree,
+                root,
+                all_observables=all_observables,
+                reverse_relationships=reverse_relationships,
+                visited=set(),
+            )
 
         rich_print(tree)
+
+    if show_score_history:
+        all_observables = cv.get_all_observables()
+        all_checks = cv.get_all_checks()
+        if all_observables or all_checks:
+            started_at = getattr(getattr(cv, "_investigation", None), "_started_at", None)
+            _render_score_history_table(
+                rich_print=rich_print,
+                title="Score History",
+                groups=[
+                    ("Observable", [obs for _key, obs in sorted(all_observables.items())]),
+                    ("Check", [check for _key, check in sorted(all_checks.items())]),
+                ],
+                started_at=started_at,
+            )
 
 
 def display_statistics(cv: Cyvest, rich_print: Callable[[Any], None]) -> None:

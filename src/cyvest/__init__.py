@@ -13,7 +13,7 @@ from cyvest.model import InvestigationWhitelist
 from cyvest.model_enums import CheckScorePolicy, ObservableType, RelationshipDirection, RelationshipType
 from cyvest.proxies import CheckProxy, ContainerProxy, EnrichmentProxy, ObservableProxy, ThreatIntelProxy
 
-__version__ = "3.1.0"
+__version__ = "3.2.0"
 
 logger.disable("cyvest")
 

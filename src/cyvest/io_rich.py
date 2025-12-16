@@ -98,7 +98,7 @@ def _build_observable_tree(
 
     obs_info = (
         f"{rel_info}{generated_by}[bold]{obs.key}[/bold] "
-        f"[{color_score}]{obs.score}[/{color_score}] "
+        f"[{color_score}]{obs.score_display}[/{color_score}] "
         f"[{color_level}]{obs.level.name}[/{color_level}]"
         f"{whitelisted_str}"
     )
@@ -196,9 +196,9 @@ def _render_score_history_table(
                 old_score_color = get_color_score(change.old_score)
                 new_score_color = get_color_score(change.new_score)
                 score_str = (
-                    f"[{old_score_color}]{change.old_score}[/{old_score_color}] "
+                    f"[{old_score_color}]{change.display_old_score}[/{old_score_color}] "
                     f"→ "
-                    f"[{new_score_color}]{change.new_score}[/{new_score_color}]"
+                    f"[{new_score_color}]{change.display_new_score}[/{new_score_color}]"
                 )
 
                 old_level_color = get_color_level(change.old_level)
@@ -292,7 +292,7 @@ def display_summary(
             color_level = get_color_level(check.level)
             color_score = get_color_score(check.score)
             name = f"  {check.check_id}"
-            score = f"[{color_score}]{check.score}[/{color_score}]"
+            score = f"[{color_score}]{check.score_display}[/{color_score}]"
             level = f"[{color_level}]{check.level.name}[/{color_level}]"
             table.add_row(name, score, level)
 
@@ -309,7 +309,7 @@ def display_summary(
             color_score = get_color_score(agg_score)
 
             name = f"  {container.path}"
-            score = f"[{color_score}]{agg_score}[/{color_score}]"
+            score = f"[{color_score}]{agg_score:.2f}[/{color_score}]"
             level = f"[{color_level}]{agg_level.name}[/{color_level}]"
             table.add_row(name, score, level)
 
@@ -336,7 +336,7 @@ def display_summary(
             for check in checks:
                 color_score = get_color_score(check.score)
                 name = f"  {check.check_id}"
-                score = f"[{color_score}]{check.score}[/{color_score}]"
+                score = f"[{color_score}]{check.score_display}[/{color_score}]"
                 level = f"[{color_level}]{check.level.name}[/{color_level}]"
                 table.add_row(name, score, level)
 
@@ -375,7 +375,7 @@ def display_summary(
     table.add_section()
     table.add_row(
         Align("[bold]GLOBAL SCORE[/bold]", align="center"),
-        f"[{color_score}]{global_score}[/{color_score}]",
+        f"[{color_score}]{global_score:.2f}[/{color_score}]",
         f"[{color_level}]{global_level.name}[/{color_level}]",
     )
 

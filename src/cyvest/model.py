@@ -8,7 +8,7 @@ and InvestigationWhitelist using Pydantic BaseModel.
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from typing import Annotated, Any
 
 from pydantic import (
@@ -33,6 +33,18 @@ from cyvest.model_enums import (
     RelationshipType,
 )
 
+_DEFAULT_SCORE_PLACES = 2
+
+
+def _format_score_decimal(value: Decimal, *, places: int = _DEFAULT_SCORE_PLACES) -> str:
+    if places < 0:
+        raise ValueError("places must be >= 0")
+    quantizer = Decimal("1").scaleb(-places)
+    try:
+        return format(value.quantize(quantizer, rounding=ROUND_HALF_UP), "f")
+    except InvalidOperation:
+        return str(value)
+
 
 class ScoreChange(BaseModel):
     """Record of a score change for audit trail."""
@@ -49,6 +61,14 @@ class ScoreChange(BaseModel):
     @field_serializer("old_score", "new_score")
     def serialize_decimal(self, v: Decimal) -> float:
         return float(v)
+
+    @property
+    def display_old_score(self) -> str:
+        return _format_score_decimal(self.old_score)
+
+    @property
+    def display_new_score(self) -> str:
+        return _format_score_decimal(self.new_score)
 
 
 class InvestigationWhitelist(BaseModel):
@@ -199,6 +219,11 @@ class ThreatIntel(BaseModel):
     @field_serializer("score")
     def serialize_score(self, v: Decimal) -> float:
         return float(v)
+
+    @computed_field(return_type=str)
+    @property
+    def score_display(self) -> str:
+        return _format_score_decimal(self.score)
 
     def set_level(self, level: Level | str) -> None:
         """
@@ -410,6 +435,11 @@ class Observable(BaseModel):
         """
         return self._score_history
 
+    @computed_field(return_type=str)
+    @property
+    def score_display(self) -> str:
+        return _format_score_decimal(self.score)
+
 
 class Check(BaseModel):
     """
@@ -560,6 +590,11 @@ class Check(BaseModel):
             List of score changes with timestamps, old/new scores and levels, and reasons
         """
         return self._score_history
+
+    @computed_field(return_type=str)
+    @property
+    def score_display(self) -> str:
+        return _format_score_decimal(self.score)
 
 
 class Enrichment(BaseModel):

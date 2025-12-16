@@ -13,9 +13,10 @@ and produces schemas matching the actual model_dump() output.
 from __future__ import annotations
 
 from datetime import datetime
+from decimal import Decimal
 from typing import Annotated, Any
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, computed_field, field_serializer, model_validator
 
 from cyvest.levels import Level
 from cyvest.model import (
@@ -25,6 +26,7 @@ from cyvest.model import (
     InvestigationWhitelist,
     Observable,
     ThreatIntel,
+    _format_score_decimal,
 )
 from cyvest.score import ScoreMode
 
@@ -101,7 +103,7 @@ class InvestigationSchema(BaseModel):
     )
 
     started_at: datetime = Field(..., description="Investigation start time (UTC).")
-    score: float = Field(..., description="Global investigation score.")
+    score: Decimal = Field(..., description="Global investigation score.")
     level: Level = Field(
         ...,
         description="Security level classification from NONE (lowest) to MALICIOUS (highest).",
@@ -138,6 +140,16 @@ class InvestigationSchema(BaseModel):
     stats: StatisticsSchema = Field(description="Investigation statistics summary.")
     stats_checks: StatsChecksSchema = Field(description="Check statistics summary.")
     data_extraction: DataExtractionSchema = Field(description="Data extraction metadata.")
+
+    @field_serializer("score")
+    def serialize_score(self, v: Decimal) -> float:
+        return float(v)
+
+    @computed_field(return_type=str)
+    @property
+    def score_display(self) -> str:
+        """Global investigation score formatted as fixed-point x.xx."""
+        return _format_score_decimal(self.score)
 
     @model_validator(mode="before")
     @classmethod

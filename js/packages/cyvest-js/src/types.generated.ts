@@ -1,86 +1,35 @@
 // AUTO-GENERATED FROM cyvest.schema.json — DO NOT EDIT
 
 /**
- * Investigation start time (UTC).
- */
-export type StartedAt = string;
-/**
- * Global investigation score.
- */
-export type Score = number;
-/**
  * Security level classification for checks, observables, and threat intelligence.
  *
  * Levels are ordered from lowest (NONE) to highest (MALICIOUS) severity.
  */
 export type Level = "NONE" | "TRUSTED" | "INFO" | "SAFE" | "NOTABLE" | "SUSPICIOUS" | "MALICIOUS";
-/**
- * Whether the investigation is whitelisted.
- */
-export type Whitelisted = boolean;
-export type Identifier = string;
-export type Name = string;
 export type Justification = string | null;
 /**
  * List of whitelist entries applied to this investigation.
  */
 export type Whitelists = InvestigationWhitelist[];
-export type Type = string;
-export type Value = string;
-export type Internal = boolean;
-export type Whitelisted1 = boolean;
-export type Comment = string;
-export type Score1 = number;
 export type ThreatIntels = string[];
-export type TargetKey = string;
-export type RelationshipType = string;
 /**
  * Direction of a relationship between observables.
  */
 export type RelationshipDirection = "outbound" | "inbound" | "bidirectional";
 export type Relationships = Relationship[];
-export type Key = string;
 /**
  * Checks that generated this observable.
  */
 export type GeneratedByChecks = string[];
-export type CheckId = string;
-export type Scope = string;
-export type Description = string;
-export type Comment1 = string;
-export type Score2 = number;
 export type Observables1 = string[];
 /**
  * Controls how a check reacts to linked observables.
  */
 export type CheckScorePolicy = "auto" | "manual";
-export type Key1 = string;
-export type Source = string;
-export type ObservableKey = string;
-export type Comment2 = string;
-export type Score3 = number;
 export type Taxonomies = {
   [k: string]: unknown;
 }[];
-export type Key2 = string;
-export type Name1 = string;
-export type Context = string;
-export type Key3 = string;
-export type Path = string;
-export type Description1 = string;
 export type Checks1 = string[];
-export type Key4 = string;
-export type AggregatedScore = number;
-export type TotalObservables = number;
-export type InternalObservables = number;
-export type ExternalObservables = number;
-export type WhitelistedObservables = number;
-export type TotalChecks = number;
-export type AppliedChecks = number;
-export type TotalThreatIntel = number;
-export type TotalContainers = number;
-export type Checks2 = number;
-export type Applied = number;
 /**
  * Root observable type used during data extraction.
  */
@@ -101,10 +50,19 @@ export type ScoreMode = "max" | "sum";
  * schemas matching the actual model_dump() output.
  */
 export interface CyvestInvestigation {
-  started_at: StartedAt;
-  score: Score;
+  /**
+   * Investigation start time (UTC).
+   */
+  started_at: string;
+  /**
+   * Global investigation score.
+   */
+  score: number;
   level: Level;
-  whitelisted: Whitelisted;
+  /**
+   * Whether the investigation is whitelisted.
+   */
+  whitelisted: boolean;
   whitelists: Whitelists;
   observables: Observables;
   checks: Checks;
@@ -115,13 +73,17 @@ export interface CyvestInvestigation {
   stats: StatisticsSchema;
   stats_checks: StatsChecksSchema;
   data_extraction: DataExtractionSchema;
+  /**
+   * Global investigation score formatted as fixed-point x.xx.
+   */
+  score_display: string;
 }
 /**
  * Represents a whitelist entry on an investigation.
  */
 export interface InvestigationWhitelist {
-  identifier: Identifier;
-  name: Name;
+  identifier: string;
+  name: string;
   justification?: Justification;
   [k: string]: unknown;
 }
@@ -138,18 +100,19 @@ export interface Observables {
  * through relationships.
  */
 export interface Observable {
-  type: Type;
-  value: Value;
-  internal: Internal;
-  whitelisted: Whitelisted1;
-  comment: Comment;
+  type: string;
+  value: string;
+  internal: boolean;
+  whitelisted: boolean;
+  comment: string;
   extra: Extra;
-  score: Score1;
+  score: number;
   level: Level;
   threat_intels: ThreatIntels;
   relationships: Relationships;
-  key: Key;
+  key: string;
   generated_by_checks: GeneratedByChecks;
+  score_display: string;
   [k: string]: unknown;
 }
 export interface Extra {
@@ -159,8 +122,8 @@ export interface Extra {
  * Represents a relationship between observables.
  */
 export interface Relationship {
-  target_key: TargetKey;
-  relationship_type: RelationshipType;
+  target_key: string;
+  relationship_type: string;
   direction: RelationshipDirection;
   [k: string]: unknown;
 }
@@ -177,16 +140,17 @@ export interface Checks {
  * and contributes to the overall investigation score.
  */
 export interface Check {
-  check_id: CheckId;
-  scope: Scope;
-  description: Description;
-  comment: Comment1;
+  check_id: string;
+  scope: string;
+  description: string;
+  comment: string;
   extra: Extra1;
-  score: Score2;
+  score: number;
   level: Level;
   observables: Observables1;
   score_policy?: CheckScorePolicy;
-  key: Key1;
+  key: string;
+  score_display: string;
   [k: string]: unknown;
 }
 export interface Extra1 {
@@ -211,14 +175,15 @@ export interface ThreatIntels1 {
  * like VirusTotal, URLScan.io, etc.
  */
 export interface ThreatIntel {
-  source: Source;
-  observable_key: ObservableKey;
-  comment: Comment2;
+  source: string;
+  observable_key: string;
+  comment: string;
   extra: Extra2;
-  score: Score3;
+  score: number;
   level: Level;
   taxonomies: Taxonomies;
-  key: Key2;
+  key: string;
+  score_display: string;
   [k: string]: unknown;
 }
 export interface Extra2 {
@@ -237,10 +202,10 @@ export interface Enrichments {
  * context but doesn't directly contribute to scoring.
  */
 export interface Enrichment {
-  name: Name1;
+  name: string;
   data: Data;
-  context: Context;
-  key: Key3;
+  context: string;
+  key: string;
   [k: string]: unknown;
 }
 export interface Data {
@@ -259,12 +224,12 @@ export interface Containers {
  * with aggregated scores and levels.
  */
 export interface Container {
-  path: Path;
-  description?: Description1;
+  path: string;
+  description?: string;
   checks: Checks1;
   sub_containers: SubContainers;
-  key: Key4;
-  aggregated_score: AggregatedScore;
+  key: string;
+  aggregated_score: number;
   aggregated_level: Level;
 }
 export interface SubContainers {
@@ -276,21 +241,21 @@ export interface SubContainers {
  * Mirrors the output of `InvestigationStats.get_summary()`.
  */
 export interface StatisticsSchema {
-  total_observables: TotalObservables;
-  internal_observables: InternalObservables;
-  external_observables: ExternalObservables;
-  whitelisted_observables: WhitelistedObservables;
+  total_observables: number;
+  internal_observables: number;
+  external_observables: number;
+  whitelisted_observables: number;
   observables_by_type?: ObservablesByType;
   observables_by_level?: ObservablesByLevel;
   observables_by_type_and_level?: ObservablesByTypeAndLevel;
-  total_checks: TotalChecks;
-  applied_checks: AppliedChecks;
+  total_checks: number;
+  applied_checks: number;
   checks_by_scope?: ChecksByScope;
   checks_by_level?: ChecksByLevel1;
-  total_threat_intel: TotalThreatIntel;
+  total_threat_intel: number;
   threat_intel_by_source?: ThreatIntelBySource;
   threat_intel_by_level?: ThreatIntelByLevel;
-  total_containers: TotalContainers;
+  total_containers: number;
 }
 export interface ObservablesByType {
   [k: string]: number;
@@ -319,8 +284,8 @@ export interface ThreatIntelByLevel {
  * Schema for check statistics summary.
  */
 export interface StatsChecksSchema {
-  checks: Checks2;
-  applied: Applied;
+  checks: number;
+  applied: number;
 }
 /**
  * Schema for data extraction metadata.

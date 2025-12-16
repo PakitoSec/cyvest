@@ -272,7 +272,7 @@ def generate_network_graph(
             f"Type: {obs_type_str}",
             f"Value: {obs.value}",
             f"Level: {obs.level.name}",
-            f"Score: {obs.score}",
+            f"Score: {obs.score_display}",
             f"Key: {key}",
         ]
 

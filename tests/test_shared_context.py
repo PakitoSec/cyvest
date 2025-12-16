@@ -1388,10 +1388,10 @@ def test_export_empty_investigation(tmp_path):
 
     markdown = shared.io_to_markdown()
     assert "# Cybersecurity Investigation Report" in markdown
-    assert "Global Score: 0" in markdown or "Global Score:** 0" in markdown
+    assert "**Global Score:** 0.00" in markdown
 
     schema = shared.io_to_dict()
-    assert schema.score == 0.0
+    assert schema.score == Decimal("0")
     assert len(schema.observables) == 1  # Just root
 
     json_path = tmp_path / "empty.json"

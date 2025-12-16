@@ -126,6 +126,10 @@ class ObservableProxy(_ReadOnlyProxy[Observable]):
         return self._read_attr("score")
 
     @property
+    def score_display(self) -> str:
+        return self._read_attr("score_display")
+
+    @property
     def level(self) -> Level:
         return self._read_attr("level")
 
@@ -296,6 +300,10 @@ class CheckProxy(_ReadOnlyProxy[Check]):
     @property
     def score(self) -> Decimal:
         return self._read_attr("score")
+
+    @property
+    def score_display(self) -> str:
+        return self._read_attr("score_display")
 
     @property
     def level(self) -> Level:
@@ -489,6 +497,10 @@ class ThreatIntelProxy(_ReadOnlyProxy[ThreatIntel]):
     @property
     def score(self) -> Decimal:
         return self._read_attr("score")
+
+    @property
+    def score_display(self) -> str:
+        return self._read_attr("score_display")
 
     @property
     def level(self) -> Level:

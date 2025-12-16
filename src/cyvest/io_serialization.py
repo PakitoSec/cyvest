@@ -79,7 +79,7 @@ def serialize_investigation(cv: Cyvest) -> InvestigationSchema:
 
     investigation = InvestigationSchema(
         started_at=started_at,
-        score=float(cv.get_global_score()),
+        score=cv.get_global_score(),
         level=cv.get_global_level(),
         whitelisted=cv.investigation_is_whitelisted(),
         whitelists=list(cv.investigation_get_whitelists()),
@@ -139,7 +139,7 @@ def generate_markdown_report(
     # Header
     lines.append("# Cybersecurity Investigation Report")
     lines.append("")
-    lines.append(f"**Global Score:** {cv.get_global_score()}")
+    lines.append(f"**Global Score:** {cv.get_global_score():.2f}")
     lines.append(f"**Global Level:** {cv.get_global_level().name}")
     whitelists = cv.investigation_get_whitelists()
     whitelist_status = "Yes" if whitelists else "No"
@@ -179,7 +179,7 @@ def generate_markdown_report(
         lines.append("")
         for check in cv.get_all_checks().values():
             if check.scope == scope and check.level != Level.NONE:
-                lines.append(f"- **{check.check_id}**: Score: {check.score}, Level: {check.level.name}")
+                lines.append(f"- **{check.check_id}**: Score: {check.score_display}, Level: {check.level.name}")
                 lines.append(f"  - Description: {check.description}")
                 if check.comment:
                     lines.append(f"  - Comment: {check.comment}")
@@ -192,7 +192,7 @@ def generate_markdown_report(
         for obs in cv.get_all_observables().values():
             lines.append(f"### {obs.obs_type}: {obs.value}")
             lines.append(f"- **Key:** {obs.key}")
-            lines.append(f"- **Score:** {obs.score}")
+            lines.append(f"- **Score:** {obs.score_display}")
             lines.append(f"- **Level:** {obs.level.name}")
             lines.append(f"- **Internal:** {obs.internal}")
             lines.append(f"- **Whitelisted:** {obs.whitelisted}")
@@ -210,7 +210,7 @@ def generate_markdown_report(
             if obs.threat_intels:
                 lines.append("- **Threat Intelligence:**")
                 for ti in obs.threat_intels:
-                    lines.append(f"  - {ti.source}: Score {ti.score}, Level {ti.level.name}")
+                    lines.append(f"  - {ti.source}: Score {ti.score_display}, Level {ti.level.name}")
                     if ti.comment:
                         lines.append(f"    - {ti.comment}")
             lines.append("")
@@ -233,7 +233,7 @@ def generate_markdown_report(
         for ctr in cv.get_all_containers().values():
             lines.append(f"### {ctr.path}")
             lines.append(f"- **Description:** {ctr.description}")
-            lines.append(f"- **Aggregated Score:** {ctr.get_aggregated_score()}")
+            lines.append(f"- **Aggregated Score:** {ctr.get_aggregated_score():.2f}")
             lines.append(f"- **Aggregated Level:** {ctr.get_aggregated_level().name}")
             lines.append(f"- **Checks:** {len(ctr.checks)}")
             lines.append(f"- **Sub-containers:** {len(ctr.sub_containers)}")

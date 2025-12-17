@@ -5,7 +5,7 @@ Provides a simplified interface for creating and managing investigation objects,
 handling score propagation, and generating reports.
 
 Includes JSON/Markdown export (io_save_json, io_save_markdown), import (io_load_json),
-and dictionary export (io_to_dict, io_to_markdown) methods.
+and investigation export (io_to_invest, io_to_markdown) methods.
 """
 
 from __future__ import annotations
@@ -567,7 +567,7 @@ class Cyvest:
             >>> path = cv.io_save_json("investigation.json")
             >>> print(path)  # /absolute/path/to/investigation.json
         """
-        save_investigation_json(self, filepath)
+        save_investigation_json(self._investigation, filepath)
         return str(Path(filepath).resolve())
 
     def io_save_markdown(
@@ -600,7 +600,9 @@ class Cyvest:
             >>> path = cv.io_save_markdown("report.md")
             >>> print(path)  # /absolute/path/to/report.md
         """
-        save_investigation_markdown(self, filepath, include_containers, include_enrichments, include_observables)
+        save_investigation_markdown(
+            self._investigation, filepath, include_containers, include_enrichments, include_observables
+        )
         return str(Path(filepath).resolve())
 
     def io_to_markdown(
@@ -627,9 +629,11 @@ class Cyvest:
             # Cybersecurity Investigation Report
             ...
         """
-        return generate_markdown_report(self, include_containers, include_enrichments, include_observables)
+        return generate_markdown_report(
+            self._investigation, include_containers, include_enrichments, include_observables
+        )
 
-    def io_to_dict(self) -> InvestigationSchema:
+    def io_to_invest(self) -> InvestigationSchema:
         """
         Serialize the investigation to an InvestigationSchema.
 
@@ -638,11 +642,11 @@ class Cyvest:
 
         Examples:
             >>> cv = Cyvest()
-            >>> schema = cv.io_to_dict()
+            >>> schema = cv.io_to_invest()
             >>> print(schema.score, schema.level)
             >>> dict_data = schema.model_dump(by_alias=True)
         """
-        return serialize_investigation(self)
+        return serialize_investigation(self._investigation)
 
     # Merge methods
 

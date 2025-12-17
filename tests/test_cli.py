@@ -11,7 +11,6 @@ from click.testing import CliRunner
 
 from cyvest import Cyvest, Level
 from cyvest.cli import cli
-from cyvest.io_serialization import save_investigation_json
 
 
 def _strip_ansi(text: str) -> str:
@@ -30,7 +29,7 @@ def _write_sample(tmp_path: Path) -> Path:
     cv.check("url_check", "network", "Validate URL").link_observable(observable).with_score(Decimal("6.0"))
 
     sample_path = tmp_path / "sample.json"
-    save_investigation_json(cv, sample_path)
+    cv.io_save_json(sample_path)
     return sample_path
 
 

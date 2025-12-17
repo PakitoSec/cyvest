@@ -1010,7 +1010,7 @@ def test_get_global_score_thread_safe():
 
 
 # ==============================================================================
-# Tests for export methods (io_to_markdown, io_save_markdown, io_to_dict, io_save_json)
+# Tests for export methods (io_to_markdown, io_save_markdown, io_to_invest, io_save_json)
 # ==============================================================================
 
 
@@ -1073,8 +1073,8 @@ def test_io_save_markdown_relative_path(tmp_path, monkeypatch):
     assert result_path == str(expected_path.resolve())
 
 
-def test_io_to_dict_basic():
-    """Test basic dictionary serialization from shared context."""
+def test_io_to_invest_basic():
+    """Test basic InvestigationSchema serialization from shared context."""
     inv = Investigation({"test": "data"}, root_type="artifact")
     shared = SharedInvestigationContext(inv)
 
@@ -1082,7 +1082,7 @@ def test_io_to_dict_basic():
         cy.observable(ObservableType.IPV4_ADDR, "192.168.1.1").add_ti("SEKOIA", Decimal("6.0"))
         cy.check("ip_reputation", "network", "Check IP reputation").with_score(Decimal("5.0"))
 
-    schema = shared.io_to_dict()
+    schema = shared.io_to_invest()
 
     # Verify schema attributes
     assert hasattr(schema, "score")
@@ -1151,7 +1151,7 @@ def test_export_methods_thread_safe():
         return shared.io_to_markdown()
 
     def export_dict():
-        return shared.io_to_dict()
+        return shared.io_to_invest()
 
     with ThreadPoolExecutor(max_workers=4) as executor:
         md_futures = [executor.submit(export_markdown) for _ in range(5)]
@@ -1215,7 +1215,7 @@ def test_export_with_enrichments(tmp_path):
     assert "dns" in markdown
 
     # Test schema export
-    schema = shared.io_to_dict()
+    schema = shared.io_to_invest()
     assert len(schema.enrichments) == 2
     assert "enr:whois" in schema.enrichments
     assert "enr:dns" in schema.enrichments
@@ -1246,7 +1246,7 @@ def test_export_with_whitelists(tmp_path):
     assert "Whitelisted Investigation: Yes" in markdown or "Whitelist" in markdown
 
     # Test schema export
-    schema = shared.io_to_dict()
+    schema = shared.io_to_invest()
     assert schema.whitelisted is True
     assert len(schema.whitelists) == 1
     assert schema.whitelists[0].identifier == "wl-001"
@@ -1297,7 +1297,7 @@ def test_export_comprehensive_investigation(tmp_path):
 
     # Export to all formats
     markdown = shared.io_to_markdown(include_enrichments=True)
-    schema = shared.io_to_dict()
+    schema = shared.io_to_invest()
 
     md_path = tmp_path / "comprehensive.md"
     json_path = tmp_path / "comprehensive.json"
@@ -1344,7 +1344,7 @@ def test_export_empty_investigation(tmp_path):
     assert "# Cybersecurity Investigation Report" in markdown
     assert "**Global Score:** 0.00" in markdown
 
-    schema = shared.io_to_dict()
+    schema = shared.io_to_invest()
     assert schema.score == Decimal("0")
     assert len(schema.observables) == 1  # Just root
 
@@ -1375,7 +1375,7 @@ def test_export_parallel_updates(tmp_path):
             f.result()
 
     # Export should capture all observables and checks
-    schema = shared.io_to_dict()
+    schema = shared.io_to_invest()
     assert len(schema.observables) == 11  # 10 created + 1 root
     assert schema.stats.checks_by_scope["scope"] == 10
 

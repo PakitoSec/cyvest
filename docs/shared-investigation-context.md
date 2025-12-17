@@ -193,18 +193,18 @@ print(path)  # /absolute/path/to/report.md
 path_no_obs = shared.io_save_markdown("report_redacted.md", include_observables=False)
 ```
 
-##### `io_to_dict() -> dict[str, Any]`
-Serialize the shared investigation to a dictionary.
+##### `io_to_invest() -> InvestigationSchema`
+Serialize the shared investigation to an `InvestigationSchema`.
 
 Thread-safe: Uses lock to ensure consistent read of investigation state.
 
-**Returns:** Dictionary representation suitable for JSON export
+**Returns:** `InvestigationSchema` instance (use `.model_dump(mode="json", by_alias=True)` for JSON-ready dict)
 
 **Examples:**
 ```python
 shared = SharedInvestigationContext(main_inv)
-data = shared.io_to_dict()
-print(data.keys())
+schema = shared.io_to_invest()
+print(schema.score, schema.level)
 ```
 
 ##### `io_save_json(filepath: str | Path) -> str`

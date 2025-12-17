@@ -13,7 +13,6 @@ from pathlib import Path
 from logurich import logger
 
 from cyvest import Cyvest, Level
-from cyvest.io_serialization import save_investigation_json
 
 logger.enable("cyvest")
 
@@ -153,7 +152,7 @@ def main() -> None:
     # Export merged investigation
     output_dir = Path(tempfile.mkdtemp(prefix="cyvest_example_03_"))
     json_path = output_dir / "merged_investigation.json"
-    save_investigation_json(main_investigation, str(json_path))
+    main_investigation.io_save_json(str(json_path))
     logger.info("✓ Merged investigation saved to {}", json_path)
     logger.info("Temporary output directory: {}", output_dir)
 

@@ -72,8 +72,7 @@ with Cyvest(data={"type": "email"}) as cv:
     print(f"Global Level: {cv.get_global_level()}")
 
     # Export
-    from cyvest.io_serialization import save_investigation_json
-    save_investigation_json(cv, "investigation.json")
+    cv.io_save_json("investigation.json")
 ```
 
 ### Model Proxies

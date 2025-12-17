@@ -11,7 +11,6 @@ from pathlib import Path
 from logurich import logger
 
 from cyvest import Cyvest, Level
-from cyvest.io_serialization import save_investigation_json, save_investigation_markdown
 
 logger.enable("cyvest")
 
@@ -88,8 +87,8 @@ def main() -> None:
         output_dir = Path(tempfile.mkdtemp(prefix="cyvest_example_01_"))
         json_path = output_dir / "email_investigation.json"
         md_path = output_dir / "email_investigation.md"
-        save_investigation_json(cv, str(json_path))
-        save_investigation_markdown(cv, str(md_path))
+        cv.io_save_json(str(json_path))
+        cv.io_save_markdown(str(md_path))
 
         logger.info("✓ Investigation saved to {} and {}", json_path, md_path)
         logger.info("Temporary output directory: {}", output_dir)

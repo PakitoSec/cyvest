@@ -132,10 +132,6 @@ Containers keep checks, sub-containers, and metrics scoped. They also enable rep
 ## 5. Export and share {: #exporting-results }
 
 ```python
-from cyvest.io_serialization import (
-    save_investigation_json,
-    save_investigation_markdown,
-)
 from cyvest.io_rich import display_summary
 from cyvest import Level
 from rich.console import Console
@@ -156,10 +152,10 @@ with Cyvest() as cv:
         exclude_levels=[Level.NONE, Level.TRUSTED, Level.INFO, Level.SAFE, Level.NOTABLE],
     )
 
-    save_investigation_json(cv, "investigation.json")
-    save_investigation_markdown(cv, "report.md")
+    cv.io_save_json("investigation.json")
+    cv.io_save_markdown("report.md")
     # Hide observables while keeping aggregate stats/whitelists
-    save_investigation_markdown(cv, "redacted_report.md", include_observables=False)
+    cv.io_save_markdown("redacted_report.md", include_observables=False)
 ```
 
 !!! tip "Filtering checks by severity"

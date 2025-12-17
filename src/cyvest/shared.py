@@ -363,9 +363,12 @@ class SharedInvestigationContext:
         include_enrichments: bool,
         include_observables: bool,
     ) -> str:
-        temp_cy = Cyvest.__new__(Cyvest)
-        temp_cy._investigation = self._main_investigation
-        return generate_markdown_report(temp_cy, include_containers, include_enrichments, include_observables)
+        return generate_markdown_report(
+            self._main_investigation,
+            include_containers,
+            include_enrichments,
+            include_observables,
+        )
 
     def io_save_markdown(
         self,
@@ -404,21 +407,23 @@ class SharedInvestigationContext:
         include_enrichments: bool,
         include_observables: bool,
     ) -> str:
-        temp_cy = Cyvest.__new__(Cyvest)
-        temp_cy._investigation = self._main_investigation
-        save_investigation_markdown(temp_cy, filepath, include_containers, include_enrichments, include_observables)
+        save_investigation_markdown(
+            self._main_investigation,
+            filepath,
+            include_containers,
+            include_enrichments,
+            include_observables,
+        )
         return str(Path(filepath).resolve())
 
-    def io_to_dict(self) -> InvestigationSchema:
-        return self._lock.run(self._io_to_dict_unlocked)
+    def io_to_invest(self) -> InvestigationSchema:
+        return self._lock.run(self._io_to_invest_unlocked)
 
-    async def aio_to_dict(self) -> InvestigationSchema:
-        return await self._lock.arun(self._io_to_dict_unlocked)
+    async def aio_to_invest(self) -> InvestigationSchema:
+        return await self._lock.arun(self._io_to_invest_unlocked)
 
-    def _io_to_dict_unlocked(self) -> InvestigationSchema:
-        temp_cy = Cyvest.__new__(Cyvest)
-        temp_cy._investigation = self._main_investigation
-        return serialize_investigation(temp_cy)
+    def _io_to_invest_unlocked(self) -> InvestigationSchema:
+        return serialize_investigation(self._main_investigation)
 
     def io_save_json(self, filepath: str | Path) -> str:
         return self._lock.run(self._io_save_json_unlocked, filepath)
@@ -427,7 +432,5 @@ class SharedInvestigationContext:
         return await self._lock.arun(self._io_save_json_unlocked, filepath)
 
     def _io_save_json_unlocked(self, filepath: str | Path) -> str:
-        temp_cy = Cyvest.__new__(Cyvest)
-        temp_cy._investigation = self._main_investigation
-        save_investigation_json(temp_cy, filepath)
+        save_investigation_json(self._main_investigation, filepath)
         return str(Path(filepath).resolve())

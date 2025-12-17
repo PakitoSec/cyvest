@@ -602,14 +602,14 @@ def test_io_save_markdown_returns_absolute_path() -> None:
         Path(temp_path).unlink(missing_ok=True)
 
 
-def test_io_to_dict_serialization() -> None:
+def test_io_to_invest_serialization() -> None:
     """Test InvestigationSchema serialization contains expected fields."""
     cv = Cyvest()
     obs = cv.observable_create("url", "https://malicious.com")
     cv.observable_add_threat_intel(obs.key, source="virustotal", score=Decimal("6.0"))
     cv.check_create("url_check", "network", "URL analysis")
 
-    schema = cv.io_to_dict()
+    schema = cv.io_to_invest()
 
     # Verify all expected fields exist via attribute access
     assert hasattr(schema, "score")

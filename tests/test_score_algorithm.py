@@ -9,7 +9,7 @@ from collections.abc import Sequence
 from decimal import Decimal
 
 from cyvest import CheckScorePolicy, Cyvest, Level
-from cyvest.io_serialization import load_investigation_json, save_investigation_json
+from cyvest.io_serialization import load_investigation_json
 from cyvest.score import ScoreMode
 
 
@@ -310,7 +310,7 @@ def test_manual_check_policy_round_trip(tmp_path) -> None:
     check = cv.check_create("persisted_manual", "scope", "desc", score_policy=CheckScorePolicy.MANUAL)
 
     path = tmp_path / "inv.json"
-    save_investigation_json(cv, path)
+    cv.io_save_json(path)
 
     loaded = load_investigation_json(path)
     loaded_check = loaded.check_get(check.key)

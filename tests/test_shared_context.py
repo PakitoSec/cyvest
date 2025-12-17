@@ -37,7 +37,7 @@ def test_shared_context_initialization():
 
     assert shared._main_investigation is inv
     assert shared._root_type == "artifact"
-    assert len(shared._observable_registry) == 0
+    assert len(shared._observable_registry) == 1  # root observable is present
     assert len(shared._check_registry) == 0
 
 
@@ -99,7 +99,7 @@ def test_get_observable():
         original_model = cy._investigation.get_observable(original.key)
 
     # Retrieve observable
-    retrieved = shared.get_observable("obs:ipv4-addr:192.168.1.1")
+    retrieved = shared.observable_get(ObservableType.IPV4_ADDR, "192.168.1.1")
 
     assert retrieved is not None
     assert retrieved.obs_type == ObservableType.IPV4_ADDR
@@ -113,7 +113,7 @@ def test_get_nonexistent_observable():
     inv = Investigation({"test": "data"}, root_type="artifact")
     shared = SharedInvestigationContext(inv)
 
-    result = shared.get_observable("obs:ipv4-addr:10.0.0.1")
+    result = shared.observable_get(ObservableType.IPV4_ADDR, "10.0.0.1")
     assert result is None
 
 
@@ -127,7 +127,7 @@ def test_get_check():
         original_check = cy._investigation.get_check(original.key)
 
     # Retrieve check
-    retrieved = shared.get_check("chk:test_check:scope")
+    retrieved = shared.check_get("test_check", "scope")
 
     assert retrieved is not None
     assert retrieved.check_id == "test_check"
@@ -137,27 +137,27 @@ def test_get_check():
 
 
 def test_has_observable():
-    """Test checking if observable exists."""
+    """Test checking if observable exists via observable_get()."""
     inv = Investigation({"test": "data"}, root_type="artifact")
     shared = SharedInvestigationContext(inv)
 
     with shared.create_cyvest() as cy:
         cy.observable(ObservableType.URL, "https://example.com")
 
-    assert shared.has_observable("obs:url:https://example.com") is True
-    assert shared.has_observable("obs:url:https://other.com") is False
+    assert shared.observable_get(ObservableType.URL, "https://example.com") is not None
+    assert shared.observable_get(ObservableType.URL, "https://other.com") is None
 
 
 def test_has_check():
-    """Test checking if check exists."""
+    """Test checking if check exists via check_get()."""
     inv = Investigation({"test": "data"}, root_type="artifact")
     shared = SharedInvestigationContext(inv)
 
     with shared.create_cyvest() as cy:
         cy.check("my_check", "category", "Description")
 
-    assert shared.has_check("chk:my_check:category") is True
-    assert shared.has_check("chk:other_check:category") is False
+    assert shared.check_get("my_check", "category") is not None
+    assert shared.check_get("other_check", "category") is None
 
 
 def test_list_observables():
@@ -192,38 +192,16 @@ def test_list_checks():
     assert "chk:check2:scope2" in keys
 
 
-def test_find_observables_by_type():
-    """Test finding observables by type."""
-    inv = Investigation({"test": "data"}, root_type="artifact")
-    shared = SharedInvestigationContext(inv)
-
-    with shared.create_cyvest() as cy:
-        cy.observable(ObservableType.EMAIL_ADDR, "user1@example.com")
-        cy.observable(ObservableType.EMAIL_ADDR, "user2@example.com")
-        cy.observable(ObservableType.DOMAIN_NAME, "example.com")
-        cy.observable(ObservableType.IPV4_ADDR, "192.168.1.1")
-
-    email_obs = shared.find_observables_by_type(ObservableType.EMAIL_ADDR)
-    assert len(email_obs) == 2
-    assert all(obs.obs_type == ObservableType.EMAIL_ADDR for obs in email_obs)
-
-    domain_obs = shared.find_observables_by_type(ObservableType.DOMAIN_NAME)
-    assert len(domain_obs) == 1
-    assert domain_obs[0].value == "example.com"
-
-
-def test_find_observables_by_value():
-    """Test finding observables by value."""
+def test_observable_get_and_list_observables():
+    """Test observable_get() and list_observables() together."""
     inv = Investigation({"test": "data"}, root_type="artifact")
     shared = SharedInvestigationContext(inv)
 
     with shared.create_cyvest() as cy:
         cy.observable(ObservableType.DOMAIN_NAME, "example.com")
-        cy.observable(ObservableType.URL, "https://example.com/path")
 
-    results = shared.find_observables_by_value("example.com")
-    assert len(results) == 1
-    assert results[0].obs_type == ObservableType.DOMAIN_NAME
+    assert shared.observable_get(ObservableType.DOMAIN_NAME, "example.com") is not None
+    assert "obs:domain-name:example.com" in shared.list_observables()
 
 
 def test_cross_task_observable_sharing():
@@ -241,7 +219,7 @@ def test_cross_task_observable_sharing():
     with shared.create_cyvest() as cy2:
         data = cy2.root().extra
         # Inspect shared domain (read-only)
-        domain_info = shared.get_observable("obs:domain-name:malicious.com")
+        domain_info = shared.observable_get(ObservableType.DOMAIN_NAME, "malicious.com")
         assert domain_info is not None
         assert domain_info.value == "malicious.com"
 
@@ -291,12 +269,12 @@ def test_thread_safety_parallel_tasks():
 
     # Verify all observables were registered (6 created + 1 root)
     assert len(shared.list_observables()) == 7
-    assert shared.has_observable("obs:domain-name:domain1.com")
-    assert shared.has_observable("obs:domain-name:domain2.com")
-    assert shared.has_observable("obs:domain-name:domain3.com")
-    assert shared.has_observable("obs:ipv4-addr:1.1.1.1")
-    assert shared.has_observable("obs:ipv4-addr:2.2.2.2")
-    assert shared.has_observable("obs:ipv4-addr:3.3.3.3")
+    assert shared.observable_get(ObservableType.DOMAIN_NAME, "domain1.com") is not None
+    assert shared.observable_get(ObservableType.DOMAIN_NAME, "domain2.com") is not None
+    assert shared.observable_get(ObservableType.DOMAIN_NAME, "domain3.com") is not None
+    assert shared.observable_get(ObservableType.IPV4_ADDR, "1.1.1.1") is not None
+    assert shared.observable_get(ObservableType.IPV4_ADDR, "2.2.2.2") is not None
+    assert shared.observable_get(ObservableType.IPV4_ADDR, "3.3.3.3") is not None
 
 
 def test_concurrent_reconciliation():
@@ -339,7 +317,7 @@ def test_reconcile_with_investigation_object():
     shared.reconcile(other_inv)
 
     # Should be in registry
-    assert shared.has_observable("obs:file:malware.exe")
+    assert shared.observable_get(ObservableType.FILE, "malware.exe") is not None
 
 
 def test_auto_reconcile_on_exception_skipped():
@@ -355,7 +333,7 @@ def test_auto_reconcile_on_exception_skipped():
         pass
 
     # Observable should NOT be in registry due to exception
-    assert not shared.has_observable("email-addr:fail@example.com")
+    assert shared.observable_get(ObservableType.EMAIL_ADDR, "fail@example.com") is None
 
 
 def test_override_data_in_create_cyvest():
@@ -390,7 +368,7 @@ def test_shared_context_with_checks_and_observables():
         url_obs.add_ti("VT", Decimal("9.0"))
 
         # Verify we can see the email check
-        email_check = shared.get_check("chk:email_analysis:header")
+        email_check = shared.check_get("email_analysis", "header")
         assert email_check is not None
         assert email_check.check_id == "email_analysis"
 
@@ -400,10 +378,10 @@ def test_shared_context_with_checks_and_observables():
     # Verify final state
     assert len(shared.list_observables()) == 3  # 2 created + 1 root
     assert len(shared.list_checks()) == 2
-    assert shared.has_observable("obs:email-addr:phishing@malicious.com")
-    assert shared.has_observable("obs:url:https://malicious.com/payload")
-    assert shared.has_check("chk:email_analysis:header")
-    assert shared.has_check("chk:url_analysis:body")
+    assert shared.observable_get(ObservableType.EMAIL_ADDR, "phishing@malicious.com") is not None
+    assert shared.observable_get(ObservableType.URL, "https://malicious.com/payload") is not None
+    assert shared.check_get("email_analysis", "header") is not None
+    assert shared.check_get("url_analysis", "body") is not None
 
 
 def test_deep_copy_prevents_modification():
@@ -416,11 +394,11 @@ def test_deep_copy_prevents_modification():
         obs.add_ti("VT", Decimal("5.0"))
 
     # Get observable and modify it
-    retrieved1 = shared.get_observable("obs:domain-name:example.com")
+    retrieved1 = shared.observable_get(ObservableType.DOMAIN_NAME, "example.com")
     retrieved1.value = "modified.com"  # Modify the copy
 
     # Get observable again - should be unchanged
-    retrieved2 = shared.get_observable("obs:domain-name:example.com")
+    retrieved2 = shared.observable_get(ObservableType.DOMAIN_NAME, "example.com")
     assert retrieved2.value == "example.com"  # Original value preserved
     assert retrieved1 is not retrieved2  # Different objects
 
@@ -430,8 +408,8 @@ def test_deep_copy_prevents_modification():
 # ==============================================================================
 
 
-def test_get_observable_with_parameters():
-    """Test get_observable using type and value parameters."""
+def test_observable_get_with_parameters():
+    """Test observable_get using type and value parameters."""
     inv = Investigation({"test": "data"}, root_type="artifact")
     shared = SharedInvestigationContext(inv)
 
@@ -439,25 +417,20 @@ def test_get_observable_with_parameters():
         cy.observable(ObservableType.EMAIL_ADDR, "user@example.com")
 
     # Test parameter-based lookup with string type
-    obs = shared.get_observable("email-addr", "user@example.com")
+    obs = shared.observable_get("email-addr", "user@example.com")
     assert obs is not None
     assert obs.obs_type == ObservableType.EMAIL_ADDR
     assert obs.value == "user@example.com"
 
     # Test parameter-based lookup with ObservableType enum
-    obs_enum = shared.get_observable(ObservableType.EMAIL_ADDR, "user@example.com")
+    obs_enum = shared.observable_get(ObservableType.EMAIL_ADDR, "user@example.com")
     assert obs_enum is not None
     assert obs_enum.obs_type == ObservableType.EMAIL_ADDR
     assert obs_enum.value == "user@example.com"
 
-    # Test key-based lookup (backward compatibility)
-    obs_key = shared.get_observable("obs:email-addr:user@example.com")
-    assert obs_key is not None
-    assert obs_key.value == "user@example.com"
 
-
-def test_get_check_with_parameters():
-    """Test get_check using check_id and scope parameters."""
+def test_check_get_with_parameters():
+    """Test check_get using check_id and scope parameters."""
     inv = Investigation({"test": "data"}, root_type="artifact")
     shared = SharedInvestigationContext(inv)
 
@@ -465,53 +438,27 @@ def test_get_check_with_parameters():
         cy.check("malware_scan", "attachment", "Scan for malware")
 
     # Test parameter-based lookup
-    check = shared.get_check("malware_scan", "attachment")
+    check = shared.check_get("malware_scan", "attachment")
     assert check is not None
     assert check.check_id == "malware_scan"
     assert check.scope == "attachment"
 
-    # Test key-based lookup (backward compatibility)
-    check_key = shared.get_check("chk:malware_scan:attachment")
-    assert check_key is not None
-    assert check_key.check_id == "malware_scan"
+    assert check.check_id == "malware_scan"
 
 
-def test_has_observable_with_parameters():
-    """Test has_observable using type and value parameters."""
+def test_existence_checks_via_getters():
+    """Use get_* returning None/non-None instead of has_* helpers."""
     inv = Investigation({"test": "data"}, root_type="artifact")
     shared = SharedInvestigationContext(inv)
 
     with shared.create_cyvest() as cy:
         cy.observable(ObservableType.DOMAIN_NAME, "malicious.com")
-
-    # Test parameter-based check with string type
-    assert shared.has_observable("domain-name", "malicious.com")
-    assert not shared.has_observable("domain-name", "safe.com")
-
-    # Test parameter-based check with ObservableType enum
-    assert shared.has_observable(ObservableType.DOMAIN_NAME, "malicious.com")
-    assert not shared.has_observable(ObservableType.IPV4_ADDR, "1.2.3.4")
-
-    # Test key-based check (backward compatibility)
-    assert shared.has_observable("obs:domain-name:malicious.com")
-    assert not shared.has_observable("obs:domain-name:safe.com")
-
-
-def test_has_check_with_parameters():
-    """Test has_check using check_id and scope parameters."""
-    inv = Investigation({"test": "data"}, root_type="artifact")
-    shared = SharedInvestigationContext(inv)
-
-    with shared.create_cyvest() as cy:
         cy.check("url_reputation", "body", "Check URL reputation")
 
-    # Test parameter-based check
-    assert shared.has_check("url_reputation", "body")
-    assert not shared.has_check("email_reputation", "header")
-
-    # Test key-based check (backward compatibility)
-    assert shared.has_check("chk:url_reputation:body")
-    assert not shared.has_check("chk:email_reputation:header")
+    assert shared.observable_get("domain-name", "malicious.com") is not None
+    assert shared.observable_get("domain-name", "safe.com") is None
+    assert shared.check_get("url_reputation", "body") is not None
+    assert shared.check_get("email_reputation", "header") is None
 
 
 def test_investigation_get_observable_with_parameters():
@@ -569,69 +516,27 @@ def test_observable_type_enum_conversion():
         cy.observable(ObservableType.NETWORK_TRAFFIC, "http-traffic")
 
     # Test that enum values work correctly
-    assert shared.has_observable(ObservableType.URL, "https://example.com")
-    assert shared.has_observable(ObservableType.FILE, "malware.exe")
-    assert shared.has_observable(ObservableType.NETWORK_TRAFFIC, "http-traffic")
+    assert shared.observable_get(ObservableType.URL, "https://example.com") is not None
+    assert shared.observable_get(ObservableType.FILE, "malware.exe") is not None
+    assert shared.observable_get(ObservableType.NETWORK_TRAFFIC, "http-traffic") is not None
 
-    url_obs = shared.get_observable(ObservableType.URL, "https://example.com")
+    url_obs = shared.observable_get(ObservableType.URL, "https://example.com")
     assert url_obs is not None
     assert url_obs.obs_type == ObservableType.URL
 
 
-def test_get_observable_invalid_arguments():
-    """Test that get_observable raises ValueError for invalid arguments."""
+def test_getters_invalid_arguments_raise_typeerror():
+    """Argument validation is handled by Python signatures."""
     inv = Investigation({"test": "data"}, root_type="artifact")
     shared = SharedInvestigationContext(inv)
 
     import pytest
 
-    # Too many arguments
-    with pytest.raises(ValueError, match="get_observable\\(\\) accepts either"):
-        shared.get_observable("type", "value", "extra")
+    with pytest.raises(TypeError):
+        shared.observable_get("type", "value", "extra")  # type: ignore[arg-type]
 
-    # No arguments
-    with pytest.raises(ValueError, match="get_observable\\(\\) accepts either"):
-        shared.get_observable()
-
-
-def test_get_check_invalid_arguments():
-    """Test that get_check raises ValueError for invalid arguments."""
-    inv = Investigation({"test": "data"}, root_type="artifact")
-    shared = SharedInvestigationContext(inv)
-
-    import pytest
-
-    # Too many arguments
-    with pytest.raises(ValueError, match="get_check\\(\\) accepts either"):
-        shared.get_check("id", "scope", "extra")
-
-    # No arguments
-    with pytest.raises(ValueError, match="get_check\\(\\) accepts either"):
-        shared.get_check()
-
-
-def test_has_observable_invalid_arguments():
-    """Test that has_observable raises ValueError for invalid arguments."""
-    inv = Investigation({"test": "data"}, root_type="artifact")
-    shared = SharedInvestigationContext(inv)
-
-    import pytest
-
-    # Too many arguments
-    with pytest.raises(ValueError, match="has_observable\\(\\) accepts either"):
-        shared.has_observable("type", "value", "extra")
-
-
-def test_has_check_invalid_arguments():
-    """Test that has_check raises ValueError for invalid arguments."""
-    inv = Investigation({"test": "data"}, root_type="artifact")
-    shared = SharedInvestigationContext(inv)
-
-    import pytest
-
-    # Too many arguments
-    with pytest.raises(ValueError, match="has_check\\(\\) accepts either"):
-        shared.has_check("id", "scope", "extra")
+    with pytest.raises(TypeError):
+        shared.check_get("id")  # type: ignore[arg-type]
 
 
 def test_parameter_based_api_in_parallel_tasks():
@@ -647,7 +552,7 @@ def test_parameter_based_api_in_parallel_tasks():
     def task2(shared_ctx):
         with shared_ctx.create_cyvest() as cy:
             # Use parameter-based lookup to get observable from task1
-            sender = shared_ctx.get_observable(ObservableType.EMAIL_ADDR, "sender@malicious.com")
+            sender = shared_ctx.observable_get(ObservableType.EMAIL_ADDR, "sender@malicious.com")
             if sender and sender.score > 5:
                 cy.check("high_risk_sender", "risk", "High risk detected").with_score(Decimal("9.0"))
 
@@ -659,11 +564,11 @@ def test_parameter_based_api_in_parallel_tasks():
         f2.result()
 
     # Verify both tasks completed and parameter-based lookups worked
-    assert shared.has_observable(ObservableType.EMAIL_ADDR, "sender@malicious.com")
-    assert shared.has_check("sender_check", "header")
-    assert shared.has_check("high_risk_sender", "risk")
+    assert shared.observable_get(ObservableType.EMAIL_ADDR, "sender@malicious.com") is not None
+    assert shared.check_get("sender_check", "header") is not None
+    assert shared.check_get("high_risk_sender", "risk") is not None
 
-    sender_obs = shared.get_observable(ObservableType.EMAIL_ADDR, "sender@malicious.com")
+    sender_obs = shared.observable_get(ObservableType.EMAIL_ADDR, "sender@malicious.com")
     assert sender_obs.score >= Decimal("8.0")
 
 
@@ -677,9 +582,9 @@ def test_normalization_consistency():
         cy.observable(ObservableType.EMAIL_ADDR, "User@Example.COM")
 
     # Lookup should work with different casing (normalization)
-    obs1 = shared.get_observable(ObservableType.EMAIL_ADDR, "user@example.com")
-    obs2 = shared.get_observable("email-addr", "USER@EXAMPLE.COM")
-    obs3 = shared.get_observable(ObservableType.EMAIL_ADDR, "  User@Example.COM  ")
+    obs1 = shared.observable_get(ObservableType.EMAIL_ADDR, "user@example.com")
+    obs2 = shared.observable_get("email-addr", "USER@EXAMPLE.COM")
+    obs3 = shared.observable_get(ObservableType.EMAIL_ADDR, "  User@Example.COM  ")
 
     assert obs1 is not None
     assert obs2 is not None
@@ -704,7 +609,7 @@ def test_prevent_relationship_with_shared_copy():
         url_obs = cy2.observable(ObservableType.URL, "https://evil.com/payload")
 
         # Get copy from shared context (anti-pattern)
-        domain_copy = shared.get_observable(ObservableType.DOMAIN_NAME, "malicious.com")
+        domain_copy = shared.observable_get(ObservableType.DOMAIN_NAME, "malicious.com")
         assert domain_copy is not None
         assert domain_copy._from_shared_context is True
 
@@ -714,7 +619,7 @@ def test_prevent_relationship_with_shared_copy():
 
         # Verify error message is helpful
         error_msg = str(exc_info.value)
-        assert "Cannot use observable from shared_context.get_observable()" in error_msg
+        assert "Cannot use observable from shared_context.observable_get()" in error_msg
         assert "read-only copy" in error_msg
         assert "cy.observable" in error_msg
         assert "Incorrect pattern" in error_msg
@@ -749,7 +654,7 @@ def test_copied_observable_has_marker():
         assert original_model._from_shared_context is False
 
     # Copy from shared context should be marked
-    copy = shared.get_observable(ObservableType.DOMAIN_NAME, "example.com")
+    copy = shared.observable_get(ObservableType.DOMAIN_NAME, "example.com")
     assert copy is not None
     assert copy._from_shared_context is True
 
@@ -775,11 +680,11 @@ def test_async_context_manager_auto_reconcile():
 
     asyncio.run(run())
 
-    assert shared.has_observable(ObservableType.EMAIL_ADDR, "async@domain.com")
-    assert shared.has_check("async_check", "scope")
+    assert shared.observable_get(ObservableType.EMAIL_ADDR, "async@domain.com") is not None
+    assert shared.check_get("async_check", "scope") is not None
 
 
-def test_areconcile_and_aget_observable():
+def test_areconcile_and_observable_aget():
     inv = Investigation({"test": "data"}, root_type="artifact")
     shared = SharedInvestigationContext(inv)
 
@@ -788,7 +693,7 @@ def test_areconcile_and_aget_observable():
 
     async def run():
         await shared.areconcile(cy)
-        obs = await shared.aget_observable(ObservableType.IPV4_ADDR, "8.8.8.8")
+        obs = await shared.observable_aget(ObservableType.IPV4_ADDR, "8.8.8.8")
         assert obs is not None
         assert obs.value == "8.8.8.8"
 
@@ -796,7 +701,7 @@ def test_areconcile_and_aget_observable():
 
 
 def test_get_enrichment_by_key():
-    """Test retrieving enrichment by key from shared context."""
+    """Test retrieving enrichment by name from shared context."""
     inv = Investigation({"test": "data"}, root_type="artifact")
     shared = SharedInvestigationContext(inv)
 
@@ -804,8 +709,7 @@ def test_get_enrichment_by_key():
         original = cy.enrichment_create("whois", {"registrar": "Test Inc", "created": "2020-01-01"})
         original_enr = cy._investigation.get_enrichment(original.key)
 
-    # Retrieve enrichment by key
-    retrieved = shared.get_enrichment("enr:whois")
+    retrieved = shared.enrichment_get("whois")
 
     assert retrieved is not None
     assert retrieved.name == "whois"
@@ -823,7 +727,7 @@ def test_get_enrichment_by_name():
         cy.enrichment_create("dns", {"A": ["1.2.3.4"], "MX": ["mail.example.com"]})
 
     # Retrieve enrichment by name
-    retrieved = shared.get_enrichment("dns")
+    retrieved = shared.enrichment_get("dns")
 
     assert retrieved is not None
     assert retrieved.name == "dns"
@@ -841,7 +745,7 @@ def test_get_enrichment_with_context():
         cy.enrichment_create("dns", {"A": ["10.0.0.1"]}, context="other.com")
 
     # Retrieve specific enrichment with context
-    retrieved = shared.get_enrichment("dns", "example.com")
+    retrieved = shared.enrichment_get("dns", "example.com")
 
     assert retrieved is not None
     assert retrieved.name == "dns"
@@ -849,7 +753,7 @@ def test_get_enrichment_with_context():
     assert retrieved.context == "example.com"
 
     # Retrieve different context
-    retrieved2 = shared.get_enrichment("dns", "other.com")
+    retrieved2 = shared.enrichment_get("dns", "other.com")
     assert retrieved2 is not None
     assert retrieved2.data["A"] == ["10.0.0.1"]
 
@@ -859,13 +763,10 @@ def test_get_nonexistent_enrichment():
     inv = Investigation({"test": "data"}, root_type="artifact")
     shared = SharedInvestigationContext(inv)
 
-    result = shared.get_enrichment("enr:nonexistent")
+    result = shared.enrichment_get("nonexistent")
     assert result is None
 
-    result = shared.get_enrichment("nonexistent")
-    assert result is None
-
-    result = shared.get_enrichment("whois", "missing-context")
+    result = shared.enrichment_get("whois", "missing-context")
     assert result is None
 
 
@@ -906,8 +807,8 @@ def test_enrichment_reconcile_updates_registry():
         cy.enrichment_create("second", {"data": "v2"})
 
     assert len(shared.list_enrichments()) == 2
-    assert shared.get_enrichment("initial") is not None
-    assert shared.get_enrichment("second") is not None
+    assert shared.enrichment_get("initial") is not None
+    assert shared.enrichment_get("second") is not None
 
 
 def test_enrichment_deep_copy_independence():
@@ -919,13 +820,13 @@ def test_enrichment_deep_copy_independence():
         cy.enrichment_create("test", {"list": [1, 2, 3], "dict": {"key": "value"}})
 
     # Get enrichment and modify it
-    retrieved1 = shared.get_enrichment("test")
+    retrieved1 = shared.enrichment_get("test")
     assert retrieved1 is not None
     retrieved1.data["list"].append(4)
     retrieved1.data["dict"]["new_key"] = "new_value"
 
     # Get enrichment again - should not be affected by previous modification
-    retrieved2 = shared.get_enrichment("test")
+    retrieved2 = shared.enrichment_get("test")
     assert retrieved2 is not None
     assert retrieved2.data["list"] == [1, 2, 3]
     assert "new_key" not in retrieved2.data["dict"]
@@ -951,25 +852,22 @@ def test_enrichment_merge_in_reconcile():
     assert merged.data["field2"] == "value2"
 
     # Registry should reflect merged canonical state after reconcile refresh
-    registry_copy = shared.get_enrichment("shared")
+    registry_copy = shared.enrichment_get("shared")
     assert registry_copy is not None
     assert registry_copy.data["field1"] == "value1"
     assert registry_copy.data["field2"] == "value2"
 
 
 def test_get_enrichment_invalid_arguments():
-    """Test that get_enrichment raises ValueError for invalid arguments."""
+    """Argument validation is handled by Python signatures."""
     inv = Investigation({"test": "data"}, root_type="artifact")
     shared = SharedInvestigationContext(inv)
 
-    # Too many arguments
-    with pytest.raises(ValueError) as exc_info:
-        shared.get_enrichment("name", "context", "extra")
-    assert "accepts either" in str(exc_info.value)
+    with pytest.raises(TypeError):
+        shared.enrichment_get("name", "context", "extra")  # type: ignore[arg-type]
 
-    # Keyword arguments not supported
-    with pytest.raises(ValueError):
-        shared.get_enrichment(name="test")
+    with pytest.raises(TypeError):
+        shared.enrichment_get(foo="test")  # type: ignore[call-arg]
 
 
 def test_enrichment_with_parallel_tasks():
@@ -988,8 +886,8 @@ def test_enrichment_with_parallel_tasks():
     def task3():
         with shared.create_cyvest() as cy:
             # Both enrichments should be available
-            enr1 = shared.get_enrichment("task1_data")
-            enr2 = shared.get_enrichment("task2_data")
+            enr1 = shared.enrichment_get("task1_data")
+            enr2 = shared.enrichment_get("task2_data")
             if enr1:
                 cy.enrichment_create("combined", {"task1_value": enr1.data["value"]})
             if enr2:
@@ -1004,7 +902,7 @@ def test_enrichment_with_parallel_tasks():
 
     # Verify all enrichments are present
     assert len(shared.list_enrichments()) == 3
-    combined = shared.get_enrichment("combined")
+    combined = shared.enrichment_get("combined")
     assert combined is not None
     # task3 should have access to task1 and task2 enrichments
 

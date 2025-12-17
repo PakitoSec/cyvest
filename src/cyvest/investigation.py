@@ -534,10 +534,10 @@ class Investigation:
                 else str(target.obs_type).upper().replace("-", "_")
             )
             raise ValueError(
-                f"Cannot use observable from shared_context.get_observable() directly in relationships.\n"
+                f"Cannot use observable from shared_context.observable_get() directly in relationships.\n"
                 f"Observable '{target_key}' is a read-only copy not registered in this investigation.\n\n"
                 f"Incorrect pattern:\n"
-                f"  source.relate_to(shared_context.get_observable(...), RelationshipType.{relationship_type})\n\n"
+                f"  source.relate_to(shared_context.observable_get(...), RelationshipType.{relationship_type})\n\n"
                 f"Correct pattern (and use reconcile or merge):\n"
                 f"  # Use cy.observable() to create/get observable in local investigation\n"
                 f"  source.relate_to(\n"

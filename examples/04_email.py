@@ -425,21 +425,31 @@ class AggregatedRiskTask(BaseRule):
         logger.info("Starting aggregated risk assessment")
 
         # Access checks from other tasks using parameter-based API
-        from_check = self.shared_context.get_check("from", "header")
-        receiver_check = self.shared_context.get_check("receiver", "header")
+        from_check = self.shared_context.check_get("from", "header")
+        receiver_check = self.shared_context.check_get("receiver", "header")
 
         # Access observables from other tasks using parameter-based API
-        sender_email = self.shared_context.get_observable(ObservableType.EMAIL_ADDR, "noreply@domainmalicious.com")
-        malicious_domain = self.shared_context.get_observable(ObservableType.DOMAIN_NAME, "domainmalicious.com")
+        sender_email = self.shared_context.observable_get(ObservableType.EMAIL_ADDR, "noreply@domainmalicious.com")
+        malicious_domain = self.shared_context.observable_get(ObservableType.DOMAIN_NAME, "domainmalicious.com")
 
         # Find all URL checks (created by BodiesUrlTask)
         all_checks = self.shared_context.list_checks()
-        url_checks = [self.shared_context.get_check(key) for key in all_checks if key.startswith("chk:body-url-")]
+        url_checks = []
+        for key in all_checks:
+            if key.startswith("chk:body-url-"):
+                _, check_id, scope = key.split(":", 2)
+                check = self.shared_context.check_get(check_id, scope)
+                if check is not None:
+                    url_checks.append(check)
 
         # Find all attachment checks
-        attachment_checks = [
-            self.shared_context.get_check(key) for key in all_checks if key.startswith("chk:attachment-")
-        ]
+        attachment_checks = []
+        for key in all_checks:
+            if key.startswith("chk:attachment-"):
+                _, check_id, scope = key.split(":", 2)
+                check = self.shared_context.check_get(check_id, scope)
+                if check is not None:
+                    attachment_checks.append(check)
 
         # Calculate composite risk score
         risk_score = Decimal("0")

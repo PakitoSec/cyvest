@@ -14,7 +14,8 @@ from cyvest.shared import SharedInvestigationContext
 ## Features
 
 - **Sync + Async**: Same implementation supports threads and asyncio
-- **Async-safe**: Async APIs run critical sections in a worker thread (no event-loop blocking)
+- **Single Lock**: Canonical state is protected by one `threading.RLock`
+- **Async-safe**: Async APIs run the entire critical section in a worker thread via `asyncio.to_thread(...)` (no event-loop blocking)
 - **Auto-Reconcile**: Works with both `with` and `async with`
 - **Cross-Task Sharing**: Tasks can access observables/checks created by other tasks
 - **Deep Copying**: Prevents concurrent modification issues
@@ -52,7 +53,7 @@ def email_from(shared_context):
 def bodies_url(shared_context):
     with shared_context.create_cyvest() as cy:
         data = cy.root().extra
-        domain_info = shared_context.get_observable(ObservableType.DOMAIN_NAME, "malicious.com")
+        domain_info = shared_context.observable_get(ObservableType.DOMAIN_NAME, "malicious.com")
         if domain_info:
             cy.observable(ObservableType.URL, data.get("url")).relate_to(
                 cy.observable(ObservableType.DOMAIN_NAME, domain_info.value),
@@ -66,9 +67,15 @@ def bodies_url(shared_context):
 
 #### Constructor
 ```python
-SharedInvestigationContext(main_investigation: Investigation)
+SharedInvestigationContext(
+    main_investigation: Investigation,
+    *,
+    lock: threading.RLock | None = None,
+    max_async_workers: int | None = None,
+)
 ```
 Creates a shared context from a main investigation. Automatically inherits `root_type`, `score_mode`, and `data`.
+`max_async_workers` (optional) limits concurrent async callers.
 
 #### Methods
 
@@ -94,28 +101,24 @@ Manually merges observables and checks from a source into the shared context.
 **Parameters:**
 - `source`: Cyvest or Investigation instance to merge
 
-**Thread-Safety:** Uses lock to ensure safe concurrent merging
+**Thread-Safety:** Merge + registry refresh are atomic under the shared `threading.RLock`.
 
-##### `get_observable(key: str) -> Observable | None`
-##### `get_observable(obs_type: str | ObservableType, value: str) -> Observable | None`
-Retrieves a shared observable by its key or by type and value.
+##### `areconcile(source: Cyvest | Investigation) -> None`
+Async equivalent of `reconcile()`. Runs the entire critical section in a worker thread.
+
+##### `observable_get(obs_type: str | ObservableType, value: str) -> Observable | None`
+Retrieves a shared observable by type and value.
 
 **Parameters:**
-- **Key-based lookup**: `key` - Observable key (format: `obs:type:value`)
-- **Parameter-based lookup** (recommended):
-  - `obs_type` - Observable type (string like `"email-addr"` or `ObservableType` enum)
-  - `value` - Observable value
+- `obs_type`: Observable type (string like `"email-addr"` or `ObservableType` enum)
+- `value`: Observable value
 
 **Returns:** Deep copy of the observable, or `None` if not found
 
 **Examples:**
 ```python
-# Parameter-based lookup (recommended) - cleaner and type-safe
-domain = shared_context.get_observable(ObservableType.DOMAIN_NAME, "malicious.com")
-email = shared_context.get_observable("email-addr", "user@example.com")
-
-# Key-based lookup (advanced usage)
-domain = shared_context.get_observable("obs:domain-name:malicious.com")
+domain = shared_context.observable_get(ObservableType.DOMAIN_NAME, "malicious.com")
+email = shared_context.observable_get("email-addr", "user@example.com")
 
 # Use in task to reference observables from other tasks
 if domain:
@@ -125,81 +128,23 @@ if domain:
     )
 ```
 
-##### `get_check(key: str) -> Check | None`
-##### `get_check(check_id: str, scope: str) -> Check | None`
-Retrieves a shared check by its key or by check ID and scope.
+##### `check_get(check_id: str, scope: str) -> Check | None`
+Retrieves a shared check by ID and scope.
 
 **Parameters:**
-- **Key-based lookup**: `key` - Check key (format: `chk:id:scope`)
-- **Parameter-based lookup** (recommended):
-  - `check_id` - Check identifier
-  - `scope` - Check scope
+- `check_id`: Check identifier
+- `scope`: Check scope
 
 **Returns:** Deep copy of the check, or `None` if not found
 
 **Examples:**
 ```python
-# Parameter-based lookup (recommended) - cleaner and more intuitive
-from_check = shared_context.get_check("from", "header")
-malware_check = shared_context.get_check("malware_scan", "attachment")
-
-# Key-based lookup (advanced usage)
-from_check = shared_context.get_check("chk:from:header")
+from_check = shared_context.check_get("from", "header")
+malware_check = shared_context.check_get("malware_scan", "attachment")
 ```
 
-##### `find_observables_by_type(obs_type: ObservableType) -> list[Observable]`
-Finds all observables of a specific type.
-
-**Parameters:**
-- `obs_type`: Observable type to search for
-
-**Returns:** List of deep copies of matching observables
-
-##### `find_observables_by_value(value: str) -> list[Observable]`
-Finds all observables with a specific value.
-
-**Parameters:**
-- `value`: Observable value to search for
-
-**Returns:** List of deep copies of matching observables
-
-##### `has_observable(key: str) -> bool`
-##### `has_observable(obs_type: str | ObservableType, value: str) -> bool`
-Checks if an observable exists in the shared context.
-
-**Parameters:**
-- **Key-based**: `key` - Observable key
-- **Parameter-based** (recommended): `obs_type`, `value` - Observable type and value
-
-**Examples:**
-```python
-# Parameter-based check (recommended)
-if shared_context.has_observable(ObservableType.EMAIL_ADDR, "sender@domain.com"):
-    # Observable exists
-
-# Key-based check
-if shared_context.has_observable("obs:email-addr:sender@domain.com"):
-    # Observable exists
-```
-
-##### `has_check(key: str) -> bool`
-##### `has_check(check_id: str, scope: str) -> bool`
-Checks if a check exists in the shared context.
-
-**Parameters:**
-- **Key-based**: `key` - Check key
-- **Parameter-based** (recommended): `check_id`, `scope` - Check ID and scope
-
-**Examples:**
-```python
-# Parameter-based check (recommended)
-if shared_context.has_check("malware_scan", "attachment"):
-    # Check exists
-
-# Key-based check
-if shared_context.has_check("chk:malware_scan:attachment"):
-    # Check exists
-```
+##### Existence checks
+Use `observable_get(...)` / `check_get(...)` and check for `None`.
 
 ##### `list_observables() -> list[str]`
 Returns a list of all observable keys in the shared context.
@@ -291,10 +236,23 @@ print(path)  # /absolute/path/to/investigation.json
 
 The implementation uses several strategies to ensure safe concurrency:
 
-1. **Single critical section**: Merge + registry refresh are atomic
+1. **Single lock**: Canonical state is protected by one `threading.RLock`
 2. **Deep Copying**: All returned observables/checks are deep copies
-3. **Async-safe access**: Async APIs run critical sections in a worker thread
+3. **Async-safe access**: Async APIs run the entire critical section in a worker thread (never on the event loop)
 4. **Immutable Keys**: Observable/check keys are immutable strings
+
+## Async Usage
+
+```python
+import asyncio
+from cyvest.shared import SharedInvestigationContext
+
+async def worker(shared: SharedInvestigationContext):
+    async with shared.create_cyvest() as cy:
+        cy.observable(ObservableType.DOMAIN_NAME, "example.com")
+
+asyncio.run(worker(shared_context))
+```
 
 ## Performance Considerations
 
@@ -314,7 +272,7 @@ See `examples/04_email.py` for a complete working example demonstrating:
 
 1. **Always use context manager**: `with shared_context.create_cyvest() as cy:`
 2. **Access data from root**: `data = cy.root().extra` to get the investigation data
-3. **Check for None**: Always check if `get_observable()` returns None
+3. **Check for None**: Always check if `observable_get()` returns None
 4. **Meaningful keys**: Use descriptive observable keys for easy lookup
 5. **Task ordering**: Consider task dependencies when designing workflows
 6. **Error handling**: Wrap task execution in try/except for robustness

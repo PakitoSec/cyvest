@@ -15,11 +15,10 @@ from __future__ import annotations
 
 import asyncio
 import threading
-from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from decimal import Decimal
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal, overload
+from typing import TYPE_CHECKING, Any, Literal
 
 from logurich import logger
 
@@ -35,82 +34,44 @@ if TYPE_CHECKING:
 
 class _SharedLock:
     """
-    Dual-mode lock adapter.
+    Dual-mode lock adapter with a single canonical lock.
 
-    - Sync path: uses a threading lock directly.
-    - Async path: serializes callers via an asyncio.Lock gate, then runs the critical section in a thread.
+    - Sync path: acquires a single `threading.RLock` around the critical section.
+    - Async path: runs the entire critical section in a worker thread via `asyncio.to_thread(...)`
+      so the event loop is never blocked.
 
     Notes:
-    - The async path does not rely on holding the threading lock in the event-loop thread; the entire
-      critical section (including lock acquire/release) runs in a worker thread.
-    - `async with _SharedLock` is provided for completeness, but internal code should prefer `arun()`
-      to ensure the critical section itself does not execute on the event loop.
+    - Optionally limits concurrent async callers via a single `asyncio.Semaphore(max_async_workers)`.
     """
 
     def __init__(
         self,
         thread_lock: threading.RLock | None = None,
         *,
-        async_gate: asyncio.Lock | None = None,
+        max_async_workers: int | None = None,
     ) -> None:
         self._thread_lock = thread_lock or threading.RLock()
-        self._async_gate: asyncio.Lock | None = async_gate
-        self._cm_executor: ThreadPoolExecutor | None = None  # used only for async context-manager methods
-
-    def __enter__(self) -> _SharedLock:
-        self._thread_lock.acquire()
-        return self
-
-    def __exit__(self, exc_type, exc, tb) -> Literal[False]:
-        self._thread_lock.release()
-        return False
-
-    async def __aenter__(self) -> _SharedLock:
-        gate = await self._ensure_async_gate()
-        await gate.acquire()
-        try:
-            # Acquire/release for the async CM must happen on a consistent worker thread for RLock.
-            loop = asyncio.get_running_loop()
-            executor = self._cm_executor
-            if executor is None:
-                executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="cyvest-shared-lock")
-                self._cm_executor = executor
-            await loop.run_in_executor(executor, self._thread_lock.acquire)
-            return self
-        except BaseException:
-            gate.release()
-            raise
-
-    async def __aexit__(self, exc_type, exc, tb) -> Literal[False]:
-        try:
-            loop = asyncio.get_running_loop()
-            executor = self._cm_executor
-            if executor is None:
-                # Should not happen, but keep behavior predictable.
-                self._thread_lock.release()
-            else:
-                await loop.run_in_executor(executor, self._thread_lock.release)
-        finally:
-            # Gate is always acquired in __aenter__.
-            if self._async_gate is not None and self._async_gate.locked():
-                self._async_gate.release()
-        return False
+        self._max_async_workers = max_async_workers
+        self._async_semaphores: dict[int, asyncio.Semaphore] = {}
 
     def run(self, fn, /, *args, **kwargs):
         with self._thread_lock:
             return fn(*args, **kwargs)
 
     async def arun(self, fn, /, *args, **kwargs):
-        gate = await self._ensure_async_gate()
-        async with gate:
+        max_workers = self._max_async_workers
+        if max_workers is None:
             return await asyncio.to_thread(self.run, fn, *args, **kwargs)
 
-    async def _ensure_async_gate(self) -> asyncio.Lock:
-        gate = self._async_gate
-        if gate is None:
-            gate = asyncio.Lock()
-            self._async_gate = gate
-        return gate
+        loop = asyncio.get_running_loop()
+        loop_id = id(loop)
+        semaphore = self._async_semaphores.get(loop_id)
+        if semaphore is None:
+            semaphore = asyncio.Semaphore(max_workers)
+            self._async_semaphores[loop_id] = semaphore
+
+        async with semaphore:
+            return await asyncio.to_thread(self.run, fn, *args, **kwargs)
 
 
 class SharedInvestigationContext:
@@ -128,13 +89,10 @@ class SharedInvestigationContext:
         self,
         root_investigation: Investigation,
         *,
-        lock: threading.RLock | asyncio.Lock | None = None,
-        async_gate: asyncio.Lock | None = None,
+        lock: threading.RLock | None = None,
+        max_async_workers: int | None = None,
     ) -> None:
-        if isinstance(lock, asyncio.Lock):
-            async_gate = lock
-            lock = None
-        self._lock = _SharedLock(lock, async_gate=async_gate)
+        self._lock = _SharedLock(lock, max_async_workers=max_async_workers)
         self._main_investigation = root_investigation
 
         self._root_type = (
@@ -145,6 +103,10 @@ class SharedInvestigationContext:
         self._observable_registry: dict[str, Observable] = {}
         self._check_registry: dict[str, Check] = {}
         self._enrichment_registry: dict[str, Enrichment] = {}
+
+        # Initialize registries from the provided canonical investigation so lookups
+        # work immediately (even before the first reconcile).
+        self._lock.run(self._refresh_registries_unlocked)
 
     # ---------------------------------------------------------------------
     # Task creation (local fragment builder)
@@ -261,18 +223,12 @@ class SharedInvestigationContext:
     # Lookups (deep-copied snapshots only)
     # ---------------------------------------------------------------------
 
-    @overload
-    def get_observable(self, key: str) -> Observable | None: ...
-
-    @overload
-    def get_observable(self, obs_type: str | ObservableType, value: str) -> Observable | None: ...
-
-    def get_observable(self, *args, **kwargs) -> Observable | None:
-        key = self._parse_observable_lookup_args(*args, **kwargs, _caller="get_observable")
+    def observable_get(self, obs_type: str | ObservableType, value: str) -> Observable | None:
+        key = self._observable_key(obs_type, value)
         return self._lock.run(self._get_observable_by_key_unlocked, key)
 
-    async def aget_observable(self, *args, **kwargs) -> Observable | None:
-        key = self._parse_observable_lookup_args(*args, **kwargs, _caller="get_observable")
+    async def observable_aget(self, obs_type: str | ObservableType, value: str) -> Observable | None:
+        key = self._observable_key(obs_type, value)
         return await self._lock.arun(self._get_observable_by_key_unlocked, key)
 
     def _get_observable_by_key_unlocked(self, key: str) -> Observable | None:
@@ -283,86 +239,49 @@ class SharedInvestigationContext:
         copy._from_shared_context = True
         return copy
 
-    def _parse_observable_lookup_args(self, *args, _caller: str, **kwargs) -> str:
-        if len(args) == 1 and not kwargs:
-            return args[0]
-        if len(args) == 2 and not kwargs:
-            obs_type, value = args
-            if isinstance(obs_type, ObservableType):
-                obs_type = obs_type.value
-            try:
-                return keys.generate_observable_key(obs_type, value)
-            except Exception as e:
-                raise ValueError(
-                    f"Failed to generate observable key for type='{obs_type}', value='{value}': {e}"
-                ) from e
-        raise ValueError(f"{_caller}() accepts either (key: str) or (obs_type: str | ObservableType, value: str)")
+    def _observable_key(self, obs_type: str | ObservableType, value: str) -> str:
+        if isinstance(obs_type, ObservableType):
+            obs_type = obs_type.value
+        try:
+            return keys.generate_observable_key(obs_type, value)
+        except Exception as e:
+            raise ValueError(f"Failed to generate observable key for type='{obs_type}', value='{value}': {e}") from e
 
-    @overload
-    def get_check(self, key: str) -> Check | None: ...
-
-    @overload
-    def get_check(self, check_id: str, scope: str) -> Check | None: ...
-
-    def get_check(self, *args, **kwargs) -> Check | None:
-        key = self._parse_check_lookup_args(*args, **kwargs, _caller="get_check")
+    def check_get(self, check_id: str, scope: str) -> Check | None:
+        key = self._check_key(check_id, scope)
         return self._lock.run(self._get_check_by_key_unlocked, key)
 
-    async def aget_check(self, *args, **kwargs) -> Check | None:
-        key = self._parse_check_lookup_args(*args, **kwargs, _caller="get_check")
+    async def check_aget(self, check_id: str, scope: str) -> Check | None:
+        key = self._check_key(check_id, scope)
         return await self._lock.arun(self._get_check_by_key_unlocked, key)
 
     def _get_check_by_key_unlocked(self, key: str) -> Check | None:
         check = self._check_registry.get(key)
         return check.model_copy(deep=True) if check else None
 
-    def _parse_check_lookup_args(self, *args, _caller: str, **kwargs) -> str:
-        if len(args) == 1 and not kwargs:
-            return args[0]
-        if len(args) == 2 and not kwargs:
-            check_id, scope = args
-            try:
-                return keys.generate_check_key(check_id, scope)
-            except Exception as e:
-                raise ValueError(f"Failed to generate check key for check_id='{check_id}', scope='{scope}': {e}") from e
-        raise ValueError(f"{_caller}() accepts either (key: str) or (check_id: str, scope: str)")
+    def _check_key(self, check_id: str, scope: str) -> str:
+        try:
+            return keys.generate_check_key(check_id, scope)
+        except Exception as e:
+            raise ValueError(f"Failed to generate check key for check_id='{check_id}', scope='{scope}': {e}") from e
 
-    @overload
-    def get_enrichment(self, key: str) -> Enrichment | None: ...
-
-    @overload
-    def get_enrichment(self, name: str, context: str = "") -> Enrichment | None: ...
-
-    def get_enrichment(self, *args, **kwargs) -> Enrichment | None:
-        key = self._parse_enrichment_lookup_args(*args, **kwargs, _caller="get_enrichment")
+    def enrichment_get(self, name: str, context: str = "") -> Enrichment | None:
+        key = self._enrichment_key(name, context)
         return self._lock.run(self._get_enrichment_by_key_unlocked, key)
 
-    async def aget_enrichment(self, *args, **kwargs) -> Enrichment | None:
-        key = self._parse_enrichment_lookup_args(*args, **kwargs, _caller="get_enrichment")
+    async def enrichment_aget(self, name: str, context: str = "") -> Enrichment | None:
+        key = self._enrichment_key(name, context)
         return await self._lock.arun(self._get_enrichment_by_key_unlocked, key)
 
     def _get_enrichment_by_key_unlocked(self, key: str) -> Enrichment | None:
         enrichment = self._enrichment_registry.get(key)
         return enrichment.model_copy(deep=True) if enrichment else None
 
-    def _parse_enrichment_lookup_args(self, *args, _caller: str, **kwargs) -> str:
-        if len(args) == 1 and not kwargs:
-            arg = args[0]
-            if arg.startswith("enr:"):
-                return arg
-            try:
-                return keys.generate_enrichment_key(arg)
-            except Exception as e:
-                raise ValueError(f"Failed to generate enrichment key for name='{arg}': {e}") from e
-        if len(args) == 2 and not kwargs:
-            name, context = args
-            try:
-                return keys.generate_enrichment_key(name, context)
-            except Exception as e:
-                raise ValueError(
-                    f"Failed to generate enrichment key for name='{name}', context='{context}': {e}"
-                ) from e
-        raise ValueError(f"{_caller}() accepts either (key: str) or (name: str, context: str = '')")
+    def _enrichment_key(self, name: str, context: str = "") -> str:
+        try:
+            return keys.generate_enrichment_key(name, context)
+        except Exception as e:
+            raise ValueError(f"Failed to generate enrichment key for name='{name}', context='{context}': {e}") from e
 
     # ---------------------------------------------------------------------
     # Lightweight state reads
@@ -404,51 +323,7 @@ class SharedInvestigationContext:
     async def alist_enrichments(self) -> list[str]:
         return await self._lock.arun(lambda: list(self._enrichment_registry.keys()))
 
-    def find_observables_by_type(self, obs_type: ObservableType) -> list[Observable]:
-        return self._lock.run(self._find_observables_by_type_unlocked, obs_type)
-
-    async def afind_observables_by_type(self, obs_type: ObservableType) -> list[Observable]:
-        return await self._lock.arun(self._find_observables_by_type_unlocked, obs_type)
-
-    def _find_observables_by_type_unlocked(self, obs_type: ObservableType) -> list[Observable]:
-        return [obs.model_copy(deep=True) for obs in self._observable_registry.values() if obs.obs_type == obs_type]
-
-    def find_observables_by_value(self, value: str) -> list[Observable]:
-        return self._lock.run(self._find_observables_by_value_unlocked, value)
-
-    async def afind_observables_by_value(self, value: str) -> list[Observable]:
-        return await self._lock.arun(self._find_observables_by_value_unlocked, value)
-
-    def _find_observables_by_value_unlocked(self, value: str) -> list[Observable]:
-        return [obs.model_copy(deep=True) for obs in self._observable_registry.values() if obs.value == value]
-
-    @overload
-    def has_observable(self, key: str) -> bool: ...
-
-    @overload
-    def has_observable(self, obs_type: str | ObservableType, value: str) -> bool: ...
-
-    def has_observable(self, *args, **kwargs) -> bool:
-        key = self._parse_observable_lookup_args(*args, **kwargs, _caller="has_observable")
-        return self._lock.run(lambda: key in self._observable_registry)
-
-    async def ahas_observable(self, *args, **kwargs) -> bool:
-        key = self._parse_observable_lookup_args(*args, **kwargs, _caller="has_observable")
-        return await self._lock.arun(lambda: key in self._observable_registry)
-
-    @overload
-    def has_check(self, key: str) -> bool: ...
-
-    @overload
-    def has_check(self, check_id: str, scope: str) -> bool: ...
-
-    def has_check(self, *args, **kwargs) -> bool:
-        key = self._parse_check_lookup_args(*args, **kwargs, _caller="has_check")
-        return self._lock.run(lambda: key in self._check_registry)
-
-    async def ahas_check(self, *args, **kwargs) -> bool:
-        key = self._parse_check_lookup_args(*args, **kwargs, _caller="has_check")
-        return await self._lock.arun(lambda: key in self._check_registry)
+    # Intentionally minimal: prefer `observable_get()` / `check_get()` and user-side filtering.
 
     # ---------------------------------------------------------------------
     # Serialization helpers (sync + async wrappers)

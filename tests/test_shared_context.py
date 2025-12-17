@@ -19,13 +19,15 @@ Test coverage:
 - Enrichment retrieval and management
 """
 
+import asyncio
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from decimal import Decimal
 
 import pytest
 
 from cyvest import Cyvest, ObservableType, RelationshipType
-from cyvest.investigation import Investigation, SharedInvestigationContext
+from cyvest.investigation import Investigation
+from cyvest.shared import SharedInvestigationContext
 
 
 def test_shared_context_initialization():
@@ -755,6 +757,42 @@ def test_copied_observable_has_marker():
     direct = inv.get_observable(ObservableType.DOMAIN_NAME, "example.com")
     assert direct is not None
     assert direct._from_shared_context is False
+
+
+# ==============================================================================
+# Async API (no pytest-asyncio required; uses asyncio.run)
+# ==============================================================================
+
+
+def test_async_context_manager_auto_reconcile():
+    inv = Investigation({"test": "data"}, root_type="artifact")
+    shared = SharedInvestigationContext(inv)
+
+    async def run():
+        async with shared.create_cyvest() as cy:
+            cy.observable(ObservableType.EMAIL_ADDR, "async@domain.com")
+            cy.check("async_check", "scope", "Async check")
+
+    asyncio.run(run())
+
+    assert shared.has_observable(ObservableType.EMAIL_ADDR, "async@domain.com")
+    assert shared.has_check("async_check", "scope")
+
+
+def test_areconcile_and_aget_observable():
+    inv = Investigation({"test": "data"}, root_type="artifact")
+    shared = SharedInvestigationContext(inv)
+
+    cy = Cyvest({"test": "data"}, root_type="artifact")
+    cy.observable(ObservableType.IPV4_ADDR, "8.8.8.8")
+
+    async def run():
+        await shared.areconcile(cy)
+        obs = await shared.aget_observable(ObservableType.IPV4_ADDR, "8.8.8.8")
+        assert obs is not None
+        assert obs.value == "8.8.8.8"
+
+    asyncio.run(run())
 
 
 def test_get_enrichment_by_key():

@@ -16,7 +16,7 @@ from logurich import logger
 from logurich.opt_click import click_logger_params
 
 from cyvest import Cyvest, Level, ObservableType, RelationshipType
-from cyvest.investigation import SharedInvestigationContext
+from cyvest.shared import SharedInvestigationContext
 
 logger.enable("cyvest")
 

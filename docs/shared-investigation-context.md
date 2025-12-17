@@ -1,46 +1,39 @@
 # SharedInvestigationContext
 
-> **Note**: This is an advanced feature that requires direct import from `cyvest.investigation`. It is not part of the main `Cyvest` facade API.
+> **Note**: This is an advanced feature that requires direct import from `cyvest.shared`. It is not part of the main `Cyvest` facade API.
 
 ## Overview
 
-The `SharedInvestigationContext` enables thread-safe sharing of observables and checks across multiple tasks in a multi-threaded investigation. This allows tasks to reuse and reference observables created by other tasks, preventing duplication and enabling aggregated checks.
+The `SharedInvestigationContext` enables safe sharing of observables and checks across concurrent tasks (threads or asyncio). This allows tasks to reuse and reference observables created by other tasks, preventing duplication and enabling aggregated checks.
 
-**Usage**: Import directly from the investigation module:
+**Usage**: Import directly from the shared module:
 ```python
-from cyvest.investigation import SharedInvestigationContext, InvestigationTask
+from cyvest.shared import SharedInvestigationContext
 ```
 
 ## Features
 
-- **Thread-Safe**: Uses `threading.RLock()` for concurrent access protection
-- **Auto-Reconcile**: Context manager pattern automatically merges task results
+- **Sync + Async**: Same implementation supports threads and asyncio
+- **Async-safe**: Async APIs run critical sections in a worker thread (no event-loop blocking)
+- **Auto-Reconcile**: Works with both `with` and `async with`
 - **Cross-Task Sharing**: Tasks can access observables/checks created by other tasks
 - **Deep Copying**: Prevents concurrent modification issues
-- **Backward Compatible**: Optional feature, existing code works unchanged
 
 ## Basic Usage
 
 ```python
-from cyvest.investigation import SharedInvestigationContext, InvestigationTask
+from cyvest.shared import SharedInvestigationContext
+from cyvest import ObservableType
 from concurrent.futures import ThreadPoolExecutor
 
 # Create a shared context from the main investigation
 shared_context = SharedInvestigationContext(main_investigation)
 
-# Use in a task with auto-reconcile
-class MyTask(InvestigationTask):
-    def run(self, shared_context):
-        # Create a Cyvest instance with auto-reconcile
-        with shared_context.create_cyvest() as cy:
-            # Access data from root observable
-            data = cy.root().extra
-
-            # Build your investigation fragment
-            cy.observable(ObservableType.EMAIL_ADDR, data.get("email"))
-
-            # Automatically merged when exiting context
-            return cy
+# Use in a worker with auto-reconcile
+def my_worker(shared_context):
+    with shared_context.create_cyvest() as cy:
+        data = cy.root().extra
+        cy.observable(ObservableType.EMAIL_ADDR, data.get("email"))
 ```
 
 ## Cross-Task Observable Sharing
@@ -48,36 +41,23 @@ class MyTask(InvestigationTask):
 Tasks can access observables created by other tasks:
 
 ```python
-class EmailFrom(InvestigationTask):
-    def run(self, shared_context):
-        with shared_context.create_cyvest() as cy:
-            # Access data from root observable
-            data = cy.root().extra
+from cyvest import ObservableType, RelationshipType
 
-            # Create and register an observable
-            domain_obs = cy.observable(
-                ObservableType.DOMAIN_NAME,
-                data.get("domain")
+def email_from(shared_context):
+    with shared_context.create_cyvest() as cy:
+        data = cy.root().extra
+        cy.observable(ObservableType.DOMAIN_NAME, data.get("domain"))
+
+
+def bodies_url(shared_context):
+    with shared_context.create_cyvest() as cy:
+        data = cy.root().extra
+        domain_info = shared_context.get_observable(ObservableType.DOMAIN_NAME, "malicious.com")
+        if domain_info:
+            cy.observable(ObservableType.URL, data.get("url")).relate_to(
+                cy.observable(ObservableType.DOMAIN_NAME, domain_info.value),
+                RelationshipType.RELATED_TO,
             )
-            return cy
-
-class BodiesUrlTask(InvestigationTask):
-    def run(self, shared_context):
-        with shared_context.create_cyvest() as cy:
-            # Access data from root observable
-            data = cy.root().extra
-
-            # Reuse the domain observable from EmailFrom task
-            # Using parameter-based lookup (recommended)
-            domain = shared_context.get_observable(ObservableType.DOMAIN_NAME, "malicious.com")
-
-            if domain:
-                # Link URL to the shared domain observable
-                cy.observable(ObservableType.URL, data.get("url")).relate_to(
-                    domain,
-                    RelationshipType.RELATED_TO
-                )
-            return cy
 ```
 
 ## API Reference
@@ -140,8 +120,8 @@ domain = shared_context.get_observable("obs:domain-name:malicious.com")
 # Use in task to reference observables from other tasks
 if domain:
     cy.observable(ObservableType.URL, "https://example.com").relate_to(
-        domain,
-        RelationshipType.RELATED_TO
+        cy.observable(ObservableType.DOMAIN_NAME, domain.value),
+        RelationshipType.RELATED_TO,
     )
 ```
 
@@ -307,31 +287,13 @@ print(path)  # /absolute/path/to/investigation.json
 
 > Access merged results by reusing the original `Investigation` instance you passed to `SharedInvestigationContext`; reconciliation mutates it in place.
 
-### Cyvest Updates
-
-#### Constructor
-```python
-Cyvest(data, root_type="artifact", score_mode=None, shared_context=None)
-```
-
-**New Parameter:**
-- `shared_context`: Optional `SharedInvestigationContext` for cross-task sharing
-
-#### New Methods
-
-##### `get_shared_observable(key: str) -> Observable | None`
-Retrieves an observable from the shared context if available, otherwise falls back to local investigation.
-
-##### `get_shared_check(key: str) -> Check | None`
-Retrieves a check from the shared context if available, otherwise falls back to local investigation.
-
 ## Thread Safety
 
-The implementation uses several strategies to ensure thread safety:
+The implementation uses several strategies to ensure safe concurrency:
 
-1. **RLock**: Reentrant lock protects all shared state modifications
+1. **Single critical section**: Merge + registry refresh are atomic
 2. **Deep Copying**: All returned observables/checks are deep copies
-3. **Atomic Operations**: Reconciliation is an atomic operation
+3. **Async-safe access**: Async APIs run critical sections in a worker thread
 4. **Immutable Keys**: Observable/check keys are immutable strings
 
 ## Performance Considerations
@@ -347,38 +309,6 @@ See `examples/04_email.py` for a complete working example demonstrating:
 - Auto-reconcile pattern for clean code
 - Cross-task observable sharing between `EmailFrom` and `BodiesUrlTask`
 - Aggregated checks across multiple concurrent tasks
-
-## Migration Guide
-
-### Before (without SharedInvestigationContext)
-```python
-class MyTask(InvestigationTask):
-    def run(self, data):
-        cy = Cyvest(data, root_type="artifact")
-        # Build investigation
-        # Access data directly from parameter
-        email = data.get("email")
-        return cy
-
-# Tasks can't share observables
-```
-
-### After (with SharedInvestigationContext)
-```python
-class MyTask(InvestigationTask):
-    def run(self, shared_context):
-        with shared_context.create_cyvest() as cy:
-            # Build investigation
-            # Access data from root observable
-            data = cy.root().extra
-            email = data.get("email")
-
-            # Can access shared observables
-            domain = shared_context.get_observable("domain-name:example.com")
-            return cy
-
-# Auto-reconciled, thread-safe, cross-task sharing enabled
-```
 
 ## Best Practices
 

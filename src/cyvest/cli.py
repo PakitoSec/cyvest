@@ -147,8 +147,6 @@ def merge(inputs: tuple[Path, ...], output: Path, output_format: str, stats: boo
     automatically handling duplicate objects and score propagation.
     The merged investigation is saved to the specified output file.
     """
-    from cyvest.io_serialization import save_investigation_json
-
     if len(inputs) < 2:
         raise click.BadParameter("Provide at least two input files.", param_hint="inputs")
 
@@ -183,7 +181,7 @@ def merge(inputs: tuple[Path, ...], output: Path, output_format: str, stats: boo
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     if output_format == "json":
-        save_investigation_json(main_investigation, str(output_path))
+        main_investigation.io_save_json(str(output_path))
         logger.info(f"[green]✓ Saved merged investigation to: {output_path}[/green]")
     elif output_format == "rich":
         # Display rich summary
@@ -191,7 +189,7 @@ def merge(inputs: tuple[Path, ...], output: Path, output_format: str, stats: boo
         main_investigation.display_summary(show_graph=True)
         # Also save as JSON
         json_output = output_path.with_suffix(".json")
-        save_investigation_json(main_investigation, str(json_output))
+        main_investigation.io_save_json(str(json_output))
         logger.info(f"\n[green]✓ Saved merged investigation to: {json_output}[/green]")
 
 

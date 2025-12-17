@@ -8,7 +8,6 @@ from jsonschema import Draft202012Validator
 
 from cyvest import Cyvest
 from cyvest.io_schema import get_investigation_schema
-from cyvest.io_serialization import serialize_investigation
 from cyvest.levels import Level
 from cyvest.model import Check, Container, Observable, ThreatIntel
 from cyvest.model_schema import InvestigationSchema
@@ -26,7 +25,7 @@ def test_schema_validates_serialized_output() -> None:
     """Schema accepts data produced by the serializer."""
     schema = get_investigation_schema()
     validator = Draft202012Validator(schema)
-    investigation_schema = serialize_investigation(_sample_investigation())
+    investigation_schema = _sample_investigation().io_to_invest()
 
     # Validate the model_dump() output (dict) against JSON schema
     validator.validate(investigation_schema.model_dump(mode="json", by_alias=True))

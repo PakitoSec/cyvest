@@ -19,9 +19,10 @@ from cyvest.score import ScoreMode
 
 if TYPE_CHECKING:
     from cyvest.cyvest import Cyvest
+    from cyvest.investigation import Investigation
 
 
-def serialize_investigation(cv: Cyvest) -> InvestigationSchema:
+def serialize_investigation(inv: Investigation) -> InvestigationSchema:
     """
     Serialize a complete investigation to an InvestigationSchema.
 
@@ -29,47 +30,36 @@ def serialize_investigation(cv: Cyvest) -> InvestigationSchema:
     Pydantic's field_serializer decorators.
 
     Args:
-        cv: Cyvest investigation to serialize
+        inv: Investigation to serialize
 
     Returns:
         InvestigationSchema instance (use .model_dump() for dict)
     """
-
-    # Helper to resolve proxies
-    def resolve(obj: Any) -> Any:
-        return obj._resolve() if hasattr(obj, "_resolve") else obj
-
-    # Resolve all observables, checks, threat intels, enrichments, containers
-    observables = {key: resolve(obs) for key, obs in cv.get_all_observables().items()}
-    threat_intels = {key: resolve(ti) for key, ti in cv.get_all_threat_intels().items()}
-    enrichments = {key: resolve(enr) for key, enr in cv.get_all_enrichments().items()}
-    containers = {key: resolve(ctr) for key, ctr in cv.get_all_containers().items()}
+    observables = dict(inv.get_all_observables())
+    threat_intels = dict(inv.get_all_threat_intels())
+    enrichments = dict(inv.get_all_enrichments())
+    containers = dict(inv.get_all_containers())
 
     # Build checks organized by scope (resolve proxies)
     checks_by_scope: dict[str, list[Check]] = {}
-    for check in cv.get_all_checks().values():
-        check = resolve(check)
+    for check in inv.get_all_checks().values():
         if check.scope not in checks_by_scope:
             checks_by_scope[check.scope] = []
         checks_by_scope[check.scope].append(check)
 
     # Build checks organized by level
     checks_by_level: dict[str, list[str]] = {}
-    for check in cv.get_all_checks().values():
-        check = resolve(check)
+    for check in inv.get_all_checks().values():
         if check.level.name not in checks_by_level:
             checks_by_level[check.level.name] = []
         checks_by_level[check.level.name].append(check.key)
 
     # Get root type
-    root = cv.observable_get_root()
-    root_type_value = None
-    if root:
-        root = resolve(root)
-        root_type_value = root.obs_type.value if hasattr(root.obs_type, "value") else str(root.obs_type)
+    root = inv.get_root()
+    root_type_value = root.obs_type.value if hasattr(root.obs_type, "value") else str(root.obs_type)
 
     # Build and validate using Pydantic model
-    started_at = getattr(getattr(cv, "_investigation", None), "_started_at", None)
+    started_at = getattr(inv, "_started_at", None)
     if not isinstance(started_at, datetime):
         started_at = datetime.now(timezone.utc)
     elif started_at.tzinfo is None:
@@ -79,45 +69,45 @@ def serialize_investigation(cv: Cyvest) -> InvestigationSchema:
 
     investigation = InvestigationSchema(
         started_at=started_at,
-        score=cv.get_global_score(),
-        level=cv.get_global_level(),
-        whitelisted=cv.investigation_is_whitelisted(),
-        whitelists=list(cv.investigation_get_whitelists()),
+        score=inv.get_global_score(),
+        level=inv.get_global_level(),
+        whitelisted=inv.is_whitelisted(),
+        whitelists=list(inv.get_whitelists()),
         observables=observables,
         checks=checks_by_scope,
         checks_by_level=checks_by_level,
         threat_intels=threat_intels,
         enrichments=enrichments,
         containers=containers,
-        stats=cv.get_statistics(),
+        stats=inv.get_statistics(),
         stats_checks=StatsChecksSchema(
-            checks=len(cv.get_all_checks()),
-            applied=sum(1 for c in cv.get_all_checks().values() if c.level != Level.NONE),
+            checks=len(inv.get_all_checks()),
+            applied=sum(1 for c in inv.get_all_checks().values() if c.level != Level.NONE),
         ),
         data_extraction={
             "root_type": root_type_value,
-            "score_mode": cv._investigation._score_engine._score_mode.value,
+            "score_mode": inv._score_engine._score_mode.value,
         },
     )
 
     return investigation
 
 
-def save_investigation_json(cv: Cyvest, filepath: str | Path) -> None:
+def save_investigation_json(inv: Investigation, filepath: str | Path) -> None:
     """
     Save an investigation to a JSON file.
 
     Args:
-        cv: Cyvest investigation to save
+        inv: Investigation to save
         filepath: Path to save the JSON file
     """
-    data = serialize_investigation(cv)
+    data = serialize_investigation(inv)
     with open(filepath, "w", encoding="utf-8") as f:
         f.write(data.model_dump_json(indent=2, by_alias=True))
 
 
 def generate_markdown_report(
-    cv: Cyvest,
+    inv: Investigation,
     include_containers: bool = False,
     include_enrichments: bool = False,
     include_observables: bool = True,
@@ -126,7 +116,7 @@ def generate_markdown_report(
     Generate a Markdown report of the investigation for LLM consumption.
 
     Args:
-        cv: Cyvest investigation
+        inv: Investigation
         include_containers: Include containers section in the report (default: False)
         include_enrichments: Include enrichments section in the report (default: False)
         include_observables: Include observables section in the report (default: True)
@@ -139,9 +129,9 @@ def generate_markdown_report(
     # Header
     lines.append("# Cybersecurity Investigation Report")
     lines.append("")
-    lines.append(f"**Global Score:** {cv.get_global_score():.2f}")
-    lines.append(f"**Global Level:** {cv.get_global_level().name}")
-    whitelists = cv.investigation_get_whitelists()
+    lines.append(f"**Global Score:** {inv.get_global_score():.2f}")
+    lines.append(f"**Global Level:** {inv.get_global_level().name}")
+    whitelists = inv.get_whitelists()
     whitelist_status = "Yes" if whitelists else "No"
     lines.append(f"**Whitelisted Investigation:** {whitelist_status}")
     if whitelists:
@@ -151,7 +141,7 @@ def generate_markdown_report(
     # Statistics
     lines.append("## Statistics")
     lines.append("")
-    stats = cv.get_statistics()
+    stats = inv.get_statistics()
     lines.append(f"- **Total Observables:** {stats.total_observables}")
     lines.append(f"- **Internal Observables:** {stats.internal_observables}")
     lines.append(f"- **External Observables:** {stats.external_observables}")
@@ -174,10 +164,10 @@ def generate_markdown_report(
     # Checks by Scope
     lines.append("## Checks by Scope")
     lines.append("")
-    for scope, _count in cv.get_statistics().checks_by_scope.items():
+    for scope, _count in inv.get_statistics().checks_by_scope.items():
         lines.append(f"### {scope}")
         lines.append("")
-        for check in cv.get_all_checks().values():
+        for check in inv.get_all_checks().values():
             if check.scope == scope and check.level != Level.NONE:
                 lines.append(f"- **{check.check_id}**: Score: {check.score_display}, Level: {check.level.name}")
                 lines.append(f"  - Description: {check.description}")
@@ -186,10 +176,10 @@ def generate_markdown_report(
         lines.append("")
 
     # Observables
-    if include_observables and cv.get_all_observables():
+    if include_observables and inv.get_all_observables():
         lines.append("## Observables")
         lines.append("")
-        for obs in cv.get_all_observables().values():
+        for obs in inv.get_all_observables().values():
             lines.append(f"### {obs.obs_type}: {obs.value}")
             lines.append(f"- **Key:** {obs.key}")
             lines.append(f"- **Score:** {obs.score_display}")
@@ -216,10 +206,10 @@ def generate_markdown_report(
             lines.append("")
 
     # Enrichments
-    if include_enrichments and cv.get_all_enrichments():
+    if include_enrichments and inv.get_all_enrichments():
         lines.append("## Enrichments")
         lines.append("")
-        for enr in cv.get_all_enrichments().values():
+        for enr in inv.get_all_enrichments().values():
             lines.append(f"### {enr.name}")
             if enr.context:
                 lines.append(f"- **Context:** {enr.context}")
@@ -227,10 +217,10 @@ def generate_markdown_report(
             lines.append("")
 
     # Containers
-    if include_containers and cv.get_all_containers():
+    if include_containers and inv.get_all_containers():
         lines.append("## Containers")
         lines.append("")
-        for ctr in cv.get_all_containers().values():
+        for ctr in inv.get_all_containers().values():
             lines.append(f"### {ctr.path}")
             lines.append(f"- **Description:** {ctr.description}")
             lines.append(f"- **Aggregated Score:** {ctr.get_aggregated_score():.2f}")
@@ -243,7 +233,7 @@ def generate_markdown_report(
 
 
 def save_investigation_markdown(
-    cv: Cyvest,
+    inv: Investigation,
     filepath: str | Path,
     include_containers: bool = False,
     include_enrichments: bool = False,
@@ -253,13 +243,13 @@ def save_investigation_markdown(
     Save an investigation as a Markdown report.
 
     Args:
-        cv: Cyvest investigation to save
+        inv: Investigation to save
         filepath: Path to save the Markdown file
         include_containers: Include containers section in the report (default: False)
         include_enrichments: Include enrichments section in the report (default: False)
         include_observables: Include observables section in the report (default: True)
     """
-    markdown = generate_markdown_report(cv, include_containers, include_enrichments, include_observables)
+    markdown = generate_markdown_report(inv, include_containers, include_enrichments, include_observables)
     with open(filepath, "w", encoding="utf-8") as f:
         f.write(markdown)
 

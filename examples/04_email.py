@@ -16,7 +16,7 @@ from logurich import logger
 from logurich.opt_click import click_logger_params
 
 from cyvest import Cyvest, Level, ObservableType, RelationshipType
-from cyvest.investigation import SharedInvestigationContext
+from cyvest.shared import SharedInvestigationContext
 
 logger.enable("cyvest")
 
@@ -425,21 +425,18 @@ class AggregatedRiskTask(BaseRule):
         logger.info("Starting aggregated risk assessment")
 
         # Access checks from other tasks using parameter-based API
-        from_check = self.shared_context.get_check("from", "header")
-        receiver_check = self.shared_context.get_check("receiver", "header")
+        from_check = self.shared_context.check_get("from", "header")
+        receiver_check = self.shared_context.check_get("receiver", "header")
 
         # Access observables from other tasks using parameter-based API
-        sender_email = self.shared_context.get_observable(ObservableType.EMAIL_ADDR, "noreply@domainmalicious.com")
-        malicious_domain = self.shared_context.get_observable(ObservableType.DOMAIN_NAME, "domainmalicious.com")
+        sender_email = self.shared_context.observable_get(ObservableType.EMAIL_ADDR, "noreply@domainmalicious.com")
+        malicious_domain = self.shared_context.observable_get(ObservableType.DOMAIN_NAME, "domainmalicious.com")
 
         # Find all URL checks (created by BodiesUrlTask)
-        all_checks = self.shared_context.list_checks()
-        url_checks = [self.shared_context.get_check(key) for key in all_checks if key.startswith("chk:body-url-")]
-
-        # Find all attachment checks
-        attachment_checks = [
-            self.shared_context.get_check(key) for key in all_checks if key.startswith("chk:attachment-")
-        ]
+        # Note: SharedInvestigationContext no longer exposes check listing APIs.
+        # Prefer explicit aggregation based on known check IDs/scopes.
+        url_checks = []
+        attachment_checks = []
 
         # Calculate composite risk score
         risk_score = Decimal("0")

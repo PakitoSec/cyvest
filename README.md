@@ -72,8 +72,7 @@ with Cyvest(data={"type": "email"}) as cv:
     print(f"Global Level: {cv.get_global_level()}")
 
     # Export
-    from cyvest.io_serialization import save_investigation_json
-    save_investigation_json(cv, "investigation.json")
+    cv.io_save_json("investigation.json")
 ```
 
 ### Model Proxies
@@ -169,26 +168,19 @@ with cv.container("network_analysis") as network:
 
 ### Multi-Threaded Investigations
 
-**Advanced Feature**: Use `SharedInvestigationContext` (imported directly from `cyvest.investigation`) for thread-safe parallel task execution with automatic observable sharing:
+**Advanced Feature**: Use `SharedInvestigationContext` (imported directly from `cyvest.shared`) for safe parallel task execution with automatic observable sharing:
 
 ```python
 from cyvest import Cyvest
-from cyvest.investigation import SharedInvestigationContext, InvestigationTask, Investigation
-from concurrent.futures import ThreadPoolExecutor
+from cyvest.investigation import Investigation
+from cyvest.shared import SharedInvestigationContext
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
-class EmailAnalysisTask(InvestigationTask):
-    def run(self, shared_context):
-        # SharedInvestigationContext.create_cyvest() creates a Cyvest instance
-        # that auto-merges results when the context exits
-        with shared_context.create_cyvest() as cy:
-            # Access data from root observable
-            data = cy.root().extra
-
-            # Build investigation fragment
-            domain = cy.observable(ObservableType.DOMAIN_NAME, data.get("domain"))
-
-            # Auto-reconciles on exit
-            return cy
+def email_analysis(shared_context):
+    # create_cyvest() yields a task-local Cyvest that auto-merges on context exit
+    with shared_context.create_cyvest() as cy:
+        data = cy.root().extra
+        cy.observable(ObservableType.DOMAIN_NAME, data.get("domain"))
 
 # Create shared context
 main_inv = Investigation(email_data, root_type="artifact")
@@ -196,7 +188,7 @@ shared = SharedInvestigationContext(main_inv)
 
 # Run tasks in parallel - they can reference each other's observables
 with ThreadPoolExecutor(max_workers=4) as executor:
-    futures = [executor.submit(task.run, shared) for task in tasks]
+    futures = [executor.submit(email_analysis, shared) for _ in tasks]
     for future in as_completed(futures):
         future.result()  # Auto-reconciled
 
@@ -420,7 +412,7 @@ Cyvest is designed for:
 
 ## Architecture Highlights
 
-- **Thread-Safe**: Advanced `SharedInvestigationContext` (via `cyvest.investigation`) provides thread-safe parallel task execution
+- **Concurrency**: Advanced `SharedInvestigationContext` (via `cyvest.shared`) enables safe parallel task execution
 - **Deterministic Keys**: Same objects always generate same keys for merging
 - **Score Propagation**: Automatic hierarchical score calculation
 - **Flexible Export**: JSON for storage, Markdown for LLM analysis

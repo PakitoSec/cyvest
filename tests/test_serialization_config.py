@@ -1,5 +1,5 @@
 from cyvest import Cyvest
-from cyvest.io_serialization import generate_markdown_report, load_investigation_json, save_investigation_json
+from cyvest.io_serialization import load_investigation_json
 from cyvest.levels import Level
 from cyvest.model import Container, Enrichment, Observable, ObservableType
 from cyvest.score import ScoreMode
@@ -9,7 +9,7 @@ def test_serialization_preserves_root_type_and_score_mode(tmp_path) -> None:
     cv = Cyvest(data={"source": "example"}, root_type="artifact", score_mode=ScoreMode.SUM)
 
     path = tmp_path / "inv.json"
-    save_investigation_json(cv, path)
+    cv.io_save_json(path)
 
     loaded = load_investigation_json(path)
 
@@ -25,7 +25,7 @@ def test_serialization_preserves_whitelisted_flag(tmp_path) -> None:
     cv.investigation_add_whitelist("wl-2", "Second entry")
 
     path = tmp_path / "inv_whitelisted.json"
-    save_investigation_json(cv, path)
+    cv.io_save_json(path)
 
     loaded = load_investigation_json(path)
     assert loaded.investigation_is_whitelisted() is True
@@ -47,7 +47,7 @@ def test_markdown_excludes_containers_by_default() -> None:
     cv._investigation.add_container(container)
 
     # Generate markdown without include_containers
-    markdown = generate_markdown_report(cv)
+    markdown = cv.io_to_markdown()
 
     # Verify containers section is not present
     assert "## Containers" not in markdown
@@ -67,7 +67,7 @@ def test_markdown_includes_containers_when_enabled() -> None:
     cv._investigation.add_container(container)
 
     # Generate markdown with include_containers=True
-    markdown = generate_markdown_report(cv, include_containers=True)
+    markdown = cv.io_to_markdown(include_containers=True)
 
     # Verify containers section is present
     assert "## Containers" in markdown
@@ -88,7 +88,7 @@ def test_markdown_excludes_enrichments_by_default() -> None:
     cv._investigation.add_enrichment(enrichment)
 
     # Generate markdown without include_enrichments
-    markdown = generate_markdown_report(cv)
+    markdown = cv.io_to_markdown()
 
     # Verify enrichments section is not present
     assert "## Enrichments" not in markdown
@@ -108,7 +108,7 @@ def test_markdown_includes_enrichments_when_enabled() -> None:
     cv._investigation.add_enrichment(enrichment)
 
     # Generate markdown with include_enrichments=True
-    markdown = generate_markdown_report(cv, include_enrichments=True)
+    markdown = cv.io_to_markdown(include_enrichments=True)
 
     # Verify enrichments section is present
     assert "## Enrichments" in markdown
@@ -123,7 +123,7 @@ def test_markdown_includes_observables_by_default() -> None:
     obs = Observable(obs_type=ObservableType.DOMAIN_NAME, value="example.com", level=Level.INFO)
     cv._investigation.add_observable(obs)
 
-    markdown = generate_markdown_report(cv)
+    markdown = cv.io_to_markdown()
 
     assert "## Observables" in markdown
     assert "example.com" in markdown
@@ -136,7 +136,7 @@ def test_markdown_excludes_observables_when_disabled() -> None:
     obs = Observable(obs_type=ObservableType.DOMAIN_NAME, value="example.com", level=Level.INFO)
     cv._investigation.add_observable(obs)
 
-    markdown = generate_markdown_report(cv, include_observables=False)
+    markdown = cv.io_to_markdown(include_observables=False)
 
     assert "## Observables" not in markdown
     assert "example.com" not in markdown
@@ -153,7 +153,7 @@ def test_markdown_removes_observables_by_type_and_level_section() -> None:
     cv._investigation.add_observable(obs2)
 
     # Generate markdown
-    markdown = generate_markdown_report(cv)
+    markdown = cv.io_to_markdown()
 
     # Verify the section is not present
     assert "Observables by Type and Level" not in markdown

@@ -146,12 +146,6 @@ malware_check = shared_context.check_get("malware_scan", "attachment")
 ##### Existence checks
 Use `observable_get(...)` / `check_get(...)` and check for `None`.
 
-##### `list_observables() -> list[str]`
-Returns a list of all observable keys in the shared context.
-
-##### `list_checks() -> list[str]`
-Returns a list of all check keys in the shared context.
-
 ##### `is_whitelisted() -> bool`
 Returns whether the underlying investigation has whitelist entries.
 

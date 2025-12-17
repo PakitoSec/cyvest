@@ -305,23 +305,25 @@ class SharedInvestigationContext:
     async def aget_global_level(self) -> Level:
         return await self._lock.arun(self._main_investigation.get_global_level)
 
-    def list_observables(self) -> list[str]:
-        return self._lock.run(lambda: list(self._observable_registry.keys()))
+    def observables_list_by_type(self, obs_type: ObservableType | str) -> list[Observable]:
+        return self._lock.run(self._observables_list_by_type_unlocked, obs_type)
 
-    async def alist_observables(self) -> list[str]:
-        return await self._lock.arun(lambda: list(self._observable_registry.keys()))
+    async def observables_alist_by_type(self, obs_type: ObservableType | str) -> list[Observable]:
+        return await self._lock.arun(self._observables_list_by_type_unlocked, obs_type)
 
-    def list_checks(self) -> list[str]:
-        return self._lock.run(lambda: list(self._check_registry.keys()))
+    def _observables_list_by_type_unlocked(self, obs_type: ObservableType | str) -> list[Observable]:
+        if isinstance(obs_type, ObservableType):
+            matches = [obs for obs in self._observable_registry.values() if obs.obs_type == obs_type]
+        else:
+            normalized = obs_type.strip().lower()
+            matches = [obs for obs in self._observable_registry.values() if obs.obs_type.value == normalized]
 
-    async def alist_checks(self) -> list[str]:
-        return await self._lock.arun(lambda: list(self._check_registry.keys()))
-
-    def list_enrichments(self) -> list[str]:
-        return self._lock.run(lambda: list(self._enrichment_registry.keys()))
-
-    async def alist_enrichments(self) -> list[str]:
-        return await self._lock.arun(lambda: list(self._enrichment_registry.keys()))
+        results: list[Observable] = []
+        for obs in matches:
+            copy = obs.model_copy(deep=True)
+            copy._from_shared_context = True
+            results.append(copy)
+        return results
 
     # Intentionally minimal: prefer `observable_get()` / `check_get()` and user-side filtering.
 

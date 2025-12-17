@@ -161,7 +161,7 @@ def test_has_check():
 
 
 def test_list_observables():
-    """Test listing all observable keys."""
+    """Observable listing API removed; validate via direct getter and registry size."""
     inv = Investigation({"test": "data"}, root_type="artifact")
     shared = SharedInvestigationContext(inv)
 
@@ -170,15 +170,14 @@ def test_list_observables():
         cy.observable(ObservableType.EMAIL_ADDR, "user2@example.com")
         cy.observable(ObservableType.DOMAIN_NAME, "example.com")
 
-    keys = shared.list_observables()
-    assert len(keys) == 4  # 3 created + 1 root
-    assert "obs:email-addr:user1@example.com" in keys
-    assert "obs:email-addr:user2@example.com" in keys
-    assert "obs:domain-name:example.com" in keys
+    assert len(shared._observable_registry) == 4  # 3 created + 1 root
+    assert shared.observable_get(ObservableType.EMAIL_ADDR, "user1@example.com") is not None
+    assert shared.observable_get(ObservableType.EMAIL_ADDR, "user2@example.com") is not None
+    assert shared.observable_get(ObservableType.DOMAIN_NAME, "example.com") is not None
 
 
 def test_list_checks():
-    """Test listing all check keys."""
+    """Checks listing API removed; validate via direct getter."""
     inv = Investigation({"test": "data"}, root_type="artifact")
     shared = SharedInvestigationContext(inv)
 
@@ -186,14 +185,12 @@ def test_list_checks():
         cy.check("check1", "scope1", "Description 1")
         cy.check("check2", "scope2", "Description 2")
 
-    keys = shared.list_checks()
-    assert len(keys) == 2
-    assert "chk:check1:scope1" in keys
-    assert "chk:check2:scope2" in keys
+    assert shared.check_get("check1", "scope1") is not None
+    assert shared.check_get("check2", "scope2") is not None
 
 
 def test_observable_get_and_list_observables():
-    """Test observable_get() and list_observables() together."""
+    """Test observable_get() basic behavior."""
     inv = Investigation({"test": "data"}, root_type="artifact")
     shared = SharedInvestigationContext(inv)
 
@@ -201,7 +198,28 @@ def test_observable_get_and_list_observables():
         cy.observable(ObservableType.DOMAIN_NAME, "example.com")
 
     assert shared.observable_get(ObservableType.DOMAIN_NAME, "example.com") is not None
-    assert "obs:domain-name:example.com" in shared.list_observables()
+    assert "obs:domain-name:example.com" in shared._observable_registry
+
+
+def test_observables_list_by_type_sync_and_async():
+    inv = Investigation({"test": "data"}, root_type="artifact")
+    shared = SharedInvestigationContext(inv)
+
+    with shared.create_cyvest() as cy:
+        cy.observable(ObservableType.EMAIL_ADDR, "user1@example.com")
+        cy.observable(ObservableType.EMAIL_ADDR, "user2@example.com")
+        cy.observable(ObservableType.DOMAIN_NAME, "example.com")
+
+    sync_results = shared.observables_list_by_type(ObservableType.EMAIL_ADDR)
+    assert len(sync_results) == 2
+    assert {o.value for o in sync_results} == {"user1@example.com", "user2@example.com"}
+
+    async def run():
+        results = await shared.observables_alist_by_type("email-addr")
+        assert len(results) == 2
+        assert {o.value for o in results} == {"user1@example.com", "user2@example.com"}
+
+    asyncio.run(run())
 
 
 def test_cross_task_observable_sharing():
@@ -268,7 +286,7 @@ def test_thread_safety_parallel_tasks():
             future.result()
 
     # Verify all observables were registered (6 created + 1 root)
-    assert len(shared.list_observables()) == 7
+    assert len(shared._observable_registry) == 7
     assert shared.observable_get(ObservableType.DOMAIN_NAME, "domain1.com") is not None
     assert shared.observable_get(ObservableType.DOMAIN_NAME, "domain2.com") is not None
     assert shared.observable_get(ObservableType.DOMAIN_NAME, "domain3.com") is not None
@@ -297,7 +315,7 @@ def test_concurrent_reconciliation():
             future.result()
 
     # Verify all checks were registered
-    assert len(shared.list_checks()) == 50
+    assert len(shared._check_registry) == 50
 
 
 def test_reconcile_with_investigation_object():
@@ -376,8 +394,8 @@ def test_shared_context_with_checks_and_observables():
         check.link_observable(url_obs)
 
     # Verify final state
-    assert len(shared.list_observables()) == 3  # 2 created + 1 root
-    assert len(shared.list_checks()) == 2
+    assert len(shared._observable_registry) == 3  # 2 created + 1 root
+    assert len(shared._check_registry) == 2
     assert shared.observable_get(ObservableType.EMAIL_ADDR, "phishing@malicious.com") is not None
     assert shared.observable_get(ObservableType.URL, "https://malicious.com/payload") is not None
     assert shared.check_get("email_analysis", "header") is not None
@@ -776,14 +794,14 @@ def test_list_enrichments():
     shared = SharedInvestigationContext(inv)
 
     # Initially empty
-    assert len(shared.list_enrichments()) == 0
+    assert len(shared._enrichment_registry) == 0
 
     with shared.create_cyvest() as cy:
         cy.enrichment_create("whois", {"registrar": "Test"})
         cy.enrichment_create("dns", {"A": ["1.2.3.4"]})
         cy.enrichment_create("geo", {"country": "US"}, context="ip-lookup")
 
-    keys = shared.list_enrichments()
+    keys = list(shared._enrichment_registry.keys())
     assert len(keys) == 3
     assert "enr:whois" in keys
     assert "enr:dns" in keys
@@ -800,13 +818,13 @@ def test_enrichment_reconcile_updates_registry():
     with shared.create_cyvest() as cy:
         cy.enrichment_create("initial", {"data": "v1"})
 
-    assert len(shared.list_enrichments()) == 1
+    assert len(shared._enrichment_registry) == 1
 
     # Create second enrichment
     with shared.create_cyvest() as cy:
         cy.enrichment_create("second", {"data": "v2"})
 
-    assert len(shared.list_enrichments()) == 2
+    assert len(shared._enrichment_registry) == 2
     assert shared.enrichment_get("initial") is not None
     assert shared.enrichment_get("second") is not None
 
@@ -901,7 +919,7 @@ def test_enrichment_with_parallel_tasks():
     task3()
 
     # Verify all enrichments are present
-    assert len(shared.list_enrichments()) == 3
+    assert len(shared._enrichment_registry) == 3
     combined = shared.enrichment_get("combined")
     assert combined is not None
     # task3 should have access to task1 and task2 enrichments

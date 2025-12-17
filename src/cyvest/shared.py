@@ -23,11 +23,17 @@ from typing import TYPE_CHECKING, Any, Literal
 from logurich import logger
 
 from cyvest import keys
+from cyvest.cyvest import Cyvest
+from cyvest.io_serialization import (
+    generate_markdown_report,
+    save_investigation_json,
+    save_investigation_markdown,
+    serialize_investigation,
+)
 from cyvest.levels import Level
 from cyvest.model import Check, Enrichment, Observable, ObservableType
 
 if TYPE_CHECKING:
-    from cyvest import Cyvest
     from cyvest.investigation import Investigation
     from cyvest.model_schema import InvestigationSchema
 
@@ -152,8 +158,6 @@ class SharedInvestigationContext:
             return False
 
     def _create_task_cyvest_sync(self, data: Any | None):
-        from cyvest import Cyvest
-
         if data is None:
             data = self._lock.run(self._get_root_data_copy_unlocked)
         else:
@@ -161,8 +165,6 @@ class SharedInvestigationContext:
         return Cyvest(data, root_type=self._root_type, score_mode=self._score_mode)
 
     async def _create_task_cyvest_async(self, data: Any | None):
-        from cyvest import Cyvest
-
         if data is None:
             data = await self._lock.arun(self._get_root_data_copy_unlocked)
         else:
@@ -185,8 +187,6 @@ class SharedInvestigationContext:
         await self._lock.arun(self._reconcile_unlocked, task_investigation)
 
     def _extract_investigation(self, source: Cyvest | Investigation) -> Investigation:
-        from cyvest import Cyvest
-
         if isinstance(source, Cyvest):
             return source._investigation
         return source
@@ -363,9 +363,6 @@ class SharedInvestigationContext:
         include_enrichments: bool,
         include_observables: bool,
     ) -> str:
-        from cyvest import Cyvest
-        from cyvest.io_serialization import generate_markdown_report
-
         temp_cy = Cyvest.__new__(Cyvest)
         temp_cy._investigation = self._main_investigation
         return generate_markdown_report(temp_cy, include_containers, include_enrichments, include_observables)
@@ -407,9 +404,6 @@ class SharedInvestigationContext:
         include_enrichments: bool,
         include_observables: bool,
     ) -> str:
-        from cyvest import Cyvest
-        from cyvest.io_serialization import save_investigation_markdown
-
         temp_cy = Cyvest.__new__(Cyvest)
         temp_cy._investigation = self._main_investigation
         save_investigation_markdown(temp_cy, filepath, include_containers, include_enrichments, include_observables)
@@ -422,9 +416,6 @@ class SharedInvestigationContext:
         return await self._lock.arun(self._io_to_dict_unlocked)
 
     def _io_to_dict_unlocked(self) -> InvestigationSchema:
-        from cyvest import Cyvest
-        from cyvest.io_serialization import serialize_investigation
-
         temp_cy = Cyvest.__new__(Cyvest)
         temp_cy._investigation = self._main_investigation
         return serialize_investigation(temp_cy)
@@ -436,9 +427,6 @@ class SharedInvestigationContext:
         return await self._lock.arun(self._io_save_json_unlocked, filepath)
 
     def _io_save_json_unlocked(self, filepath: str | Path) -> str:
-        from cyvest import Cyvest
-        from cyvest.io_serialization import save_investigation_json
-
         temp_cy = Cyvest.__new__(Cyvest)
         temp_cy._investigation = self._main_investigation
         save_investigation_json(temp_cy, filepath)

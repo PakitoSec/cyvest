@@ -211,6 +211,11 @@ Scores and levels are automatically calculated and propagated:
   - A link is effective when `propagation_mode="GLOBAL"` or when `origin_investigation_id == check.origin_investigation_id`
 - **Check → Global**: All check scores sum to global investigation score
 
+**Provenance model**
+
+- `Investigation.investigation_id` is a stable ULID included in exports.
+- Checks and links keep a *canonical origin* (`origin_investigation_id`) used for scoring, plus an audit set (`source_investigation_ids`) that records which investigations contributed data during merges.
+
 To force cross-investigation propagation for a specific link, use a GLOBAL link:
 
 ```python

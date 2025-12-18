@@ -168,6 +168,15 @@ To override the default local-only behavior for a single link:
 cy.check_link_observable(check.key, observable.key, propagation_mode="GLOBAL")
 ```
 
+### Provenance (checks and links)
+
+Cyvest keeps two provenance concepts:
+
+- **Canonical origin** (`origin_investigation_id`): used by scoring/propagation to decide whether a `LOCAL_ONLY` link is effective.
+- **Audit sources** (`source_investigation_ids`): records which investigations contributed to a check/link during merges; it never affects scoring.
+
+Exports always include `investigation_id` so `origin_investigation_id` and `source_investigation_ids` remain meaningful after serialization.
+
 ### Scoring Modes
 
 Cyvest supports two scoring modes for observable score calculation:

@@ -167,6 +167,9 @@ with Cyvest() as cv:
 !!! question "Where do exports live?"
     The docs assume you write to the project root, but automation pipelines typically point to `dist/` (JSON) and `reports/` (Markdown/PDF). Adjust paths to match your workflow.
 
+!!! note "Provenance fields in JSON"
+    Exports include `investigation_id` plus check/link provenance fields (`origin_investigation_id`, `source_investigation_ids`, `observable_links`) so merges remain deterministic and traceable.
+
 ---
 
 ## Next Steps

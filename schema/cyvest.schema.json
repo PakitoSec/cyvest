@@ -31,16 +31,24 @@
         "level": {
           "$ref": "#/$defs/Level"
         },
-        "observables": {
+        "origin_investigation_id": {
+          "title": "Origin Investigation Id",
+          "type": "string"
+        },
+        "source_investigation_ids": {
           "items": {
             "type": "string"
           },
-          "title": "Observables",
-          "type": "array"
+          "title": "Source Investigation Ids",
+          "type": "array",
+          "uniqueItems": true
         },
-        "score_policy": {
-          "$ref": "#/$defs/CheckScorePolicy",
-          "default": "auto"
+        "observable_links": {
+          "items": {
+            "$ref": "#/$defs/ObservableLink"
+          },
+          "title": "Observable Links",
+          "type": "array"
         },
         "key": {
           "title": "Key",
@@ -60,21 +68,14 @@
         "extra",
         "score",
         "level",
-        "observables",
+        "origin_investigation_id",
+        "source_investigation_ids",
+        "observable_links",
         "key",
         "score_display"
       ],
       "title": "Check",
       "type": "object"
-    },
-    "CheckScorePolicy": {
-      "description": "Controls how a check reacts to linked observables.",
-      "enum": [
-        "auto",
-        "manual"
-      ],
-      "title": "CheckScorePolicy",
-      "type": "string"
     },
     "Container": {
       "additionalProperties": false,
@@ -317,6 +318,48 @@
       ],
       "title": "Observable",
       "type": "object"
+    },
+    "ObservableLink": {
+      "additionalProperties": false,
+      "description": "Edge metadata for a Check\u2194Observable association.",
+      "properties": {
+        "observable_key": {
+          "title": "Observable Key",
+          "type": "string"
+        },
+        "origin_investigation_id": {
+          "title": "Origin Investigation Id",
+          "type": "string"
+        },
+        "source_investigation_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Source Investigation Ids",
+          "type": "array",
+          "uniqueItems": true
+        },
+        "propagation_mode": {
+          "$ref": "#/$defs/PropagationMode",
+          "default": "LOCAL_ONLY"
+        }
+      },
+      "required": [
+        "observable_key",
+        "origin_investigation_id",
+        "source_investigation_ids"
+      ],
+      "title": "ObservableLink",
+      "type": "object"
+    },
+    "PropagationMode": {
+      "description": "Controls how a Check\u2194Observable link propagates across merged investigations.",
+      "enum": [
+        "LOCAL_ONLY",
+        "GLOBAL"
+      ],
+      "title": "PropagationMode",
+      "type": "string"
     },
     "Relationship": {
       "description": "Represents a relationship between observables.",
@@ -564,6 +607,11 @@
   "additionalProperties": false,
   "description": "Schema for a complete serialized investigation.\n\nThis model describes the output of `serialize_investigation()` from\n`cyvest.io_serialization`. It is the top-level schema for exported investigations.\n\nEntity types reference the runtime models directly. When generating schemas with\n`mode='serialization'`, Pydantic respects field_serializer decorators and produces\nschemas matching the actual model_dump() output.",
   "properties": {
+    "investigation_id": {
+      "description": "Stable investigation identity (ULID).",
+      "title": "Investigation Id",
+      "type": "string"
+    },
     "started_at": {
       "description": "Investigation start time (UTC).",
       "format": "date-time",
@@ -666,6 +714,7 @@
     }
   },
   "required": [
+    "investigation_id",
     "started_at",
     "score",
     "level",

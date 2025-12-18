@@ -1085,6 +1085,7 @@ def test_io_to_invest_basic():
     schema = shared.io_to_invest()
 
     # Verify schema attributes
+    assert hasattr(schema, "investigation_id")
     assert hasattr(schema, "score")
     assert hasattr(schema, "level")
     assert hasattr(schema, "observables")
@@ -1115,6 +1116,7 @@ def test_io_save_json_creates_file(tmp_path):
     with open(filepath) as f:
         loaded = json.load(f)
 
+    assert "investigation_id" in loaded
     assert "score" in loaded
     assert "observables" in loaded
     assert "obs:url:https://malicious.com/payload" in loaded["observables"]

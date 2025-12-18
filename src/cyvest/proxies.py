@@ -12,19 +12,20 @@ from __future__ import annotations
 
 from copy import deepcopy
 from decimal import Decimal
-from typing import TYPE_CHECKING, Any, Generic, Literal, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 from cyvest.levels import Level, normalize_level
 from cyvest.model import (
     Check,
-    CheckScorePolicy,
     Container,
     Enrichment,
     Observable,
+    ObservableLink,
     ObservableType,
     Relationship,
     ThreatIntel,
 )
+from cyvest.model_enums import PropagationMode
 
 if TYPE_CHECKING:
     from cyvest.investigation import Investigation
@@ -253,7 +254,12 @@ class ObservableProxy(_ReadOnlyProxy[Observable]):
         self._get_investigation().add_relationship(self.key, resolved_target, relationship_type, direction)
         return self
 
-    def link_check(self, check: Check | CheckProxy | str) -> ObservableProxy:
+    def link_check(
+        self,
+        check: Check | CheckProxy | str,
+        *,
+        propagation_mode: PropagationMode | str = PropagationMode.LOCAL_ONLY,
+    ) -> ObservableProxy:
         """Link this observable to a check."""
         if isinstance(check, CheckProxy):
             check_key = check.key
@@ -264,7 +270,7 @@ class ObservableProxy(_ReadOnlyProxy[Observable]):
         else:
             raise TypeError("Check must provide a key.")
 
-        self._get_investigation().link_check_observable(check_key, self.key)
+        self._get_investigation().link_check_observable(check_key, self.key, propagation_mode=propagation_mode)
         return self
 
 
@@ -310,12 +316,16 @@ class CheckProxy(_ReadOnlyProxy[Check]):
         return self._read_attr("level")
 
     @property
-    def observables(self) -> list[Observable]:
-        return self._read_attr("observables")
+    def origin_investigation_id(self) -> str:
+        return self._read_attr("origin_investigation_id")
 
     @property
-    def score_policy(self) -> CheckScorePolicy:
-        return self._read_attr("score_policy")
+    def source_investigation_ids(self) -> set[str]:
+        return self._read_attr("source_investigation_ids")
+
+    @property
+    def observable_links(self) -> list[ObservableLink]:
+        return self._read_attr("observable_links")
 
     def get_score_history(self) -> tuple:
         """Return a copy of the score change history."""
@@ -328,7 +338,6 @@ class CheckProxy(_ReadOnlyProxy[Check]):
         comment: str | None = None,
         description: str | None = None,
         extra: dict[str, Any] | None = None,
-        score_policy: CheckScorePolicy | Literal["auto", "manual"] | None = None,
         merge_extra: bool = True,
     ) -> CheckProxy:
         """Update mutable metadata on the check."""
@@ -339,8 +348,6 @@ class CheckProxy(_ReadOnlyProxy[Check]):
             updates["description"] = description
         if extra is not None:
             updates["extra"] = extra
-        if score_policy is not None:
-            updates["score_policy"] = score_policy
 
         if not updates:
             return self
@@ -348,19 +355,6 @@ class CheckProxy(_ReadOnlyProxy[Check]):
         dict_merge = {"extra": merge_extra} if extra is not None else None
         self._get_investigation().update_model_metadata("check", self.key, updates, dict_merge=dict_merge)
         return self
-
-    def set_score_policy(self, policy: CheckScorePolicy | Literal["auto", "manual"]) -> CheckProxy:
-        """Switch between AUTO (default) and MANUAL scoring behavior."""
-        self.update_metadata(score_policy=policy)
-        return self
-
-    def disable_auto_score(self) -> CheckProxy:
-        """Convenience: prevent observables from updating this check."""
-        return self.set_score_policy(CheckScorePolicy.MANUAL)
-
-    def enable_auto_score(self) -> CheckProxy:
-        """Convenience: allow observables to update this check (default)."""
-        return self.set_score_policy(CheckScorePolicy.AUTO)
 
     def in_container(self, container: Container | ContainerProxy | str) -> CheckProxy:
         """Add this check to a container."""
@@ -376,7 +370,12 @@ class CheckProxy(_ReadOnlyProxy[Check]):
         self._get_investigation().add_check_to_container(container_key, self.key)
         return self
 
-    def link_observable(self, observable: Observable | ObservableProxy | str) -> CheckProxy:
+    def link_observable(
+        self,
+        observable: Observable | ObservableProxy | str,
+        *,
+        propagation_mode: PropagationMode | str = PropagationMode.LOCAL_ONLY,
+    ) -> CheckProxy:
         """Link an observable to this check."""
         if isinstance(observable, ObservableProxy):
             observable_key = observable.key
@@ -387,7 +386,7 @@ class CheckProxy(_ReadOnlyProxy[Check]):
         else:
             raise TypeError("Observable must provide a key.")
 
-        self._get_investigation().link_check_observable(self.key, observable_key)
+        self._get_investigation().link_check_observable(self.key, observable_key, propagation_mode=propagation_mode)
         return self
 
     def with_score(self, score: Decimal | float, reason: str = "") -> CheckProxy:

@@ -158,9 +158,15 @@ Scores are **Decimal** values with automatic propagation:
 
 1. **Threat Intel → Observable**: Observable score = **max** of all threat intel scores (not sum)
 2. **Child Observable → Parent**: Child scores aggregate to parents based on scoring mode
-3. **Observable → Check**: Check score = **max** of all linked observables' scores and check's current score
-   - Use `score_policy=CheckScorePolicy.MANUAL` (or `check.disable_auto_score()`) to prevent observables from changing a check
+3. **Observable → Check (provenance-aware)**: Check score/level only considers observables reachable through *effective* links (`observable_links`)
+   - A link is effective when `propagation_mode="GLOBAL"` or when `origin_investigation_id == check.origin_investigation_id`
 4. **All Checks → Global**: Check scores sum to global score
+
+To override the default local-only behavior for a single link:
+
+```python
+cy.check_link_observable(check.key, observable.key, propagation_mode="GLOBAL")
+```
 
 ### Scoring Modes
 

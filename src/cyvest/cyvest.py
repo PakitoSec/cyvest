@@ -27,7 +27,8 @@ from cyvest.io_serialization import (
     serialize_investigation,
 )
 from cyvest.levels import Level
-from cyvest.model import Check, CheckScorePolicy, Container, Enrichment, Observable, ThreatIntel
+from cyvest.model import Check, Container, Enrichment, Observable, ThreatIntel
+from cyvest.model_enums import PropagationMode
 from cyvest.model_schema import InvestigationSchema, StatisticsSchema
 from cyvest.proxies import CheckProxy, ContainerProxy, EnrichmentProxy, ObservableProxy, ThreatIntelProxy
 from cyvest.score import ScoreMode
@@ -356,7 +357,6 @@ class Cyvest:
         extra: dict[str, Any] | None = None,
         score: Decimal | float | None = None,
         level: Level | str | None = None,
-        score_policy: CheckScorePolicy | Literal["auto", "manual"] | None = None,
     ) -> CheckProxy:
         """
         Create a new check.
@@ -369,7 +369,6 @@ class Cyvest:
             extra: Optional extra data
             score: Optional explicit score
             level: Optional explicit level
-            score_policy: Whether observables can update the check (AUTO|MANUAL)
 
         Returns:
             The created check
@@ -380,13 +379,12 @@ class Cyvest:
             "description": description,
             "comment": comment,
             "extra": extra or {},
+            "origin_investigation_id": self._investigation.investigation_id,
         }
         if score is not None:
             check_kwargs["score"] = Decimal(str(score))
         if level is not None:
             check_kwargs["level"] = level
-        if score_policy is not None:
-            check_kwargs["score_policy"] = score_policy
         check = Check(**check_kwargs)
         return self._check_proxy(self._investigation.add_check(check))
 
@@ -402,18 +400,26 @@ class Cyvest:
         """
         return self._check_proxy(self._investigation.get_check(key))
 
-    def check_link_observable(self, check_key: str, observable_key: str) -> CheckProxy | None:
+    def check_link_observable(
+        self,
+        check_key: str,
+        observable_key: str,
+        propagation_mode: PropagationMode | str = PropagationMode.LOCAL_ONLY,
+    ) -> CheckProxy | None:
         """
         Link an observable to a check.
 
         Args:
             check_key: Key of the check
             observable_key: Key of the observable
+            propagation_mode: Propagation behavior for this link
 
         Returns:
             The check if found, None otherwise
         """
-        return self._check_proxy(self._investigation.link_check_observable(check_key, observable_key))
+        return self._check_proxy(
+            self._investigation.link_check_observable(check_key, observable_key, propagation_mode=propagation_mode)
+        )
 
     def check_update_score(self, check_key: str, score: Decimal | float, reason: str = "") -> CheckProxy | None:
         """
@@ -811,7 +817,6 @@ class Cyvest:
         extra: dict[str, Any] | None = None,
         score: Decimal | float | None = None,
         level: Level | str | None = None,
-        score_policy: CheckScorePolicy | Literal["auto", "manual"] | None = None,
     ) -> CheckProxy:
         """
         Create a check with fluent helper methods.
@@ -824,12 +829,11 @@ class Cyvest:
             extra: Optional extra data
             score: Optional explicit score
             level: Optional explicit level
-            score_policy: Whether observables can update the check (AUTO|MANUAL)
 
         Returns:
             Check proxy exposing mutation helpers for chaining
         """
-        return self.check_create(check_id, scope, description, comment, extra, score, level, score_policy)
+        return self.check_create(check_id, scope, description, comment, extra, score, level)
 
     def container(self, path: str, description: str = "") -> ContainerProxy:
         """

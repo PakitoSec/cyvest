@@ -123,7 +123,9 @@ def test_proxy_dir_exposes_public_fields() -> None:
             "extra",
             "score",
             "level",
-            "score_policy",
+            "origin_investigation_id",
+            "source_investigation_ids",
+            "observable_links",
             "key",
         },
         container: {"path", "description", "checks", "sub_containers", "key"},
@@ -169,10 +171,10 @@ def test_proxy_public_fields_are_deep_copied() -> None:
     extra_copy["owner"] = "secops"
     assert "owner" not in obs.extra
 
-    observables_copy = check.observables
-    assert len(observables_copy) == 1
-    observables_copy.clear()
-    assert len(check.observables) == 1
+    links_copy = check.observable_links
+    assert len(links_copy) == 1
+    links_copy.clear()
+    assert len(check.observable_links) == 1
 
     checks_copy = container.checks
     checks_copy.clear()

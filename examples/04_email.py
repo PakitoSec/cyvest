@@ -163,7 +163,7 @@ class EmailFrom(BaseRule):
 
         # Create check for header analysis
         (
-            cy.check("from", "header", "test email vt 10", "> ok boys", score_policy="manual")
+            cy.check("from", "header", "test email vt 10", "> ok boys")
             .link_observable(obs)
             .with_score(obs.score)
             .in_container(cy.container("emails"))

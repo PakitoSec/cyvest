@@ -38,7 +38,7 @@ from enum import Enum
 from typing import TYPE_CHECKING, Literal
 
 from cyvest.levels import Level, get_level_from_score
-from cyvest.model_enums import CheckScorePolicy, RelationshipDirection
+from cyvest.model_enums import PropagationMode, RelationshipDirection
 
 
 class ScoreMode(Enum):
@@ -111,6 +111,7 @@ class ScoreEngine:
         """
         self._observables: dict[str, Observable] = {}
         self._checks: dict[str, Check] = {}
+        self._check_keys_by_observable_key: dict[str, set[str]] = {}
         self._score_mode = ScoreMode.normalize(score_mode)
 
     def register_observable(self, observable: Observable) -> None:
@@ -130,6 +131,19 @@ class ScoreEngine:
             check: Check to register
         """
         self._checks[check.key] = check
+        for link in getattr(check, "observable_links", []):
+            self._check_keys_by_observable_key.setdefault(link.observable_key, set()).add(check.key)
+
+    def rebuild_link_index(self) -> None:
+        """Rebuild the check↔observable link index from scratch."""
+        self._check_keys_by_observable_key.clear()
+        for check in self._checks.values():
+            for link in getattr(check, "observable_links", []):
+                self._check_keys_by_observable_key.setdefault(link.observable_key, set()).add(check.key)
+
+    def register_check_observable_link(self, *, check_key: str, observable_key: str) -> None:
+        """Register a newly created check↔observable link in the propagation index."""
+        self._check_keys_by_observable_key.setdefault(observable_key, set()).add(check_key)
 
     def propagate_threat_intel_to_observable(self, ti: ThreatIntel, observable: Observable) -> None:
         """
@@ -154,14 +168,14 @@ class ScoreEngine:
             # Root does NOT propagate to parent observables, but DOES propagate to checks
             if observable.value == "root":
                 # Allow root to propagate to checks only
-                self._propagate_observable_to_checks(observable)
+                self._propagate_observable_to_checks(observable.key)
                 return
 
             # Propagate to parent observables
             self._propagate_to_parent_observables(observable)
 
             # Propagate to linked checks
-            self._propagate_observable_to_checks(observable)
+            self._propagate_observable_to_checks(observable.key)
 
     def _calculate_observable_score(self, observable: Observable, visited: set[str] | None = None) -> Decimal:
         """
@@ -294,7 +308,7 @@ class ScoreEngine:
             if new_parent_score != parent_obs.score:
                 parent_obs.update_score(new_parent_score, reason=f"Child observable {observable.key} updated")
                 # Propagate to checks even for root; root barrier only stops upward flow
-                self._propagate_observable_to_checks(parent_obs)
+                self._propagate_observable_to_checks(parent_obs.key)
 
                 # Stop upward propagation at root (value="root")
                 if parent_obs.value != "root":
@@ -319,108 +333,44 @@ class ScoreEngine:
                 if rel.direction == RelationshipDirection.OUTBOUND and rel.target_key == observable.key:
                     _update_parent(parent_obs)
 
-    def _propagate_observable_to_checks(self, observable: Observable) -> None:
+    def _propagate_observable_to_checks(self, observable_key: str) -> None:
         """
         Propagate observable score to linked checks.
 
-        Check score is calculated as the maximum of all linked observables' scores
-        and the check's current score.
-
-        Check level inherits SAFE if any linked observable is SAFE and all others are
-        lower than or equal to SAFE (NONE, TRUSTED, INFO, SAFE).
-
-        Note: Root observable CAN propagate to checks (unlike parent observables).
-
         Args:
-            observable: The observable to check
+            observable_key: Key of the observable that changed
         """
-        for check in self._checks.values():
-            if check.score_policy == CheckScorePolicy.MANUAL:
-                continue  # Manual checks ignore observable-driven updates
-            # Check if this observable is linked to the check
-            if self._is_observable_linked_to_check(observable, check):
-                # Collect all linked observable scores and observables
-                linked_scores = []
-                linked_observables = []
-                for obs in self._observables.values():
-                    if self._is_observable_linked_to_check(obs, check):
-                        linked_scores.append(obs.score)
-                        linked_observables.append(obs)
+        candidate_check_keys = self._check_keys_by_observable_key.get(observable_key, set())
+        for check_key in candidate_check_keys:
+            check = self._checks.get(check_key)
+            if check is None:
+                continue
 
-                # Calculate new check score as max of all linked observables and current check score
-                if linked_scores:
-                    new_check_score = max(linked_scores + [check.score])
+            eligible_observables: list[Observable] = []
+            for link in getattr(check, "observable_links", []):
+                is_effective = (
+                    link.propagation_mode == PropagationMode.GLOBAL
+                    or link.origin_investigation_id == check.origin_investigation_id
+                )
+                if not is_effective:
+                    continue
+                obs = self._observables.get(link.observable_key)
+                if obs is not None:
+                    eligible_observables.append(obs)
 
-                    if new_check_score != check.score:
-                        check.update_score(new_check_score, reason=f"Linked observable {observable.key} updated")
+            if not eligible_observables:
+                continue
 
-                # Check SAFE level propagation: if any observable is SAFE and all are <= SAFE,
-                # set check to SAFE (overrides any previous level)
-                if linked_observables:
-                    has_safe = any(obs.level == Level.SAFE for obs in linked_observables)
-                    all_lower_or_safe = all(obs.level <= Level.SAFE for obs in linked_observables)
+            max_obs_score = max(obs.score for obs in eligible_observables)
+            max_obs_level = max((obs.level for obs in eligible_observables), default=check.level)
 
-                    if has_safe and all_lower_or_safe and check.level < Level.SAFE:
-                        check.set_level(Level.SAFE)
+            new_score = max(check.score, max_obs_score)
+            if new_score != check.score:
+                check.update_score(new_score, reason=f"Linked observable {observable_key} updated")
 
-    def _is_observable_linked_to_check(self, observable: Observable, check: Check, indirect: bool = False) -> bool:
-        """
-        Check if an observable is linked to a check (directly or indirectly).
-
-        Args:
-            observable: The observable to check
-            check: The check to verify linkage with
-
-        Returns:
-            True if linked, False otherwise
-        """
-        # Direct linkage
-        if observable in check.observables:
-            return True
-
-        if indirect is False:
-            return False
-
-        # Indirect linkage through relationships
-        for obs in check.observables:
-            if self._is_related(obs, observable):
-                return True
-
-        return False
-
-    def _is_related(self, obs1: Observable, obs2: Observable, visited: set[str] | None = None) -> bool:
-        """
-        Check if two observables are related through relationships.
-
-        Args:
-            obs1: First observable
-            obs2: Second observable
-            visited: Set of visited observable keys to avoid cycles
-
-        Returns:
-            True if related, False otherwise
-        """
-        if visited is None:
-            visited = set()
-
-        if obs1.key == obs2.key:
-            return True
-
-        if obs1.key in visited:
-            return False
-
-        visited.add(obs1.key)
-
-        # Check relationships
-        for rel in obs1.relationships:
-            if rel.target_key == obs2.key:
-                return True
-            # Recursively check related observables
-            related_obs = self._observables.get(rel.target_key)
-            if related_obs and self._is_related(related_obs, obs2, visited):
-                return True
-
-        return False
+            new_level = max(check.level, max_obs_level)
+            if new_level != check.level:
+                check.set_level(new_level)
 
     def recalculate_all(self) -> None:
         """
@@ -436,7 +386,7 @@ class ScoreEngine:
 
         # Then propagate to all checks (not just MALICIOUS observables)
         for obs in self._observables.values():
-            self._propagate_observable_to_checks(obs)
+            self._propagate_observable_to_checks(obs.key)
 
     def get_global_score(self) -> Decimal:
         """

@@ -21,11 +21,13 @@ export type Relationships = Relationship[];
  * Checks that generated this observable.
  */
 export type GeneratedByChecks = string[];
-export type Observables1 = string[];
+export type SourceInvestigationIds = string[];
+export type SourceInvestigationIds1 = string[];
 /**
- * Controls how a check reacts to linked observables.
+ * Controls how a Check↔Observable link propagates across merged investigations.
  */
-export type CheckScorePolicy = "auto" | "manual";
+export type PropagationMode = "LOCAL_ONLY" | "GLOBAL";
+export type ObservableLinks = ObservableLink[];
 export type Taxonomies = {
   [k: string]: unknown;
 }[];
@@ -50,6 +52,10 @@ export type ScoreMode = "max" | "sum";
  * schemas matching the actual model_dump() output.
  */
 export interface CyvestInvestigation {
+  /**
+   * Stable investigation identity (ULID).
+   */
+  investigation_id: string;
   /**
    * Investigation start time (UTC).
    */
@@ -147,14 +153,24 @@ export interface Check {
   extra: Extra1;
   score: number;
   level: Level;
-  observables: Observables1;
-  score_policy?: CheckScorePolicy;
+  origin_investigation_id: string;
+  source_investigation_ids: SourceInvestigationIds;
+  observable_links: ObservableLinks;
   key: string;
   score_display: string;
   [k: string]: unknown;
 }
 export interface Extra1 {
   [k: string]: unknown;
+}
+/**
+ * Edge metadata for a Check↔Observable association.
+ */
+export interface ObservableLink {
+  observable_key: string;
+  origin_investigation_id: string;
+  source_investigation_ids: SourceInvestigationIds1;
+  propagation_mode?: PropagationMode;
 }
 /**
  * Check keys organized by level name.

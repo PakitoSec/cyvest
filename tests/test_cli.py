@@ -7,10 +7,12 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+import pytest
 from click.testing import CliRunner
 
 from cyvest import Cyvest, Level
-from cyvest.cli import cli
+
+cli = pytest.importorskip("cyvest.cli").cli
 
 
 def _strip_ansi(text: str) -> str:

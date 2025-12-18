@@ -19,16 +19,18 @@ from cyvest.level_score_rules import recalculate_level_for_score
 from cyvest.levels import Level, normalize_level
 from cyvest.model import (
     Check,
-    CheckScorePolicy,
     Container,
     Enrichment,
     InvestigationWhitelist,
     Observable,
+    ObservableLink,
     ObservableType,
     ThreatIntel,
 )
+from cyvest.model_enums import PropagationMode
 from cyvest.score import ScoreEngine, ScoreMode
 from cyvest.stats import InvestigationStats
+from cyvest.ulid import generate_ulid
 
 if TYPE_CHECKING:
     from cyvest.model_schema import StatisticsSchema
@@ -48,7 +50,7 @@ class Investigation:
             "dict_fields": {"extra"},
         },
         "check": {
-            "fields": {"comment", "extra", "description", "score_policy"},
+            "fields": {"comment", "extra", "description"},
             "dict_fields": {"extra"},
         },
         "threat_intel": {
@@ -66,7 +68,12 @@ class Investigation:
     }
 
     def __init__(
-        self, data: Any, root_type: str = "file", score_mode: ScoreMode | Literal["max", "sum"] = ScoreMode.MAX
+        self,
+        data: Any,
+        root_type: str = "file",
+        score_mode: ScoreMode | Literal["max", "sum"] = ScoreMode.MAX,
+        *,
+        investigation_id: str | None = None,
     ) -> None:
         """
         Initialize a new investigation.
@@ -76,6 +83,7 @@ class Investigation:
             score_mode: Score calculation mode (MAX or SUM)
         """
         self._started_at = datetime.now(timezone.utc)
+        self.investigation_id = investigation_id or generate_ulid()
 
         # Object collections
         self._observables: dict[str, Observable] = {}
@@ -192,8 +200,8 @@ class Investigation:
         - Update score (take maximum)
         - Update level (take maximum)
         - Update extra (merge dicts)
-        - Replace comment with incoming
-        - Merge observables (key-based deduplication)
+        - Concatenate comments
+        - Merge observable links (tuple-based deduplication, provenance-preserving)
 
         Args:
             existing: The existing check
@@ -210,10 +218,11 @@ class Investigation:
         if incoming.level > existing.level:
             existing.set_level(incoming.level)
 
-        # Preserve the stricter score policy (MANUAL wins)
-        if incoming.score_policy == CheckScorePolicy.MANUAL or existing.score_policy == CheckScorePolicy.MANUAL:
-            if existing.score_policy != CheckScorePolicy.MANUAL:
-                existing.set_score_policy(CheckScorePolicy.MANUAL)
+        canonical_origin = existing.origin_investigation_id
+        incoming_origin_before = incoming.origin_investigation_id
+        existing.source_investigation_ids |= set(getattr(incoming, "source_investigation_ids", set())) | {
+            incoming_origin_before
+        }
 
         # Update extra (merge dictionaries)
         existing.extra.update(incoming.extra)
@@ -225,45 +234,41 @@ class Investigation:
             else:
                 existing.comment = incoming.comment
 
-        # Merge observables (use key-based deduplication, not identity)
-        existing_obs_keys = {obs.key for obs in existing.observables}
-        for obs in incoming.observables:
-            if obs.key not in existing_obs_keys:
-                target_obs = self._observables.get(obs.key)
-                if target_obs is None:
-                    target_obs, _ = self.add_observable(obs)
-                existing.add_observable(target_obs)
-                existing_obs_keys.add(target_obs.key)
+        existing_by_tuple: dict[tuple[str, str, PropagationMode], int] = {}
+        for idx, existing_link in enumerate(existing.observable_links):
+            existing_by_tuple[
+                (existing_link.observable_key, existing_link.origin_investigation_id, existing_link.propagation_mode)
+            ] = idx
 
-        # Ensure final observable references are canonical
-        self._reattach_check_observables(existing)
+        for incoming_link in incoming.observable_links:
+            incoming_link_origin_before = incoming_link.origin_investigation_id
+            canonicalized_sources = set(incoming_link.source_investigation_ids) | {incoming_link_origin_before}
+            canonicalized_link = incoming_link.model_copy(
+                update={
+                    "origin_investigation_id": canonical_origin,
+                    "source_investigation_ids": canonicalized_sources,
+                }
+            )
+            link_tuple = (
+                canonicalized_link.observable_key,
+                canonicalized_link.origin_investigation_id,
+                canonicalized_link.propagation_mode,
+            )
+            existing_idx = existing_by_tuple.get(link_tuple)
+            if existing_idx is None:
+                existing.observable_links.append(canonicalized_link)
+                existing_by_tuple[link_tuple] = len(existing.observable_links) - 1
+                continue
+
+            existing_link = existing.observable_links[existing_idx]
+            merged_sources = set(existing_link.source_investigation_ids) | set(
+                canonicalized_link.source_investigation_ids
+            )
+            existing.observable_links[existing_idx] = existing_link.model_copy(
+                update={"source_investigation_ids": merged_sources}
+            )
 
         return existing
-
-    def _reattach_check_observables(self, check: Check) -> None:
-        """
-        Rebind a check's observables to the canonical investigation objects.
-
-        When merging investigations, check.observables may reference Observable instances
-        that belong to the temporary task investigation, which breaks identity-based
-        score propagation. This helper replaces them with the instances stored in this
-        investigation and refreshes generated-by metadata.
-        """
-        if not check.observables:
-            return
-
-        canonical: list[Observable] = []
-        for obs in check.observables:
-            target = self._observables.get(obs.key)
-            if target is None:
-                target, _ = self.add_observable(obs)
-            if target not in canonical:
-                canonical.append(target)
-
-        check.observables = []
-        for obs in canonical:
-            check.add_observable(obs)
-            obs.mark_generated_by_check(check.key)
 
     def _merge_threat_intel(self, existing: ThreatIntel, incoming: ThreatIntel) -> ThreatIntel:
         """
@@ -422,11 +427,14 @@ class Investigation:
         """
         if check.key in self._checks:
             r = self._merge_check(self._checks[check.key], check)
+            self._score_engine.rebuild_link_index()
             self._score_engine.recalculate_all()
             return r
 
-        # Ensure observables linked to the check reference canonical instances
-        self._reattach_check_observables(check)
+        if not getattr(check, "origin_investigation_id", None):
+            check.origin_investigation_id = self.investigation_id
+        if not getattr(check, "source_investigation_ids", None):
+            check.source_investigation_ids = {check.origin_investigation_id}
 
         # Register new check
         self._checks[check.key] = check
@@ -569,13 +577,19 @@ class Investigation:
 
         return source_obs
 
-    def link_check_observable(self, check_key: str, observable_key: str) -> Check | None:
+    def link_check_observable(
+        self,
+        check_key: str,
+        observable_key: str,
+        propagation_mode: PropagationMode | str = PropagationMode.LOCAL_ONLY,
+    ) -> Check | None:
         """
         Link an observable to a check.
 
         Args:
             check_key: Key of the check
             observable_key: Key of the observable
+            propagation_mode: Propagation behavior for this link
 
         Returns:
             The check if found, None otherwise
@@ -584,9 +598,20 @@ class Investigation:
         observable = self._observables.get(observable_key)
 
         if check and observable:
-            check.add_observable(observable)
+            propagation_mode = PropagationMode(propagation_mode)
+            link = ObservableLink(
+                observable_key=observable_key,
+                origin_investigation_id=self.investigation_id,
+                propagation_mode=propagation_mode,
+            )
+            before = len(check.observable_links)
+            check.add_observable_link(link)
+            after = len(check.observable_links)
+            if after != before:
+                self._score_engine.register_check_observable_link(check_key=check.key, observable_key=observable_key)
+
             observable.mark_generated_by_check(check_key)
-            self._score_engine._propagate_observable_to_checks(observable)
+            self._score_engine._propagate_observable_to_checks(observable_key)
 
         return check
 
@@ -785,8 +810,6 @@ class Investigation:
                 continue
             if field == "level":
                 value = normalize_level(value)
-            if field == "score_policy":
-                value = CheckScorePolicy(value)
             if field in dict_fields:
                 if not isinstance(value, dict):
                     raise TypeError(f"Field '{field}' on {model_type} expects a dict value.")
@@ -1015,6 +1038,9 @@ class Investigation:
         # Merge whitelists (other investigation overrides on identifier conflicts)
         for entry in other.get_whitelists():
             self.add_whitelist(entry.identifier, entry.name, entry.justification)
+
+        # Rebuild link index after merges (safe, provenance-preserving)
+        self._score_engine.rebuild_link_index()
 
         # Final score recalculation
         self._score_engine.recalculate_all()

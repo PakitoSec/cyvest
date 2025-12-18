@@ -91,7 +91,8 @@ def test_check_observable_linking() -> None:
     obs = cv.observable_create("url", "https://bad.com")
     check = cv.check_create("url_check", "analysis", "Check URL")
     cv.check_link_observable(check.key, obs.key)
-    assert any(o.key == obs.key for o in check.observables)
+    assert any(link.observable_key == obs.key for link in check.observable_links)
+    assert any(link.origin_investigation_id == check.origin_investigation_id for link in check.observable_links)
 
 
 def test_container_creation() -> None:
@@ -547,6 +548,11 @@ def test_io_save_load_json_roundtrip() -> None:
         loaded_check = loaded_cv.check_get(check.key)
         assert loaded_check is not None
         assert loaded_check.scope == "network"
+        assert any(link.observable_key == obs1.key for link in loaded_check.observable_links)
+        assert all(
+            link.origin_investigation_id == loaded_check.origin_investigation_id
+            for link in loaded_check.observable_links
+        )
 
         # Verify enrichments
         assert len(loaded_cv.get_all_enrichments()) == len(cv.get_all_enrichments())
@@ -612,6 +618,7 @@ def test_io_to_invest_serialization() -> None:
     schema = cv.io_to_invest()
 
     # Verify all expected fields exist via attribute access
+    assert hasattr(schema, "investigation_id")
     assert hasattr(schema, "score")
     assert hasattr(schema, "level")
     assert hasattr(schema, "observables")
@@ -628,6 +635,7 @@ def test_io_to_invest_serialization() -> None:
 
     # Test model_dump() for dict compatibility
     data = schema.model_dump(by_alias=True)
+    assert "investigation_id" in data
     assert "score" in data
     assert "observables" in data
 

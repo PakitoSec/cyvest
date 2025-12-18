@@ -207,9 +207,17 @@ Scores and levels are automatically calculated and propagated:
   - **OUTBOUND relationships**: target scores propagate to source (source is parent)
   - **INBOUND relationships**: source scores propagate to target (target is parent)
   - **BIDIRECTIONAL relationships**: no hierarchical propagation
-- **Observable → Check**: Check score = **max** of all linked observables' scores and check's current score
-- **Manual checks**: Set `score_policy=CheckScorePolicy.MANUAL` (or `check.disable_auto_score()`) to prevent observable-driven score/level changes
+- **Observable → Check (provenance-aware)**: Check score/level only considers observables reachable through *effective* links (`observable_links`)
+  - A link is effective when `propagation_mode="GLOBAL"` or when `origin_investigation_id == check.origin_investigation_id`
 - **Check → Global**: All check scores sum to global investigation score
+
+To force cross-investigation propagation for a specific link, use a GLOBAL link:
+
+```python
+cv.check_link_observable(check.key, observable.key, propagation_mode="GLOBAL")
+# or fluent:
+cv.check("id", "scope", "desc").link_observable(observable, propagation_mode="GLOBAL")
+```
 
 Score to Level mapping:
 

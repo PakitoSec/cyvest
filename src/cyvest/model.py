@@ -27,8 +27,8 @@ from cyvest import keys
 from cyvest.level_score_rules import apply_creation_score_level_defaults, recalculate_level_for_score
 from cyvest.levels import Level, get_level_from_score, normalize_level
 from cyvest.model_enums import (
-    CheckScorePolicy,
     ObservableType,
+    PropagationMode,
     RelationshipDirection,
     RelationshipType,
 )
@@ -441,6 +441,32 @@ class Observable(BaseModel):
         return _format_score_decimal(self.score)
 
 
+class ObservableLink(BaseModel):
+    """Edge metadata for a Check↔Observable association."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    observable_key: str
+    origin_investigation_id: str
+    source_investigation_ids: set[str] = Field(...)
+    propagation_mode: PropagationMode = PropagationMode.LOCAL_ONLY
+
+    @model_validator(mode="before")
+    @classmethod
+    def ensure_audit_defaults(cls, values: Any) -> Any:
+        if not isinstance(values, dict):
+            return values
+        source_ids = values.get("source_investigation_ids")
+        if source_ids is None:
+            source_ids = set()
+        if not source_ids:
+            origin = values.get("origin_investigation_id")
+            if isinstance(origin, str) and origin:
+                source_ids = {origin}
+        values["source_investigation_ids"] = source_ids
+        return values
+
+
 class Check(BaseModel):
     """
     Represents a verification step in the investigation.
@@ -458,8 +484,9 @@ class Check(BaseModel):
     extra: dict[str, Any] = Field(...)
     score: Decimal = Field(...)
     level: Level = Field(...)
-    observables: list[Observable] = Field(...)
-    score_policy: CheckScorePolicy = CheckScorePolicy.AUTO
+    origin_investigation_id: str = Field(...)
+    source_investigation_ids: set[str] = Field(...)
+    observable_links: list[ObservableLink] = Field(...)
     key: str = Field(...)
     _score_history: list[ScoreChange] = PrivateAttr(default_factory=list)
 
@@ -493,34 +520,28 @@ class Check(BaseModel):
             values["extra"] = {}
         if "comment" not in values:
             values["comment"] = ""
-        if "observables" not in values:
-            values["observables"] = []
+        if "observable_links" not in values:
+            values["observable_links"] = []
+        if values.get("source_investigation_ids") is None:
+            values["source_investigation_ids"] = set()
+        if "source_investigation_ids" not in values:
+            values["source_investigation_ids"] = set()
         if "key" not in values:
             values["key"] = ""
         return values
-
-    @field_validator("score_policy", mode="before")
-    @classmethod
-    def coerce_score_policy(cls, v: Any) -> CheckScorePolicy:
-        if isinstance(v, CheckScorePolicy):
-            return v
-        return CheckScorePolicy(v)
 
     @model_validator(mode="after")
     def generate_key(self) -> Self:
         """Generate key."""
         if not self.key:
             self.key = keys.generate_check_key(self.check_id, self.scope)
+        if not self.source_investigation_ids:
+            self.source_investigation_ids = {self.origin_investigation_id}
         return self
 
     @field_serializer("score")
     def serialize_score(self, v: Decimal) -> float:
         return float(v)
-
-    @field_serializer("observables")
-    def serialize_observables(self, value: list[Observable]) -> list[str]:
-        """Serialize observables as keys only."""
-        return [obs.key for obs in value]
 
     def update_score(self, new_score: Decimal, reason: str = "", *, record_history: bool = True) -> None:
         """
@@ -559,28 +580,49 @@ class Check(BaseModel):
         """
         self.level = normalize_level(level)
 
-    def set_score_policy(self, policy: CheckScorePolicy | str) -> None:
+    def add_observable_link(self, link: ObservableLink) -> None:
         """
-        Control whether observables can update this check's score/level.
-        """
-        self.score_policy = CheckScorePolicy(policy)
+        Add an observable link to this check.
 
-    def add_observable(self, observable: Observable) -> None:
-        """
-        Add an observable to this check.
-
-        When an observable is added to a check with level NONE, the check's level
+        When an effective observable link is added to a check with level NONE, the check's level
         is automatically upgraded to INFO to indicate that the check is now classified.
 
         Args:
-            observable: The observable to link
+            link: The observable link to add
         """
-        if observable not in self.observables:
-            self.observables.append(observable)
+        existing: dict[tuple[str, str, PropagationMode], int] = {}
+        for idx, existing_link in enumerate(self.observable_links):
+            existing[
+                (existing_link.observable_key, existing_link.origin_investigation_id, existing_link.propagation_mode)
+            ] = idx
+        link_tuple = (link.observable_key, link.origin_investigation_id, link.propagation_mode)
+        existing_idx = existing.get(link_tuple)
+        if existing_idx is not None:
+            existing_link = self.observable_links[existing_idx]
+            merged_sources = (
+                set(existing_link.source_investigation_ids)
+                | set(link.source_investigation_ids)
+                | {link.origin_investigation_id}
+            )
+            self.observable_links[existing_idx] = existing_link.model_copy(
+                update={"source_investigation_ids": merged_sources}
+            )
+            return
 
-            # Auto-upgrade level from NONE to INFO when first observable is added
-            if self.level == Level.NONE:
-                self.set_level(Level.INFO)
+        self.observable_links.append(
+            link.model_copy(
+                update={
+                    "source_investigation_ids": set(link.source_investigation_ids) or {link.origin_investigation_id}
+                }
+            )
+        )
+
+        is_effective = (
+            link.propagation_mode == PropagationMode.GLOBAL
+            or link.origin_investigation_id == self.origin_investigation_id
+        )
+        if is_effective and self.level == Level.NONE:
+            self.set_level(Level.INFO)
 
     def get_score_history(self) -> list[ScoreChange]:
         """

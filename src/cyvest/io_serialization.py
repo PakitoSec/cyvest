@@ -68,6 +68,7 @@ def serialize_investigation(inv: Investigation) -> InvestigationSchema:
         started_at = started_at.astimezone(timezone.utc)
 
     investigation = InvestigationSchema(
+        investigation_id=inv.investigation_id,
         started_at=started_at,
         score=inv.get_global_score(),
         level=inv.get_global_level(),
@@ -270,6 +271,10 @@ def load_investigation_json(filepath: str | Path) -> Cyvest:
     with open(filepath, encoding="utf-8") as handle:
         data = json.load(handle)
 
+    investigation_id = data.get("investigation_id")
+    if not isinstance(investigation_id, str) or not investigation_id.strip():
+        raise ValueError("Serialized investigation must include 'investigation_id'.")
+
     data_payload = data.get("data")
     extraction = data.get("data_extraction", {})
 
@@ -289,7 +294,12 @@ def load_investigation_json(filepath: str | Path) -> Cyvest:
     cv = Cyvest(data=data_payload, root_type=root_type, score_mode=score_mode)
 
     # Reset internal state to avoid default root pollution
-    cv._investigation = Investigation(data_payload, root_type=root_type, score_mode=score_mode)
+    cv._investigation = Investigation(
+        data_payload,
+        root_type=root_type,
+        score_mode=score_mode,
+        investigation_id=investigation_id,
+    )
 
     started_at_raw = data.get("started_at")
     if isinstance(started_at_raw, str) and started_at_raw.strip():
@@ -398,16 +408,17 @@ def load_investigation_json(filepath: str | Path) -> Cyvest:
                 "extra": check_info.get("extra", {}),
                 "score": Decimal(str(check_info.get("score", 0))),
                 "level": check_info.get("level", "NONE"),
-                "score_policy": check_info.get("score_policy", "auto"),
+                "origin_investigation_id": check_info.get("origin_investigation_id"),
+                "source_investigation_ids": check_info.get("source_investigation_ids"),
+                "observable_links": check_info.get("observable_links", []),
                 "key": check_info.get("key", ""),
             }
             check = Check.model_validate(check_data)
-            observable_keys = check_info.get("observables", [])
-            for obs_key in observable_keys:
-                observable = cv._investigation.get_observable(obs_key)
-                if observable:
-                    check.add_observable(observable)
             cv._investigation.add_check(check)
+            for link in check.observable_links:
+                observable = cv._investigation.get_observable(link.observable_key)
+                if observable:
+                    observable.mark_generated_by_check(check.key)
 
     # Enrichments - leverage Pydantic model_validate
     for enr_info in data.get("enrichments", {}).values():

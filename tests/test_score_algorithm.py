@@ -8,8 +8,7 @@ and score history access.
 from collections.abc import Sequence
 from decimal import Decimal
 
-from cyvest import CheckScorePolicy, Cyvest, Level
-from cyvest.io_serialization import load_investigation_json
+from cyvest import Cyvest, Level
 from cyvest.score import ScoreMode
 
 
@@ -284,38 +283,101 @@ def test_check_score_history() -> None:
     assert any(entry.new_score == Decimal("5.0") for entry in history)
 
 
-def test_manual_check_ignores_observable_scores() -> None:
-    """Ensure MANUAL score policy blocks observable-driven updates."""
-    cv = Cyvest()
+def test_local_only_link_does_not_affect_foreign_check() -> None:
+    """LOCAL_ONLY links do not propagate across investigation provenance boundaries."""
+    cv_main = Cyvest()
+    cv_other = Cyvest()
 
-    check = cv.check_create("manual_check", "test", "Manual scoring only", score_policy=CheckScorePolicy.MANUAL)
-    obs = cv.observable_create("ip", "10.0.0.50")
-    cv.observable_add_threat_intel(obs.key, source="source1", score=Decimal("9.0"))
+    foreign_check = cv_other.check_create("foreign", "scope", "Created in other investigation")
+    cv_main.merge_investigation(cv_other)
 
-    cv.check_link_observable(check.key, obs.key)
+    obs = cv_main.observable_create("ip", "10.0.0.50")
+    cv_main.observable_add_threat_intel(obs.key, source="source1", score=Decimal("9.0"))
 
-    # Score should not change and level should stay at the link-upgrade (INFO)
-    assert check.score == Decimal("0")
-    assert check.level == Level.INFO
+    # Link is created in cv_main's investigation context, so it is not effective for a foreign check.
+    cv_main.check_link_observable(foreign_check.key, obs.key)
 
-    # Further observable score changes still do not flow into the check
-    cv.observable_add_threat_intel(obs.key, source="source2", score=Decimal("10.0"))
-    assert check.score == Decimal("0")
-    assert check.level == Level.INFO
+    loaded_foreign = cv_main.check_get(foreign_check.key)
+    assert loaded_foreign is not None
+    assert loaded_foreign.score == Decimal("0")
+    assert loaded_foreign.level == Level.NONE
 
 
-def test_manual_check_policy_round_trip(tmp_path) -> None:
-    """Persist and restore manual policy via JSON serialization."""
-    cv = Cyvest()
-    check = cv.check_create("persisted_manual", "scope", "desc", score_policy=CheckScorePolicy.MANUAL)
+def test_global_link_can_affect_foreign_check() -> None:
+    """GLOBAL links are effective regardless of origin_investigation_id mismatch."""
+    cv_main = Cyvest()
+    cv_other = Cyvest()
 
-    path = tmp_path / "inv.json"
-    cv.io_save_json(path)
+    foreign_check = cv_other.check_create("foreign", "scope", "Created in other investigation")
+    cv_main.merge_investigation(cv_other)
 
-    loaded = load_investigation_json(path)
-    loaded_check = loaded.check_get(check.key)
-    assert loaded_check is not None
-    assert loaded_check.score_policy == CheckScorePolicy.MANUAL
+    obs = cv_main.observable_create("ip", "10.0.0.52")
+    cv_main.observable_add_threat_intel(obs.key, source="source1", score=Decimal("9.0"))
+
+    cv_main.check_link_observable(foreign_check.key, obs.key, propagation_mode="GLOBAL")
+
+    loaded_foreign = cv_main.check_get(foreign_check.key)
+    assert loaded_foreign is not None
+    assert loaded_foreign.score == Decimal("9.0")
+    assert loaded_foreign.level == Level.MALICIOUS
+
+
+def test_check_reconciliation_rewrites_link_origin_and_preserves_audit_sources() -> None:
+    """Merging the same check key rewrites incoming link origins to the canonical check origin while preserving audit."""  # noqa: E501
+    cv1 = Cyvest()
+    cv2 = Cyvest()
+
+    cv1_id = cv1._investigation.investigation_id
+    cv2_id = cv2._investigation.investigation_id
+
+    obs1 = cv1.observable_create("ip", "10.0.0.60")
+    cv1.observable_add_threat_intel(obs1.key, source="s1", score=Decimal("4.0"))
+    check1 = cv1.check_create("recon", "scope", "Same semantic check")
+    cv1.check_link_observable(check1.key, obs1.key)
+
+    obs2 = cv2.observable_create("ip", "10.0.0.61")
+    cv2.observable_add_threat_intel(obs2.key, source="s2", score=Decimal("9.0"))
+    check2 = cv2.check_create("recon", "scope", "Same semantic check")
+    cv2.check_link_observable(check2.key, obs2.key)
+
+    cv1.merge_investigation(cv2)
+
+    merged = cv1.check_get(check1.key)
+    assert merged is not None
+    assert merged.origin_investigation_id == cv1_id
+    assert {cv1_id, cv2_id} <= merged.source_investigation_ids
+
+    # Incoming link is rewritten to the canonical origin but keeps audit attribution.
+    link_to_obs2 = next(link for link in merged.observable_links if link.observable_key == obs2.key)
+    assert link_to_obs2.origin_investigation_id == cv1_id
+    assert cv2_id in link_to_obs2.source_investigation_ids
+
+    # Both links are effective after reconciliation, so the check takes the max score.
+    assert merged.score == Decimal("9.0")
+    assert merged.level == Level.MALICIOUS
+
+
+def test_local_only_links_preserve_behavior_after_merge() -> None:
+    """Checks keep being influenced by links created in their origin investigation after merges."""
+    cv_main = Cyvest()
+    cv_other = Cyvest()
+
+    obs = cv_other.observable_create("ip", "10.0.0.51")
+    cv_other.observable_add_threat_intel(obs.key, source="source1", score=Decimal("4.0"))
+    check = cv_other.check_create("local", "scope", "Local check")
+    cv_other.check_link_observable(check.key, obs.key)
+
+    cv_main.merge_investigation(cv_other)
+
+    merged_check = cv_main.check_get(check.key)
+    assert merged_check is not None
+    assert merged_check.score == Decimal("4.0")
+    assert merged_check.level == Level.SUSPICIOUS
+
+    # Updating the globally merged observable still affects the check via its effective LOCAL_ONLY link.
+    cv_main.observable_add_threat_intel(obs.key, source="source2", score=Decimal("7.0"))
+    assert merged_check.score == Decimal("7.0")
+    assert merged_check.level == Level.MALICIOUS
 
 
 def test_score_propagation_through_hierarchy() -> None:

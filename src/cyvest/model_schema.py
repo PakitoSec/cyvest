@@ -102,6 +102,7 @@ class InvestigationSchema(BaseModel):
         },
     )
 
+    investigation_id: str = Field(..., description="Stable investigation identity (ULID).")
     started_at: datetime = Field(..., description="Investigation start time (UTC).")
     score: Decimal = Field(..., description="Global investigation score.")
     level: Level = Field(

@@ -1287,9 +1287,17 @@ class Investigation:
 
         merge_summary: list[dict[str, Any]] = []
 
+        (
+            incoming_observables,
+            incoming_threat_intels,
+            incoming_checks,
+            incoming_enrichments,
+            incoming_containers,
+        ) = self._clone_for_merge(other)
+
         # PASS 1: Merge observables and collect deferred relationships
         all_deferred_relationships = []
-        for obs in other._observables.values():
+        for obs in incoming_observables.values():
             existing = self._observables.get(obs.key)
             before = _snapshot_observable(existing) if existing else None
             _, deferred = self.add_observable(obs)
@@ -1332,7 +1340,7 @@ class Investigation:
                 )
 
         # Merge threat intels (need to link to observables)
-        for ti in other._threat_intels.values():
+        for ti in incoming_threat_intels.values():
             existing_ti = self._threat_intels.get(ti.key)
             before = _snapshot_threat_intel(existing_ti) if existing_ti else None
             # Find the observable this TI belongs to
@@ -1356,7 +1364,7 @@ class Investigation:
             )
 
         # Merge checks
-        for check in other._checks.values():
+        for check in incoming_checks.values():
             existing_check = self._checks.get(check.key)
             before = _snapshot_check(existing_check) if existing_check else None
             self.add_check(check)
@@ -1377,7 +1385,7 @@ class Investigation:
             )
 
         # Merge enrichments
-        for enrichment in other._enrichments.values():
+        for enrichment in incoming_enrichments.values():
             existing_enrichment = self._enrichments.get(enrichment.key)
             before = _snapshot_enrichment(existing_enrichment) if existing_enrichment else None
             self.add_enrichment(enrichment)
@@ -1398,7 +1406,7 @@ class Investigation:
             )
 
         # Merge containers
-        for container in other._containers.values():
+        for container in incoming_containers.values():
             existing_container = self._containers.get(container.key)
             before = _snapshot_container(existing_container) if existing_container else None
             self.add_container(container)
@@ -1440,4 +1448,78 @@ class Investigation:
                 "into_investigation_name": self.investigation_name,
                 "object_changes": merge_summary,
             },
+        )
+
+    def _clone_for_merge(
+        self, other: Investigation
+    ) -> tuple[
+        dict[str, Observable],
+        dict[str, ThreatIntel],
+        dict[str, Check],
+        dict[str, Enrichment],
+        dict[str, Container],
+    ]:
+        """Clone incoming models while preserving shared object references."""
+        incoming_threat_intels = {key: ti.model_copy(deep=True) for key, ti in other._threat_intels.items()}
+        incoming_checks = {key: check.model_copy(deep=True) for key, check in other._checks.items()}
+        incoming_enrichments = {key: enrichment.model_copy(deep=True) for key, enrichment in other._enrichments.items()}
+
+        orphan_threat_intels: dict[str, ThreatIntel] = {}
+
+        def _copy_threat_intel(ti: ThreatIntel) -> ThreatIntel:
+            if ti.key in incoming_threat_intels:
+                return incoming_threat_intels[ti.key]
+            existing = orphan_threat_intels.get(ti.key)
+            if existing:
+                return existing
+            copied = ti.model_copy(deep=True)
+            orphan_threat_intels[ti.key] = copied
+            return copied
+
+        incoming_observables: dict[str, Observable] = {}
+        for obs in other._observables.values():
+            copied_obs = obs.model_copy(deep=True)
+            if obs.threat_intels:
+                copied_obs.threat_intels = [_copy_threat_intel(ti) for ti in obs.threat_intels]
+            incoming_observables[obs.key] = copied_obs
+
+        orphan_checks: dict[str, Check] = {}
+
+        def _copy_check(check: Check) -> Check:
+            if check.key in incoming_checks:
+                return incoming_checks[check.key]
+            existing = orphan_checks.get(check.key)
+            if existing:
+                return existing
+            copied = check.model_copy(deep=True)
+            orphan_checks[check.key] = copied
+            return copied
+
+        incoming_containers: dict[str, Container] = {}
+
+        def _copy_container(container: Container) -> Container:
+            existing = incoming_containers.get(container.key)
+            if existing:
+                return existing
+            copied = Container(
+                path=container.path,
+                description=container.description,
+                checks=[_copy_check(check) for check in container.checks],
+                sub_containers={},
+                key=container.key,
+            )
+            incoming_containers[container.key] = copied
+            for sub_key, sub in container.sub_containers.items():
+                copied.sub_containers[sub_key] = _copy_container(sub)
+            return copied
+
+        for container in other._containers.values():
+            _copy_container(container)
+
+        return (
+            incoming_observables,
+            incoming_threat_intels,
+            incoming_checks,
+            incoming_enrichments,
+            incoming_containers,
         )

@@ -6,13 +6,13 @@ from decimal import Decimal
 
 import pytest
 
-from cyvest import Cyvest, Level
+from cyvest import Cyvest, Level, ObservableType
 
 
 def test_observable_proxy_update_metadata() -> None:
     """ObservableProxy.update_metadata should patch safe fields in place."""
     cv = Cyvest()
-    obs = cv.observable_create("url", "https://example.com")
+    obs = cv.observable_create(ObservableType.URL, "https://example.com")
 
     obs.update_metadata(
         comment="Investigated",
@@ -52,7 +52,7 @@ def test_check_proxy_update_metadata() -> None:
 def test_threat_intel_proxy_update_metadata() -> None:
     """ThreatIntelProxy.update_metadata should allow comment/level/extra."""
     cv = Cyvest()
-    obs = cv.observable_create("domain-name", "example.com")
+    obs = cv.observable_create(ObservableType.DOMAIN_NAME, "example.com")
     ti = cv.observable_add_threat_intel(
         obs.key,
         source="vt",
@@ -94,7 +94,7 @@ def test_container_proxy_update_metadata() -> None:
 def test_proxy_dir_exposes_public_fields() -> None:
     """Proxies should list readable dataclass fields for IDE auto-completion."""
     cv = Cyvest()
-    obs = cv.observable_create("url", "https://example.com")
+    obs = cv.observable_create(ObservableType.URL, "https://example.com")
     check = cv.check_create("check-id", "scope", "desc")
     container = cv.container_create("root")
     ti = cv.observable_add_threat_intel(obs.key, source="vt", score=Decimal("1"), comment="c")
@@ -158,7 +158,7 @@ def test_proxy_dir_exposes_public_fields() -> None:
 def test_proxy_public_fields_are_deep_copied() -> None:
     """Mutable model data exposed through proxies should be defensive copies."""
     cv = Cyvest()
-    obs = cv.observable_create("domain-name", "example.com")
+    obs = cv.observable_create(ObservableType.DOMAIN_NAME, "example.com")
     check = cv.check_create("check-id", "scope", "desc")
     linked_check = cv.check_link_observable(check.key, obs.key)
     assert linked_check is not None

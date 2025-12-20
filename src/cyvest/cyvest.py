@@ -53,7 +53,7 @@ class Cyvest:
         self,
         data: Any = None,
         root_type: Literal["file", "artifact"] = "file",
-        score_mode: ScoreMode | Literal["max", "sum"] = ScoreMode.MAX,
+        score_mode: ScoreMode = ScoreMode.MAX,
         investigation_name: str | None = None,
     ) -> None:
         """
@@ -65,7 +65,7 @@ class Cyvest:
             score_mode: Score calculation mode (MAX or SUM)
             investigation_name: Optional human-readable investigation name
         """
-        normalized_score_mode = ScoreMode.normalize(score_mode)
+        normalized_score_mode = score_mode
         self._investigation = Investigation(
             data,
             root_type=root_type,
@@ -224,7 +224,7 @@ class Cyvest:
         comment: str = "",
         extra: dict[str, Any] | None = None,
         score: Decimal | float | None = None,
-        level: Level | str | None = None,
+        level: Level | None = None,
     ) -> ObservableProxy:
         """
         Create a new observable or return existing one.
@@ -265,7 +265,7 @@ class Cyvest:
         ...
 
     @overload
-    def observable_get(self, obs_type: str | ObservableType, value: str) -> ObservableProxy | None:
+    def observable_get(self, obs_type: ObservableType, value: str) -> ObservableProxy | None:
         """Get an observable by type and value."""
         ...
 
@@ -290,34 +290,26 @@ class Cyvest:
             elif not args and set(kwargs) == {"obs_type", "value"}:
                 obs_type = kwargs["obs_type"]
                 value = kwargs["value"]
-                if isinstance(obs_type, ObservableType):
-                    obs_type = obs_type.value
                 try:
-                    key = keys.generate_observable_key(obs_type, value)
+                    key = keys.generate_observable_key(obs_type.value, value)
                 except Exception as e:
                     raise ValueError(
                         f"Failed to generate observable key for type='{obs_type}', value='{value}': {e}"
                     ) from e
             else:
-                raise ValueError(
-                    "observable_get() accepts either (key: str) or (obs_type: str | ObservableType, value: str)"
-                )
+                raise ValueError("observable_get() accepts either (key: str) or (obs_type: ObservableType, value: str)")
         elif len(args) == 1:
             key = args[0]
         elif len(args) == 2:
             obs_type, value = args
-            if isinstance(obs_type, ObservableType):
-                obs_type = obs_type.value
             try:
-                key = keys.generate_observable_key(obs_type, value)
+                key = keys.generate_observable_key(obs_type.value, value)
             except Exception as e:
                 raise ValueError(
                     f"Failed to generate observable key for type='{obs_type}', value='{value}': {e}"
                 ) from e
         else:
-            raise ValueError(
-                "observable_get() accepts either (key: str) or (obs_type: str | ObservableType, value: str)"
-            )
+            raise ValueError("observable_get() accepts either (key: str) or (obs_type: ObservableType, value: str)")
         return self._observable_proxy(self._investigation.get_observable(key))
 
     def observable_get_root(self) -> ObservableProxy:
@@ -360,7 +352,7 @@ class Cyvest:
         score: Decimal | float,
         comment: str = "",
         extra: dict[str, Any] | None = None,
-        level: Level | str | None = None,
+        level: Level | None = None,
         taxonomies: list[dict[str, Any]] | None = None,
     ) -> ThreatIntelProxy | None:
         """
@@ -400,7 +392,7 @@ class Cyvest:
     def observable_set_level(
         self,
         observable: Observable | ObservableProxy | str,
-        level: Level | str,
+        level: Level,
         reason: str | None = None,
     ) -> ObservableProxy | None:
         """
@@ -434,7 +426,7 @@ class Cyvest:
         comment: str = "",
         extra: dict[str, Any] | None = None,
         score: Decimal | float | None = None,
-        level: Level | str | None = None,
+        level: Level | None = None,
     ) -> CheckProxy:
         """
         Create a new check.
@@ -913,7 +905,7 @@ class Cyvest:
     def display_summary(
         self,
         show_graph: bool = True,
-        exclude_levels: Level | str | Iterable[Level | str] = Level.NONE,
+        exclude_levels: Level | Iterable[Level] = Level.NONE,
         show_audit_log: bool = False,
     ) -> None:
         display_summary(
@@ -931,7 +923,7 @@ class Cyvest:
         self,
         output_dir: str | None = None,
         open_browser: bool = True,
-        min_level: Level | str | None = None,
+        min_level: Level | None = None,
         observable_types: list[ObservableType] | None = None,
         physics: bool = True,
         group_by_type: bool = False,
@@ -966,17 +958,12 @@ class Cyvest:
         """
         from cyvest.io_visualization import generate_network_graph
 
-        # Convert string types to ObservableType enums if provided
-        obs_types_enum = None
-        if observable_types is not None:
-            obs_types_enum = [ObservableType(t) for t in observable_types]
-
         return generate_network_graph(
             self,
             output_dir=output_dir,
             open_browser=open_browser,
             min_level=min_level,
-            observable_types=obs_types_enum,
+            observable_types=observable_types,
             physics=physics,
             group_by_type=group_by_type,
             max_label_length=max_label_length,
@@ -994,7 +981,7 @@ class Cyvest:
         comment: str = "",
         extra: dict[str, Any] | None = None,
         score: Decimal | float | None = None,
-        level: Level | str | None = None,
+        level: Level | None = None,
     ) -> ObservableProxy:
         """
         Create (or fetch) an observable with fluent helper methods.
@@ -1022,7 +1009,7 @@ class Cyvest:
         comment: str = "",
         extra: dict[str, Any] | None = None,
         score: Decimal | float | None = None,
-        level: Level | str | None = None,
+        level: Level | None = None,
     ) -> CheckProxy:
         """
         Create a check with fluent helper methods.

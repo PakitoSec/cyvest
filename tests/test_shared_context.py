@@ -215,7 +215,7 @@ def test_observables_list_by_type_sync_and_async():
     assert {o.value for o in sync_results} == {"user1@example.com", "user2@example.com"}
 
     async def run():
-        results = await shared.observables_alist_by_type("email-addr")
+        results = await shared.observables_alist_by_type(ObservableType.EMAIL_ADDR)
         assert len(results) == 2
         assert {o.value for o in results} == {"user1@example.com", "user2@example.com"}
 
@@ -434,17 +434,10 @@ def test_observable_get_with_parameters():
     with shared.create_cyvest() as cy:
         cy.observable(ObservableType.EMAIL_ADDR, "user@example.com")
 
-    # Test parameter-based lookup with string type
-    obs = shared.observable_get("email-addr", "user@example.com")
+    obs = shared.observable_get(ObservableType.EMAIL_ADDR, "user@example.com")
     assert obs is not None
     assert obs.obs_type == ObservableType.EMAIL_ADDR
     assert obs.value == "user@example.com"
-
-    # Test parameter-based lookup with ObservableType enum
-    obs_enum = shared.observable_get(ObservableType.EMAIL_ADDR, "user@example.com")
-    assert obs_enum is not None
-    assert obs_enum.obs_type == ObservableType.EMAIL_ADDR
-    assert obs_enum.value == "user@example.com"
 
 
 def test_check_get_with_parameters():
@@ -473,8 +466,8 @@ def test_existence_checks_via_getters():
         cy.observable(ObservableType.DOMAIN_NAME, "malicious.com")
         cy.check("url_reputation", "body", "Check URL reputation")
 
-    assert shared.observable_get("domain-name", "malicious.com") is not None
-    assert shared.observable_get("domain-name", "safe.com") is None
+    assert shared.observable_get(ObservableType.DOMAIN_NAME, "malicious.com") is not None
+    assert shared.observable_get(ObservableType.DOMAIN_NAME, "safe.com") is None
     assert shared.check_get("url_reputation", "body") is not None
     assert shared.check_get("email_reputation", "header") is None
 
@@ -484,15 +477,9 @@ def test_cyvest_get_observable_with_parameters():
     cy = Cyvest({"test": "data"}, root_type="artifact")
     obs_proxy = cy.observable(ObservableType.IPV4_ADDR, "10.0.0.1")
 
-    # Test parameter-based lookup with string type
-    obs = cy.observable_get("ipv4-addr", "10.0.0.1")
+    obs = cy.observable_get(ObservableType.IPV4_ADDR, "10.0.0.1")
     assert obs is not None
     assert obs.value == "10.0.0.1"
-
-    # Test parameter-based lookup with ObservableType enum
-    obs_enum = cy.observable_get(ObservableType.IPV4_ADDR, "10.0.0.1")
-    assert obs_enum is not None
-    assert obs_enum.value == "10.0.0.1"
 
     # Test key-based lookup (backward compatibility)
     obs_key = cy.observable_get(obs_proxy.key)
@@ -593,7 +580,7 @@ def test_normalization_consistency():
 
     # Lookup should work with different casing (normalization)
     obs1 = shared.observable_get(ObservableType.EMAIL_ADDR, "user@example.com")
-    obs2 = shared.observable_get("email-addr", "USER@EXAMPLE.COM")
+    obs2 = shared.observable_get(ObservableType.EMAIL_ADDR, "USER@EXAMPLE.COM")
     obs3 = shared.observable_get(ObservableType.EMAIL_ADDR, "  User@Example.COM  ")
 
     assert obs1 is not None

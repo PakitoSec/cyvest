@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from cyvest import Cyvest, Level, RelationshipDirection
+from cyvest import Cyvest, Level, ObservableType, RelationshipDirection
 
 
 def test_cyvest_initialization() -> None:
@@ -23,14 +23,14 @@ def test_context_manager() -> None:
     """Test Cyvest as context manager."""
     with Cyvest() as cv:
         assert cv is not None
-        obs = cv.observable_create("ip", "192.168.1.1")
+        obs = cv.observable_create(ObservableType.IPV4_ADDR, "192.168.1.1")
         assert obs is not None
 
 
 def test_observable_creation() -> None:
     """Test creating observables via facade."""
     cv = Cyvest()
-    obs = cv.observable_create("url", "https://example.com", internal=False)
+    obs = cv.observable_create(ObservableType.URL, "https://example.com", internal=False)
     assert obs.obs_type == "url"
     assert obs.value == "https://example.com"
     assert obs.internal is False
@@ -41,7 +41,7 @@ def test_observable_creation() -> None:
 def test_observable_retrieval() -> None:
     """Test retrieving observables."""
     cv = Cyvest()
-    obs = cv.observable_create("ip", "10.0.0.1")
+    obs = cv.observable_create(ObservableType.IPV4_ADDR, "10.0.0.1")
     retrieved = cv.observable_get(obs.key)
     assert retrieved is not None
     assert retrieved.key == obs.key
@@ -51,8 +51,8 @@ def test_facade_getters_accept_component_parameters() -> None:
     """Facade getters should accept key components where available."""
     cv = Cyvest()
 
-    obs = cv.observable_create("url", "https://example.com")
-    assert cv.observable_get("url", "https://example.com") is not None
+    obs = cv.observable_create(ObservableType.URL, "https://example.com")
+    assert cv.observable_get(ObservableType.URL, "https://example.com") is not None
     assert cv.observable_get(cv.OBS.URL, "https://example.com") is not None
     assert cv.observable_get(obs.key) is not None
 
@@ -76,7 +76,7 @@ def test_facade_getters_accept_component_parameters() -> None:
 def test_threat_intel_addition() -> None:
     """Test adding threat intel to observable."""
     cv = Cyvest()
-    obs = cv.observable_create("hash", "abc123")
+    obs = cv.observable_create(ObservableType.ARTIFACT, "abc123")
     ti = cv.observable_add_threat_intel(obs.key, source="virustotal", score=Decimal("8.0"), comment="Malicious")
     assert ti is not None
     assert ti.source == "virustotal"
@@ -87,7 +87,7 @@ def test_threat_intel_addition() -> None:
 def test_string_levels_are_accepted_by_api() -> None:
     """Cyvest APIs should accept string level values."""
     cv = Cyvest()
-    obs = cv.observable_create("domain-name", "example.com", level="safe")
+    obs = cv.observable_create(ObservableType.DOMAIN_NAME, "example.com", level="safe")
     assert obs.level == Level.SAFE
 
     check = cv.check_create("string_level", "scope", "desc", level="notable")
@@ -114,7 +114,7 @@ def test_check_creation() -> None:
 def test_check_observable_linking() -> None:
     """Test linking observables to checks."""
     cv = Cyvest()
-    obs = cv.observable_create("url", "https://bad.com")
+    obs = cv.observable_create(ObservableType.URL, "https://bad.com")
     check = cv.check_create("url_check", "analysis", "Check URL")
     cv.check_link_observable(check.key, obs.key)
     assert any(link.observable_key == obs.key for link in check.observable_links)
@@ -158,8 +158,8 @@ def test_global_score_calculation() -> None:
 def test_statistics() -> None:
     """Test statistics gathering."""
     cv = Cyvest()
-    cv.observable_create("url", "https://example.com")
-    cv.observable_create("ip", "192.168.1.1")
+    cv.observable_create(ObservableType.URL, "https://example.com")
+    cv.observable_create(ObservableType.IPV4_ADDR, "192.168.1.1")
     cv.check_create("c1", "network", "desc")
     stats = cv.get_statistics()
     assert stats.total_observables >= 2  # Plus root
@@ -192,11 +192,11 @@ def test_investigation_whitelisting_flag() -> None:
 def test_investigation_merge() -> None:
     """Test merging investigations."""
     cv1 = Cyvest()
-    cv1.observable_create("url", "https://example.com")
+    cv1.observable_create(ObservableType.URL, "https://example.com")
     cv1.check_create("c1", "s1", "d1", score=Decimal("3.0"))
 
     cv2 = Cyvest()
-    cv2.observable_create("ip", "192.168.1.1")
+    cv2.observable_create(ObservableType.IPV4_ADDR, "192.168.1.1")
     cv2.check_create("c2", "s2", "d2", score=Decimal("2.0"))
 
     # Merge cv2 into cv1
@@ -208,6 +208,22 @@ def test_investigation_merge() -> None:
     all_checks = cv1.get_all_checks()
     assert len(all_checks) == 2
     assert cv1.get_global_score() == Decimal("5.0")
+
+
+def test_merge_investigation_copies_incoming_objects() -> None:
+    """Merged investigations should not share object references."""
+    cv_main = Cyvest()
+    cv_other = Cyvest()
+    obs = cv_other.observable_create(ObservableType.IPV4_ADDR, "192.0.2.1")
+
+    cv_main.merge_investigation(cv_other)
+
+    assert cv_other.observable_get(obs.key) is not None
+    assert len(cv_other.observable_get(obs.key).threat_intels) == 0
+
+    cv_main.observable_add_threat_intel(obs.key, source="source1", score=Decimal("9.0"))
+
+    assert len(cv_other.observable_get(obs.key).threat_intels) == 0
 
 
 def test_root_observable() -> None:
@@ -224,8 +240,8 @@ def test_root_observable() -> None:
 def test_relationship_with_direction() -> None:
     """Test adding relationships with direction via Cyvest API."""
     cv = Cyvest()
-    obs1 = cv.observable_create("url", "https://example.com")
-    obs2 = cv.observable_create("ip", "192.168.1.1")
+    obs1 = cv.observable_create(ObservableType.URL, "https://example.com")
+    obs2 = cv.observable_create(ObservableType.IPV4_ADDR, "192.168.1.1")
 
     # Default direction (bidirectional)
     cv.observable_add_relationship(obs1.key, obs2.key, "related-to")
@@ -245,8 +261,8 @@ def test_relationship_semantic_defaults_via_api() -> None:
     from cyvest import RelationshipType
 
     cv = Cyvest()
-    obs1 = cv.observable_create("url", "https://example.com")
-    obs2 = cv.observable_create("ip", "192.168.1.1")
+    obs1 = cv.observable_create(ObservableType.URL, "https://example.com")
+    obs2 = cv.observable_create(ObservableType.IPV4_ADDR, "192.168.1.1")
 
     # No direction specified - uses BIDIRECTIONAL by default
     cv.observable_add_relationship(obs1.key, obs2.key, RelationshipType.RELATED_TO)
@@ -261,7 +277,7 @@ def test_finalize_relationships_single_orphan() -> None:
     root = cv.observable_get_root()
 
     # Create an observable with no relationships
-    orphan = cv.observable_create("ip", "192.168.1.1")
+    orphan = cv.observable_create(ObservableType.IPV4_ADDR, "192.168.1.1")
 
     # Finalize relationships
     cv.finalize_relationships()
@@ -283,9 +299,9 @@ def test_finalize_relationships_orphan_subgraph() -> None:
     root = cv.observable_get_root()
 
     # Create a connected sub-graph: obs1 -> obs2 -> obs3
-    obs1 = cv.observable_create("ip", "10.0.0.1")
-    obs2 = cv.observable_create("domain", "example.com")
-    obs3 = cv.observable_create("url", "https://example.com/path")
+    obs1 = cv.observable_create(ObservableType.IPV4_ADDR, "10.0.0.1")
+    obs2 = cv.observable_create(ObservableType.DOMAIN_NAME, "example.com")
+    obs3 = cv.observable_create(ObservableType.URL, "https://example.com/path")
 
     cv.observable_add_relationship(obs1.key, obs2.key, RelationshipType.RELATED_TO)
     cv.observable_add_relationship(obs2.key, obs3.key, RelationshipType.RELATED_TO)
@@ -311,19 +327,19 @@ def test_finalize_relationships_multiple_orphan_subgraphs() -> None:
     root = cv.observable_get_root()
 
     # First sub-graph: sg1_a -> sg1_b
-    sg1_a = cv.observable_create("ip", "10.0.0.1")
-    sg1_b = cv.observable_create("domain", "sub1.com")
+    sg1_a = cv.observable_create(ObservableType.IPV4_ADDR, "10.0.0.1")
+    sg1_b = cv.observable_create(ObservableType.DOMAIN_NAME, "sub1.com")
     cv.observable_add_relationship(sg1_a.key, sg1_b.key, RelationshipType.RELATED_TO)
 
     # Second sub-graph: sg2_a -> sg2_b -> sg2_c
-    sg2_a = cv.observable_create("ip", "10.0.0.2")
-    sg2_b = cv.observable_create("domain", "sub2.com")
-    sg2_c = cv.observable_create("url", "https://sub2.com")
+    sg2_a = cv.observable_create(ObservableType.IPV4_ADDR, "10.0.0.2")
+    sg2_b = cv.observable_create(ObservableType.DOMAIN_NAME, "sub2.com")
+    sg2_c = cv.observable_create(ObservableType.URL, "https://sub2.com")
     cv.observable_add_relationship(sg2_a.key, sg2_b.key, RelationshipType.RELATED_TO)
     cv.observable_add_relationship(sg2_b.key, sg2_c.key, RelationshipType.RELATED_TO)
 
     # Third isolated orphan
-    sg3_orphan = cv.observable_create("hash", "abc123")
+    sg3_orphan = cv.observable_create(ObservableType.ARTIFACT, "abc123")
 
     cv.finalize_relationships()
 
@@ -347,8 +363,8 @@ def test_finalize_relationships_preconnected_graph() -> None:
     root = cv.observable_get_root()
 
     # Create a graph already connected to root
-    obs1 = cv.observable_create("ip", "10.0.0.1")
-    obs2 = cv.observable_create("domain", "example.com")
+    obs1 = cv.observable_create(ObservableType.IPV4_ADDR, "10.0.0.1")
+    obs2 = cv.observable_create(ObservableType.DOMAIN_NAME, "example.com")
 
     # Connect to root
     cv.observable_add_relationship(root.key, obs1.key, RelationshipType.RELATED_TO)
@@ -373,11 +389,11 @@ def test_finalize_relationships_complex_subgraph_selection() -> None:
     # Create a sub-graph with multiple potential starting nodes
     # Structure: source -> hub1 -> leaf1
     #                  -> hub2 -> leaf2
-    source = cv.observable_create("ip", "10.0.0.1")
-    hub1 = cv.observable_create("domain", "hub1.com")
-    hub2 = cv.observable_create("domain", "hub2.com")
-    leaf1 = cv.observable_create("url", "https://hub1.com/page")
-    leaf2 = cv.observable_create("url", "https://hub2.com/page")
+    source = cv.observable_create(ObservableType.IPV4_ADDR, "10.0.0.1")
+    hub1 = cv.observable_create(ObservableType.DOMAIN_NAME, "hub1.com")
+    hub2 = cv.observable_create(ObservableType.DOMAIN_NAME, "hub2.com")
+    leaf1 = cv.observable_create(ObservableType.URL, "https://hub1.com/page")
+    leaf2 = cv.observable_create(ObservableType.URL, "https://hub2.com/page")
 
     cv.observable_add_relationship(source.key, hub1.key, RelationshipType.RELATED_TO)
     cv.observable_add_relationship(source.key, hub2.key, RelationshipType.RELATED_TO)
@@ -401,12 +417,12 @@ def test_merge_safe_observable_preserves_safe_with_low_score() -> None:
     """Test that merging SAFE observable with low-score incoming preserves SAFE."""
     cv1 = Cyvest()
     # Create SAFE observable in first investigation
-    obs1 = cv1.observable_create("domain", "trusted.example.com", score=0, level=Level.SAFE)
+    obs1 = cv1.observable_create(ObservableType.DOMAIN_NAME, "trusted.example.com", score=0, level=Level.SAFE)
     assert obs1.level == Level.SAFE
 
     cv2 = Cyvest()
     # Create same observable with INFO level (score=0) in second investigation
-    obs2 = cv2.observable_create("domain", "trusted.example.com", score=0, level=Level.INFO)
+    obs2 = cv2.observable_create(ObservableType.DOMAIN_NAME, "trusted.example.com", score=0, level=Level.INFO)
     cv2.observable_add_threat_intel(obs2.key, source="ti_source", score=Decimal("0"))
     assert obs2.level == Level.INFO
 
@@ -423,11 +439,11 @@ def test_merge_safe_observable_with_trusted_score() -> None:
     """Test that merging SAFE observable with TRUSTED-level incoming preserves SAFE."""
     cv1 = Cyvest()
     # Create SAFE observable
-    obs1 = cv1.observable_create("domain", "trusted.example.com", score=0, level=Level.SAFE)
+    obs1 = cv1.observable_create(ObservableType.DOMAIN_NAME, "trusted.example.com", score=0, level=Level.SAFE)
 
     cv2 = Cyvest()
     # Create same observable with negative score (TRUSTED level)
-    obs2 = cv2.observable_create("domain", "trusted.example.com")
+    obs2 = cv2.observable_create(ObservableType.DOMAIN_NAME, "trusted.example.com")
     cv2.observable_add_threat_intel(obs2.key, source="ti_source", score=Decimal("-1.0"))
     assert obs2.level == Level.TRUSTED
 
@@ -445,11 +461,11 @@ def test_merge_safe_observable_upgrades_with_notable() -> None:
     """Test that merging SAFE observable with NOTABLE-level incoming upgrades to NOTABLE."""
     cv1 = Cyvest()
     # Create SAFE observable
-    obs1 = cv1.observable_create("domain", "trusted.example.com", score=0, level=Level.SAFE)
+    obs1 = cv1.observable_create(ObservableType.DOMAIN_NAME, "trusted.example.com", score=0, level=Level.SAFE)
 
     cv2 = Cyvest()
     # Create same observable with NOTABLE level
-    obs2 = cv2.observable_create("domain", "trusted.example.com")
+    obs2 = cv2.observable_create(ObservableType.DOMAIN_NAME, "trusted.example.com")
     cv2.observable_add_threat_intel(obs2.key, source="ti_source", score=Decimal("2.0"))
     assert obs2.level == Level.NOTABLE
 
@@ -466,11 +482,11 @@ def test_merge_safe_observable_upgrades_with_malicious() -> None:
     """Test that merging SAFE observable with MALICIOUS-level incoming upgrades to MALICIOUS."""
     cv1 = Cyvest()
     # Create SAFE observable
-    obs1 = cv1.observable_create("domain", "trusted.example.com", score=0, level=Level.SAFE)
+    obs1 = cv1.observable_create(ObservableType.DOMAIN_NAME, "trusted.example.com", score=0, level=Level.SAFE)
 
     cv2 = Cyvest()
     # Create same observable with MALICIOUS level
-    obs2 = cv2.observable_create("domain", "trusted.example.com")
+    obs2 = cv2.observable_create(ObservableType.DOMAIN_NAME, "trusted.example.com")
     cv2.observable_add_threat_intel(obs2.key, source="ti_source", score=Decimal("6.0"))
     assert obs2.level == Level.MALICIOUS
 
@@ -487,13 +503,13 @@ def test_merge_non_safe_explicit_level_normal_behavior() -> None:
     """Test that merging keeps the highest score/derived level."""
     cv1 = Cyvest()
     # Create observable and raise its score to SUSPICIOUS.
-    obs1 = cv1.observable_create("domain", "test.example.com")
+    obs1 = cv1.observable_create(ObservableType.DOMAIN_NAME, "test.example.com")
     cv1.observable_set_level(obs1.key, Level.SUSPICIOUS)
     cv1.observable_add_threat_intel(obs1.key, source="source1", score=Decimal("4.0"))
 
     cv2 = Cyvest()
     # Create same observable with lower score
-    obs2 = cv2.observable_create("domain", "test.example.com")
+    obs2 = cv2.observable_create(ObservableType.DOMAIN_NAME, "test.example.com")
     cv2.observable_add_threat_intel(obs2.key, source="source2", score=Decimal("2.0"))
 
     # Merge cv2 into cv1
@@ -509,7 +525,7 @@ def test_merge_non_safe_explicit_level_normal_behavior() -> None:
 def test_observable_proxy_is_read_only() -> None:
     """Observable proxies should block direct attribute mutation."""
     cv = Cyvest()
-    obs = cv.observable_create("ip", "203.0.113.5")
+    obs = cv.observable_create(ObservableType.IPV4_ADDR, "203.0.113.5")
 
     with pytest.raises(AttributeError):
         obs.score = Decimal("5")  # type: ignore[misc]
@@ -534,10 +550,10 @@ def test_io_save_load_json_roundtrip() -> None:
     """Test saving and loading investigation from JSON."""
     # Create investigation with various components
     cv = Cyvest()
-    obs1 = cv.observable_create("ip", "192.168.1.1", internal=False)
+    obs1 = cv.observable_create(ObservableType.IPV4_ADDR, "192.168.1.1", internal=False)
     cv.observable_add_threat_intel(obs1.key, source="virustotal", score=Decimal("7.5"), comment="Malicious IP")
 
-    obs2 = cv.observable_create("domain", "evil.com", internal=False)
+    obs2 = cv.observable_create(ObservableType.DOMAIN_NAME, "evil.com", internal=False)
     cv.observable_add_threat_intel(obs2.key, source="urlscan", score=Decimal("8.0"))
 
     cv.observable_add_relationship(obs1.key, obs2.key, "related-to")
@@ -609,7 +625,7 @@ def test_io_save_json_returns_absolute_path() -> None:
 def test_io_save_markdown_returns_absolute_path() -> None:
     """Test that io_save_markdown returns absolute path."""
     cv = Cyvest()
-    cv.observable_create("ip", "10.0.0.1")
+    cv.observable_create(ObservableType.IPV4_ADDR, "10.0.0.1")
 
     with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
         temp_path = f.name
@@ -632,7 +648,7 @@ def test_io_save_markdown_returns_absolute_path() -> None:
 def test_io_to_invest_serialization() -> None:
     """Test InvestigationSchema serialization contains expected fields."""
     cv = Cyvest()
-    obs = cv.observable_create("url", "https://malicious.com")
+    obs = cv.observable_create(ObservableType.URL, "https://malicious.com")
     cv.observable_add_threat_intel(obs.key, source="virustotal", score=Decimal("6.0"))
     cv.check_create("url_check", "network", "URL analysis")
 
@@ -674,7 +690,7 @@ def test_io_to_invest_serialization() -> None:
 def test_io_to_markdown_generates_report() -> None:
     """Test Markdown report generation."""
     cv = Cyvest()
-    obs = cv.observable_create("domain", "test.com", internal=False)
+    obs = cv.observable_create(ObservableType.DOMAIN_NAME, "test.com", internal=False)
     cv.observable_add_threat_intel(obs.key, source="abuse.ch", score=Decimal("5.0"))
     check = cv.check_create("domain_check", "dns", "DNS analysis", score=Decimal("4.0"), level=Level.SUSPICIOUS)
     cv.check_link_observable(check.key, obs.key)

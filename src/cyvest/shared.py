@@ -223,11 +223,11 @@ class SharedInvestigationContext:
     # Lookups (deep-copied snapshots only)
     # ---------------------------------------------------------------------
 
-    def observable_get(self, obs_type: str | ObservableType, value: str) -> Observable | None:
+    def observable_get(self, obs_type: ObservableType, value: str) -> Observable | None:
         key = self._observable_key(obs_type, value)
         return self._lock.run(self._get_observable_by_key_unlocked, key)
 
-    async def observable_aget(self, obs_type: str | ObservableType, value: str) -> Observable | None:
+    async def observable_aget(self, obs_type: ObservableType, value: str) -> Observable | None:
         key = self._observable_key(obs_type, value)
         return await self._lock.arun(self._get_observable_by_key_unlocked, key)
 
@@ -239,11 +239,9 @@ class SharedInvestigationContext:
         copy._from_shared_context = True
         return copy
 
-    def _observable_key(self, obs_type: str | ObservableType, value: str) -> str:
-        if isinstance(obs_type, ObservableType):
-            obs_type = obs_type.value
+    def _observable_key(self, obs_type: ObservableType, value: str) -> str:
         try:
-            return keys.generate_observable_key(obs_type, value)
+            return keys.generate_observable_key(obs_type.value, value)
         except Exception as e:
             raise ValueError(f"Failed to generate observable key for type='{obs_type}', value='{value}': {e}") from e
 
@@ -305,18 +303,14 @@ class SharedInvestigationContext:
     async def aget_global_level(self) -> Level:
         return await self._lock.arun(self._main_investigation.get_global_level)
 
-    def observables_list_by_type(self, obs_type: ObservableType | str) -> list[Observable]:
+    def observables_list_by_type(self, obs_type: ObservableType) -> list[Observable]:
         return self._lock.run(self._observables_list_by_type_unlocked, obs_type)
 
-    async def observables_alist_by_type(self, obs_type: ObservableType | str) -> list[Observable]:
+    async def observables_alist_by_type(self, obs_type: ObservableType) -> list[Observable]:
         return await self._lock.arun(self._observables_list_by_type_unlocked, obs_type)
 
-    def _observables_list_by_type_unlocked(self, obs_type: ObservableType | str) -> list[Observable]:
-        if isinstance(obs_type, ObservableType):
-            matches = [obs for obs in self._observable_registry.values() if obs.obs_type == obs_type]
-        else:
-            normalized = obs_type.strip().lower()
-            matches = [obs for obs in self._observable_registry.values() if obs.obs_type.value == normalized]
+    def _observables_list_by_type_unlocked(self, obs_type: ObservableType) -> list[Observable]:
+        matches = [obs for obs in self._observable_registry.values() if obs.obs_type == obs_type]
 
         results: list[Observable] = []
         for obs in matches:

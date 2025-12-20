@@ -24,13 +24,14 @@ if TYPE_CHECKING:
     from cyvest.cyvest import Cyvest
 
 
-def _normalize_exclude_levels(levels: Level | str | Iterable[Level | str]) -> set[Level]:
+def _normalize_exclude_levels(levels: Level | Iterable[Level]) -> set[Level]:
     base_excluded: set[Level] = {Level.NONE}
     if levels is None:
         return base_excluded
-    if isinstance(levels, (Level, str)):
-        normalized_level = normalize_level(levels) if isinstance(levels, str) else levels
-        return base_excluded | {normalized_level}
+    if isinstance(levels, Level):
+        return base_excluded | {levels}
+    if isinstance(levels, str):
+        return base_excluded | {normalize_level(levels)}
 
     collected = list(levels)
     if not collected:
@@ -314,7 +315,7 @@ def display_summary(
     cv: Cyvest,
     rich_print: Callable[[Any], None],
     show_graph: bool = True,
-    exclude_levels: Level | str | Iterable[Level | str] = Level.NONE,
+    exclude_levels: Level | Iterable[Level] = Level.NONE,
     show_audit_log: bool = False,
 ) -> None:
     """

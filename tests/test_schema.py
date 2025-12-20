@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import pytest
 
-from cyvest import Cyvest
+from cyvest import Cyvest, ObservableType
 from cyvest.io_schema import get_investigation_schema
 from cyvest.levels import Level
 from cyvest.model import Check, Container, Observable, ThreatIntel
@@ -16,7 +16,7 @@ from cyvest.model_schema import InvestigationSchema
 def _sample_investigation() -> Cyvest:
     """Create a minimal investigation for schema validation."""
     cv = Cyvest()
-    obs = cv.observable("domain-name", "example.com", internal=False)
+    obs = cv.observable(ObservableType.DOMAIN_NAME, "example.com", internal=False)
     cv.check("domain_check", "network", "Validate domain").link_observable(obs)
     return cv
 

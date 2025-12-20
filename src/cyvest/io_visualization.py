@@ -11,7 +11,7 @@ import webbrowser
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from cyvest.levels import LEVEL_COLORS, Level, normalize_level
+from cyvest.levels import LEVEL_COLORS, Level
 from cyvest.model import ObservableType, RelationshipDirection, RelationshipType
 
 if TYPE_CHECKING:
@@ -138,7 +138,7 @@ def generate_network_graph(
     cv: Cyvest,
     output_dir: str | None = None,
     open_browser: bool = True,
-    min_level: Level | str | None = None,
+    min_level: Level | None = None,
     observable_types: list[ObservableType] | None = None,
     physics: bool = True,
     group_by_type: bool = False,
@@ -177,7 +177,7 @@ def generate_network_graph(
     if not PYVIS_AVAILABLE or Network is None:  # pragma: no branch - both change together
         raise VisualizationDependencyMissingError()
 
-    normalized_min_level = normalize_level(min_level) if min_level is not None else None
+    normalized_min_level = min_level
 
     # Create pyvis network with physics enabled for organic layout
     net = Network(

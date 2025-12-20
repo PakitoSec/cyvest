@@ -305,6 +305,7 @@ def visualize(
     your default browser unless --no-browser is specified.
     """
     from cyvest.levels import Level
+    from cyvest.model_enums import ObservableType
 
     cv = load_investigation_json(input)
 
@@ -316,7 +317,19 @@ def visualize(
     # Parse observable types if provided
     observable_types = None
     if types is not None:
-        observable_types = [t.strip() for t in types.split(",")]
+        parsed_types: list[ObservableType] = []
+        for token in types.split(","):
+            token = token.strip()
+            if not token:
+                continue
+            try:
+                parsed_types.append(ObservableType(token.lower()))
+            except ValueError:
+                try:
+                    parsed_types.append(ObservableType[token.upper()])
+                except KeyError as exc:
+                    raise click.ClickException(f"Unknown observable type: {token}") from exc
+        observable_types = parsed_types or None
 
     # Convert output_dir to string if provided
     output_dir_str = str(output_dir.resolve()) if output_dir is not None else None

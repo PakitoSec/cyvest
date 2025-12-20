@@ -1,6 +1,10 @@
 // AUTO-GENERATED FROM cyvest.schema.json — DO NOT EDIT
 
 /**
+ * Optional human-readable investigation name.
+ */
+export type InvestigationName = string | null;
+/**
  * Security level classification for checks, observables, and threat intelligence.
  *
  * Levels are ordered from lowest (NONE) to highest (MALICIOUS) severity.
@@ -11,6 +15,17 @@ export type Justification = string | null;
  * List of whitelist entries applied to this investigation.
  */
 export type Whitelists = InvestigationWhitelist[];
+export type Actor = string | null;
+export type Reason = string | null;
+export type Tool = string | null;
+export type ObjectType = string | null;
+export type ObjectKey = string | null;
+/**
+ * Append-only investigation audit log.
+ */
+export type EventLog = AuditEvent[];
+export type OriginInvestigationId = string | null;
+export type SourceInvestigationIds = string[];
 export type ThreatIntels = string[];
 /**
  * Direction of a relationship between observables.
@@ -18,20 +33,26 @@ export type ThreatIntels = string[];
 export type RelationshipDirection = "outbound" | "inbound" | "bidirectional";
 export type Relationships = Relationship[];
 /**
- * Checks that generated this observable.
+ * Checks that currently link to this observable (navigation-only).
  */
-export type GeneratedByChecks = string[];
-export type SourceInvestigationIds = string[];
+export type CheckLinks = string[];
 export type SourceInvestigationIds1 = string[];
+export type SourceInvestigationIds2 = string[];
 /**
  * Controls how a Check↔Observable link propagates across merged investigations.
  */
 export type PropagationMode = "LOCAL_ONLY" | "GLOBAL";
 export type ObservableLinks = ObservableLink[];
+export type OriginInvestigationId1 = string | null;
+export type SourceInvestigationIds3 = string[];
 export type Taxonomies = {
   [k: string]: unknown;
 }[];
+export type OriginInvestigationId2 = string | null;
+export type SourceInvestigationIds4 = string[];
 export type Checks1 = string[];
+export type OriginInvestigationId3 = string | null;
+export type SourceInvestigationIds5 = string[];
 /**
  * Root observable type used during data extraction.
  */
@@ -56,6 +77,7 @@ export interface CyvestInvestigation {
    * Stable investigation identity (ULID).
    */
   investigation_id: string;
+  investigation_name?: InvestigationName;
   /**
    * Investigation start time (UTC).
    */
@@ -70,6 +92,7 @@ export interface CyvestInvestigation {
    */
   whitelisted: boolean;
   whitelists: Whitelists;
+  event_log?: EventLog;
   observables: Observables;
   checks: Checks;
   checks_by_level: ChecksByLevel;
@@ -94,6 +117,24 @@ export interface InvestigationWhitelist {
   [k: string]: unknown;
 }
 /**
+ * Centralized audit event for investigation-level changes.
+ */
+export interface AuditEvent {
+  event_id: string;
+  timestamp: string;
+  event_type: string;
+  actor?: Actor;
+  reason?: Reason;
+  tool?: Tool;
+  object_type?: ObjectType;
+  object_key?: ObjectKey;
+  details?: Details;
+  [k: string]: unknown;
+}
+export interface Details {
+  [k: string]: unknown;
+}
+/**
  * Observables keyed by their unique key.
  */
 export interface Observables {
@@ -114,10 +155,12 @@ export interface Observable {
   extra: Extra;
   score: number;
   level: Level;
+  origin_investigation_id?: OriginInvestigationId;
+  source_investigation_ids?: SourceInvestigationIds;
   threat_intels: ThreatIntels;
   relationships: Relationships;
   key: string;
-  generated_by_checks: GeneratedByChecks;
+  check_links: CheckLinks;
   score_display: string;
   [k: string]: unknown;
 }
@@ -154,7 +197,7 @@ export interface Check {
   score: number;
   level: Level;
   origin_investigation_id: string;
-  source_investigation_ids: SourceInvestigationIds;
+  source_investigation_ids: SourceInvestigationIds1;
   observable_links: ObservableLinks;
   key: string;
   score_display: string;
@@ -169,7 +212,7 @@ export interface Extra1 {
 export interface ObservableLink {
   observable_key: string;
   origin_investigation_id: string;
-  source_investigation_ids: SourceInvestigationIds1;
+  source_investigation_ids: SourceInvestigationIds2;
   propagation_mode?: PropagationMode;
 }
 /**
@@ -197,6 +240,8 @@ export interface ThreatIntel {
   extra: Extra2;
   score: number;
   level: Level;
+  origin_investigation_id?: OriginInvestigationId1;
+  source_investigation_ids?: SourceInvestigationIds3;
   taxonomies: Taxonomies;
   key: string;
   score_display: string;
@@ -221,6 +266,8 @@ export interface Enrichment {
   name: string;
   data: Data;
   context: string;
+  origin_investigation_id?: OriginInvestigationId2;
+  source_investigation_ids?: SourceInvestigationIds4;
   key: string;
   [k: string]: unknown;
 }
@@ -244,6 +291,8 @@ export interface Container {
   description?: string;
   checks: Checks1;
   sub_containers: SubContainers;
+  origin_investigation_id?: OriginInvestigationId3;
+  source_investigation_ids?: SourceInvestigationIds5;
   key: string;
   aggregated_score: number;
   aggregated_level: Level;

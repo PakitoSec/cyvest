@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from cyvest.levels import Level
-from cyvest.model import Check, Container, Enrichment, Observable, Relationship, ThreatIntel
+from cyvest.model import AuditEvent, Check, Container, Enrichment, Observable, Relationship, ThreatIntel
 from cyvest.model_schema import InvestigationSchema, StatsChecksSchema
 from cyvest.score import ScoreMode
 
@@ -35,6 +35,7 @@ def serialize_investigation(inv: Investigation) -> InvestigationSchema:
     Returns:
         InvestigationSchema instance (use .model_dump() for dict)
     """
+    inv._refresh_check_links()
     observables = dict(inv.get_all_observables())
     threat_intels = dict(inv.get_all_threat_intels())
     enrichments = dict(inv.get_all_enrichments())
@@ -56,7 +57,7 @@ def serialize_investigation(inv: Investigation) -> InvestigationSchema:
 
     # Get root type
     root = inv.get_root()
-    root_type_value = root.obs_type.value if hasattr(root.obs_type, "value") else str(root.obs_type)
+    root_type_value = root.obs_type.value
 
     # Build and validate using Pydantic model
     started_at = getattr(inv, "_started_at", None)
@@ -69,11 +70,13 @@ def serialize_investigation(inv: Investigation) -> InvestigationSchema:
 
     investigation = InvestigationSchema(
         investigation_id=inv.investigation_id,
+        investigation_name=inv.investigation_name,
         started_at=started_at,
         score=inv.get_global_score(),
         level=inv.get_global_level(),
         whitelisted=inv.is_whitelisted(),
         whitelists=list(inv.get_whitelists()),
+        event_log=inv.get_event_log(),
         observables=observables,
         checks=checks_by_scope,
         checks_by_level=checks_by_level,
@@ -130,6 +133,8 @@ def generate_markdown_report(
     # Header
     lines.append("# Cybersecurity Investigation Report")
     lines.append("")
+    if getattr(inv, "investigation_name", None):
+        lines.append(f"**Investigation Name:** {inv.investigation_name}")
     lines.append(f"**Global Score:** {inv.get_global_score():.2f}")
     lines.append(f"**Global Level:** {inv.get_global_level().name}")
     whitelists = inv.get_whitelists()
@@ -281,7 +286,7 @@ def load_investigation_json(filepath: str | Path) -> Cyvest:
     root_type_raw = extraction.get("root_type")
     root_type = "file"
     if root_type_raw:
-        root_type = root_type_raw.value if hasattr(root_type_raw, "value") else str(root_type_raw)
+        root_type = root_type_raw
     if root_type not in ("file", "artifact"):
         root_type = "file"
 
@@ -300,6 +305,12 @@ def load_investigation_json(filepath: str | Path) -> Cyvest:
         score_mode=score_mode,
         investigation_id=investigation_id,
     )
+    cv._investigation._audit_enabled = False
+    cv._investigation._event_log = []
+
+    investigation_name = data.get("investigation_name")
+    if isinstance(investigation_name, str):
+        cv._investigation.investigation_name = investigation_name
 
     started_at_raw = data.get("started_at")
     if isinstance(started_at_raw, str) and started_at_raw.strip():
@@ -354,12 +365,12 @@ def load_investigation_json(filepath: str | Path) -> Cyvest:
             "extra": obs_info.get("extra", {}),
             "score": Decimal(str(obs_info.get("score", 0))),
             "level": obs_info.get("level", "INFO"),
+            "origin_investigation_id": obs_info.get("origin_investigation_id"),
+            "source_investigation_ids": obs_info.get("source_investigation_ids"),
             "key": obs_info.get("key", ""),
             "relationships": [Relationship.model_validate(rel) for rel in obs_info.get("relationships", [])],
         }
         obs = Observable.model_validate(obs_data)
-        # Restore private attribute
-        obs._generated_by_checks = obs_info.get("generated_by_checks", [])
         cv._investigation.add_observable(obs)
 
     if root_obs_info is not None:
@@ -373,11 +384,12 @@ def load_investigation_json(filepath: str | Path) -> Cyvest:
             "extra": root_obs_info.get("extra", data_payload),
             "score": Decimal(str(root_obs_info.get("score", 0))),
             "level": root_obs_info.get("level", "INFO"),
+            "origin_investigation_id": root_obs_info.get("origin_investigation_id"),
+            "source_investigation_ids": root_obs_info.get("source_investigation_ids"),
             "key": new_root_key,
             "relationships": [Relationship.model_validate(rel) for rel in root_obs_info.get("relationships", [])],
         }
         root_obs = Observable.model_validate(root_data)
-        root_obs._generated_by_checks = root_obs_info.get("generated_by_checks", [])
         cv._investigation.add_observable(root_obs)
 
     # Threat intel - leverage Pydantic model_validate
@@ -389,6 +401,8 @@ def load_investigation_json(filepath: str | Path) -> Cyvest:
             "extra": ti_info.get("extra", {}),
             "score": Decimal(str(ti_info.get("score", 0))),
             "level": ti_info.get("level", "INFO"),
+            "origin_investigation_id": ti_info.get("origin_investigation_id"),
+            "source_investigation_ids": ti_info.get("source_investigation_ids"),
             "taxonomies": ti_info.get("taxonomies", []),
             "key": ti_info.get("key", ""),
         }
@@ -415,10 +429,6 @@ def load_investigation_json(filepath: str | Path) -> Cyvest:
             }
             check = Check.model_validate(check_data)
             cv._investigation.add_check(check)
-            for link in check.observable_links:
-                observable = cv._investigation.get_observable(link.observable_key)
-                if observable:
-                    observable.mark_generated_by_check(check.key)
 
     # Enrichments - leverage Pydantic model_validate
     for enr_info in data.get("enrichments", {}).values():
@@ -426,6 +436,8 @@ def load_investigation_json(filepath: str | Path) -> Cyvest:
             "name": enr_info.get("name", ""),
             "data": enr_info.get("data", {}),
             "context": enr_info.get("context", ""),
+            "origin_investigation_id": enr_info.get("origin_investigation_id"),
+            "source_investigation_ids": enr_info.get("source_investigation_ids"),
             "key": enr_info.get("key", ""),
         }
         enrichment = Enrichment.model_validate(enr_data)
@@ -436,6 +448,8 @@ def load_investigation_json(filepath: str | Path) -> Cyvest:
         container_data = {
             "path": container_info.get("path", ""),
             "description": container_info.get("description", ""),
+            "origin_investigation_id": container_info.get("origin_investigation_id"),
+            "source_investigation_ids": container_info.get("source_investigation_ids"),
             "key": container_info.get("key", ""),
         }
         container = Container.model_validate(container_data)
@@ -444,16 +458,27 @@ def load_investigation_json(filepath: str | Path) -> Cyvest:
         for check_key in container_info.get("checks", []):
             check = cv._investigation.get_check(check_key)
             if check:
-                container.add_check(check)
+                cv._investigation.add_check_to_container(container.key, check.key)
 
         for sub_info in container_info.get("sub_containers", {}).values():
             sub_container = build_container(sub_info)
-            container.add_sub_container(sub_container)
+            cv._investigation.add_sub_container(container.key, sub_container.key)
 
         return container
 
     for container_info in data.get("containers", {}).values():
         build_container(container_info)
+
+    cv._investigation._refresh_check_links()
+
+    event_log = []
+    for event_info in data.get("event_log", []) or []:
+        try:
+            event_log.append(AuditEvent.model_validate(event_info))
+        except Exception:
+            continue
+    cv._investigation._event_log = event_log
+    cv._investigation._audit_enabled = True
 
     # Note: Root observable is managed by Investigation, no need to set it here
 

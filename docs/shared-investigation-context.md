@@ -24,7 +24,6 @@ from cyvest.shared import SharedInvestigationContext
 
 ```python
 from cyvest.shared import SharedInvestigationContext
-from cyvest import ObservableType
 from concurrent.futures import ThreadPoolExecutor
 
 # Create a shared context from the main investigation
@@ -34,7 +33,7 @@ shared_context = SharedInvestigationContext(main_investigation)
 def my_worker(shared_context):
     with shared_context.create_cyvest() as cy:
         data = cy.root().extra
-        cy.observable(ObservableType.EMAIL_ADDR, data.get("email"))
+        cy.observable(cy.OBS.EMAIL_ADDR, data.get("email"))
 ```
 
 ## Cross-Task Observable Sharing
@@ -42,22 +41,20 @@ def my_worker(shared_context):
 Tasks can access observables created by other tasks:
 
 ```python
-from cyvest import ObservableType, RelationshipType
-
 def email_from(shared_context):
     with shared_context.create_cyvest() as cy:
         data = cy.root().extra
-        cy.observable(ObservableType.DOMAIN_NAME, data.get("domain"))
+        cy.observable(cy.OBS.DOMAIN_NAME, data.get("domain"))
 
 
 def bodies_url(shared_context):
     with shared_context.create_cyvest() as cy:
         data = cy.root().extra
-        domain_info = shared_context.observable_get(ObservableType.DOMAIN_NAME, "malicious.com")
+        domain_info = shared_context.observable_get(cy.OBS.DOMAIN_NAME, "malicious.com")
         if domain_info:
-            cy.observable(ObservableType.URL, data.get("url")).relate_to(
-                cy.observable(ObservableType.DOMAIN_NAME, domain_info.value),
-                RelationshipType.RELATED_TO,
+            cy.observable(cy.OBS.URL, data.get("url")).relate_to(
+                cy.observable(cy.OBS.DOMAIN_NAME, domain_info.value),
+                cy.REL.RELATED_TO,
             )
 ```
 
@@ -106,25 +103,27 @@ Manually merges observables and checks from a source into the shared context.
 ##### `areconcile(source: Cyvest | Investigation) -> None`
 Async equivalent of `reconcile()`. Runs the entire critical section in a worker thread.
 
-##### `observable_get(obs_type: str | ObservableType, value: str) -> Observable | None`
+##### `observable_get(obs_type: ObservableType, value: str) -> Observable | None`
 Retrieves a shared observable by type and value.
 
 **Parameters:**
-- `obs_type`: Observable type (string like `"email-addr"` or `ObservableType` enum)
+- `obs_type`: Observable type (use `Cyvest.OBS.*` for the official vocabulary)
 - `value`: Observable value
 
 **Returns:** Deep copy of the observable, or `None` if not found
 
 **Examples:**
 ```python
-domain = shared_context.observable_get(ObservableType.DOMAIN_NAME, "malicious.com")
-email = shared_context.observable_get("email-addr", "user@example.com")
+from cyvest import Cyvest
+
+domain = shared_context.observable_get(Cyvest.OBS.DOMAIN_NAME, "malicious.com")
+email = shared_context.observable_get(Cyvest.OBS.EMAIL_ADDR, "user@example.com")
 
 # Use in task to reference observables from other tasks
 if domain:
-    cy.observable(ObservableType.URL, "https://example.com").relate_to(
-        cy.observable(ObservableType.DOMAIN_NAME, domain.value),
-        RelationshipType.RELATED_TO,
+    cy.observable(cy.OBS.URL, "https://example.com").relate_to(
+        cy.observable(cy.OBS.DOMAIN_NAME, domain.value),
+        cy.REL.RELATED_TO,
     )
 ```
 
@@ -246,7 +245,7 @@ from cyvest.shared import SharedInvestigationContext
 
 async def worker(shared: SharedInvestigationContext):
     async with shared.create_cyvest() as cy:
-        cy.observable(ObservableType.DOMAIN_NAME, "example.com")
+        cy.observable(cy.OBS.DOMAIN_NAME, "example.com")
 
 asyncio.run(worker(shared_context))
 ```

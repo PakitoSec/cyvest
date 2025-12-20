@@ -123,18 +123,21 @@ def test_relationship_with_custom_type() -> None:
 
 def test_observable_add_relationship_with_enum() -> None:
     """Test adding relationship to observable using enum."""
+    from cyvest.investigation import Investigation
+
+    inv = Investigation(data={})
     obs = Observable(
         obs_type=ObservableType.URL,
         value="https://example.com",
     )
 
-    obs._add_relationship_internal(
-        target_key="obs:ipv4-addr:192.0.2.1",
-        relationship_type=RelationshipType.RELATED_TO,
-    )
+    target = Observable(obs_type=ObservableType.IPV4_ADDR, value="192.0.2.1")
+    inv.add_observable(obs)
+    inv.add_observable(target)
+    inv.add_relationship(obs, target, RelationshipType.RELATED_TO)
 
     assert len(obs.relationships) == 1
-    assert obs.relationships[0].target_key == "obs:ipv4-addr:192.0.2.1"
+    assert obs.relationships[0].target_key == target.key
     assert obs.relationships[0].relationship_type == RelationshipType.RELATED_TO
 
 

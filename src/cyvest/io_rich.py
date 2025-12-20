@@ -18,7 +18,7 @@ from rich.table import Table
 from rich.tree import Tree
 
 from cyvest.levels import Level, get_color_level, get_color_score, normalize_level
-from cyvest.model import Observable, Relationship, RelationshipDirection
+from cyvest.model import Observable, Relationship, RelationshipDirection, _format_score_decimal
 
 if TYPE_CHECKING:
     from cyvest.cyvest import Cyvest
@@ -89,15 +89,15 @@ def _build_observable_tree(
     color_level = get_color_level(obs.level)
     color_score = get_color_score(obs.score)
 
-    generated_by = ""
-    if obs.generated_by_checks:
-        checks_str = "[cyan], [/cyan]".join(escape(check_id) for check_id in obs.generated_by_checks)
-        generated_by = f"[cyan][[/cyan]{checks_str}[cyan]][/cyan] "
+    linked_checks = ""
+    if obs.check_links:
+        checks_str = "[cyan], [/cyan]".join(escape(check_id) for check_id in obs.check_links)
+        linked_checks = f"[cyan][[/cyan]{checks_str}[cyan]][/cyan] "
 
     whitelisted_str = " [green]WHITELISTED[/green]" if obs.whitelisted else ""
 
     obs_info = (
-        f"{rel_info}{generated_by}[bold]{obs.key}[/bold] "
+        f"{rel_info}{linked_checks}[bold]{obs.key}[/bold] "
         f"[{color_score}]{obs.score_display}[/{color_score}] "
         f"[{color_level}]{obs.level.name}[/{color_level}]"
         f"{whitelisted_str}"
@@ -136,14 +136,104 @@ def _build_observable_tree(
         )
 
 
-def _render_score_history_table(
+def _render_audit_log_table(
     *,
     rich_print: Callable[[Any], None],
     title: str,
-    groups: Iterable[tuple[str, Iterable[Any]]],
+    events: Iterable[Any],
     started_at: datetime | None,
 ) -> None:
-    materialized_groups: list[tuple[str, list[Any]]] = [(name, list(items)) for name, items in groups]
+    def _render_score_change(details: dict[str, Any]) -> str:
+        old_score = details.get("old_score")
+        new_score = details.get("new_score")
+        old_level = details.get("old_level")
+        new_level = details.get("new_level")
+
+        parts: list[str] = []
+        if old_score is not None and new_score is not None:
+            old_score = old_score if isinstance(old_score, Decimal) else Decimal(str(old_score))
+            new_score = new_score if isinstance(new_score, Decimal) else Decimal(str(new_score))
+            old_score_color = get_color_score(old_score)
+            new_score_color = get_color_score(new_score)
+            score_str = (
+                f"[{old_score_color}]{_format_score_decimal(old_score)}[/"
+                f"{old_score_color}] → "
+                f"[{new_score_color}]{_format_score_decimal(new_score)}[/"
+                f"{new_score_color}]"
+            )
+            parts.append(f"Score: {score_str}")
+
+        if old_level is not None and new_level is not None:
+            old_level_enum = normalize_level(old_level)
+            new_level_enum = normalize_level(new_level)
+            old_level_color = get_color_level(old_level_enum)
+            new_level_color = get_color_level(new_level_enum)
+            level_str = (
+                f"[{old_level_color}]{old_level_enum.name}[/"
+                f"{old_level_color}] → "
+                f"[{new_level_color}]{new_level_enum.name}[/"
+                f"{new_level_color}]"
+            )
+            parts.append(f"Level: {level_str}")
+
+        return " | ".join(parts) if parts else "[dim]-[/dim]"
+
+    def _render_level_change(details: dict[str, Any]) -> str:
+        old_level = details.get("old_level")
+        new_level = details.get("new_level")
+        score = details.get("score")
+        if old_level is None or new_level is None:
+            return "[dim]-[/dim]"
+        old_level_enum = normalize_level(old_level)
+        new_level_enum = normalize_level(new_level)
+        old_level_color = get_color_level(old_level_enum)
+        new_level_color = get_color_level(new_level_enum)
+        level_str = (
+            f"[{old_level_color}]{old_level_enum.name}[/"
+            f"{old_level_color}] → "
+            f"[{new_level_color}]{new_level_enum.name}[/"
+            f"{new_level_color}]"
+        )
+        if score is None:
+            return f"Level: {level_str}"
+        score = score if isinstance(score, Decimal) else Decimal(str(score))
+        score_color = get_color_score(score)
+        score_str = f"[{score_color}]{_format_score_decimal(score)}[/{score_color}]"
+        return f"Level: {level_str} | Score: {score_str}"
+
+    def _render_merge_event(details: dict[str, Any]) -> str:
+        from_name = details.get("from_investigation_name")
+        into_name = details.get("into_investigation_name")
+        from_id = details.get("from_investigation_id")
+        into_id = details.get("into_investigation_id")
+        from_label = escape(str(from_name)) if from_name else escape(str(from_id))
+        into_label = escape(str(into_name)) if into_name else escape(str(into_id))
+        if not from_label or from_label == "None":
+            from_label = "[dim]-[/dim]"
+        if not into_label or into_label == "None":
+            into_label = "[dim]-[/dim]"
+
+        object_changes = details.get("object_changes") or []
+        counts: dict[str, int] = {}
+        for change in object_changes:
+            action = change.get("action")
+            if not action:
+                continue
+            counts[action] = counts.get(action, 0) + 1
+
+        if counts:
+            parts = [f"{key}={value}" for key, value in sorted(counts.items())]
+            summary = ", ".join(parts)
+            return f"Merge: {from_label} → {into_label} | Changes: {summary}"
+
+        return f"Merge: {from_label} → {into_label}"
+
+    detail_renderers: dict[str, Callable[[dict[str, Any]], str]] = {
+        "SCORE_CHANGED": _render_score_change,
+        "SCORE_RECALCULATED": _render_score_change,
+        "LEVEL_UPDATED": _render_level_change,
+        "INVESTIGATION_MERGED": _render_merge_event,
+    }
 
     def _coerce_utc(value: datetime) -> datetime:
         if value.tzinfo is None:
@@ -160,71 +250,63 @@ def _render_score_history_table(
         return f"{hours:02d}:{minutes:02d}:{seconds:02d}.{ms:03d}"
 
     table = Table(title=title, show_lines=False)
-    table.add_column("Item")
     table.add_column("#", justify="right")
     table.add_column("Elapsed", style="dim")
-    table.add_column("Score", justify="center")
-    table.add_column("Level", justify="center")
-    table.add_column("Reason")
+    table.add_column("Event")
+    table.add_column("Object")
+    table.add_column("Context")
 
+    events_sorted = sorted(events, key=lambda evt: evt.timestamp)
     effective_start = _coerce_utc(started_at) if started_at is not None else None
-    if effective_start is None:
-        earliest: datetime | None = None
-        for _group_name, items in materialized_groups:
-            for item in items:
-                for change in item.get_score_history():
-                    ts = _coerce_utc(change.timestamp)
-                    if earliest is None or ts < earliest:
-                        earliest = ts
-        effective_start = earliest
+    if effective_start is None and events_sorted:
+        effective_start = _coerce_utc(events_sorted[0].timestamp)
 
-    has_history = False
-    for group_name, items in materialized_groups:
-        item_color = "cyan" if group_name.lower() == "observable" else "magenta"
-        for item in items:
-            score_history = sorted(item.get_score_history(), key=lambda change: change.timestamp)
-            if not score_history:
-                continue
+    grouped_events: dict[str, list[Any]] = {}
+    group_order: list[str] = []
+    for event in events_sorted:
+        group_key = event.object_key or ""
+        if group_key not in grouped_events:
+            grouped_events[group_key] = []
+            group_order.append(group_key)
+        grouped_events[group_key].append(event)
 
-            if has_history:
-                table.add_section()
+    row_idx = 1
+    for group_key in group_order:
+        if row_idx > 1:
+            table.add_section()
+        for event in grouped_events[group_key]:
+            event_timestamp = _coerce_utc(event.timestamp)
+            elapsed = ""
+            if effective_start is not None:
+                elapsed = _format_elapsed((event_timestamp - effective_start).total_seconds())
 
-            for idx, change in enumerate(score_history, start=1):
-                has_history = True
+            event_type = escape(event.event_type)
+            object_label = "[dim]-[/dim]"
+            if event.object_key:
+                object_label = escape(event.object_key)
+            reason = escape(event.reason) if event.reason else "[dim]-[/dim]"
+            details = "[dim]-[/dim]"
+            renderer = detail_renderers.get(event.event_type)
+            if renderer:
+                details = renderer(getattr(event, "details", {}) or {})
 
-                change_timestamp = _coerce_utc(change.timestamp)
-                old_score_color = get_color_score(change.old_score)
-                new_score_color = get_color_score(change.new_score)
-                score_str = (
-                    f"[{old_score_color}]{change.display_old_score}[/{old_score_color}] "
-                    f"→ "
-                    f"[{new_score_color}]{change.display_new_score}[/{new_score_color}]"
-                )
+            if reason == "[dim]-[/dim]":
+                context = details
+            elif details == "[dim]-[/dim]":
+                context = reason
+            else:
+                context = f"{reason} | {details}"
 
-                old_level_color = get_color_level(change.old_level)
-                new_level_color = get_color_level(change.new_level)
-                level_str = (
-                    f"[{old_level_color}]{change.old_level.name}[/{old_level_color}] "
-                    f"→ "
-                    f"[{new_level_color}]{change.new_level.name}[/{new_level_color}]"
-                )
+            table.add_row(
+                str(row_idx),
+                elapsed,
+                event_type,
+                object_label,
+                context,
+            )
+            row_idx += 1
 
-                reason = escape(change.reason) if change.reason else "[dim]-[/dim]"
-                elapsed = ""
-                if effective_start is not None:
-                    elapsed = _format_elapsed((change_timestamp - effective_start).total_seconds())
-
-                item_cell = f"[{item_color}]{escape(item.key)}[/{item_color}]"
-                table.add_row(
-                    item_cell,
-                    str(idx),
-                    elapsed,
-                    score_str,
-                    level_str,
-                    reason,
-                )
-
-    table.caption = "No score changes recorded." if not has_history else ""
+    table.caption = "No audit events recorded." if not events_sorted else ""
     rich_print(table)
 
 
@@ -233,7 +315,7 @@ def display_summary(
     rich_print: Callable[[Any], None],
     show_graph: bool = True,
     exclude_levels: Level | str | Iterable[Level | str] = Level.NONE,
-    show_score_history: bool = False,
+    show_audit_log: bool = False,
 ) -> None:
     """
     Display a comprehensive summary of the investigation using Rich.
@@ -243,7 +325,7 @@ def display_summary(
         rich_print: A rich renderable handler that is called with renderables for output
         show_graph: Whether to display the observable graph
         exclude_levels: Level(s) to omit from the report (default: Level.NONE)
-        show_score_history: Whether to display score change history for observables and checks (default: False)
+        show_audit_log: Whether to display the investigation audit log (default: False)
     """
 
     resolved_excluded_levels = _normalize_exclude_levels(exclude_levels)
@@ -407,18 +489,15 @@ def display_summary(
 
         rich_print(tree)
 
-    if show_score_history:
-        all_observables = cv.get_all_observables()
-        all_checks = cv.get_all_checks()
-        if all_observables or all_checks:
-            started_at = getattr(getattr(cv, "_investigation", None), "_started_at", None)
-            _render_score_history_table(
+    if show_audit_log:
+        investigation = getattr(cv, "_investigation", None)
+        events = investigation.get_event_log() if investigation else []
+        if events:
+            started_at = getattr(investigation, "_started_at", None) if investigation else None
+            _render_audit_log_table(
                 rich_print=rich_print,
-                title="Score History",
-                groups=[
-                    ("Observable", [obs for _key, obs in sorted(all_observables.items())]),
-                    ("Check", [check for _key, check in sorted(all_checks.items())]),
-                ],
+                title="Audit Log",
+                events=events,
                 started_at=started_at,
             )
 

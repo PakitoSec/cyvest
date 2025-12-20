@@ -32,22 +32,23 @@ Whitelist entries are included in JSON/Markdown exports so downstream systems ca
 - Email addresses, hostnames
 - Any entity that can be analyzed
 
-Cyvest ships enums for common observable types to keep your investigations consistent.
+Cyvest ships enums for common observable types to keep your investigations consistent and discoverable.
 
 Each observable has:
-- **Type**: The kind of artifact (can use `ObservableType` enum or string)
+- **Type**: The kind of artifact (use `cv.OBS.*` to keep the vocabulary consistent)
 - **Value**: The actual value
 - **Score**: Numeric severity (auto-calculated)
 - **Level**: Classification (TRUSTED, INFO, SAFE, NOTABLE, SUSPICIOUS, MALICIOUS)
-- **Relationships**: Links to other observables (can use `RelationshipType` enum)
+- **Relationships**: Links to other observables (use `cv.REL.*` and `cv.DIR.*`)
 - **Threat Intelligence**: Verdicts from external sources
 
 > **Model proxies:** All public Cyvest APIs return `ObservableProxy` (and `CheckProxy`, `ThreatIntelProxy`, …)
 > instances rather than raw dataclasses. These proxies provide live scores/levels but raise an error if you
-> attempt to assign attributes. Use the facade helpers (`cv.observable_add_threat_intel`, `cv.observable_set_level`, …)
-> or the fluent methods on the proxies themselves (`with_ti`, `relate_to`, `link_observable`, etc.) so the score engine
-> remains consistent. Safe metadata fields (`comment`, `extra`, `internal`, etc.) can be updated via the dedicated
-> `update_metadata()` helpers on each proxy:
+> attempt to assign attributes. All mutations flow through the Investigation layer, so use the facade helpers
+> (`cv.observable_add_threat_intel`, `cv.observable_set_level`, …) or the fluent methods on the proxies themselves
+> (`with_ti`, `relate_to`, `link_observable`, etc.) so the score engine and audit log remain consistent.
+> Safe metadata fields (`comment`, `extra`, `internal`, etc.) can be updated via the dedicated `update_metadata()`
+> helpers on each proxy:
 >
 > ```python
 > url_obs.update_metadata(comment="triaged", extra={"ticket": "INC-4242"})
@@ -59,49 +60,42 @@ Each observable has:
 **Observable Types:**
 
 ```python
-from cyvest import ObservableType
+from cyvest import Cyvest
 
 # Network observables
-ObservableType.IPV4_ADDR          # "ipv4-addr"
-ObservableType.IPV6_ADDR          # "ipv6-addr"
-ObservableType.DOMAIN_NAME        # "domain-name"
-ObservableType.URL                # "url"
-ObservableType.MAC_ADDR           # "mac-addr"
-ObservableType.NETWORK_TRAFFIC    # "network-traffic"
+Cyvest.OBS.IPV4_ADDR          # "ipv4-addr"
+Cyvest.OBS.IPV6_ADDR          # "ipv6-addr"
+Cyvest.OBS.DOMAIN_NAME        # "domain-name"
+Cyvest.OBS.URL                # "url"
+Cyvest.OBS.MAC_ADDR           # "mac-addr"
+Cyvest.OBS.NETWORK_TRAFFIC    # "network-traffic"
 
 # Email observables
-ObservableType.EMAIL_ADDR         # "email-addr"
-ObservableType.EMAIL_MESSAGE      # "email-message"
-ObservableType.EMAIL_MIME_PART    # "email-mime-part"
+Cyvest.OBS.EMAIL_ADDR         # "email-addr"
+Cyvest.OBS.EMAIL_MESSAGE      # "email-message"
+Cyvest.OBS.EMAIL_MIME_PART    # "email-mime-part"
 
 # File observables
-ObservableType.FILE               # "file"
-ObservableType.DIRECTORY          # "directory"
-ObservableType.ARTIFACT           # "artifact"
+Cyvest.OBS.FILE               # "file"
+Cyvest.OBS.DIRECTORY          # "directory"
+Cyvest.OBS.ARTIFACT           # "artifact"
 
 # System observables
-ObservableType.PROCESS            # "process"
-ObservableType.SOFTWARE           # "software"
-ObservableType.USER_ACCOUNT       # "user-account"
-ObservableType.WINDOWS_REGISTRY_KEY  # "windows-registry-key"
+Cyvest.OBS.PROCESS            # "process"
+Cyvest.OBS.SOFTWARE           # "software"
+Cyvest.OBS.USER_ACCOUNT       # "user-account"
+Cyvest.OBS.WINDOWS_REGISTRY_KEY  # "windows-registry-key"
 
 # Other observables
-ObservableType.AUTONOMOUS_SYSTEM  # "autonomous-system"
-ObservableType.MUTEX              # "mutex"
-ObservableType.X509_CERTIFICATE   # "x509-certificate"
+Cyvest.OBS.AUTONOMOUS_SYSTEM  # "autonomous-system"
+Cyvest.OBS.MUTEX              # "mutex"
+Cyvest.OBS.X509_CERTIFICATE   # "x509-certificate"
 ```
 
-You can use enums or strings interchangeably:
+Use the facade namespace for autocomplete:
 
 ```python
-# Using enum (recommended - provides autocomplete)
-obs1 = cv.observable(ObservableType.URL, "https://example.com")
-
-# Using string (backward compatible)
-obs2 = cv.observable("url", "https://example.com")
-
-# Custom types as strings
-obs3 = cv.observable("custom-indicator", "some-value")
+obs = cv.observable(cv.OBS.URL, "https://example.com")
 ```
 
 ### Checks
@@ -177,6 +171,12 @@ Cyvest keeps two provenance concepts:
 
 Exports always include `investigation_id` so `origin_investigation_id` and `source_investigation_ids` remain meaningful after serialization.
 
+All mergeable objects (observables, checks, threat intel, enrichments, containers) also carry these two fields for provenance and audit attribution. These fields never affect scoring directly.
+
+### Reverse Links (navigation)
+
+Observables expose `check_links`, derived from `Check.observable_links`, to show which checks currently link to them. These reverse links are non-authoritative and never drive propagation decisions.
+
 ### Scoring Modes
 
 Cyvest supports two scoring modes for observable score calculation:
@@ -204,33 +204,37 @@ cv = Cyvest(score_mode=ScoreMode.MAX)
 cv = Cyvest(score_mode=ScoreMode.SUM)
 ```
 
-### Score History
+### Audit Log
 
-Every score change is automatically tracked for debugging and audit purposes:
+All meaningful changes are recorded in a centralized, append-only audit log at the investigation level:
 
 ```python
-# Observable score history
-obs = cv.observable_create("ip", "10.0.0.1")
+# Observable score changes
+obs = cv.observable_create(cv.OBS.IPV4_ADDR, "10.0.0.1")
 cv.observable_add_threat_intel(obs.key, "source1", score=Decimal("5.0"))
 cv.observable_add_threat_intel(obs.key, "source2", score=Decimal("8.0"))
 
-# Get complete history
-history = obs.get_score_history()
-for change in history:
-    print(f"{change.timestamp}: {change.old_score} → {change.new_score}")
-    print(f"  Level: {change.old_level} → {change.new_level}")
-    print(f"  Reason: {change.reason}")
-
-# Check score history works the same way
-check_history = check.get_score_history()
+events = cv.investigation_get_audit_log()
+obs_score_events = [
+    event
+    for event in events
+    if event.object_key == obs.key and event.event_type.startswith("SCORE")
+]
+for event in obs_score_events:
+    print(event.timestamp, event.details["old_score"], "→", event.details["new_score"])
+    print("Level:", event.details["old_level"], "→", event.details["new_level"])
+    print("Reason:", event.reason)
 ```
 
-**Score Change Record:**
+**Audit Event Fields (score changes):**
 
 - Timestamp
 - Old/new score values
 - Old/new level values
-- Reason for change (which TI source, which child updated, etc.)
+- Reason for change (threat intel, propagation, merge, manual, etc.)
+- Contributing investigation IDs when relevant (e.g., merges)
+
+Investigation names are optional, human-readable labels. They are serialized separately from `investigation_id` and are never used for scoring or propagation.
 
 ### Hierarchical Score Propagation
 
@@ -281,17 +285,17 @@ When root appears as a child of other observables, it is **SKIPPED** in their sc
 
 ```python
 # Example: Cross-contamination prevention
-domain = cv.observable("domain", "branch1.com")
+domain = cv.observable(cv.OBS.DOMAIN_NAME, "branch1.com")
 domain.with_ti("source1", score=Decimal("9.0"))
 
-ip = cv.observable("ipv4-addr", "192.0.2.1")
+ip = cv.observable(cv.OBS.IPV4_ADDR, "192.0.2.1")
 ip.with_ti("source2", score=Decimal("1.0"))
 
 root = cv.root()
 
 # Both have root as child
-cv.observable_add_relationship(domain, root, "related-to", direction="outbound")
-cv.observable_add_relationship(ip, root, "related-to", direction="outbound")
+cv.observable_add_relationship(domain, root, cv.REL.RELATED_TO, direction=cv.DIR.OUTBOUND)
+cv.observable_add_relationship(ip, root, cv.REL.RELATED_TO, direction=cv.DIR.OUTBOUND)
 
 # Results:
 # - domain score: 9.0 (only its TI, root skipped)
@@ -331,20 +335,20 @@ This barrier ensures that observables linked through the root remain isolated fr
 **Examples:**
 
 ```python
-from cyvest import Cyvest, RelationshipDirection, RelationshipType
+from cyvest import Cyvest
 from decimal import Decimal
 
 cv = Cyvest()
 
 # Example 1: OUTBOUND - Domain → IP (IP is child)
-domain = cv.observable_create("domain", "malware.com")
+domain = cv.observable_create(cv.OBS.DOMAIN_NAME, "malware.com")
 cv.observable_add_threat_intel(domain.key, "virustotal", score=Decimal("2.0"))
 
-ip = cv.observable_create("ip", "198.51.100.42")
+ip = cv.observable_create(cv.OBS.IPV4_ADDR, "198.51.100.42")
 cv.observable_add_threat_intel(ip.key, "abuseipdb", score=Decimal("8.0"))
 
 # Domain resolves to IP (OUTBOUND by default)
-cv.observable_add_relationship(domain, ip, RelationshipType.RELATED_TO, RelationshipDirection.OUTBOUND)
+cv.observable_add_relationship(domain, ip, cv.REL.RELATED_TO, cv.DIR.OUTBOUND)
 
 # Result: domain score = max(2.0, 8.0) = 8.0 (includes child IP score)
 print(f"Domain score: {domain.score}")  # 8.0
@@ -352,14 +356,14 @@ print(f"IP score: {ip.score}")          # 8.0
 
 
 # Example 2: INBOUND - File ← URL (URL is parent)
-malware = cv.observable_create("file", "trojan.exe")
+malware = cv.observable_create(cv.OBS.FILE, "trojan.exe")
 cv.observable_add_threat_intel(malware.key, "av", score=Decimal("9.0"))
 
-url = cv.observable_create("url", "http://evil.com/payload")
+url = cv.observable_create(cv.OBS.URL, "http://evil.com/payload")
 cv.observable_add_threat_intel(url.key, "urlscan", score=Decimal("3.0"))
 
 # File downloaded from URL (INBOUND by default for DOWNLOADED)
-cv.observable_add_relationship(malware, url, RelationshipType.RELATED_TO, RelationshipDirection.INBOUND)
+cv.observable_add_relationship(malware, url, cv.REL.RELATED_TO, cv.DIR.INBOUND)
 
 # Result: URL is parent, gets file's score
 print(f"File score: {malware.score}")  # 9.0
@@ -367,14 +371,14 @@ print(f"URL score: {url.score}")        # 9.0 (includes child file score)
 
 
 # Example 3: BIDIRECTIONAL - No hierarchy
-host1 = cv.observable_create("ip", "10.0.1.10")
+host1 = cv.observable_create(cv.OBS.IPV4_ADDR, "10.0.1.10")
 cv.observable_add_threat_intel(host1.key, "ids", score=Decimal("7.0"))
 
-host2 = cv.observable_create("ip", "10.0.1.20")
+host2 = cv.observable_create(cv.OBS.IPV4_ADDR, "10.0.1.20")
 cv.observable_add_threat_intel(host2.key, "ids", score=Decimal("2.0"))
 
 # Hosts communicate (BIDIRECTIONAL by default)
-cv.observable_add_relationship(host1, host2, RelationshipType.RELATED_TO)
+cv.observable_add_relationship(host1, host2, cv.REL.RELATED_TO)
 
 # Result: No hierarchical propagation, each keeps own score
 print(f"Host1 score: {host1.score}")  # 7.0
@@ -382,17 +386,17 @@ print(f"Host2 score: {host2.score}")  # 2.0
 
 
 # Example 4: Override semantic defaults
-domain2 = cv.observable_create("domain", "example.com")
+domain2 = cv.observable_create(cv.OBS.DOMAIN_NAME, "example.com")
 cv.observable_add_threat_intel(domain2.key, "source", score=Decimal("1.0"))
 
-ip2 = cv.observable_create("ip", "192.0.2.1")
+ip2 = cv.observable_create(cv.OBS.IPV4_ADDR, "192.0.2.1")
 cv.observable_add_threat_intel(ip2.key, "source", score=Decimal("5.0"))
 
 # Override default to BIDIRECTIONAL (no hierarchy)
 cv.observable_add_relationship(
     domain2, ip2,  # Observable proxies
-    RelationshipType.RELATED_TO,
-    RelationshipDirection.BIDIRECTIONAL
+    cv.REL.RELATED_TO,
+    cv.DIR.BIDIRECTIONAL
 )
 
 # Result: No propagation due to override
@@ -406,17 +410,17 @@ Score propagation works recursively through multiple levels:
 
 ```python
 # Grandparent → Parent → Child hierarchy
-grandparent = cv.observable_create("domain", "root.com")
+grandparent = cv.observable_create(cv.OBS.DOMAIN_NAME, "root.com")
 cv.observable_add_threat_intel(grandparent.key, "source1", score=Decimal("1.0"))
 
-parent = cv.observable_create("domain", "sub.root.com")
+parent = cv.observable_create(cv.OBS.DOMAIN_NAME, "sub.root.com")
 cv.observable_add_threat_intel(parent.key, "source2", score=Decimal("2.0"))
 
-child = cv.observable_create("ip", "203.0.113.10")
+child = cv.observable_create(cv.OBS.IPV4_ADDR, "203.0.113.10")
 cv.observable_add_threat_intel(child.key, "source3", score=Decimal("9.0"))
 
-cv.observable_add_relationship(grandparent.key, parent.key, "related-to", RelationshipDirection.OUTBOUND)
-cv.observable_add_relationship(parent.key, child.key, "related-to", RelationshipDirection.OUTBOUND)
+cv.observable_add_relationship(grandparent.key, parent.key, cv.REL.RELATED_TO, cv.DIR.OUTBOUND)
+cv.observable_add_relationship(parent.key, child.key, cv.REL.RELATED_TO, cv.DIR.OUTBOUND)
 
 # Scores propagate all the way up:
 # child = 9.0
@@ -457,7 +461,7 @@ You can set levels explicitly or let them be calculated from scores:
 cv.observable_add_threat_intel(obs.key, source="analysis", score=Decimal("8.0"))  # Becomes MALICIOUS
 
 # Explicitly set through the facade
-cv.observable_set_level(obs.key, Level.SAFE)  # Overrides calculation
+cv.observable_set_level(obs.key, cv.LVL.SAFE)  # Overrides calculation
 
 # Higher calculated level wins when new intel arrives
 cv.observable_add_threat_intel(obs.key, source="analysis", score=Decimal("9.0"))  # Changes to MALICIOUS
@@ -465,7 +469,7 @@ cv.observable_add_threat_intel(obs.key, source="analysis", score=Decimal("9.0"))
 
 ### SAFE Level Protection
 
-The **SAFE level has special protection** against downgrades. When an observable is created with or set to `Level.SAFE`, it cannot be downgraded to lower levels (NONE, TRUSTED, INFO) by threat intelligence or score updates, but can still be upgraded to higher levels (NOTABLE, SUSPICIOUS, MALICIOUS).
+The **SAFE level has special protection** against downgrades. When an observable is created with or set to `Cyvest.LVL.SAFE`, it cannot be downgraded to lower levels (NONE, TRUSTED, INFO) by threat intelligence or score updates, but can still be upgraded to higher levels (NOTABLE, SUSPICIOUS, MALICIOUS).
 
 **Key Behaviors:**
 
@@ -478,17 +482,17 @@ The **SAFE level has special protection** against downgrades. When an observable
 **Example:**
 
 ```python
-from cyvest import Cyvest, Level
+from cyvest import Cyvest
 from decimal import Decimal
 
 cv = Cyvest()
 
 # Create a SAFE observable (e.g., known-good domain)
 trusted = cv.observable_create(
-    "domain",
+    cv.OBS.DOMAIN_NAME,
     "trusted.example.com",
     score=0,
-    level=Level.SAFE
+    level=cv.LVL.SAFE
 )
 
 # Add threat intel with low score (would normally be INFO level)
@@ -522,12 +526,12 @@ print(f"Score: {trusted.score}, Level: {trusted.level}")
 # Output: Score: 6.0, Level: MALICIOUS
 
 # Threat intel with SAFE level can also mark observables as SAFE
-uncertain = cv.observable_create("domain", "example.com")
+uncertain = cv.observable_create(cv.OBS.DOMAIN_NAME, "example.com")
 cv.observable_add_threat_intel(
     uncertain.key,
     "whitelist_service",
     score=Decimal("0"),
-    level=Level.SAFE,
+    level=cv.LVL.SAFE,
     comment="Verified by corporate whitelist"
 )
 # Observable upgraded to SAFE with automatic protection enabled
@@ -555,20 +559,21 @@ print(f"Score: {uncertain.score}, Level: {uncertain.level}")
 
 **Protection Scope:**
 
-The SAFE protection **only applies to the SAFE level itself**. Other explicit levels (set via `set_level()`) don't have the same protection and can be overridden by higher calculated levels according to the normal rules.
+The SAFE protection **only applies to the SAFE level itself**. Other explicit levels (set via `cv.observable_set_level()` or explicit threat intel `level=`) don't have the same protection and can be overridden by higher calculated levels according to the normal rules.
 
 **SAFE Propagation to Checks:**
 
 Checks automatically inherit the SAFE level from their linked observables under specific conditions:
 
-1. **At least one** linked observable has `Level.SAFE`
+1. **At least one** linked observable has `Cyvest.LVL.SAFE`
 2. **All** other linked observables have levels ≤ SAFE (NONE, TRUSTED, INFO, or SAFE)
 3. The check's current level is < SAFE
 
 When these conditions are met, the check is automatically set to SAFE level, overriding any previous level assignment.
 
 ```python
-from cyvest import Cyvest, Level
+from decimal import Decimal
+from cyvest import Cyvest
 
 cv = Cyvest()
 
@@ -576,19 +581,19 @@ cv = Cyvest()
 check = cv.check_create("domain_check", "network", "Analyze domain reputation")
 
 # Link a SAFE observable
-safe_domain = cv.observable_create("domain", "trusted.example.com", level=Level.SAFE)
+safe_domain = cv.observable_create(cv.OBS.DOMAIN_NAME, "trusted.example.com", level=cv.LVL.SAFE)
 cv.check_link_observable(check.key, safe_domain.key)
 
 # Check inherits SAFE level from the observable
 print(f"Check level: {check.level}")  # Output: Check level: SAFE
 
 # Add INFO-level observables - check remains SAFE
-info_ip = cv.observable_create("ipv4-addr", "192.0.2.1")
+info_ip = cv.observable_create(cv.OBS.IPV4_ADDR, "192.0.2.1")
 cv.check_link_observable(check.key, info_ip.key)
 print(f"Check level: {check.level}")  # Output: Check level: SAFE
 
 # Add MALICIOUS observable - check upgrades to MALICIOUS
-malicious_url = cv.observable_create("url", "http://malware.example")
+malicious_url = cv.observable_create(cv.OBS.URL, "http://malware.example")
 cv.observable_add_threat_intel(malicious_url.key, "virustotal", score=Decimal("8.0"))
 cv.check_link_observable(check.key, malicious_url.key)
 print(f"Check level: {check.level}")  # Output: Check level: MALICIOUS
@@ -601,28 +606,26 @@ This propagation ensures that checks analyzing whitelisted/trusted assets are pr
 Relationships let you link observables together. Use the Cyvest facade or proxy helpers (e.g., `cv.observable_add_relationship()` or `ObservableProxy.relate_to()`) so validation and score propagation stay consistent.
 
 ```python
-from cyvest import RelationshipDirection, RelationshipType
-
 # Using observable proxies (recommended)
 cv.observable_add_relationship(
     source=url,  # Observable proxy
     target=ip,   # Observable proxy
-    relationship_type=RelationshipType.RELATED_TO,
+    relationship_type=cv.REL.RELATED_TO,
 )
 
 # Override direction to control score hierarchy
 cv.observable_add_relationship(
     source=parent,
     target=child,
-    relationship_type=RelationshipType.RELATED_TO,
-    direction=RelationshipDirection.OUTBOUND,  # child score flows to parent
+    relationship_type=cv.REL.RELATED_TO,
+    direction=cv.DIR.OUTBOUND,  # child score flows to parent
 )
 
-# Using string keys (backward compatible)
+# Using string keys
 cv.observable_add_relationship(
     source=url.key,
     target=ip.key,
-    relationship_type="related-to",
+    relationship_type=cv.REL.RELATED_TO,
 )
 ```
 
@@ -643,6 +646,18 @@ Keys enable:
 - Reliable merging
 - Deduplication
 
+The facade getters accept either keys or component parameters:
+
+```python
+obs = cv.observable_get(cv.OBS.URL, "https://malicious.com")
+obs_by_key = cv.observable_get("obs:url:https://malicious.com")
+
+check = cv.check_get("malware_detection", "endpoint")
+check_by_key = cv.check_get("chk:malware_detection:endpoint")
+```
+
+Low-level `Investigation` getters accept keys only; use the facade for component-based lookups.
+
 ## Root Observable
 
 Every investigation has a **root observable** representing the analyzed artifact:
@@ -653,7 +668,7 @@ root = cv.root()  # or cv.observable_get_root()
 ```
 
 The root observable is automatically created with:
-- **Type**: `ObservableType.FILE` (default) or `ObservableType.ARTIFACT` if `root_type="artifact"`
+- **Type**: `cv.OBS.FILE` (default) or `cv.OBS.ARTIFACT` if `root_type="artifact"`
 - **Value**: `"root"` (fixed identifier)
 - **Key**: `obs:file:root` or `obs:artifact:root` (derived from type + value)
 - **Purpose**: Entry point for the investigation
@@ -683,9 +698,9 @@ root = cv.root()
 cv.observable_add_threat_intel(root.key, "scanner", score=Decimal("9.0"))
 
 # Create observables linked to root
-child = cv.observable_create("url", "https://example.com")
+child = cv.observable_create(cv.OBS.URL, "https://example.com")
 cv.observable_add_threat_intel(child.key, "urlscan", score=Decimal("5.0"))
-cv.relationship_add(root.key, child.key, "related-to", direction="outbound")
+cv.relationship_add(root.key, child.key, cv.REL.RELATED_TO, direction=cv.DIR.OUTBOUND)
 
 # Create check for root
 check = cv.check_create("root-check", "validation")
@@ -700,7 +715,7 @@ cv.check_link_observable(check.check_id, root.key)
 
 ### Automatic Root Linking
 
-Orphan observables (without relationships) are automatically linked to root with `related-to`.
+Orphan observables (without relationships) are automatically linked to root with `cv.REL.RELATED_TO`.
 
 ## Statistics
 
@@ -748,10 +763,10 @@ This eliminates duplicate objects and ensures consistency:
 cv = Cyvest()
 
 # First creation
-obs1 = cv.observable_create("url", "https://example.com", score=5.0)
+obs1 = cv.observable_create(cv.OBS.URL, "https://example.com", score=5.0)
 
 # Adding same observable again - automatically merges!
-obs2 = cv.observable_create("url", "https://example.com", score=7.0)
+obs2 = cv.observable_create(cv.OBS.URL, "https://example.com", score=7.0)
 
 # obs1 and obs2 are the same object with merged data
 assert obs1 is obs2
@@ -765,10 +780,10 @@ You can also merge entire investigations:
 ```python
 # Create separate investigations
 inv1 = Cyvest()
-inv1.observable_create("url", "https://example.com")
+inv1.observable_create(inv1.OBS.URL, "https://example.com")
 
 inv2 = Cyvest()
-inv2.observable_create("ip", "192.168.1.1")
+inv2.observable_create(inv2.OBS.IPV4_ADDR, "192.168.1.1")
 
 # Merge inv2 into inv1 - automatic deduplication
 inv1.merge_investigation(inv2)

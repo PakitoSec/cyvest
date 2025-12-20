@@ -3,7 +3,7 @@ Tests for relationship validation through Investigation layer.
 """
 
 from cyvest import Cyvest
-from cyvest.model import Observable
+from cyvest.model import Observable, Relationship
 
 
 def test_add_relationship_with_valid_target() -> None:
@@ -107,8 +107,11 @@ def test_merge_filters_invalid_relationships() -> None:
     cv = Cyvest()
 
     # Create observable with relationship to non-existent target
-    obs = Observable(obs_type="domain", value="example.com")
-    obs._add_relationship_internal("obs:ip:nonexistent", "related-to")
+    obs = Observable(
+        obs_type="domain",
+        value="example.com",
+        relationships=[Relationship(target_key="obs:ip:nonexistent", relationship_type="related-to")],
+    )
 
     # Add it to investigation - the relationship should be filtered during merge
     cv.observable_create("domain", "example.com")
@@ -129,8 +132,11 @@ def test_merge_keeps_valid_relationships() -> None:
     target = cv.observable_create("ip", "192.0.2.1")
 
     # Create observable with relationship to existing target
-    obs = Observable(obs_type="domain", value="example.com")
-    obs._add_relationship_internal(target.key, "related-to")
+    obs = Observable(
+        obs_type="domain",
+        value="example.com",
+        relationships=[Relationship(target_key=target.key, relationship_type="related-to")],
+    )
 
     # Add it to investigation - the relationship should be kept
     merged, deferred = cv._investigation.add_observable(obs)

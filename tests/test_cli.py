@@ -154,8 +154,8 @@ def test_display_summary_exclude_levels() -> None:
     assert "none_check" in output_all
 
 
-def test_display_summary_score_history_table() -> None:
-    """display_summary shows observable score history when requested."""
+def test_display_summary_audit_log_table() -> None:
+    """display_summary shows audit log when requested."""
     from decimal import Decimal
     from io import StringIO
 
@@ -172,9 +172,9 @@ def test_display_summary_score_history_table() -> None:
 
     output = StringIO()
     console = Console(file=output, width=140)
-    display_summary(cv, console.print, show_graph=False, show_score_history=True)
+    display_summary(cv, console.print, show_graph=False, show_audit_log=True)
     rendered = output.getvalue()
 
-    assert "Score History" in rendered
+    assert "Audit Log" in rendered
     assert "Threat intel update from virustotal" in rendered
     assert "bump" in rendered

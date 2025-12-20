@@ -47,6 +47,32 @@ def test_observable_retrieval() -> None:
     assert retrieved.key == obs.key
 
 
+def test_facade_getters_accept_component_parameters() -> None:
+    """Facade getters should accept key components where available."""
+    cv = Cyvest()
+
+    obs = cv.observable_create("url", "https://example.com")
+    assert cv.observable_get("url", "https://example.com") is not None
+    assert cv.observable_get(cv.OBS.URL, "https://example.com") is not None
+    assert cv.observable_get(obs.key) is not None
+
+    check = cv.check_create("check_id", "scope", "desc")
+    assert cv.check_get("check_id", "scope") is not None
+    assert cv.check_get(check.key) is not None
+
+    ctr = cv.container_create("path/to/container")
+    assert cv.container_get("path/to/container") is not None
+    assert cv.container_get(ctr.key) is not None
+
+    enr = cv.enrichment_create("metadata", {"key": "value"})
+    assert cv.enrichment_get("metadata") is not None
+    assert cv.enrichment_get(enr.key) is not None
+
+    enr_ctx = cv.enrichment_create("metadata_ctx", {"k": "v"}, context="source")
+    assert cv.enrichment_get("metadata_ctx", "source") is not None
+    assert cv.enrichment_get(enr_ctx.key) is not None
+
+
 def test_threat_intel_addition() -> None:
     """Test adding threat intel to observable."""
     cv = Cyvest()

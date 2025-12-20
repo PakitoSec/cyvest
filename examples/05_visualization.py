@@ -17,7 +17,7 @@ from pathlib import Path
 
 from logurich import logger
 
-from cyvest import Cyvest, ObservableType, RelationshipDirection, RelationshipType
+from cyvest import Cyvest
 
 logger.enable("cyvest")
 
@@ -25,79 +25,79 @@ logger.enable("cyvest")
 with Cyvest() as cv:
     # Malicious infrastructure
     malicious_domain = (
-        cv.observable(ObservableType.DOMAIN_NAME, "evil-phishing.com")
+        cv.observable(cv.OBS.DOMAIN_NAME, "evil-phishing.com")
         .add_ti("VirusTotal", score=9.0, comment="Known phishing domain")
         .add_ti("AlienVault OTX", score=8.5, comment="Recently reported")
     )
 
     malicious_ip = (
-        cv.observable(ObservableType.IPV4_ADDR, "185.220.101.50")
+        cv.observable(cv.OBS.IPV4_ADDR, "185.220.101.50")
         .add_ti("AbuseIPDB", score=9.5, comment="C2 server")
-        .relate_to(malicious_domain, RelationshipType.RELATED_TO, RelationshipDirection.OUTBOUND)
+        .relate_to(malicious_domain, cv.REL.RELATED_TO, cv.DIR.OUTBOUND)
     )
 
     # Suspicious infrastructure
     suspicious_domain = (
-        cv.observable(ObservableType.DOMAIN_NAME, "sketchy-site.net")
+        cv.observable(cv.OBS.DOMAIN_NAME, "sketchy-site.net")
         .add_ti("VirusTotal", score=4.5, comment="Some detections")
         .relate_to(
-            cv.observable(ObservableType.IPV4_ADDR, "192.168.100.5").add_ti("Shodan", score=3.0),
-            RelationshipType.RELATED_TO,
-            RelationshipDirection.OUTBOUND,
+            cv.observable(cv.OBS.IPV4_ADDR, "192.168.100.5").add_ti("Shodan", score=3.0),
+            cv.REL.RELATED_TO,
+            cv.DIR.OUTBOUND,
         )
     )
 
     # Email analysis
     attacker_email = (
-        cv.observable(ObservableType.EMAIL_ADDR, "attacker@evil-phishing.com")
+        cv.observable(cv.OBS.EMAIL_ADDR, "attacker@evil-phishing.com")
         .add_ti("EmailRep", score=8.0, comment="Suspicious sender")
-        .relate_to(malicious_domain, RelationshipType.RELATED_TO)
+        .relate_to(malicious_domain, cv.REL.RELATED_TO)
     )
 
-    victim_email = cv.observable(ObservableType.EMAIL_ADDR, "victim@company.com", internal=True).add_ti(
+    victim_email = cv.observable(cv.OBS.EMAIL_ADDR, "victim@company.com", internal=True).add_ti(
         "Internal Whitelist", score=-1.0, comment="Known employee"
     )
 
     # Email message with multiple relationships
     email_message = (
-        cv.observable(ObservableType.EMAIL_MESSAGE, "Phishing Email - Invoice #12345")
-        .relate_to(attacker_email, RelationshipType.RELATED_TO, RelationshipDirection.OUTBOUND)
-        .relate_to(victim_email, RelationshipType.RELATED_TO, RelationshipDirection.OUTBOUND)
+        cv.observable(cv.OBS.EMAIL_MESSAGE, "Phishing Email - Invoice #12345")
+        .relate_to(attacker_email, cv.REL.RELATED_TO, cv.DIR.OUTBOUND)
+        .relate_to(victim_email, cv.REL.RELATED_TO, cv.DIR.OUTBOUND)
         .add_ti("Email Gateway", score=7.0, comment="Flagged as suspicious")
     )
 
     # Malicious URLs in email
     phishing_url1 = (
-        cv.observable(ObservableType.URL, "https://evil-phishing.com/login")
+        cv.observable(cv.OBS.URL, "https://evil-phishing.com/login")
         .add_ti("URLhaus", score=9.0)
-        .relate_to(malicious_domain, RelationshipType.RELATED_TO, RelationshipDirection.OUTBOUND)
+        .relate_to(malicious_domain, cv.REL.RELATED_TO, cv.DIR.OUTBOUND)
     )
 
     phishing_url2 = (
-        cv.observable(ObservableType.URL, "https://evil-phishing.com/verify")
+        cv.observable(cv.OBS.URL, "https://evil-phishing.com/verify")
         .add_ti("URLhaus", score=8.5)
-        .relate_to(malicious_domain, RelationshipType.RELATED_TO, RelationshipDirection.OUTBOUND)
+        .relate_to(malicious_domain, cv.REL.RELATED_TO, cv.DIR.OUTBOUND)
     )
 
     # Email contains URLs
-    email_message.relate_to(phishing_url1, RelationshipType.RELATED_TO, RelationshipDirection.OUTBOUND)
-    email_message.relate_to(phishing_url2, RelationshipType.RELATED_TO, RelationshipDirection.OUTBOUND)
+    email_message.relate_to(phishing_url1, cv.REL.RELATED_TO, cv.DIR.OUTBOUND)
+    email_message.relate_to(phishing_url2, cv.REL.RELATED_TO, cv.DIR.OUTBOUND)
 
     # Malware file dropped
     malware_file = (
-        cv.observable(ObservableType.FILE, "invoice.exe")
+        cv.observable(cv.OBS.FILE, "invoice.exe")
         .add_ti("VirusTotal", score=10.0, comment="Detected by 45/70 engines")
-        .relate_to(phishing_url1, RelationshipType.RELATED_TO, RelationshipDirection.INBOUND)
-        .relate_to(malicious_ip, RelationshipType.RELATED_TO, RelationshipDirection.BIDIRECTIONAL)
+        .relate_to(phishing_url1, cv.REL.RELATED_TO, cv.DIR.INBOUND)
+        .relate_to(malicious_ip, cv.REL.RELATED_TO, cv.DIR.BIDIRECTIONAL)
     )
 
     # Safe/whitelisted observables for contrast
-    safe_domain = cv.observable(ObservableType.DOMAIN_NAME, "google.com", whitelisted=True).add_ti(
+    safe_domain = cv.observable(cv.OBS.DOMAIN_NAME, "google.com", whitelisted=True).add_ti(
         "Internal Whitelist", score=-2.0, comment="Known good domain"
     )
 
     # Notable but not malicious
-    notable_domain = cv.observable(ObservableType.DOMAIN_NAME, "new-service.cloud").add_ti(
+    notable_domain = cv.observable(cv.OBS.DOMAIN_NAME, "new-service.cloud").add_ti(
         "Passive DNS", score=2.0, comment="Recently registered domain"
     )
 

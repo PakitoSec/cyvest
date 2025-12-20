@@ -2,10 +2,9 @@
 Tests for the reworked score algorithm.
 
 Tests MAX vs SUM modes, check score calculation, hierarchical propagation,
-and score history access.
+and audit log access.
 """
 
-from collections.abc import Sequence
 from decimal import Decimal
 
 from cyvest import Cyvest, Level
@@ -225,62 +224,79 @@ def test_check_score_preserves_higher_current_score() -> None:
     assert check.level == Level.MALICIOUS
 
 
-def test_observable_score_history() -> None:
-    """Test that observable score history can be retrieved."""
+def test_observable_score_audit_events() -> None:
+    """Observable score changes should appear in the audit log."""
     cv = Cyvest()
 
     # Create observable
     obs = cv.observable_create("ip", "10.0.0.1")
 
-    # Initial history should have 0 entries (no changes yet)
-    history = obs.get_score_history()
-    assert isinstance(history, Sequence)
-    assert len(history) == 0
+    # Initial audit log should have no score events for this observable.
+    events = [
+        event
+        for event in cv.investigation_get_audit_log()
+        if event.object_key == obs.key and event.event_type.startswith("SCORE")
+    ]
+    assert len(events) == 0
 
     # Add threat intel (triggers score change)
     cv.observable_add_threat_intel(obs.key, source="source1", score=Decimal("5.0"))
 
-    # History should now have 1 entry
-    history = obs.get_score_history()
-    assert len(history) == 1
-    assert history[0].old_score == Decimal("0")
-    assert history[0].new_score == Decimal("5.0")
-    assert history[0].old_level == Level.INFO
-    assert history[0].new_level == Level.MALICIOUS
-    assert "source1" in history[0].reason
+    # Audit log should now have a score change entry.
+    events = [
+        event
+        for event in cv.investigation_get_audit_log()
+        if event.object_key == obs.key and event.event_type.startswith("SCORE")
+    ]
+    assert len(events) == 1
+    assert events[0].details["old_score"] == 0.0
+    assert events[0].details["new_score"] == 5.0
+    assert events[0].details["old_level"] == Level.INFO.value
+    assert events[0].details["new_level"] == Level.MALICIOUS.value
+    assert "source1" in (events[0].reason or "")
 
     # Add another threat intel
     cv.observable_add_threat_intel(obs.key, source="source2", score=Decimal("8.0"))
 
-    # History should now have 2 entries
-    history = obs.get_score_history()
-    assert len(history) == 2
-    assert history[1].old_score == Decimal("5.0")
-    assert history[1].new_score == Decimal("8.0")
-    assert "source2" in history[1].reason
+    # Audit log should now have 2 entries
+    events = [
+        event
+        for event in cv.investigation_get_audit_log()
+        if event.object_key == obs.key and event.event_type.startswith("SCORE")
+    ]
+    assert len(events) == 2
+    assert events[1].details["old_score"] == 5.0
+    assert events[1].details["new_score"] == 8.0
+    assert "source2" in (events[1].reason or "")
 
 
-def test_check_score_history() -> None:
-    """Test that check score history can be retrieved."""
+def test_check_score_audit_events() -> None:
+    """Check score changes should appear in the audit log."""
     cv = Cyvest()
 
     # Create check
     check = cv.check_create("check1", "test", "Test check")
 
-    # Initial history should have 0 entries
-    history = check.get_score_history()
-    assert isinstance(history, Sequence)
-    assert len(history) == 0
+    events = [
+        event
+        for event in cv.investigation_get_audit_log()
+        if event.object_key == check.key and event.event_type.startswith("SCORE")
+    ]
+    assert len(events) == 0
 
     # Create observable and link to check
     obs = cv.observable_create("ip", "10.0.0.1")
     cv.observable_add_threat_intel(obs.key, source="source1", score=Decimal("5.0"))
     cv.check_link_observable(check.key, obs.key)
 
-    # History should now have entries from score updates
-    history = check.get_score_history()
-    assert len(history) >= 1
-    assert any(entry.new_score == Decimal("5.0") for entry in history)
+    # Audit log should now have entries from score updates
+    events = [
+        event
+        for event in cv.investigation_get_audit_log()
+        if event.object_key == check.key and event.event_type.startswith("SCORE")
+    ]
+    assert len(events) >= 1
+    assert any(entry.details.get("new_score") == 5.0 for entry in events)
 
 
 def test_local_only_link_does_not_affect_foreign_check() -> None:
@@ -691,9 +707,13 @@ def test_safe_level_score_updates_with_frozen_level() -> None:
     assert obs.score == Decimal("0")
     assert obs.level == Level.SAFE  # Level frozen at SAFE even though score=0 would be INFO
 
-    # Verify score history tracked the changes
-    history = obs.get_score_history()
-    assert len(history) > 0
+    # Verify audit log tracked the score change
+    events = [
+        event
+        for event in cv.investigation_get_audit_log()
+        if event.object_key == obs.key and event.event_type.startswith("SCORE")
+    ]
+    assert len(events) > 0
 
 
 def test_non_safe_levels_recalculate_and_can_downgrade() -> None:

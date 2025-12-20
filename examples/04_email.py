@@ -15,7 +15,7 @@ import click
 from logurich import logger
 from logurich.opt_click import click_logger_params
 
-from cyvest import Cyvest, Level, ObservableType, RelationshipType
+from cyvest import Cyvest
 from cyvest.shared import SharedInvestigationContext
 
 logger.enable("cyvest")
@@ -145,18 +145,18 @@ class EmailFrom(BaseRule):
 
         # Build observable chain with threat intel
         obs = (
-            cy.observable(ObservableType.EMAIL_ADDR, from_addr)
-            .relate_to(cy.root(), relationship_type=RelationshipType.RELATED_TO, direction="inbound")
+            cy.observable(cy.OBS.EMAIL_ADDR, from_addr)
+            .relate_to(cy.root(), relationship_type=cy.REL.RELATED_TO, direction=cy.DIR.INBOUND)
             .relate_to(
-                cy.observable(ObservableType.DOMAIN_NAME, from_domain)
+                cy.observable(cy.OBS.DOMAIN_NAME, from_domain)
                 .add_ti("VT", from_domain_score)
                 .relate_to(
-                    cy.observable(ObservableType.IPV4_ADDR, from_ip).add_ti("ABUSEIPDB", from_ip_score),
-                    RelationshipType.RELATED_TO,
-                    direction="outbound",
+                    cy.observable(cy.OBS.IPV4_ADDR, from_ip).add_ti("ABUSEIPDB", from_ip_score),
+                    cy.REL.RELATED_TO,
+                    direction=cy.DIR.OUTBOUND,
                 ),
-                RelationshipType.RELATED_TO,
-                direction="outbound",
+                cy.REL.RELATED_TO,
+                direction=cy.DIR.OUTBOUND,
             )
             .add_ti("VT", 0, "> test")
         )
@@ -165,7 +165,6 @@ class EmailFrom(BaseRule):
         (
             cy.check("from", "header", "test email vt 10", "> ok boys")
             .link_observable(obs)
-            .with_score(obs.score)
             .in_container(cy.container("emails"))
         )
 
@@ -190,7 +189,7 @@ class EmailFromBIS(BaseRule):
         logger.info(f"Analyzing email header FROM: {from_addr}")
 
         # Build observable chain with threat intel
-        obs = cy.observable(ObservableType.EMAIL_ADDR, from_addr).add_ti("PROOFPOINT", 5, "> test")
+        obs = cy.observable(cy.OBS.EMAIL_ADDR, from_addr).add_ti("PROOFPOINT", 5, "> test")
 
         # Create check for header analysis
         (
@@ -218,8 +217,8 @@ class EmailReciever(BaseRule):
 
         cy.enrichment_create("receiver", {"receiver": ["ok"]}, context="from splunk")
         cy.check("receiver", "header", "description", "> receiver").with_score(0.1).link_observable(
-            cy.observable(ObservableType.EMAIL_ADDR, "user@company.com").relate_to(
-                cy.root(), RelationshipType.RELATED_TO, direction="inbound"
+            cy.observable(cy.OBS.EMAIL_ADDR, "user@company.com").relate_to(
+                cy.root(), cy.REL.RELATED_TO, direction=cy.DIR.INBOUND
             )
         ).in_container(cy.container("emails"))
 
@@ -265,12 +264,12 @@ class BodiesUrlTask(BaseRule):
                 if domain in url:
                     matching_domain = domain
                     break
-            url_obs = cy.observable(ObservableType.URL, url).add_ti("VT", score)
+            url_obs = cy.observable(cy.OBS.URL, url).add_ti("VT", score)
             if matching_domain:
                 url_obs.relate_to(
-                    cy.observable(ObservableType.DOMAIN_NAME, matching_domain),
-                    RelationshipType.RELATED_TO,
-                    direction="inbound",
+                    cy.observable(cy.OBS.DOMAIN_NAME, matching_domain),
+                    cy.REL.RELATED_TO,
+                    direction=cy.DIR.INBOUND,
                 )
 
             # Create check and link to container
@@ -317,14 +316,14 @@ class BodiesDomainTask(BaseRule):
 
             # Build Domain observable with relationships
             domain_obs = (
-                cy.observable(ObservableType.DOMAIN_NAME, domain)
+                cy.observable(cy.OBS.DOMAIN_NAME, domain)
                 .add_ti("VT", score)
                 .relate_to(
-                    cy.observable(ObservableType.FILE, "BODY/HTML").relate_to(
-                        cy.root(), RelationshipType.RELATED_TO, direction="inbound"
+                    cy.observable(cy.OBS.FILE, "BODY/HTML").relate_to(
+                        cy.root(), cy.REL.RELATED_TO, direction=cy.DIR.INBOUND
                     ),
-                    RelationshipType.RELATED_TO,
-                    direction="inbound",
+                    cy.REL.RELATED_TO,
+                    direction=cy.DIR.INBOUND,
                 )
             )
 
@@ -373,11 +372,11 @@ class AttachmentTask(BaseRule):
 
             # Build file observable with hash observables
             file_obs = (
-                cy.observable(ObservableType.FILE, filename)
-                .relate_to(cy.root(), RelationshipType.RELATED_TO, direction="inbound")
+                cy.observable(cy.OBS.FILE, filename)
+                .relate_to(cy.root(), cy.REL.RELATED_TO, direction=cy.DIR.INBOUND)
                 .relate_to(
-                    cy.observable(ObservableType.FILE, f"MD5:{md5_hash}").add_ti("VT", score, "MD5 hash analysis"),
-                    RelationshipType.RELATED_TO,
+                    cy.observable(cy.OBS.FILE, f"MD5:{md5_hash}").add_ti("VT", score, "MD5 hash analysis"),
+                    cy.REL.RELATED_TO,
                 )
             )
 
@@ -429,28 +428,15 @@ class AggregatedRiskTask(BaseRule):
         receiver_check = self.shared_context.check_get("receiver", "header")
 
         # Access observables from other tasks using parameter-based API
-        sender_email = self.shared_context.observable_get(ObservableType.EMAIL_ADDR, "noreply@domainmalicious.com")
-        malicious_domain = self.shared_context.observable_get(ObservableType.DOMAIN_NAME, "domainmalicious.com")
+        sender_email = self.shared_context.observable_get(Cyvest.OBS.EMAIL_ADDR, "noreply@domainmalicious.com")
+        malicious_domain = self.shared_context.observable_get(Cyvest.OBS.DOMAIN_NAME, "domainmalicious.com")
 
-        # Find all URL checks (created by BodiesUrlTask)
-        # Note: SharedInvestigationContext no longer exposes check listing APIs.
-        # Prefer explicit aggregation based on known check IDs/scopes.
-        url_checks = []
-        attachment_checks = []
+        url_checks = self.shared_context.observables_list_by_type(Cyvest.OBS.URL)
+        attachment_checks = self.shared_context.observables_list_by_type(Cyvest.OBS.FILE)
 
         # Calculate composite risk score
         risk_score = Decimal("0")
         risk_indicators = []
-
-        # Factor 1: Sender reputation (high weight)
-        if sender_email and sender_email.score >= 5:
-            risk_score += sender_email.score * Decimal("0.4")  # 40% weight
-            risk_indicators.append(f"Malicious sender: {sender_email.value} (score: {sender_email.score})")
-
-        # Factor 2: Domain reputation (medium weight)
-        if malicious_domain and malicious_domain.score >= 3:
-            risk_score += malicious_domain.score * Decimal("0.3")  # 30% weight
-            risk_indicators.append(f"Suspicious domain: {malicious_domain.value} (score: {malicious_domain.score})")
 
         # Factor 3: URL threats (medium weight)
         if url_checks:
@@ -504,7 +490,7 @@ class AI(BaseRule):
 
     def run(self, cy: Cyvest) -> None:
         """Calculate aggregated risk score based on all previous checks."""
-        cy.check("ai", "full", "ai", score=0, level=Level.MALICIOUS)
+        cy.check("ai", "full", "ai", score=0, level=cy.LVL.MALICIOUS)
 
 
 # ============================================================================
@@ -563,16 +549,17 @@ def main(workers, browser, stats, output):
     cy = executor.run(tasks, email_data)
 
     # Finalize relationships
-    cy.observable_finalize_relationships()
+    cy.finalize_relationships()
     cy._investigation._score_engine.recalculate_all()
 
-    c = cy._investigation.get_check("email_risk_aggregated", "full")
-    logger.info(c.comment)
+    c = cy.check_get("email_risk_aggregated", "full")
+    if c is not None:
+        logger.info(c.comment)
 
     # Display results
     logger.info("Investigation complete - displaying summary - score should be 36.1")
 
-    cy.display_summary(show_score_history=True)
+    cy.display_summary()
     if stats:
         cy.display_statistics()
     cy.display_network(open_browser=browser)

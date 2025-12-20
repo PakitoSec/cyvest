@@ -20,6 +20,7 @@ from pydantic import BaseModel, ConfigDict, Field, computed_field, field_seriali
 
 from cyvest.levels import Level
 from cyvest.model import (
+    AuditEvent,
     Check,
     Container,
     Enrichment,
@@ -103,6 +104,10 @@ class InvestigationSchema(BaseModel):
     )
 
     investigation_id: str = Field(..., description="Stable investigation identity (ULID).")
+    investigation_name: str | None = Field(
+        default=None,
+        description="Optional human-readable investigation name.",
+    )
     started_at: datetime = Field(..., description="Investigation start time (UTC).")
     score: Decimal = Field(..., description="Global investigation score.")
     level: Level = Field(
@@ -113,6 +118,10 @@ class InvestigationSchema(BaseModel):
     whitelists: list[InvestigationWhitelist] = Field(
         ...,
         description="List of whitelist entries applied to this investigation.",
+    )
+    event_log: list[AuditEvent] = Field(
+        default_factory=list,
+        description="Append-only investigation audit log.",
     )
     observables: dict[str, Observable] = Field(
         ...,
@@ -160,6 +169,7 @@ class InvestigationSchema(BaseModel):
 
         v.setdefault("level", Level.NONE)
         v.setdefault("whitelists", [])
+        v.setdefault("event_log", [])
         v.setdefault("observables", {})
         v.setdefault("checks", {})
         v.setdefault("checks_by_level", {})
@@ -177,6 +187,7 @@ __all__ = [
     "StatsChecksSchema",
     "DataExtractionSchema",
     # Re-export from model.py for convenience
+    "AuditEvent",
     "Observable",
     "Check",
     "ThreatIntel",

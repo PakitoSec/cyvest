@@ -111,8 +111,9 @@ def test_proxy_dir_exposes_public_fields() -> None:
             "extra",
             "score",
             "level",
-            "_generated_by_checks",
-            "generated_by_checks",
+            "origin_investigation_id",
+            "source_investigation_ids",
+            "check_links",
             "key",
         },
         check: {
@@ -128,7 +129,15 @@ def test_proxy_dir_exposes_public_fields() -> None:
             "observable_links",
             "key",
         },
-        container: {"path", "description", "checks", "sub_containers", "key"},
+        container: {
+            "path",
+            "description",
+            "checks",
+            "sub_containers",
+            "origin_investigation_id",
+            "source_investigation_ids",
+            "key",
+        },
         ti: {
             "source",
             "observable_key",
@@ -136,10 +145,12 @@ def test_proxy_dir_exposes_public_fields() -> None:
             "extra",
             "score",
             "level",
+            "origin_investigation_id",
+            "source_investigation_ids",
             "taxonomies",
             "key",
         },
-        enrichment: {"name", "data", "context", "key"},
+        enrichment: {"name", "data", "context", "origin_investigation_id", "source_investigation_ids", "key"},
     }
 
     for proxy, fields in expectations.items():
@@ -188,7 +199,7 @@ def test_proxy_public_fields_are_deep_copied() -> None:
     data_copy["host"]["ip"] = "10.0.0.2"
     assert enrichment.data["host"]["ip"] == "10.0.0.1"
 
-    generated_copy = obs.generated_by_checks
-    assert check.key in generated_copy
-    generated_copy.append("another-check")
-    assert obs.generated_by_checks == [check.key]
+    linked_copy = obs.check_links
+    assert check.key in linked_copy
+    linked_copy.append("another-check")
+    assert obs.check_links == [check.key]

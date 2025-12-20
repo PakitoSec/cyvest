@@ -35,7 +35,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 from enum import Enum
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Literal, Protocol
 
 from cyvest.levels import Level, get_level_from_score
 from cyvest.model_enums import PropagationMode, RelationshipDirection
@@ -71,6 +71,29 @@ if TYPE_CHECKING:
     from cyvest.model import Check, Observable, ThreatIntel
 
 
+class ScoreChangeSink(Protocol):
+    """Interface for applying score/level changes with optional side effects."""
+
+    def apply_score_change(
+        self,
+        obj: object,
+        new_score: Decimal,
+        *,
+        reason: str,
+        event_type: str = "SCORE_CHANGED",
+        contributing_investigation_ids: set[str] | None = None,
+    ) -> bool: ...
+
+    def apply_level_change(
+        self,
+        obj: object,
+        level: Level | str,
+        *,
+        reason: str,
+        event_type: str = "LEVEL_UPDATED",
+    ) -> bool: ...
+
+
 class ScoreEngine:
     """
     Engine for managing score calculation and propagation.
@@ -103,16 +126,23 @@ class ScoreEngine:
        - Ensures checks linked to root receive updated scores
     """
 
-    def __init__(self, score_mode: ScoreMode | Literal["max", "sum"] = ScoreMode.MAX) -> None:
+    def __init__(
+        self,
+        score_mode: ScoreMode | Literal["max", "sum"] = ScoreMode.MAX,
+        *,
+        sink: ScoreChangeSink,
+    ) -> None:
         """Initialize the score engine.
 
         Args:
             score_mode: Score calculation mode (MAX or SUM)
+            sink: Sink used to apply score/level changes
         """
         self._observables: dict[str, Observable] = {}
         self._checks: dict[str, Check] = {}
         self._check_keys_by_observable_key: dict[str, set[str]] = {}
         self._score_mode = ScoreMode.normalize(score_mode)
+        self._sink = sink
 
     def register_observable(self, observable: Observable) -> None:
         """
@@ -145,6 +175,10 @@ class ScoreEngine:
         """Register a newly created check↔observable link in the propagation index."""
         self._check_keys_by_observable_key.setdefault(observable_key, set()).add(check_key)
 
+    def get_check_links_for_observable(self, observable_key: str) -> list[str]:
+        """Return sorted check keys that currently link to the observable."""
+        return sorted(self._check_keys_by_observable_key.get(observable_key, set()))
+
     def propagate_threat_intel_to_observable(self, ti: ThreatIntel, observable: Observable) -> None:
         """
         Propagate threat intel score to its observable.
@@ -156,13 +190,21 @@ class ScoreEngine:
         # Special handling for SAFE level threat intel
         # If TI has SAFE level and observable level is lower, upgrade observable to SAFE
         if ti.level == Level.SAFE and observable.level < Level.SAFE:
-            observable.set_level(Level.SAFE)
+            self._sink.apply_level_change(
+                observable,
+                Level.SAFE,
+                reason=f"Threat intel update from {ti.source}",
+            )
 
         # Calculate the new observable score (includes TI scores and child scores)
         new_score = self._calculate_observable_score(observable)
 
         if new_score != observable.score:
-            observable.update_score(new_score, reason=f"Threat intel update from {ti.source}")
+            self._sink.apply_score_change(
+                observable,
+                new_score,
+                reason=f"Threat intel update from {ti.source}",
+            )
 
             # Root observable barrier: stop upward propagation at root level
             # Root does NOT propagate to parent observables, but DOES propagate to checks
@@ -306,7 +348,11 @@ class ScoreEngine:
             new_parent_score = self._calculate_observable_score(parent_obs)
 
             if new_parent_score != parent_obs.score:
-                parent_obs.update_score(new_parent_score, reason=f"Child observable {observable.key} updated")
+                self._sink.apply_score_change(
+                    parent_obs,
+                    new_parent_score,
+                    reason=f"Child observable {observable.key} updated",
+                )
                 # Propagate to checks even for root; root barrier only stops upward flow
                 self._propagate_observable_to_checks(parent_obs.key)
 
@@ -366,11 +412,19 @@ class ScoreEngine:
 
             new_score = max(check.score, max_obs_score)
             if new_score != check.score:
-                check.update_score(new_score, reason=f"Linked observable {observable_key} updated")
+                self._sink.apply_score_change(
+                    check,
+                    new_score,
+                    reason=f"Linked observable {observable_key} updated",
+                )
 
             new_level = max(check.level, max_obs_level)
             if new_level != check.level:
-                check.set_level(new_level)
+                self._sink.apply_level_change(
+                    check,
+                    new_level,
+                    reason=f"Linked observable {observable_key} updated",
+                )
 
     def recalculate_all(self) -> None:
         """
@@ -382,7 +436,12 @@ class ScoreEngine:
         for obs in self._observables.values():
             new_score = self._calculate_observable_score(obs)
             if new_score != obs.score:
-                obs.update_score(new_score, reason="Recalculation", record_history=False)
+                self._sink.apply_score_change(
+                    obs,
+                    new_score,
+                    reason="Recalculation",
+                    event_type="SCORE_RECALCULATED",
+                )
 
         # Then propagate to all checks (not just MALICIOUS observables)
         for obs in self._observables.values():

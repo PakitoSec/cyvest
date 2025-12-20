@@ -25,7 +25,7 @@ from decimal import Decimal
 
 import pytest
 
-from cyvest import Cyvest, ObservableType, RelationshipType
+from cyvest import Cyvest, ObservableType, RelationshipType, keys
 from cyvest.investigation import Investigation
 from cyvest.shared import SharedInvestigationContext
 
@@ -479,46 +479,38 @@ def test_existence_checks_via_getters():
     assert shared.check_get("email_reputation", "header") is None
 
 
-def test_investigation_get_observable_with_parameters():
-    """Test Investigation.get_observable using parameters for API consistency."""
-    inv = Investigation({"test": "data"}, root_type="artifact")
+def test_cyvest_get_observable_with_parameters():
+    """Test Cyvest.observable_get using parameters for API consistency."""
     cy = Cyvest({"test": "data"}, root_type="artifact")
-    cy.observable(ObservableType.IPV4_ADDR, "10.0.0.1")
-
-    # Merge into investigation
-    inv.merge_investigation(cy._investigation)
+    obs_proxy = cy.observable(ObservableType.IPV4_ADDR, "10.0.0.1")
 
     # Test parameter-based lookup with string type
-    obs = inv.get_observable("ipv4-addr", "10.0.0.1")
+    obs = cy.observable_get("ipv4-addr", "10.0.0.1")
     assert obs is not None
     assert obs.value == "10.0.0.1"
 
     # Test parameter-based lookup with ObservableType enum
-    obs_enum = inv.get_observable(ObservableType.IPV4_ADDR, "10.0.0.1")
+    obs_enum = cy.observable_get(ObservableType.IPV4_ADDR, "10.0.0.1")
     assert obs_enum is not None
     assert obs_enum.value == "10.0.0.1"
 
     # Test key-based lookup (backward compatibility)
-    obs_key = inv.get_observable("obs:ipv4-addr:10.0.0.1")
+    obs_key = cy.observable_get(obs_proxy.key)
     assert obs_key is not None
 
 
-def test_investigation_get_check_with_parameters():
-    """Test Investigation.get_check using parameters for API consistency."""
-    inv = Investigation({"test": "data"}, root_type="artifact")
+def test_cyvest_get_check_with_parameters():
+    """Test Cyvest.check_get using parameters for API consistency."""
     cy = Cyvest({"test": "data"}, root_type="artifact")
-    cy.check("dns_lookup", "network", "DNS reputation check")
-
-    # Merge into investigation
-    inv.merge_investigation(cy._investigation)
+    check_proxy = cy.check("dns_lookup", "network", "DNS reputation check")
 
     # Test parameter-based lookup
-    check = inv.get_check("dns_lookup", "network")
+    check = cy.check_get("dns_lookup", "network")
     assert check is not None
     assert check.check_id == "dns_lookup"
 
     # Test key-based lookup (backward compatibility)
-    check_key = inv.get_check("chk:dns_lookup:network")
+    check_key = cy.check_get(check_proxy.key)
     assert check_key is not None
 
 
@@ -653,7 +645,8 @@ def test_prevent_relationship_with_shared_copy():
         # Should succeed without error
 
     # Verify the correct pattern created the relationship
-    url = inv.get_observable(ObservableType.URL, "https://evil.com/payload")
+    url_key = keys.generate_observable_key(ObservableType.URL.value, "https://evil.com/payload")
+    url = inv.get_observable(url_key)
     assert url is not None
     assert len(url.relationships) > 0
     assert any(rel.target_key.endswith("malicious.com") for rel in url.relationships)
@@ -677,7 +670,8 @@ def test_copied_observable_has_marker():
     assert copy._from_shared_context is True
 
     # Get from investigation directly should not be marked
-    direct = inv.get_observable(ObservableType.DOMAIN_NAME, "example.com")
+    direct_key = keys.generate_observable_key(ObservableType.DOMAIN_NAME.value, "example.com")
+    direct = inv.get_observable(direct_key)
     assert direct is not None
     assert direct._from_shared_context is False
 

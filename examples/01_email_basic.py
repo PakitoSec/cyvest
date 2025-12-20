@@ -10,7 +10,7 @@ from pathlib import Path
 
 from logurich import logger
 
-from cyvest import Cyvest, Level
+from cyvest import Cyvest
 
 logger.enable("cyvest")
 
@@ -20,25 +20,25 @@ def main() -> None:
     # Create investigation
     with Cyvest(data={"type": "email", "subject": "Urgent: Verify Your Account"}) as cv:
         # Create email-related observables using the fluent proxy interface
-        sender_email = cv.observable("email", "suspicious@phishing-domain.com", internal=False).with_ti(
+        sender_email = cv.observable(cv.OBS.EMAIL_ADDR, "suspicious@phishing-domain.com", internal=False).with_ti(
             "internal_db", score=Decimal("0"), comment="Unknown sender"
         )
 
         # Create URL observables
         phishing_url = (
-            cv.observable("url", "https://fake-bank-login.com/verify", internal=False)
-            .with_ti("virustotal", score=Decimal("8.5"), level=Level.MALICIOUS, comment="Known phishing URL")
-            .with_ti("urlscan", score=Decimal("7.0"), level=Level.MALICIOUS, comment="Malicious content detected")
-            .relate_to(cv.root(), "related-to")
+            cv.observable(cv.OBS.URL, "https://fake-bank-login.com/verify", internal=False)
+            .with_ti("virustotal", score=Decimal("8.5"), level=cv.LVL.MALICIOUS, comment="Known phishing URL")
+            .with_ti("urlscan", score=Decimal("7.0"), level=cv.LVL.MALICIOUS, comment="Malicious content detected")
+            .relate_to(cv.root(), cv.REL.RELATED_TO)
         )
 
         # Create domain observable
-        domain = cv.observable("domain", "fake-bank-login.com", internal=False).with_ti(
+        domain = cv.observable(cv.OBS.DOMAIN_NAME, "fake-bank-login.com", internal=False).with_ti(
             "dns_lookup", score=Decimal("0"), comment="Recently registered domain (2 days old)"
         )
 
         # Link URL to domain
-        cv.observable_add_relationship(phishing_url.key, domain.key, "uses")
+        cv.observable_add_relationship(phishing_url.key, domain.key, cv.REL.RELATED_TO)
 
         # Create checks
         sender_check = cv.check_create(
@@ -80,7 +80,7 @@ def main() -> None:
         )
 
         # Finalize relationships (link orphan observables to root)
-        cv.observable_finalize_relationships()
+        cv.finalize_relationships()
         cv.display_summary(show_graph=True)
 
         # Export to files in a temp directory for easy cleanup

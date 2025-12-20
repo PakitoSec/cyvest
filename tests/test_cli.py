@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner
 
-from cyvest import Cyvest, Level, ObservableType
+from cyvest import Cyvest
 
 cli = pytest.importorskip("cyvest.cli").cli
 
@@ -25,8 +25,8 @@ def _write_sample(tmp_path: Path) -> Path:
     from decimal import Decimal
 
     cv = Cyvest()
-    observable = cv.observable(ObservableType.URL, "https://example.com", internal=False).with_ti(
-        "virustotal", score=Decimal("6.0"), level=Level.MALICIOUS
+    observable = cv.observable(Cyvest.OBS.URL, "https://example.com", internal=False).with_ti(
+        "virustotal", score=Decimal("6.0"), level=Cyvest.LVL.MALICIOUS
     )
     cv.check("url_check", "network", "Validate URL").link_observable(observable).with_score(Decimal("6.0"))
 
@@ -105,9 +105,9 @@ def test_display_summary_exclude_levels() -> None:
     # Create observables and checks at different levels
     # Score ranges: MALICIOUS >= 5.0, SUSPICIOUS 3.0-5.0, NOTABLE < 3.0, INFO = 0.0
     # Note: Checks with observables are now automatically upgraded from NONE to INFO
-    obs_malicious = cv.observable(ObservableType.URL, "https://malicious.com", internal=False)
-    obs_suspicious = cv.observable(ObservableType.URL, "https://suspicious.com", internal=False)
-    obs_info = cv.observable(ObservableType.URL, "https://info.com", internal=False)
+    obs_malicious = cv.observable(Cyvest.OBS.URL, "https://malicious.com", internal=False)
+    obs_suspicious = cv.observable(Cyvest.OBS.URL, "https://suspicious.com", internal=False)
+    obs_info = cv.observable(Cyvest.OBS.URL, "https://info.com", internal=False)
 
     cv.check("malicious_check", "network", "Malicious URL").link_observable(obs_malicious).with_score(
         Decimal("6.0")
@@ -116,10 +116,10 @@ def test_display_summary_exclude_levels() -> None:
         Decimal("4.0")
     )  # SUSPICIOUS
     cv.check("info_check", "network", "Info URL").link_observable(obs_info).with_score(Decimal("0.0"))  # INFO
-    # Create a check without observable (Level.NONE - no auto-upgrade without observable)
+    # Create a check without observable (Cyvest.LVL.NONE - no auto-upgrade without observable)
     cv.check("none_check", "network", "None check without observable")
 
-    # Default excludes Level.NONE
+    # Default excludes Cyvest.LVL.NONE
     output = StringIO()
     console = Console(file=output, width=120)
     display_summary(cv, console.print, show_graph=False)
@@ -134,7 +134,7 @@ def test_display_summary_exclude_levels() -> None:
     # Exclude INFO and SUSPICIOUS along with NONE
     output = StringIO()
     console = Console(file=output, width=120)
-    display_summary(cv, console.print, show_graph=False, exclude_levels=[Level.INFO, Level.SUSPICIOUS])
+    display_summary(cv, console.print, show_graph=False, exclude_levels=[Cyvest.LVL.INFO, Cyvest.LVL.SUSPICIOUS])
     output_excluding_info = output.getvalue()
 
     assert "malicious_check" in output_excluding_info
@@ -164,8 +164,8 @@ def test_display_summary_audit_log_table() -> None:
     from cyvest.io_rich import display_summary
 
     cv = Cyvest()
-    obs = cv.observable(ObservableType.URL, "https://example.com", internal=False)
-    obs.with_ti("virustotal", score=Decimal("6.0"), level=Level.MALICIOUS)
+    obs = cv.observable(Cyvest.OBS.URL, "https://example.com", internal=False)
+    obs.with_ti("virustotal", score=Decimal("6.0"), level=Cyvest.LVL.MALICIOUS)
     cv.check("score-check", "test", "Score check").with_score(Decimal("1.0"), reason="initial").with_score(
         Decimal("2.0"), reason="bump"
     )

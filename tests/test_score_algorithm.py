@@ -7,17 +7,17 @@ and audit log access.
 
 from decimal import Decimal
 
-from cyvest import Cyvest, Level, ObservableType
+from cyvest import Cyvest
 from cyvest.score import ScoreMode
 
 
 def test_observable_starts_with_zero_score_info_level() -> None:
     """Test that observables start with score 0 and level INFO."""
     cv = Cyvest()
-    obs = cv.observable_create(ObservableType.IPV4_ADDR, "192.168.1.1")
+    obs = cv.observable_create(Cyvest.OBS.IPV4_ADDR, "192.168.1.1")
 
     assert obs.score == Decimal("0")
-    assert obs.level == Level.INFO
+    assert obs.level == Cyvest.LVL.INFO
 
 
 def test_max_mode_threat_intel_scores() -> None:
@@ -25,14 +25,14 @@ def test_max_mode_threat_intel_scores() -> None:
     cv = Cyvest(score_mode=ScoreMode.MAX)
 
     # Create observable with multiple threat intel sources
-    obs = cv.observable_create(ObservableType.IPV4_ADDR, "10.0.0.1")
+    obs = cv.observable_create(Cyvest.OBS.IPV4_ADDR, "10.0.0.1")
     cv.observable_add_threat_intel(obs.key, source="source1", score=Decimal("3.0"))
     cv.observable_add_threat_intel(obs.key, source="source2", score=Decimal("7.0"))
     cv.observable_add_threat_intel(obs.key, source="source3", score=Decimal("2.0"))
 
     # In MAX mode, observable score should be max of TI scores = 7.0
     assert obs.score == Decimal("7.0")
-    assert obs.level == Level.MALICIOUS
+    assert obs.level == Cyvest.LVL.MALICIOUS
 
 
 def test_sum_mode_threat_intel_scores() -> None:
@@ -40,14 +40,14 @@ def test_sum_mode_threat_intel_scores() -> None:
     cv = Cyvest(score_mode=ScoreMode.SUM)
 
     # Create observable with multiple threat intel sources
-    obs = cv.observable_create(ObservableType.IPV4_ADDR, "10.0.0.1")
+    obs = cv.observable_create(Cyvest.OBS.IPV4_ADDR, "10.0.0.1")
     cv.observable_add_threat_intel(obs.key, source="source1", score=Decimal("3.0"))
     cv.observable_add_threat_intel(obs.key, source="source2", score=Decimal("7.0"))
     cv.observable_add_threat_intel(obs.key, source="source3", score=Decimal("2.0"))
 
     # In SUM mode with no children, score should be max of TI scores = 7.0
     assert obs.score == Decimal("7.0")
-    assert obs.level == Level.MALICIOUS
+    assert obs.level == Cyvest.LVL.MALICIOUS
 
 
 def test_max_mode_hierarchical_scoring() -> None:
@@ -55,11 +55,11 @@ def test_max_mode_hierarchical_scoring() -> None:
     cv = Cyvest(score_mode=ScoreMode.MAX)
 
     # Create domain with TI score 2.0
-    domain = cv.observable_create(ObservableType.DOMAIN_NAME, "example.com")
+    domain = cv.observable_create(Cyvest.OBS.DOMAIN_NAME, "example.com")
     cv.observable_add_threat_intel(domain.key, source="source1", score=Decimal("2.0"))
 
     # Create IP with TI score 8.0
-    ip = cv.observable_create(ObservableType.IPV4_ADDR, "1.2.3.4")
+    ip = cv.observable_create(Cyvest.OBS.IPV4_ADDR, "1.2.3.4")
     cv.observable_add_threat_intel(ip.key, source="source2", score=Decimal("8.0"))
 
     # Domain relates to IP (hierarchical via outbound direction)
@@ -67,7 +67,7 @@ def test_max_mode_hierarchical_scoring() -> None:
 
     # In MAX mode, domain score = max(domain TI=2.0, ip score=8.0) = 8.0
     assert domain.score == Decimal("8.0")
-    assert domain.level == Level.MALICIOUS
+    assert domain.level == Cyvest.LVL.MALICIOUS
 
 
 def test_sum_mode_hierarchical_scoring() -> None:
@@ -75,11 +75,11 @@ def test_sum_mode_hierarchical_scoring() -> None:
     cv = Cyvest(score_mode=ScoreMode.SUM)
 
     # Create domain with TI score 2.0
-    domain = cv.observable_create(ObservableType.DOMAIN_NAME, "example.com")
+    domain = cv.observable_create(Cyvest.OBS.DOMAIN_NAME, "example.com")
     cv.observable_add_threat_intel(domain.key, source="source1", score=Decimal("2.0"))
 
     # Create IP with TI score 8.0
-    ip = cv.observable_create(ObservableType.IPV4_ADDR, "1.2.3.4")
+    ip = cv.observable_create(Cyvest.OBS.IPV4_ADDR, "1.2.3.4")
     cv.observable_add_threat_intel(ip.key, source="source2", score=Decimal("8.0"))
 
     # Domain relates to IP (hierarchical via outbound direction)
@@ -87,7 +87,7 @@ def test_sum_mode_hierarchical_scoring() -> None:
 
     # In SUM mode, domain score = max(domain TI=2.0) + sum(child scores=8.0) = 10.0
     assert domain.score == Decimal("10.0")
-    assert domain.level == Level.MALICIOUS
+    assert domain.level == Cyvest.LVL.MALICIOUS
 
 
 def test_max_mode_multiple_children() -> None:
@@ -95,17 +95,17 @@ def test_max_mode_multiple_children() -> None:
     cv = Cyvest(score_mode=ScoreMode.MAX)
 
     # Create parent with TI score 1.0
-    parent = cv.observable_create(ObservableType.DOMAIN_NAME, "parent.com")
+    parent = cv.observable_create(Cyvest.OBS.DOMAIN_NAME, "parent.com")
     cv.observable_add_threat_intel(parent.key, source="source1", score=Decimal("1.0"))
 
     # Create children with different scores
-    child1 = cv.observable_create(ObservableType.IPV4_ADDR, "1.1.1.1")
+    child1 = cv.observable_create(Cyvest.OBS.IPV4_ADDR, "1.1.1.1")
     cv.observable_add_threat_intel(child1.key, source="source2", score=Decimal("3.0"))
 
-    child2 = cv.observable_create(ObservableType.IPV4_ADDR, "2.2.2.2")
+    child2 = cv.observable_create(Cyvest.OBS.IPV4_ADDR, "2.2.2.2")
     cv.observable_add_threat_intel(child2.key, source="source3", score=Decimal("6.0"))
 
-    child3 = cv.observable_create(ObservableType.IPV4_ADDR, "3.3.3.3")
+    child3 = cv.observable_create(Cyvest.OBS.IPV4_ADDR, "3.3.3.3")
     cv.observable_add_threat_intel(child3.key, source="source4", score=Decimal("2.0"))
 
     # Connect parent to children
@@ -115,7 +115,7 @@ def test_max_mode_multiple_children() -> None:
 
     # In MAX mode, parent score = max(1.0, 3.0, 6.0, 2.0) = 6.0
     assert parent.score == Decimal("6.0")
-    assert parent.level == Level.MALICIOUS
+    assert parent.level == Cyvest.LVL.MALICIOUS
 
 
 def test_sum_mode_multiple_children() -> None:
@@ -123,17 +123,17 @@ def test_sum_mode_multiple_children() -> None:
     cv = Cyvest(score_mode=ScoreMode.SUM)
 
     # Create parent with TI score 1.0
-    parent = cv.observable_create(ObservableType.DOMAIN_NAME, "parent.com")
+    parent = cv.observable_create(Cyvest.OBS.DOMAIN_NAME, "parent.com")
     cv.observable_add_threat_intel(parent.key, source="source1", score=Decimal("1.0"))
 
     # Create children with different scores
-    child1 = cv.observable_create(ObservableType.IPV4_ADDR, "1.1.1.1")
+    child1 = cv.observable_create(Cyvest.OBS.IPV4_ADDR, "1.1.1.1")
     cv.observable_add_threat_intel(child1.key, source="source2", score=Decimal("3.0"))
 
-    child2 = cv.observable_create(ObservableType.IPV4_ADDR, "2.2.2.2")
+    child2 = cv.observable_create(Cyvest.OBS.IPV4_ADDR, "2.2.2.2")
     cv.observable_add_threat_intel(child2.key, source="source3", score=Decimal("6.0"))
 
-    child3 = cv.observable_create(ObservableType.IPV4_ADDR, "3.3.3.3")
+    child3 = cv.observable_create(Cyvest.OBS.IPV4_ADDR, "3.3.3.3")
     cv.observable_add_threat_intel(child3.key, source="source4", score=Decimal("2.0"))
 
     # Connect parent to children
@@ -143,7 +143,7 @@ def test_sum_mode_multiple_children() -> None:
 
     # In SUM mode, parent score = max(parent TI=1.0) + sum(children=3.0+6.0+2.0) = 1.0 + 11.0 = 12.0
     assert parent.score == Decimal("12.0")
-    assert parent.level == Level.MALICIOUS
+    assert parent.level == Cyvest.LVL.MALICIOUS
 
 
 def test_check_score_from_single_observable() -> None:
@@ -153,10 +153,10 @@ def test_check_score_from_single_observable() -> None:
     # Create check with initial score 0
     check = cv.check_create("check1", "test", "Test check")
     assert check.score == Decimal("0")
-    assert check.level == Level.NONE
+    assert check.level == Cyvest.LVL.NONE
 
     # Create observable and add TI
-    obs = cv.observable_create(ObservableType.IPV4_ADDR, "10.0.0.1")
+    obs = cv.observable_create(Cyvest.OBS.IPV4_ADDR, "10.0.0.1")
     cv.observable_add_threat_intel(obs.key, source="source1", score=Decimal("5.0"))
 
     # Link observable to check
@@ -165,7 +165,7 @@ def test_check_score_from_single_observable() -> None:
     # Check score should be max of linked observable scores and check's current score
     # max([5.0, 0.0]) = 5.0
     assert check.score == Decimal("5.0")
-    assert check.level == Level.MALICIOUS
+    assert check.level == Cyvest.LVL.MALICIOUS
 
 
 def test_check_score_from_multiple_observables() -> None:
@@ -176,13 +176,13 @@ def test_check_score_from_multiple_observables() -> None:
     check = cv.check_create("check1", "test", "Test check")
 
     # Create multiple observables with different scores
-    obs1 = cv.observable_create(ObservableType.IPV4_ADDR, "10.0.0.1")
+    obs1 = cv.observable_create(Cyvest.OBS.IPV4_ADDR, "10.0.0.1")
     cv.observable_add_threat_intel(obs1.key, source="source1", score=Decimal("3.0"))
 
-    obs2 = cv.observable_create(ObservableType.IPV4_ADDR, "10.0.0.2")
+    obs2 = cv.observable_create(Cyvest.OBS.IPV4_ADDR, "10.0.0.2")
     cv.observable_add_threat_intel(obs2.key, source="source2", score=Decimal("7.0"))
 
-    obs3 = cv.observable_create(ObservableType.IPV4_ADDR, "10.0.0.3")
+    obs3 = cv.observable_create(Cyvest.OBS.IPV4_ADDR, "10.0.0.3")
     cv.observable_add_threat_intel(obs3.key, source="source3", score=Decimal("2.0"))
 
     # Link all observables to check
@@ -193,7 +193,7 @@ def test_check_score_from_multiple_observables() -> None:
     # Check score should be max of all linked observable scores
     # max([3.0, 7.0, 2.0, 0.0]) = 7.0
     assert check.score == Decimal("7.0")
-    assert check.level == Level.MALICIOUS
+    assert check.level == Cyvest.LVL.MALICIOUS
 
 
 def test_check_score_preserves_higher_current_score() -> None:
@@ -205,7 +205,7 @@ def test_check_score_preserves_higher_current_score() -> None:
     assert check.score == Decimal("5.0")
 
     # Create observable with lower score
-    obs = cv.observable_create(ObservableType.IPV4_ADDR, "10.0.0.1")
+    obs = cv.observable_create(Cyvest.OBS.IPV4_ADDR, "10.0.0.1")
     cv.observable_add_threat_intel(obs.key, source="source1", score=Decimal("3.0"))
 
     # Link observable to check
@@ -215,13 +215,13 @@ def test_check_score_preserves_higher_current_score() -> None:
     assert check.score == Decimal("5.0")
 
     # Now add a higher scoring observable
-    obs2 = cv.observable_create(ObservableType.IPV4_ADDR, "10.0.0.2")
+    obs2 = cv.observable_create(Cyvest.OBS.IPV4_ADDR, "10.0.0.2")
     cv.observable_add_threat_intel(obs2.key, source="source2", score=Decimal("8.0"))
     cv.check_link_observable(check.key, obs2.key)
 
     # Check score should now be max([3.0, 8.0, 5.0]) = 8.0
     assert check.score == Decimal("8.0")
-    assert check.level == Level.MALICIOUS
+    assert check.level == Cyvest.LVL.MALICIOUS
 
 
 def test_observable_score_audit_events() -> None:
@@ -229,7 +229,7 @@ def test_observable_score_audit_events() -> None:
     cv = Cyvest()
 
     # Create observable
-    obs = cv.observable_create(ObservableType.IPV4_ADDR, "10.0.0.1")
+    obs = cv.observable_create(Cyvest.OBS.IPV4_ADDR, "10.0.0.1")
 
     # Initial audit log should have no score events for this observable.
     events = [
@@ -251,8 +251,8 @@ def test_observable_score_audit_events() -> None:
     assert len(events) == 1
     assert events[0].details["old_score"] == 0.0
     assert events[0].details["new_score"] == 5.0
-    assert events[0].details["old_level"] == Level.INFO.value
-    assert events[0].details["new_level"] == Level.MALICIOUS.value
+    assert events[0].details["old_level"] == Cyvest.LVL.INFO.value
+    assert events[0].details["new_level"] == Cyvest.LVL.MALICIOUS.value
     assert "source1" in (events[0].reason or "")
 
     # Add another threat intel
@@ -285,7 +285,7 @@ def test_check_score_audit_events() -> None:
     assert len(events) == 0
 
     # Create observable and link to check
-    obs = cv.observable_create(ObservableType.IPV4_ADDR, "10.0.0.1")
+    obs = cv.observable_create(Cyvest.OBS.IPV4_ADDR, "10.0.0.1")
     cv.observable_add_threat_intel(obs.key, source="source1", score=Decimal("5.0"))
     cv.check_link_observable(check.key, obs.key)
 
@@ -307,7 +307,7 @@ def test_local_only_link_does_not_affect_foreign_check() -> None:
     foreign_check = cv_other.check_create("foreign", "scope", "Created in other investigation")
     cv_main.merge_investigation(cv_other)
 
-    obs = cv_main.observable_create(ObservableType.IPV4_ADDR, "10.0.0.50")
+    obs = cv_main.observable_create(Cyvest.OBS.IPV4_ADDR, "10.0.0.50")
     cv_main.observable_add_threat_intel(obs.key, source="source1", score=Decimal("9.0"))
 
     # Link is created in cv_main's investigation context, so it is not effective for a foreign check.
@@ -316,7 +316,7 @@ def test_local_only_link_does_not_affect_foreign_check() -> None:
     loaded_foreign = cv_main.check_get(foreign_check.key)
     assert loaded_foreign is not None
     assert loaded_foreign.score == Decimal("0")
-    assert loaded_foreign.level == Level.NONE
+    assert loaded_foreign.level == Cyvest.LVL.NONE
 
 
 def test_global_link_can_affect_foreign_check() -> None:
@@ -327,7 +327,7 @@ def test_global_link_can_affect_foreign_check() -> None:
     foreign_check = cv_other.check_create("foreign", "scope", "Created in other investigation")
     cv_main.merge_investigation(cv_other)
 
-    obs = cv_main.observable_create(ObservableType.IPV4_ADDR, "10.0.0.52")
+    obs = cv_main.observable_create(Cyvest.OBS.IPV4_ADDR, "10.0.0.52")
     cv_main.observable_add_threat_intel(obs.key, source="source1", score=Decimal("9.0"))
 
     cv_main.check_link_observable(foreign_check.key, obs.key, propagation_mode="GLOBAL")
@@ -335,7 +335,7 @@ def test_global_link_can_affect_foreign_check() -> None:
     loaded_foreign = cv_main.check_get(foreign_check.key)
     assert loaded_foreign is not None
     assert loaded_foreign.score == Decimal("9.0")
-    assert loaded_foreign.level == Level.MALICIOUS
+    assert loaded_foreign.level == Cyvest.LVL.MALICIOUS
 
 
 def test_check_reconciliation_preserves_origin_and_links() -> None:
@@ -345,12 +345,12 @@ def test_check_reconciliation_preserves_origin_and_links() -> None:
 
     cv1_id = cv1._investigation.investigation_id
 
-    obs1 = cv1.observable_create(ObservableType.IPV4_ADDR, "10.0.0.60")
+    obs1 = cv1.observable_create(Cyvest.OBS.IPV4_ADDR, "10.0.0.60")
     cv1.observable_add_threat_intel(obs1.key, source="s1", score=Decimal("4.0"))
     check1 = cv1.check_create("recon", "scope", "Same semantic check")
     cv1.check_link_observable(check1.key, obs1.key)
 
-    obs2 = cv2.observable_create(ObservableType.IPV4_ADDR, "10.0.0.61")
+    obs2 = cv2.observable_create(Cyvest.OBS.IPV4_ADDR, "10.0.0.61")
     cv2.observable_add_threat_intel(obs2.key, source="s2", score=Decimal("9.0"))
     check2 = cv2.check_create("recon", "scope", "Same semantic check")
     cv2.check_link_observable(check2.key, obs2.key)
@@ -366,7 +366,7 @@ def test_check_reconciliation_preserves_origin_and_links() -> None:
 
     # Both links are effective after reconciliation, so the check takes the max score.
     assert merged.score == Decimal("9.0")
-    assert merged.level == Level.MALICIOUS
+    assert merged.level == Cyvest.LVL.MALICIOUS
 
 
 def test_foreign_check_global_updates_local_only_freezes_after_merge() -> None:
@@ -377,30 +377,30 @@ def test_foreign_check_global_updates_local_only_freezes_after_merge() -> None:
     foreign_check = cv_other.check_create("foreign", "scope", "Created in other investigation")
     cv_main.merge_investigation(cv_other)
 
-    obs_local = cv_main.observable_create(ObservableType.IPV4_ADDR, "10.0.0.51")
+    obs_local = cv_main.observable_create(Cyvest.OBS.IPV4_ADDR, "10.0.0.51")
     cv_main.observable_add_threat_intel(obs_local.key, source="source1", score=Decimal("2.0"))
     cv_main.check_link_observable(foreign_check.key, obs_local.key)
 
-    obs_global = cv_main.observable_create(ObservableType.IPV4_ADDR, "10.0.0.52")
+    obs_global = cv_main.observable_create(Cyvest.OBS.IPV4_ADDR, "10.0.0.52")
     cv_main.observable_add_threat_intel(obs_global.key, source="source1", score=Decimal("4.0"))
     cv_main.check_link_observable(foreign_check.key, obs_global.key, propagation_mode="GLOBAL")
 
     merged_check = cv_main.check_get(foreign_check.key)
     assert merged_check is not None
     assert merged_check.score == Decimal("4.0")
-    assert merged_check.level == Level.SUSPICIOUS
+    assert merged_check.level == Cyvest.LVL.SUSPICIOUS
 
     cv_later = Cyvest()
-    obs_local_later = cv_later.observable_create(ObservableType.IPV4_ADDR, "10.0.0.51")
+    obs_local_later = cv_later.observable_create(Cyvest.OBS.IPV4_ADDR, "10.0.0.51")
     cv_later.observable_add_threat_intel(obs_local_later.key, source="source2", score=Decimal("8.0"))
-    obs_global_later = cv_later.observable_create(ObservableType.IPV4_ADDR, "10.0.0.52")
+    obs_global_later = cv_later.observable_create(Cyvest.OBS.IPV4_ADDR, "10.0.0.52")
     cv_later.observable_add_threat_intel(obs_global_later.key, source="source2", score=Decimal("6.0"))
     cv_main.merge_investigation(cv_later)
 
     merged_check = cv_main.check_get(foreign_check.key)
     assert merged_check is not None
     assert merged_check.score == Decimal("6.0")
-    assert merged_check.level == Level.MALICIOUS
+    assert merged_check.level == Cyvest.LVL.MALICIOUS
 
 
 def test_score_propagation_through_hierarchy() -> None:
@@ -408,13 +408,13 @@ def test_score_propagation_through_hierarchy() -> None:
     cv = Cyvest(score_mode=ScoreMode.MAX)
 
     # Create 3-level hierarchy: grandparent -> parent -> child
-    grandparent = cv.observable_create(ObservableType.DOMAIN_NAME, "grandparent.com")
+    grandparent = cv.observable_create(Cyvest.OBS.DOMAIN_NAME, "grandparent.com")
     cv.observable_add_threat_intel(grandparent.key, source="source1", score=Decimal("1.0"))
 
-    parent = cv.observable_create(ObservableType.DOMAIN_NAME, "parent.com")
+    parent = cv.observable_create(Cyvest.OBS.DOMAIN_NAME, "parent.com")
     cv.observable_add_threat_intel(parent.key, source="source2", score=Decimal("2.0"))
 
-    child = cv.observable_create(ObservableType.IPV4_ADDR, "1.2.3.4")
+    child = cv.observable_create(Cyvest.OBS.IPV4_ADDR, "1.2.3.4")
     cv.observable_add_threat_intel(child.key, source="source3", score=Decimal("9.0"))
 
     # Connect hierarchy
@@ -428,7 +428,7 @@ def test_score_propagation_through_hierarchy() -> None:
     assert child.score == Decimal("9.0")
     assert parent.score == Decimal("9.0")
     assert grandparent.score == Decimal("9.0")
-    assert grandparent.level == Level.MALICIOUS
+    assert grandparent.level == Cyvest.LVL.MALICIOUS
 
 
 def test_score_propagation_updates_parent() -> None:
@@ -436,10 +436,10 @@ def test_score_propagation_updates_parent() -> None:
     cv = Cyvest(score_mode=ScoreMode.MAX)
 
     # Create parent and child
-    parent = cv.observable_create(ObservableType.DOMAIN_NAME, "parent.com")
+    parent = cv.observable_create(Cyvest.OBS.DOMAIN_NAME, "parent.com")
     cv.observable_add_threat_intel(parent.key, source="source1", score=Decimal("1.0"))
 
-    child = cv.observable_create(ObservableType.IPV4_ADDR, "1.2.3.4")
+    child = cv.observable_create(Cyvest.OBS.IPV4_ADDR, "1.2.3.4")
     cv.observable_add_threat_intel(child.key, source="source2", score=Decimal("2.0"))
 
     # Connect them
@@ -454,47 +454,43 @@ def test_score_propagation_updates_parent() -> None:
     # Parent score should update to max(1.0, 8.0) = 8.0
     assert child.score == Decimal("8.0")
     assert parent.score == Decimal("8.0")
-    assert parent.level == Level.MALICIOUS
+    assert parent.level == Cyvest.LVL.MALICIOUS
 
 
 def test_inbound_relationship_propagation() -> None:
     """Test that INBOUND relationships correctly identify parents for score propagation."""
-    from cyvest import RelationshipDirection
-
     cv = Cyvest(score_mode=ScoreMode.MAX)
 
     # Create file with INBOUND relationship to URL (file ← URL means URL is parent)
-    malware_file = cv.observable_create(ObservableType.FILE, "malware.exe")
+    malware_file = cv.observable_create(Cyvest.OBS.FILE, "malware.exe")
     cv.observable_add_threat_intel(malware_file.key, source="av", score=Decimal("9.0"))
 
-    download_url = cv.observable_create(ObservableType.URL, "http://evil.com/malware.exe")
+    download_url = cv.observable_create(Cyvest.OBS.URL, "http://evil.com/malware.exe")
     cv.observable_add_threat_intel(download_url.key, source="urlscan", score=Decimal("2.0"))
 
     # Add INBOUND relationship: file ← URL (URL downloaded the file, URL is parent)
-    cv.observable_add_relationship(malware_file.key, download_url.key, "downloaded", RelationshipDirection.INBOUND)
+    cv.observable_add_relationship(malware_file.key, download_url.key, "downloaded", Cyvest.DIR.INBOUND)
 
     # File has INBOUND to URL, so URL is parent and should get file's score
     # URL score = max(2.0, 9.0) = 9.0
     assert malware_file.score == Decimal("9.0")
     assert download_url.score == Decimal("9.0")
-    assert download_url.level == Level.MALICIOUS
+    assert download_url.level == Cyvest.LVL.MALICIOUS
 
 
 def test_bidirectional_relationship_no_propagation() -> None:
     """Test that BIDIRECTIONAL relationships do not participate in hierarchical score propagation."""
-    from cyvest import RelationshipDirection
-
     cv = Cyvest(score_mode=ScoreMode.MAX)
 
     # Create two hosts with bidirectional communication
-    host1 = cv.observable_create(ObservableType.IPV4_ADDR, "10.0.1.10")
+    host1 = cv.observable_create(Cyvest.OBS.IPV4_ADDR, "10.0.1.10")
     cv.observable_add_threat_intel(host1.key, source="ids", score=Decimal("8.0"))
 
-    host2 = cv.observable_create(ObservableType.IPV4_ADDR, "10.0.1.20")
+    host2 = cv.observable_create(Cyvest.OBS.IPV4_ADDR, "10.0.1.20")
     cv.observable_add_threat_intel(host2.key, source="ids", score=Decimal("1.0"))
 
     # Add BIDIRECTIONAL relationship (symmetric, no hierarchy)
-    cv.observable_add_relationship(host1.key, host2.key, "communicates-with", RelationshipDirection.BIDIRECTIONAL)
+    cv.observable_add_relationship(host1.key, host2.key, "communicates-with", Cyvest.DIR.BIDIRECTIONAL)
 
     # Bidirectional relationships should NOT propagate scores hierarchically
     # Each host keeps only its own TI score
@@ -504,18 +500,16 @@ def test_bidirectional_relationship_no_propagation() -> None:
 
 def test_outbound_vs_inbound_direction_semantics() -> None:
     """Test that OUTBOUND and INBOUND create opposite parent-child relationships."""
-    from cyvest import RelationshipDirection
-
     cv = Cyvest(score_mode=ScoreMode.MAX)
 
     # Scenario 1: OUTBOUND - domain → IP (IP is child of domain)
-    domain1 = cv.observable_create(ObservableType.DOMAIN_NAME, "example1.com")
+    domain1 = cv.observable_create(Cyvest.OBS.DOMAIN_NAME, "example1.com")
     cv.observable_add_threat_intel(domain1.key, source="source1", score=Decimal("1.0"))
 
-    ip1 = cv.observable_create(ObservableType.IPV4_ADDR, "1.1.1.1")
+    ip1 = cv.observable_create(Cyvest.OBS.IPV4_ADDR, "1.1.1.1")
     cv.observable_add_threat_intel(ip1.key, source="source2", score=Decimal("7.0"))
 
-    cv.observable_add_relationship(domain1.key, ip1.key, "related-to", RelationshipDirection.OUTBOUND)
+    cv.observable_add_relationship(domain1.key, ip1.key, "related-to", Cyvest.DIR.OUTBOUND)
 
     # Domain has OUTBOUND to IP, so IP is child, domain gets child's score
     # domain1 score = max(1.0, 7.0) = 7.0
@@ -523,13 +517,13 @@ def test_outbound_vs_inbound_direction_semantics() -> None:
     assert ip1.score == Decimal("7.0")
 
     # Scenario 2: INBOUND - domain ← IP (IP is parent of domain)
-    domain2 = cv.observable_create(ObservableType.DOMAIN_NAME, "example2.com")
+    domain2 = cv.observable_create(Cyvest.OBS.DOMAIN_NAME, "example2.com")
     cv.observable_add_threat_intel(domain2.key, source="source3", score=Decimal("8.0"))
 
-    ip2 = cv.observable_create(ObservableType.IPV4_ADDR, "2.2.2.2")
+    ip2 = cv.observable_create(Cyvest.OBS.IPV4_ADDR, "2.2.2.2")
     cv.observable_add_threat_intel(ip2.key, source="source4", score=Decimal("2.0"))
 
-    cv.observable_add_relationship(domain2.key, ip2.key, "related-to", RelationshipDirection.INBOUND)
+    cv.observable_add_relationship(domain2.key, ip2.key, "related-to", Cyvest.DIR.INBOUND)
 
     # Domain has INBOUND to IP, so IP is parent, IP gets domain's score
     # ip2 score = max(2.0, 8.0) = 8.0
@@ -539,28 +533,26 @@ def test_outbound_vs_inbound_direction_semantics() -> None:
 
 def test_mixed_directions_in_hierarchy() -> None:
     """Test score propagation with mixed OUTBOUND and INBOUND relationships."""
-    from cyvest import RelationshipDirection
-
     cv = Cyvest(score_mode=ScoreMode.MAX)
 
     # Create a chain: A → B ← C
     # A has OUTBOUND to B (B is child of A)
     # C has INBOUND to B (B is parent of C)
 
-    obs_a = cv.observable_create(ObservableType.DOMAIN_NAME, "a.com")
+    obs_a = cv.observable_create(Cyvest.OBS.DOMAIN_NAME, "a.com")
     cv.observable_add_threat_intel(obs_a.key, source="source1", score=Decimal("2.0"))
 
-    obs_b = cv.observable_create(ObservableType.IPV4_ADDR, "1.1.1.1")
+    obs_b = cv.observable_create(Cyvest.OBS.IPV4_ADDR, "1.1.1.1")
     cv.observable_add_threat_intel(obs_b.key, source="source2", score=Decimal("3.0"))
 
-    obs_c = cv.observable_create(ObservableType.URL, "http://c.com")
+    obs_c = cv.observable_create(Cyvest.OBS.URL, "http://c.com")
     cv.observable_add_threat_intel(obs_c.key, source="source3", score=Decimal("9.0"))
 
     # A → B (B is child of A)
-    cv.observable_add_relationship(obs_a.key, obs_b.key, "related-to", RelationshipDirection.OUTBOUND)
+    cv.observable_add_relationship(obs_a.key, obs_b.key, "related-to", Cyvest.DIR.OUTBOUND)
 
     # C has INBOUND to B (B is parent of C)
-    cv.observable_add_relationship(obs_c.key, obs_b.key, "related-to", RelationshipDirection.INBOUND)
+    cv.observable_add_relationship(obs_c.key, obs_b.key, "related-to", Cyvest.DIR.INBOUND)
 
     # obs_c score = 9.0 (its own TI)
     # obs_b is parent of obs_c, so gets max(3.0, 9.0) = 9.0
@@ -572,51 +564,47 @@ def test_mixed_directions_in_hierarchy() -> None:
 
 def test_explicit_direction_override() -> None:
     """Test that explicitly setting direction overrides semantic defaults."""
-    from cyvest import RelationshipDirection, RelationshipType
-
     cv = Cyvest(score_mode=ScoreMode.MAX)
 
-    domain = cv.observable_create(ObservableType.DOMAIN_NAME, "override.com")
+    domain = cv.observable_create(Cyvest.OBS.DOMAIN_NAME, "override.com")
     cv.observable_add_threat_intel(domain.key, source="source1", score=Decimal("1.0"))
 
-    ip = cv.observable_create(ObservableType.IPV4_ADDR, "3.3.3.3")
+    ip = cv.observable_create(Cyvest.OBS.IPV4_ADDR, "3.3.3.3")
     cv.observable_add_threat_intel(ip.key, source="source2", score=Decimal("8.0"))
 
     # Override default BIDIRECTIONAL to OUTBOUND to enable hierarchy
-    cv.observable_add_relationship(domain.key, ip.key, RelationshipType.RELATED_TO, RelationshipDirection.OUTBOUND)
+    cv.observable_add_relationship(domain.key, ip.key, Cyvest.REL.RELATED_TO, Cyvest.DIR.OUTBOUND)
 
     # OUTBOUND means ip is a child; its score propagates to the domain
     assert domain.score == Decimal("8.0")
     assert ip.score == Decimal("8.0")
 
     # Verify the relationship has OUTBOUND direction
-    assert domain.relationships[0].direction == RelationshipDirection.OUTBOUND
+    assert domain.relationships[0].direction == Cyvest.DIR.OUTBOUND
 
 
 def test_sum_mode_with_direction_based_children() -> None:
     """Test SUM mode score calculation with direction-based child detection."""
-    from cyvest import RelationshipDirection
-
     cv = Cyvest(score_mode=ScoreMode.SUM)
 
     # Parent with multiple children via OUTBOUND relationships
-    parent = cv.observable_create(ObservableType.DOMAIN_NAME, "parent.com")
+    parent = cv.observable_create(Cyvest.OBS.DOMAIN_NAME, "parent.com")
     cv.observable_add_threat_intel(parent.key, source="source1", score=Decimal("1.0"))
 
-    child1 = cv.observable_create(ObservableType.IPV4_ADDR, "1.1.1.1")
+    child1 = cv.observable_create(Cyvest.OBS.IPV4_ADDR, "1.1.1.1")
     cv.observable_add_threat_intel(child1.key, source="source2", score=Decimal("3.0"))
 
-    child2 = cv.observable_create(ObservableType.IPV4_ADDR, "2.2.2.2")
+    child2 = cv.observable_create(Cyvest.OBS.IPV4_ADDR, "2.2.2.2")
     cv.observable_add_threat_intel(child2.key, source="source3", score=Decimal("5.0"))
 
     # Add OUTBOUND relationships
-    cv.observable_add_relationship(parent.key, child1.key, "related-to", RelationshipDirection.OUTBOUND)
-    cv.observable_add_relationship(parent.key, child2.key, "related-to", RelationshipDirection.OUTBOUND)
+    cv.observable_add_relationship(parent.key, child1.key, "related-to", Cyvest.DIR.OUTBOUND)
+    cv.observable_add_relationship(parent.key, child2.key, "related-to", Cyvest.DIR.OUTBOUND)
 
     # Also add one BIDIRECTIONAL that should be ignored
-    noise_obs = cv.observable_create(ObservableType.IPV4_ADDR, "9.9.9.9")
+    noise_obs = cv.observable_create(Cyvest.OBS.IPV4_ADDR, "9.9.9.9")
     cv.observable_add_threat_intel(noise_obs.key, source="source4", score=Decimal("100.0"))
-    cv.observable_add_relationship(parent.key, noise_obs.key, "related-to", RelationshipDirection.BIDIRECTIONAL)
+    cv.observable_add_relationship(parent.key, noise_obs.key, "related-to", Cyvest.DIR.BIDIRECTIONAL)
 
     # In SUM mode: parent score = max(parent TI=1.0) + sum(OUTBOUND children = 3.0 + 5.0) = 9.0
     # BIDIRECTIONAL relationship should NOT contribute
@@ -627,94 +615,94 @@ def test_sum_mode_with_direction_based_children() -> None:
 def test_safe_level_explicit_creation() -> None:
     """Test that observable created with level=SAFE is SAFE."""
     cv = Cyvest()
-    obs = cv.observable_create(ObservableType.DOMAIN_NAME, "trusted.example.com", score=0, level=Level.SAFE)
+    obs = cv.observable_create(Cyvest.OBS.DOMAIN_NAME, "trusted.example.com", score=0, level=Cyvest.LVL.SAFE)
 
     assert obs.score == Decimal("0")
-    assert obs.level == Level.SAFE
+    assert obs.level == Cyvest.LVL.SAFE
 
 
 def test_safe_level_prevents_info_downgrade() -> None:
     """Test that SAFE observable stays SAFE when receiving INFO level threat intel."""
     cv = Cyvest()
-    obs = cv.observable_create(ObservableType.DOMAIN_NAME, "trusted.example.com", score=0, level=Level.SAFE)
+    obs = cv.observable_create(Cyvest.OBS.DOMAIN_NAME, "trusted.example.com", score=0, level=Cyvest.LVL.SAFE)
 
     # Add threat intel with score=0 (would be INFO level)
     cv.observable_add_threat_intel(obs.key, source="ti_source", score=Decimal("0"))
 
     # Score updates but level stays SAFE
     assert obs.score == Decimal("0")
-    assert obs.level == Level.SAFE
+    assert obs.level == Cyvest.LVL.SAFE
 
 
 def test_safe_level_prevents_trusted_downgrade() -> None:
     """Test that SAFE observable stays SAFE when receiving TRUSTED level threat intel."""
     cv = Cyvest()
-    obs = cv.observable_create(ObservableType.DOMAIN_NAME, "trusted.example.com", score=0, level=Level.SAFE)
+    obs = cv.observable_create(Cyvest.OBS.DOMAIN_NAME, "trusted.example.com", score=0, level=Cyvest.LVL.SAFE)
 
     # Add threat intel with negative score (would be TRUSTED level)
     cv.observable_add_threat_intel(obs.key, source="ti_source", score=Decimal("-1.0"))
 
     # Score updates but level stays SAFE (TRUSTED < SAFE)
     assert obs.score == Decimal("-1.0")
-    assert obs.level == Level.SAFE
+    assert obs.level == Cyvest.LVL.SAFE
 
 
 def test_safe_level_allows_notable_upgrade() -> None:
     """Test that SAFE observable upgrades to NOTABLE with appropriate threat intel."""
     cv = Cyvest()
-    obs = cv.observable_create(ObservableType.DOMAIN_NAME, "trusted.example.com", score=0, level=Level.SAFE)
+    obs = cv.observable_create(Cyvest.OBS.DOMAIN_NAME, "trusted.example.com", score=0, level=Cyvest.LVL.SAFE)
 
     # Add threat intel with score=2.0 (NOTABLE level, which is > SAFE)
     cv.observable_add_threat_intel(obs.key, source="ti_source", score=Decimal("2.0"))
 
     # Both score and level upgrade
     assert obs.score == Decimal("2.0")
-    assert obs.level == Level.NOTABLE
+    assert obs.level == Cyvest.LVL.NOTABLE
 
 
 def test_safe_level_allows_suspicious_upgrade() -> None:
     """Test that SAFE observable upgrades to SUSPICIOUS with appropriate threat intel."""
     cv = Cyvest()
-    obs = cv.observable_create(ObservableType.DOMAIN_NAME, "trusted.example.com", score=0, level=Level.SAFE)
+    obs = cv.observable_create(Cyvest.OBS.DOMAIN_NAME, "trusted.example.com", score=0, level=Cyvest.LVL.SAFE)
 
     # Add threat intel with score=4.0 (SUSPICIOUS level)
     cv.observable_add_threat_intel(obs.key, source="ti_source", score=Decimal("4.0"))
 
     # Both score and level upgrade
     assert obs.score == Decimal("4.0")
-    assert obs.level == Level.SUSPICIOUS
+    assert obs.level == Cyvest.LVL.SUSPICIOUS
 
 
 def test_safe_level_allows_malicious_upgrade() -> None:
     """Test that SAFE observable upgrades to MALICIOUS with appropriate threat intel."""
     cv = Cyvest()
-    obs = cv.observable_create(ObservableType.DOMAIN_NAME, "trusted.example.com", score=0, level=Level.SAFE)
+    obs = cv.observable_create(Cyvest.OBS.DOMAIN_NAME, "trusted.example.com", score=0, level=Cyvest.LVL.SAFE)
 
     # Add threat intel with score=6.0 (MALICIOUS level)
     cv.observable_add_threat_intel(obs.key, source="ti_source", score=Decimal("6.0"))
 
     # Both score and level upgrade
     assert obs.score == Decimal("6.0")
-    assert obs.level == Level.MALICIOUS
+    assert obs.level == Cyvest.LVL.MALICIOUS
 
 
 def test_safe_level_score_updates_with_frozen_level() -> None:
     """Test that SAFE observable score updates even when level stays SAFE."""
     cv = Cyvest()
     obs = cv.observable_create(
-        ObservableType.DOMAIN_NAME, "trusted.example.com", score=Decimal("-1.0"), level=Level.SAFE
+        Cyvest.OBS.DOMAIN_NAME, "trusted.example.com", score=Decimal("-1.0"), level=Cyvest.LVL.SAFE
     )
 
     # Initial state: score=-1.0 (would be TRUSTED), level=SAFE
     assert obs.score == Decimal("-1.0")
-    assert obs.level == Level.SAFE
+    assert obs.level == Cyvest.LVL.SAFE
 
     # Add threat intel with score=0 (would be INFO, still < SAFE)
     cv.observable_add_threat_intel(obs.key, source="source1", score=Decimal("0"))
 
     # Score should update to 0 (max of -1.0 and 0), but level stays SAFE
     assert obs.score == Decimal("0")
-    assert obs.level == Level.SAFE  # Level frozen at SAFE even though score=0 would be INFO
+    assert obs.level == Cyvest.LVL.SAFE  # Level frozen at SAFE even though score=0 would be INFO
 
     # Verify audit log tracked the score change
     events = [
@@ -728,98 +716,98 @@ def test_safe_level_score_updates_with_frozen_level() -> None:
 def test_non_safe_levels_recalculate_and_can_downgrade() -> None:
     """Non-SAFE levels are recalculated from score and can downgrade."""
     cv = Cyvest()
-    obs = cv.observable_create(ObservableType.DOMAIN_NAME, "test.example.com")
+    obs = cv.observable_create(Cyvest.OBS.DOMAIN_NAME, "test.example.com")
 
     # Manually set to SUSPICIOUS through Cyvest service layer
-    cv.observable_set_level(obs.key, Level.SUSPICIOUS)
-    assert obs.level == Level.SUSPICIOUS
+    cv.observable_set_level(obs.key, Cyvest.LVL.SUSPICIOUS)
+    assert obs.level == Cyvest.LVL.SUSPICIOUS
 
     # Add threat intel with lower score (NOTABLE)
     cv.observable_add_threat_intel(obs.key, source="ti_source", score=Decimal("2.0"))
 
     # Score=2.0 gives NOTABLE which is < SUSPICIOUS, so level downgrades to NOTABLE.
     assert obs.score == Decimal("2.0")
-    assert obs.level == Level.NOTABLE
+    assert obs.level == Cyvest.LVL.NOTABLE
 
 
 def test_threat_intel_with_safe_level_upgrades_info_observable() -> None:
     """Test that threat intel with SAFE level upgrades an INFO observable to SAFE."""
     cv = Cyvest()
-    obs = cv.observable_create(ObservableType.DOMAIN_NAME, "trusted.example.com")
+    obs = cv.observable_create(Cyvest.OBS.DOMAIN_NAME, "trusted.example.com")
 
     # Observable starts with INFO level
-    assert obs.level == Level.INFO
+    assert obs.level == Cyvest.LVL.INFO
 
     # Add threat intel with SAFE level
-    cv.observable_add_threat_intel(obs.key, source="whitelist_db", score=Decimal("0"), level=Level.SAFE)
+    cv.observable_add_threat_intel(obs.key, source="whitelist_db", score=Decimal("0"), level=Cyvest.LVL.SAFE)
 
     # Observable should now be SAFE
-    assert obs.level == Level.SAFE
+    assert obs.level == Cyvest.LVL.SAFE
 
 
 def test_threat_intel_with_safe_level_upgrades_trusted_observable() -> None:
     """Test that threat intel with SAFE level upgrades a TRUSTED observable to SAFE."""
     cv = Cyvest()
-    obs = cv.observable_create(ObservableType.DOMAIN_NAME, "example.com")
+    obs = cv.observable_create(Cyvest.OBS.DOMAIN_NAME, "example.com")
 
     # Add TI with negative score to get TRUSTED level
     cv.observable_add_threat_intel(obs.key, source="source1", score=Decimal("-1.0"))
-    assert obs.level == Level.TRUSTED
+    assert obs.level == Cyvest.LVL.TRUSTED
 
     # Add threat intel with SAFE level
-    cv.observable_add_threat_intel(obs.key, source="whitelist_db", score=Decimal("0"), level=Level.SAFE)
+    cv.observable_add_threat_intel(obs.key, source="whitelist_db", score=Decimal("0"), level=Cyvest.LVL.SAFE)
 
     # Observable should now be SAFE
-    assert obs.level == Level.SAFE
+    assert obs.level == Cyvest.LVL.SAFE
 
 
 def test_threat_intel_with_safe_level_does_not_downgrade_notable() -> None:
     """Test that threat intel with SAFE level doesn't downgrade NOTABLE observable."""
     cv = Cyvest()
-    obs = cv.observable_create(ObservableType.DOMAIN_NAME, "example.com")
+    obs = cv.observable_create(Cyvest.OBS.DOMAIN_NAME, "example.com")
 
     # Add TI to get NOTABLE level
     cv.observable_add_threat_intel(obs.key, source="source1", score=Decimal("2.0"))
-    assert obs.level == Level.NOTABLE
+    assert obs.level == Cyvest.LVL.NOTABLE
 
     # Add threat intel with SAFE level (lower than NOTABLE)
-    cv.observable_add_threat_intel(obs.key, source="whitelist_db", score=Decimal("0"), level=Level.SAFE)
+    cv.observable_add_threat_intel(obs.key, source="whitelist_db", score=Decimal("0"), level=Cyvest.LVL.SAFE)
 
     # Observable should stay NOTABLE (SAFE < NOTABLE, so no downgrade)
-    assert obs.level == Level.NOTABLE
+    assert obs.level == Cyvest.LVL.NOTABLE
 
 
 def test_threat_intel_with_safe_level_does_not_downgrade_malicious() -> None:
     """Test that threat intel with SAFE level doesn't downgrade MALICIOUS observable."""
     cv = Cyvest()
-    obs = cv.observable_create(ObservableType.DOMAIN_NAME, "example.com")
+    obs = cv.observable_create(Cyvest.OBS.DOMAIN_NAME, "example.com")
 
     # Add TI to get MALICIOUS level
     cv.observable_add_threat_intel(obs.key, source="source1", score=Decimal("6.0"))
-    assert obs.level == Level.MALICIOUS
+    assert obs.level == Cyvest.LVL.MALICIOUS
 
     # Add threat intel with SAFE level (lower than MALICIOUS)
-    cv.observable_add_threat_intel(obs.key, source="whitelist_db", score=Decimal("0"), level=Level.SAFE)
+    cv.observable_add_threat_intel(obs.key, source="whitelist_db", score=Decimal("0"), level=Cyvest.LVL.SAFE)
 
     # Observable should stay MALICIOUS (no downgrade from SAFE TI)
-    assert obs.level == Level.MALICIOUS
+    assert obs.level == Cyvest.LVL.MALICIOUS
 
 
 def test_threat_intel_safe_then_malicious_upgrades() -> None:
     """Test that SAFE observable can still be upgraded by MALICIOUS threat intel."""
     cv = Cyvest()
-    obs = cv.observable_create(ObservableType.DOMAIN_NAME, "example.com")
+    obs = cv.observable_create(Cyvest.OBS.DOMAIN_NAME, "example.com")
 
     # Add threat intel with SAFE level
-    cv.observable_add_threat_intel(obs.key, source="whitelist_db", score=Decimal("0"), level=Level.SAFE)
-    assert obs.level == Level.SAFE
+    cv.observable_add_threat_intel(obs.key, source="whitelist_db", score=Decimal("0"), level=Cyvest.LVL.SAFE)
+    assert obs.level == Cyvest.LVL.SAFE
 
     # Add threat intel with MALICIOUS score
     cv.observable_add_threat_intel(obs.key, source="virustotal", score=Decimal("8.0"))
 
     # Observable should upgrade to MALICIOUS
     assert obs.score == Decimal("8.0")
-    assert obs.level == Level.MALICIOUS
+    assert obs.level == Cyvest.LVL.MALICIOUS
 
 
 def test_threat_intel_safe_level_with_none_observable() -> None:
@@ -828,17 +816,17 @@ def test_threat_intel_safe_level_with_none_observable() -> None:
 
     # Create a check with NONE level
     check = cv.check_create("test_check", "scope", "description")
-    assert check.level == Level.NONE
+    assert check.level == Cyvest.LVL.NONE
 
     # Create observable starting at INFO
-    obs = cv.observable_create(ObservableType.IPV4_ADDR, "192.168.1.1")
-    assert obs.level == Level.INFO
+    obs = cv.observable_create(Cyvest.OBS.IPV4_ADDR, "192.168.1.1")
+    assert obs.level == Cyvest.LVL.INFO
 
     # Add threat intel with SAFE level to observable
-    cv.observable_add_threat_intel(obs.key, source="whitelist", score=Decimal("0"), level=Level.SAFE)
+    cv.observable_add_threat_intel(obs.key, source="whitelist", score=Decimal("0"), level=Cyvest.LVL.SAFE)
 
     # Observable should be SAFE
-    assert obs.level == Level.SAFE
+    assert obs.level == Cyvest.LVL.SAFE
 
 
 def test_check_inherits_safe_from_single_observable() -> None:
@@ -847,14 +835,14 @@ def test_check_inherits_safe_from_single_observable() -> None:
 
     # Create check
     check = cv.check_create("safe_check", "test", "Test SAFE inheritance")
-    assert check.level == Level.NONE
+    assert check.level == Cyvest.LVL.NONE
 
     # Create SAFE observable and link to check
-    safe_obs = cv.observable_create(ObservableType.DOMAIN_NAME, "trusted.example.com", level=Level.SAFE)
+    safe_obs = cv.observable_create(Cyvest.OBS.DOMAIN_NAME, "trusted.example.com", level=Cyvest.LVL.SAFE)
     cv.check_link_observable(check.key, safe_obs.key)
 
     # Check should inherit SAFE level
-    assert check.level == Level.SAFE
+    assert check.level == Cyvest.LVL.SAFE
 
 
 def test_check_inherits_safe_from_multiple_observables_all_lower() -> None:
@@ -865,9 +853,9 @@ def test_check_inherits_safe_from_multiple_observables_all_lower() -> None:
     check = cv.check_create("safe_check", "test", "Test SAFE inheritance")
 
     # Create mixed observables: SAFE, INFO, TRUSTED
-    safe_obs = cv.observable_create(ObservableType.DOMAIN_NAME, "trusted.example.com", level=Level.SAFE)
-    info_obs = cv.observable_create(ObservableType.IPV4_ADDR, "10.0.0.1")  # default INFO level
-    trusted_obs = cv.observable_create(ObservableType.IPV4_ADDR, "10.0.0.2")
+    safe_obs = cv.observable_create(Cyvest.OBS.DOMAIN_NAME, "trusted.example.com", level=Cyvest.LVL.SAFE)
+    info_obs = cv.observable_create(Cyvest.OBS.IPV4_ADDR, "10.0.0.1")  # default INFO level
+    trusted_obs = cv.observable_create(Cyvest.OBS.IPV4_ADDR, "10.0.0.2")
     cv.observable_add_threat_intel(trusted_obs.key, "source", score=Decimal("-1.0"))  # TRUSTED level
 
     # Link all to check
@@ -876,7 +864,7 @@ def test_check_inherits_safe_from_multiple_observables_all_lower() -> None:
     cv.check_link_observable(check.key, trusted_obs.key)
 
     # Check should inherit SAFE level (all observables <= SAFE)
-    assert check.level == Level.SAFE
+    assert check.level == Cyvest.LVL.SAFE
 
 
 def test_check_does_not_inherit_safe_when_notable_present() -> None:
@@ -887,8 +875,8 @@ def test_check_does_not_inherit_safe_when_notable_present() -> None:
     check = cv.check_create("check1", "test", "Test check")
 
     # Create mixed observables: SAFE and NOTABLE
-    safe_obs = cv.observable_create(ObservableType.DOMAIN_NAME, "trusted.example.com", level=Level.SAFE)
-    notable_obs = cv.observable_create(ObservableType.IPV4_ADDR, "10.0.0.1")
+    safe_obs = cv.observable_create(Cyvest.OBS.DOMAIN_NAME, "trusted.example.com", level=Cyvest.LVL.SAFE)
+    notable_obs = cv.observable_create(Cyvest.OBS.IPV4_ADDR, "10.0.0.1")
     cv.observable_add_threat_intel(notable_obs.key, "source", score=Decimal("2.0"))  # NOTABLE level
 
     # Link both to check
@@ -896,7 +884,7 @@ def test_check_does_not_inherit_safe_when_notable_present() -> None:
     cv.check_link_observable(check.key, notable_obs.key)
 
     # Check should be NOTABLE (not SAFE) because one observable is NOTABLE
-    assert check.level == Level.NOTABLE
+    assert check.level == Cyvest.LVL.NOTABLE
 
 
 def test_check_safe_preserved_when_adding_low_level_observables() -> None:
@@ -905,18 +893,18 @@ def test_check_safe_preserved_when_adding_low_level_observables() -> None:
 
     # Create check with SAFE observable
     check = cv.check_create("safe_check", "test", "Test SAFE preservation")
-    safe_obs = cv.observable_create(ObservableType.DOMAIN_NAME, "trusted.example.com", level=Level.SAFE)
+    safe_obs = cv.observable_create(Cyvest.OBS.DOMAIN_NAME, "trusted.example.com", level=Cyvest.LVL.SAFE)
     cv.check_link_observable(check.key, safe_obs.key)
 
     # Check should be SAFE
-    assert check.level == Level.SAFE
+    assert check.level == Cyvest.LVL.SAFE
 
     # Add INFO observable
-    info_obs = cv.observable_create(ObservableType.IPV4_ADDR, "10.0.0.1")
+    info_obs = cv.observable_create(Cyvest.OBS.IPV4_ADDR, "10.0.0.1")
     cv.check_link_observable(check.key, info_obs.key)
 
     # Check should remain SAFE
-    assert check.level == Level.SAFE
+    assert check.level == Cyvest.LVL.SAFE
 
 
 def test_check_safe_upgrades_to_malicious_when_malicious_observable_added() -> None:
@@ -925,19 +913,19 @@ def test_check_safe_upgrades_to_malicious_when_malicious_observable_added() -> N
 
     # Create check with SAFE observable
     check = cv.check_create("check1", "test", "Test SAFE upgrade")
-    safe_obs = cv.observable_create(ObservableType.DOMAIN_NAME, "trusted.example.com", level=Level.SAFE)
+    safe_obs = cv.observable_create(Cyvest.OBS.DOMAIN_NAME, "trusted.example.com", level=Cyvest.LVL.SAFE)
     cv.check_link_observable(check.key, safe_obs.key)
 
     # Check should be SAFE
-    assert check.level == Level.SAFE
+    assert check.level == Cyvest.LVL.SAFE
 
     # Add MALICIOUS observable
-    malicious_obs = cv.observable_create(ObservableType.IPV4_ADDR, "10.0.0.1")
+    malicious_obs = cv.observable_create(Cyvest.OBS.IPV4_ADDR, "10.0.0.1")
     cv.observable_add_threat_intel(malicious_obs.key, "source", score=Decimal("6.0"))  # MALICIOUS
     cv.check_link_observable(check.key, malicious_obs.key)
 
     # Check should upgrade to MALICIOUS
-    assert check.level == Level.MALICIOUS
+    assert check.level == Cyvest.LVL.MALICIOUS
 
 
 def test_check_safe_with_multiple_safe_observables() -> None:
@@ -948,15 +936,15 @@ def test_check_safe_with_multiple_safe_observables() -> None:
     check = cv.check_create("safe_check", "test", "Test multiple SAFE")
 
     # Create multiple SAFE observables
-    safe_obs1 = cv.observable_create(ObservableType.DOMAIN_NAME, "trusted1.example.com", level=Level.SAFE)
-    safe_obs2 = cv.observable_create(ObservableType.DOMAIN_NAME, "trusted2.example.com", level=Level.SAFE)
+    safe_obs1 = cv.observable_create(Cyvest.OBS.DOMAIN_NAME, "trusted1.example.com", level=Cyvest.LVL.SAFE)
+    safe_obs2 = cv.observable_create(Cyvest.OBS.DOMAIN_NAME, "trusted2.example.com", level=Cyvest.LVL.SAFE)
 
     # Link all to check
     cv.check_link_observable(check.key, safe_obs1.key)
     cv.check_link_observable(check.key, safe_obs2.key)
 
     # Check should be SAFE
-    assert check.level == Level.SAFE
+    assert check.level == Cyvest.LVL.SAFE
 
 
 def test_max_mode_hierarchical_root_barrier_scoring() -> None:
@@ -966,11 +954,11 @@ def test_max_mode_hierarchical_root_barrier_scoring() -> None:
     root = cv.root()
 
     # Create domain with TI score 2.0
-    domain = cv.observable_create(ObservableType.DOMAIN_NAME, "example.com")
+    domain = cv.observable_create(Cyvest.OBS.DOMAIN_NAME, "example.com")
     cv.observable_add_threat_intel(domain.key, source="source1", score=Decimal("2.0"))
 
     # Create IP with TI score 8.0
-    ip = cv.observable_create(ObservableType.IPV4_ADDR, "1.2.3.4")
+    ip = cv.observable_create(Cyvest.OBS.IPV4_ADDR, "1.2.3.4")
     cv.observable_add_threat_intel(ip.key, source="source2", score=Decimal("8.0"))
 
     # Link both through root: root → IP (OUTBOUND), domain → root (INBOUND)
@@ -983,11 +971,11 @@ def test_max_mode_hierarchical_root_barrier_scoring() -> None:
     # - Root DOES aggregate child scores: max(0.0 TI, 8.0 child) = 8.0 (MAX mode)
     # - Domain does NOT receive propagation from root (barrier blocks upward)
     assert domain.score == Decimal("2.0")
-    assert domain.level == Level.NOTABLE
+    assert domain.level == Cyvest.LVL.NOTABLE
     assert ip.score == Decimal("8.0")
-    assert ip.level == Level.MALICIOUS
+    assert ip.level == Cyvest.LVL.MALICIOUS
     assert root.score == Decimal("8.0")  # Aggregates child IP score
-    assert root.level == Level.MALICIOUS
+    assert root.level == Cyvest.LVL.MALICIOUS
 
 
 def test_sum_mode_hierarchical_root_barrier_scoring() -> None:
@@ -997,11 +985,11 @@ def test_sum_mode_hierarchical_root_barrier_scoring() -> None:
     root = cv.root()
 
     # Create domain with TI score 3.0
-    domain = cv.observable_create(ObservableType.DOMAIN_NAME, "example.com")
+    domain = cv.observable_create(Cyvest.OBS.DOMAIN_NAME, "example.com")
     cv.observable_add_threat_intel(domain.key, source="source1", score=Decimal("3.0"))
 
     # Create IP with TI score 5.0
-    ip = cv.observable_create(ObservableType.IPV4_ADDR, "1.2.3.4")
+    ip = cv.observable_create(Cyvest.OBS.IPV4_ADDR, "1.2.3.4")
     cv.observable_add_threat_intel(ip.key, source="source2", score=Decimal("5.0"))
 
     # Link both through root: root → IP (OUTBOUND), domain → root (INBOUND)
@@ -1026,10 +1014,10 @@ def test_root_with_threat_intel_only_affects_root() -> None:
     root = cv.root()
 
     # Create observables linked to root
-    obs1 = cv.observable_create(ObservableType.IPV4_ADDR, "10.0.0.1")
+    obs1 = cv.observable_create(Cyvest.OBS.IPV4_ADDR, "10.0.0.1")
     cv.observable_add_threat_intel(obs1.key, source="source1", score=Decimal("2.0"))
 
-    obs2 = cv.observable_create(ObservableType.DOMAIN_NAME, "example.com")
+    obs2 = cv.observable_create(Cyvest.OBS.DOMAIN_NAME, "example.com")
     cv.observable_add_threat_intel(obs2.key, source="source2", score=Decimal("3.0"))
 
     # Link to root
@@ -1043,11 +1031,11 @@ def test_root_with_threat_intel_only_affects_root() -> None:
     # - Root score = max(7.0 TI, 3.0 child obs2) = 7.0 (MAX mode, aggregates children)
     # - obs1 and obs2 keep their own scores, NOT affected by root's TI (barrier blocks upward)
     assert root.score == Decimal("7.0")  # max(7.0 TI, 2.0 obs1, 3.0 obs2)
-    assert root.level == Level.MALICIOUS
+    assert root.level == Cyvest.LVL.MALICIOUS
     assert obs1.score == Decimal("2.0")
-    assert obs1.level == Level.NOTABLE
+    assert obs1.level == Cyvest.LVL.NOTABLE
     assert obs2.score == Decimal("3.0")
-    assert obs2.level == Level.SUSPICIOUS
+    assert obs2.level == Cyvest.LVL.SUSPICIOUS
 
 
 def test_root_updates_when_child_score_changes() -> None:
@@ -1055,7 +1043,7 @@ def test_root_updates_when_child_score_changes() -> None:
     cv = Cyvest(score_mode=ScoreMode.MAX)
 
     root = cv.root()
-    child = cv.observable_create(ObservableType.IPV4_ADDR, "10.0.0.1")
+    child = cv.observable_create(Cyvest.OBS.IPV4_ADDR, "10.0.0.1")
     cv.observable_add_relationship(root.key, child.key, "related-to", direction="outbound")
 
     cv.observable_add_threat_intel(child.key, source="source1", score=Decimal("2.0"))
@@ -1073,13 +1061,13 @@ def test_root_barrier_with_multiple_levels() -> None:
     root = cv.root()
 
     # Create 3-level hierarchy: domain → IP → URL
-    domain = cv.observable_create(ObservableType.DOMAIN_NAME, "malicious.com")
+    domain = cv.observable_create(Cyvest.OBS.DOMAIN_NAME, "malicious.com")
     cv.observable_add_threat_intel(domain.key, source="source1", score=Decimal("9.0"))
 
-    ip = cv.observable_create(ObservableType.IPV4_ADDR, "1.2.3.4")
+    ip = cv.observable_create(Cyvest.OBS.IPV4_ADDR, "1.2.3.4")
     cv.observable_add_threat_intel(ip.key, source="source2", score=Decimal("8.0"))
 
-    url = cv.observable_create(ObservableType.URL, "http://malicious.com/evil")
+    url = cv.observable_create(Cyvest.OBS.URL, "http://malicious.com/evil")
     cv.observable_add_threat_intel(url.key, source="source3", score=Decimal("7.0"))
 
     # Build hierarchy: domain → IP → URL
@@ -1096,7 +1084,7 @@ def test_root_barrier_with_multiple_levels() -> None:
 
     # Verify root DOES aggregate domain's score, but doesn't propagate upward
     assert root.score == Decimal("9.0")  # max(0.0 TI, 9.0 child domain)
-    assert root.level == Level.MALICIOUS
+    assert root.level == Cyvest.LVL.MALICIOUS
 
 
 def test_root_propagates_to_checks_not_parents() -> None:
@@ -1114,17 +1102,17 @@ def test_root_propagates_to_checks_not_parents() -> None:
 
     # Verify root has the score from its TI
     assert root.score == Decimal("8.0")
-    assert root.level == Level.MALICIOUS
+    assert root.level == Cyvest.LVL.MALICIOUS
 
     # Verify check DOES get root's score (root propagates to checks)
     assert check.score == Decimal("8.0")
-    assert check.level == Level.MALICIOUS
+    assert check.level == Cyvest.LVL.MALICIOUS
 
     # Now create a non-root observable and link to the same check
-    obs = cv.observable_create(ObservableType.IPV4_ADDR, "10.0.0.1")
+    obs = cv.observable_create(Cyvest.OBS.IPV4_ADDR, "10.0.0.1")
     cv.observable_add_threat_intel(obs.key, source="ip_ti", score=Decimal("5.0"))
     cv.check_link_observable(check.key, obs.key)
 
     # Check should now get max of both observables (root=8.0, ip=5.0)
     assert check.score == Decimal("8.0")
-    assert check.level == Level.MALICIOUS
+    assert check.level == Cyvest.LVL.MALICIOUS

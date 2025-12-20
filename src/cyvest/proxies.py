@@ -133,14 +133,6 @@ class ObservableProxy(_ReadOnlyProxy[Observable]):
         return self._read_attr("level")
 
     @property
-    def origin_investigation_id(self) -> str | None:
-        return self._read_attr("origin_investigation_id")
-
-    @property
-    def source_investigation_ids(self) -> set[str]:
-        return self._read_attr("source_investigation_ids")
-
-    @property
     def threat_intels(self) -> list[ThreatIntel]:
         return self._read_attr("threat_intels")
 
@@ -321,10 +313,6 @@ class CheckProxy(_ReadOnlyProxy[Check]):
         return self._read_attr("origin_investigation_id")
 
     @property
-    def source_investigation_ids(self) -> set[str]:
-        return self._read_attr("source_investigation_ids")
-
-    @property
     def observable_links(self) -> list[ObservableLink]:
         return self._read_attr("observable_links")
 
@@ -422,14 +410,6 @@ class ContainerProxy(_ReadOnlyProxy[Container]):
     def sub_containers(self) -> dict[str, Container]:
         return self._read_attr("sub_containers")
 
-    @property
-    def origin_investigation_id(self) -> str | None:
-        return self._read_attr("origin_investigation_id")
-
-    @property
-    def source_investigation_ids(self) -> set[str]:
-        return self._read_attr("source_investigation_ids")
-
     def get_aggregated_score(self):
         """Return the aggregated score copy."""
         return self._call_readonly("get_aggregated_score")
@@ -515,14 +495,6 @@ class ThreatIntelProxy(_ReadOnlyProxy[ThreatIntel]):
         return self._read_attr("level")
 
     @property
-    def origin_investigation_id(self) -> str | None:
-        return self._read_attr("origin_investigation_id")
-
-    @property
-    def source_investigation_ids(self) -> set[str]:
-        return self._read_attr("source_investigation_ids")
-
-    @property
     def taxonomies(self) -> list[dict[str, Any]]:
         return self._read_attr("taxonomies")
 
@@ -571,14 +543,6 @@ class EnrichmentProxy(_ReadOnlyProxy[Enrichment]):
     @property
     def context(self) -> str:
         return self._read_attr("context")
-
-    @property
-    def origin_investigation_id(self) -> str | None:
-        return self._read_attr("origin_investigation_id")
-
-    @property
-    def source_investigation_ids(self) -> set[str]:
-        return self._read_attr("source_investigation_ids")
 
     def update_metadata(
         self,

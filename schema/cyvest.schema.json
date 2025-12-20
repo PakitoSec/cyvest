@@ -126,14 +126,6 @@
           "title": "Origin Investigation Id",
           "type": "string"
         },
-        "source_investigation_ids": {
-          "items": {
-            "type": "string"
-          },
-          "title": "Source Investigation Ids",
-          "type": "array",
-          "uniqueItems": true
-        },
         "observable_links": {
           "items": {
             "$ref": "#/$defs/ObservableLink"
@@ -160,7 +152,6 @@
         "score",
         "level",
         "origin_investigation_id",
-        "source_investigation_ids",
         "observable_links",
         "key",
         "score_display"
@@ -194,26 +185,6 @@
           },
           "title": "Sub Containers",
           "type": "object"
-        },
-        "origin_investigation_id": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Origin Investigation Id"
-        },
-        "source_investigation_ids": {
-          "items": {
-            "type": "string"
-          },
-          "title": "Source Investigation Ids",
-          "type": "array",
-          "uniqueItems": true
         },
         "key": {
           "title": "Key",
@@ -282,26 +253,6 @@
         "context": {
           "title": "Context",
           "type": "string"
-        },
-        "origin_investigation_id": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Origin Investigation Id"
-        },
-        "source_investigation_ids": {
-          "items": {
-            "type": "string"
-          },
-          "title": "Source Investigation Ids",
-          "type": "array",
-          "uniqueItems": true
         },
         "key": {
           "title": "Key",
@@ -399,26 +350,6 @@
         "level": {
           "$ref": "#/$defs/Level"
         },
-        "origin_investigation_id": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Origin Investigation Id"
-        },
-        "source_investigation_ids": {
-          "items": {
-            "type": "string"
-          },
-          "title": "Source Investigation Ids",
-          "type": "array",
-          "uniqueItems": true
-        },
         "threat_intels": {
           "items": {
             "type": "string"
@@ -478,27 +409,13 @@
           "title": "Observable Key",
           "type": "string"
         },
-        "origin_investigation_id": {
-          "title": "Origin Investigation Id",
-          "type": "string"
-        },
-        "source_investigation_ids": {
-          "items": {
-            "type": "string"
-          },
-          "title": "Source Investigation Ids",
-          "type": "array",
-          "uniqueItems": true
-        },
         "propagation_mode": {
           "$ref": "#/$defs/PropagationMode",
           "default": "LOCAL_ONLY"
         }
       },
       "required": [
-        "observable_key",
-        "origin_investigation_id",
-        "source_investigation_ids"
+        "observable_key"
       ],
       "title": "ObservableLink",
       "type": "object"
@@ -719,26 +636,6 @@
         },
         "level": {
           "$ref": "#/$defs/Level"
-        },
-        "origin_investigation_id": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Origin Investigation Id"
-        },
-        "source_investigation_ids": {
-          "items": {
-            "type": "string"
-          },
-          "title": "Source Investigation Ids",
-          "type": "array",
-          "uniqueItems": true
         },
         "taxonomies": {
           "items": {

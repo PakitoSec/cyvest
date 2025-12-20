@@ -111,8 +111,6 @@ def test_proxy_dir_exposes_public_fields() -> None:
             "extra",
             "score",
             "level",
-            "origin_investigation_id",
-            "source_investigation_ids",
             "check_links",
             "key",
         },
@@ -125,7 +123,6 @@ def test_proxy_dir_exposes_public_fields() -> None:
             "score",
             "level",
             "origin_investigation_id",
-            "source_investigation_ids",
             "observable_links",
             "key",
         },
@@ -134,8 +131,6 @@ def test_proxy_dir_exposes_public_fields() -> None:
             "description",
             "checks",
             "sub_containers",
-            "origin_investigation_id",
-            "source_investigation_ids",
             "key",
         },
         ti: {
@@ -145,12 +140,10 @@ def test_proxy_dir_exposes_public_fields() -> None:
             "extra",
             "score",
             "level",
-            "origin_investigation_id",
-            "source_investigation_ids",
             "taxonomies",
             "key",
         },
-        enrichment: {"name", "data", "context", "origin_investigation_id", "source_investigation_ids", "key"},
+        enrichment: {"name", "data", "context", "key"},
     }
 
     for proxy, fields in expectations.items():

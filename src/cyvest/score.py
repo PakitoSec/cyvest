@@ -74,6 +74,8 @@ if TYPE_CHECKING:
 class ScoreChangeSink(Protocol):
     """Interface for applying score/level changes with optional side effects."""
 
+    investigation_id: str
+
     def apply_score_change(
         self,
         obj: object,
@@ -143,6 +145,7 @@ class ScoreEngine:
         self._check_keys_by_observable_key: dict[str, set[str]] = {}
         self._score_mode = ScoreMode.normalize(score_mode)
         self._sink = sink
+        self._investigation_id = sink.investigation_id
 
     def register_observable(self, observable: Observable) -> None:
         """
@@ -394,10 +397,10 @@ class ScoreEngine:
 
             eligible_observables: list[Observable] = []
             for link in getattr(check, "observable_links", []):
-                is_effective = (
-                    link.propagation_mode == PropagationMode.GLOBAL
-                    or link.origin_investigation_id == check.origin_investigation_id
-                )
+                if link.propagation_mode == PropagationMode.GLOBAL:
+                    is_effective = True
+                else:
+                    is_effective = check.origin_investigation_id == self._investigation_id
                 if not is_effective:
                     continue
                 obs = self._observables.get(link.observable_key)

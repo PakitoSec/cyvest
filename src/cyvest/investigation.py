@@ -120,8 +120,6 @@ class Investigation:
             extra=data,
             score=Decimal("0"),
             level=Level.INFO,
-            origin_investigation_id=self.investigation_id,
-            source_investigation_ids={self.investigation_id},
         )
         self._observables[self._root_observable.key] = self._root_observable
         self._score_engine.register_observable(self._root_observable)
@@ -130,10 +128,6 @@ class Investigation:
             event_type="OBSERVABLE_CREATED",
             object_type="observable",
             object_key=self._root_observable.key,
-            details={
-                "origin_investigation_id": self._root_observable.origin_investigation_id,
-                "source_investigation_ids": sorted(self._root_observable.source_investigation_ids),
-            },
         )
 
     def _record_event(
@@ -184,32 +178,14 @@ class Investigation:
             source_obs.relationships.append(rel)
 
     def _add_check_observable_link(self, check: Check, link: ObservableLink) -> bool:
-        existing: dict[tuple[str, str, PropagationMode], int] = {}
+        existing: dict[tuple[str, PropagationMode], int] = {}
         for idx, existing_link in enumerate(check.observable_links):
-            existing[
-                (existing_link.observable_key, existing_link.origin_investigation_id, existing_link.propagation_mode)
-            ] = idx
-        link_tuple = (link.observable_key, link.origin_investigation_id, link.propagation_mode)
-        existing_idx = existing.get(link_tuple)
-        if existing_idx is not None:
-            existing_link = check.observable_links[existing_idx]
-            merged_sources = (
-                set(existing_link.source_investigation_ids)
-                | set(link.source_investigation_ids)
-                | {link.origin_investigation_id}
-            )
-            check.observable_links[existing_idx] = existing_link.model_copy(
-                update={"source_investigation_ids": merged_sources}
-            )
+            existing[(existing_link.observable_key, existing_link.propagation_mode)] = idx
+        link_tuple = (link.observable_key, link.propagation_mode)
+        if link_tuple in existing:
             return False
 
-        check.observable_links.append(
-            link.model_copy(
-                update={
-                    "source_investigation_ids": set(link.source_investigation_ids) or {link.origin_investigation_id}
-                }
-            )
-        )
+        check.observable_links.append(link)
         return True
 
     def _container_add_check(self, container: Container, check: Check) -> None:
@@ -375,18 +351,6 @@ class Investigation:
         Returns:
             Tuple of (merged observable, deferred relationships)
         """
-        # Ensure provenance defaults
-        if not incoming.origin_investigation_id:
-            incoming.origin_investigation_id = self.investigation_id
-        if not incoming.source_investigation_ids:
-            incoming.source_investigation_ids = {incoming.origin_investigation_id}
-
-        if not existing.origin_investigation_id:
-            existing.origin_investigation_id = incoming.origin_investigation_id
-        incoming_origin_before = incoming.origin_investigation_id
-        if incoming_origin_before:
-            existing.source_investigation_ids |= set(incoming.source_investigation_ids) | {incoming_origin_before}
-
         # Normal merge logic for scores and levels (SAFE level protection in Observable.update_score)
         # Take the higher score
         if incoming.score > existing.score:
@@ -394,7 +358,6 @@ class Investigation:
                 existing,
                 incoming.score,
                 reason=f"Merged from {incoming.key}",
-                contributing_investigation_ids=set(incoming.source_investigation_ids),
             )
 
         # Take the higher level
@@ -457,11 +420,10 @@ class Investigation:
         Returns:
             The merged check (existing is modified in place)
         """
-        # Ensure provenance defaults
         if not incoming.origin_investigation_id:
             incoming.origin_investigation_id = self.investigation_id
-        if not incoming.source_investigation_ids:
-            incoming.source_investigation_ids = {incoming.origin_investigation_id}
+        if not existing.origin_investigation_id:
+            existing.origin_investigation_id = incoming.origin_investigation_id
 
         # Take the higher score
         if incoming.score > existing.score:
@@ -469,15 +431,11 @@ class Investigation:
                 existing,
                 incoming.score,
                 reason=f"Merged from {incoming.key}",
-                contributing_investigation_ids=set(incoming.source_investigation_ids),
             )
 
         # Take the higher level
         if incoming.level > existing.level:
             self.apply_level_change(existing, incoming.level, reason=f"Merged from {incoming.key}")
-
-        incoming_origin_before = incoming.origin_investigation_id
-        existing.source_investigation_ids |= set(incoming.source_investigation_ids) | {incoming_origin_before}
 
         # Update extra (merge dictionaries)
         existing.extra.update(incoming.extra)
@@ -489,42 +447,16 @@ class Investigation:
             else:
                 existing.comment = incoming.comment
 
-        existing_by_tuple: dict[tuple[str, str, PropagationMode], int] = {}
+        existing_by_tuple: dict[tuple[str, PropagationMode], int] = {}
         for idx, existing_link in enumerate(existing.observable_links):
-            existing_by_tuple[
-                (existing_link.observable_key, existing_link.origin_investigation_id, existing_link.propagation_mode)
-            ] = idx
-
-        canonical_origin = existing.origin_investigation_id or incoming.origin_investigation_id or self.investigation_id
+            existing_by_tuple[(existing_link.observable_key, existing_link.propagation_mode)] = idx
         for incoming_link in incoming.observable_links:
-            incoming_link_origin = incoming_link.origin_investigation_id
-            incoming_sources = set(incoming_link.source_investigation_ids)
-            if incoming_link_origin:
-                incoming_sources.add(incoming_link_origin)
-            if canonical_origin:
-                incoming_sources.add(canonical_origin)
-            normalized_link = incoming_link.model_copy(
-                update={
-                    "origin_investigation_id": canonical_origin,
-                    "source_investigation_ids": incoming_sources,
-                }
-            )
-            link_tuple = (
-                normalized_link.observable_key,
-                normalized_link.origin_investigation_id,
-                normalized_link.propagation_mode,
-            )
+            link_tuple = (incoming_link.observable_key, incoming_link.propagation_mode)
             existing_idx = existing_by_tuple.get(link_tuple)
             if existing_idx is None:
-                existing.observable_links.append(normalized_link)
+                existing.observable_links.append(incoming_link)
                 existing_by_tuple[link_tuple] = len(existing.observable_links) - 1
                 continue
-
-            existing_link = existing.observable_links[existing_idx]
-            merged_sources = set(existing_link.source_investigation_ids) | set(normalized_link.source_investigation_ids)
-            existing.observable_links[existing_idx] = existing_link.model_copy(
-                update={"source_investigation_ids": merged_sources}
-            )
 
         return existing
 
@@ -546,25 +478,12 @@ class Investigation:
         Returns:
             The merged threat intel (existing is modified in place)
         """
-        # Ensure provenance defaults
-        if not incoming.origin_investigation_id:
-            incoming.origin_investigation_id = self.investigation_id
-        if not incoming.source_investigation_ids:
-            incoming.source_investigation_ids = {incoming.origin_investigation_id}
-
-        if not existing.origin_investigation_id:
-            existing.origin_investigation_id = incoming.origin_investigation_id
-        incoming_origin_before = incoming.origin_investigation_id
-        if incoming_origin_before:
-            existing.source_investigation_ids |= set(incoming.source_investigation_ids) | {incoming_origin_before}
-
         # Take the higher score
         if incoming.score > existing.score:
             self.apply_score_change(
                 existing,
                 incoming.score,
                 reason=f"Merged from {incoming.key}",
-                contributing_investigation_ids=set(incoming.source_investigation_ids),
             )
 
         # Take the higher level
@@ -612,18 +531,6 @@ class Investigation:
                     base[key] = value
             return base
 
-        # Ensure provenance defaults
-        if not incoming.origin_investigation_id:
-            incoming.origin_investigation_id = self.investigation_id
-        if not incoming.source_investigation_ids:
-            incoming.source_investigation_ids = {incoming.origin_investigation_id}
-
-        if not existing.origin_investigation_id:
-            existing.origin_investigation_id = incoming.origin_investigation_id
-        incoming_origin_before = incoming.origin_investigation_id
-        if incoming_origin_before:
-            existing.source_investigation_ids |= set(incoming.source_investigation_ids) | {incoming_origin_before}
-
         # Deep merge data structures
         if isinstance(existing.data, dict) and isinstance(incoming.data, dict):
             deep_merge(existing.data, incoming.data)
@@ -651,18 +558,6 @@ class Investigation:
         Returns:
             The merged container (existing is modified in place)
         """
-        # Ensure provenance defaults
-        if not incoming.origin_investigation_id:
-            incoming.origin_investigation_id = self.investigation_id
-        if not incoming.source_investigation_ids:
-            incoming.source_investigation_ids = {incoming.origin_investigation_id}
-
-        if not existing.origin_investigation_id:
-            existing.origin_investigation_id = incoming.origin_investigation_id
-        incoming_origin_before = incoming.origin_investigation_id
-        if incoming_origin_before:
-            existing.source_investigation_ids |= set(incoming.source_investigation_ids) | {incoming_origin_before}
-
         # Update description if incoming has one
         if incoming.description:
             existing.description = incoming.description
@@ -701,11 +596,6 @@ class Investigation:
         Returns:
             Tuple of (resulting observable, deferred relationships)
         """
-        if not obs.origin_investigation_id:
-            obs.origin_investigation_id = self.investigation_id
-        if not obs.source_investigation_ids:
-            obs.source_investigation_ids = {obs.origin_investigation_id}
-
         if obs.key in self._observables:
             r = self._merge_observable(self._observables[obs.key], obs)
             self._score_engine.recalculate_all()
@@ -720,10 +610,6 @@ class Investigation:
             event_type="OBSERVABLE_CREATED",
             object_type="observable",
             object_key=obs.key,
-            details={
-                "origin_investigation_id": obs.origin_investigation_id,
-                "source_investigation_ids": sorted(obs.source_investigation_ids),
-            },
         )
         return obs, []
 
@@ -747,8 +633,6 @@ class Investigation:
 
         if not getattr(check, "origin_investigation_id", None):
             check.origin_investigation_id = self.investigation_id
-        if not getattr(check, "source_investigation_ids", None):
-            check.source_investigation_ids = {check.origin_investigation_id}
 
         # Register new check
         self._checks[check.key] = check
@@ -760,10 +644,6 @@ class Investigation:
             event_type="CHECK_CREATED",
             object_type="check",
             object_key=check.key,
-            details={
-                "origin_investigation_id": check.origin_investigation_id,
-                "source_investigation_ids": sorted(check.source_investigation_ids),
-            },
         )
         return check
 
@@ -778,11 +658,6 @@ class Investigation:
         Returns:
             The resulting threat intel (either new or merged)
         """
-        if not ti.origin_investigation_id:
-            ti.origin_investigation_id = self.investigation_id
-        if not ti.source_investigation_ids:
-            ti.source_investigation_ids = {ti.origin_investigation_id}
-
         if ti.key in self._threat_intels:
             merged_ti = self._merge_threat_intel(self._threat_intels[ti.key], ti)
             # Propagate score to observable
@@ -823,11 +698,6 @@ class Investigation:
         Returns:
             The resulting enrichment (either new or merged)
         """
-        if not enrichment.origin_investigation_id:
-            enrichment.origin_investigation_id = self.investigation_id
-        if not enrichment.source_investigation_ids:
-            enrichment.source_investigation_ids = {enrichment.origin_investigation_id}
-
         if enrichment.key in self._enrichments:
             return self._merge_enrichment(self._enrichments[enrichment.key], enrichment)
 
@@ -837,10 +707,6 @@ class Investigation:
             event_type="ENRICHMENT_CREATED",
             object_type="enrichment",
             object_key=enrichment.key,
-            details={
-                "origin_investigation_id": enrichment.origin_investigation_id,
-                "source_investigation_ids": sorted(enrichment.source_investigation_ids),
-            },
         )
         return enrichment
 
@@ -854,11 +720,6 @@ class Investigation:
         Returns:
             The resulting container (either new or merged)
         """
-        if not container.origin_investigation_id:
-            container.origin_investigation_id = self.investigation_id
-        if not container.source_investigation_ids:
-            container.source_investigation_ids = {container.origin_investigation_id}
-
         if container.key in self._containers:
             r = self._merge_container(self._containers[container.key], container)
             self._score_engine.recalculate_all()
@@ -871,10 +732,6 @@ class Investigation:
             event_type="CONTAINER_CREATED",
             object_type="container",
             object_key=container.key,
-            details={
-                "origin_investigation_id": container.origin_investigation_id,
-                "source_investigation_ids": sorted(container.source_investigation_ids),
-            },
         )
         return container
 
@@ -978,7 +835,6 @@ class Investigation:
             propagation_mode = PropagationMode(propagation_mode)
             link = ObservableLink(
                 observable_key=observable_key,
-                origin_investigation_id=self.investigation_id,
                 propagation_mode=propagation_mode,
             )
             created = self._add_check_observable_link(check, link)
@@ -992,7 +848,6 @@ class Investigation:
                     details={
                         "observable_key": observable_key,
                         "propagation_mode": propagation_mode.value,
-                        "origin_investigation_id": self.investigation_id,
                     },
                 )
                 is_effective = (
@@ -1367,14 +1222,6 @@ class Investigation:
             other: The investigation to merge
         """
 
-        def _ensure_origin(obj: Any, fallback_origin: str) -> None:
-            if not obj.origin_investigation_id:
-                obj.origin_investigation_id = fallback_origin
-            if not obj.source_investigation_ids:
-                origin = obj.origin_investigation_id
-                if isinstance(origin, str) and origin:
-                    obj.source_investigation_ids = {origin}
-
         def _diff_fields(before: dict[str, Any], after: dict[str, Any]) -> list[str]:
             return [field for field, value in before.items() if value != after.get(field)]
 
@@ -1396,17 +1243,13 @@ class Investigation:
                 "whitelisted": obs.whitelisted,
                 "threat_intels": sorted(ti.key for ti in obs.threat_intels),
                 "relationships": sorted(relationships),
-                "origin_investigation_id": obs.origin_investigation_id,
-                "source_investigation_ids": set(obs.source_investigation_ids),
             }
 
         def _snapshot_check(check: Check) -> dict[str, Any]:
             links = [
                 (
                     link.observable_key,
-                    link.origin_investigation_id,
                     link.propagation_mode.value,
-                    tuple(sorted(link.source_investigation_ids)),
                 )
                 for link in check.observable_links
             ]
@@ -1417,7 +1260,6 @@ class Investigation:
                 "description": check.description,
                 "extra": deepcopy(check.extra),
                 "origin_investigation_id": check.origin_investigation_id,
-                "source_investigation_ids": set(check.source_investigation_ids),
                 "observable_links": sorted(links),
             }
 
@@ -1428,16 +1270,12 @@ class Investigation:
                 "comment": ti.comment,
                 "extra": deepcopy(ti.extra),
                 "taxonomies": deepcopy(ti.taxonomies),
-                "origin_investigation_id": ti.origin_investigation_id,
-                "source_investigation_ids": set(ti.source_investigation_ids),
             }
 
         def _snapshot_enrichment(enrichment: Enrichment) -> dict[str, Any]:
             return {
                 "context": enrichment.context,
                 "data": deepcopy(enrichment.data),
-                "origin_investigation_id": enrichment.origin_investigation_id,
-                "source_investigation_ids": set(enrichment.source_investigation_ids),
             }
 
         def _snapshot_container(container: Container) -> dict[str, Any]:
@@ -1445,8 +1283,6 @@ class Investigation:
                 "description": container.description,
                 "checks": sorted(check.key for check in container.checks),
                 "sub_containers": sorted(container.sub_containers.keys()),
-                "origin_investigation_id": container.origin_investigation_id,
-                "source_investigation_ids": set(container.source_investigation_ids),
             }
 
         merge_summary: list[dict[str, Any]] = []
@@ -1454,7 +1290,6 @@ class Investigation:
         # PASS 1: Merge observables and collect deferred relationships
         all_deferred_relationships = []
         for obs in other._observables.values():
-            _ensure_origin(obs, other.investigation_id)
             existing = self._observables.get(obs.key)
             before = _snapshot_observable(existing) if existing else None
             _, deferred = self.add_observable(obs)
@@ -1498,7 +1333,6 @@ class Investigation:
 
         # Merge threat intels (need to link to observables)
         for ti in other._threat_intels.values():
-            _ensure_origin(ti, other.investigation_id)
             existing_ti = self._threat_intels.get(ti.key)
             before = _snapshot_threat_intel(existing_ti) if existing_ti else None
             # Find the observable this TI belongs to
@@ -1523,7 +1357,6 @@ class Investigation:
 
         # Merge checks
         for check in other._checks.values():
-            _ensure_origin(check, other.investigation_id)
             existing_check = self._checks.get(check.key)
             before = _snapshot_check(existing_check) if existing_check else None
             self.add_check(check)
@@ -1545,7 +1378,6 @@ class Investigation:
 
         # Merge enrichments
         for enrichment in other._enrichments.values():
-            _ensure_origin(enrichment, other.investigation_id)
             existing_enrichment = self._enrichments.get(enrichment.key)
             before = _snapshot_enrichment(existing_enrichment) if existing_enrichment else None
             self.add_enrichment(enrichment)
@@ -1567,7 +1399,6 @@ class Investigation:
 
         # Merge containers
         for container in other._containers.values():
-            _ensure_origin(container, other.investigation_id)
             existing_container = self._containers.get(container.key)
             before = _snapshot_container(existing_container) if existing_container else None
             self.add_container(container)
@@ -1591,7 +1422,7 @@ class Investigation:
         for entry in other.get_whitelists():
             self.add_whitelist(entry.identifier, entry.name, entry.justification)
 
-        # Rebuild link index after merges (safe, provenance-preserving)
+        # Rebuild link index after merges
         self._score_engine.rebuild_link_index()
         self._refresh_check_links()
 

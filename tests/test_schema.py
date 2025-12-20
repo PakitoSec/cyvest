@@ -49,7 +49,7 @@ def test_level_required_in_serialization_schema() -> None:
         if model is Observable:
             assert {"score", "threat_intels", "relationships", "internal", "whitelisted"} <= required
         if model is Check:
-            assert {"origin_investigation_id", "source_investigation_ids", "observable_links", "score"} <= required
+            assert {"origin_investigation_id", "observable_links", "score"} <= required
 
 
 def test_container_aggregated_level_schema() -> None:

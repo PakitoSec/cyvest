@@ -330,7 +330,7 @@ class BodiesDomainTask(BaseRule):
             # Create check and link to container
             chk = (
                 cy.check(f"body-domain-{domain}", "body", f"Domain analysis {domain}", comment=f"> score: {score}")
-                .link_observable(domain_obs)
+                .link_observable(domain_obs, propagation_mode=cy.PROP.GLOBAL)
                 .in_container(container)
             )
 

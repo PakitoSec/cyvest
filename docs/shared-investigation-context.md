@@ -226,7 +226,7 @@ print(path)  # /absolute/path/to/investigation.json
 > Access merged results by reusing the original `Investigation` instance you passed to `SharedInvestigationContext`; reconciliation mutates it in place.
 
 !!! note "Provenance-aware reconciliation"
-    `investigation_id` is serialized and every check/link carries canonical provenance (`origin_investigation_id`) plus audit attribution (`source_investigation_ids`).
+    `investigation_id` is serialized and checks carry canonical provenance (`origin_investigation_id`) for LOCAL_ONLY propagation.
 
 ## Thread Safety
 

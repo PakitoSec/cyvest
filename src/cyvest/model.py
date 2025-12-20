@@ -162,8 +162,6 @@ class ThreatIntel(BaseModel):
     extra: dict[str, Any] = Field(...)
     score: Decimal = Field(...)
     level: Level = Field(...)
-    origin_investigation_id: str | None = Field(default=None)
-    source_investigation_ids: set[str] = Field(default_factory=set)
     taxonomies: list[dict[str, Any]] = Field(...)
     key: str = Field(...)
 
@@ -205,16 +203,6 @@ class ThreatIntel(BaseModel):
             values["taxonomies"] = []
         if "key" not in values:
             values["key"] = ""
-        if values.get("source_investigation_ids") is None:
-            values["source_investigation_ids"] = set()
-        if "source_investigation_ids" not in values:
-            values["source_investigation_ids"] = set()
-        source_ids = values.get("source_investigation_ids") or set()
-        if not source_ids:
-            origin = values.get("origin_investigation_id")
-            if isinstance(origin, str) and origin:
-                source_ids = {origin}
-        values["source_investigation_ids"] = source_ids
         return values
 
     @model_validator(mode="after")
@@ -253,8 +241,6 @@ class Observable(BaseModel):
     extra: dict[str, Any] = Field(...)
     score: Decimal = Field(...)
     level: Level = Field(...)
-    origin_investigation_id: str | None = Field(default=None)
-    source_investigation_ids: set[str] = Field(default_factory=set)
     threat_intels: list[ThreatIntel] = Field(...)
     relationships: list[Relationship] = Field(...)
     key: str = Field(...)
@@ -315,16 +301,6 @@ class Observable(BaseModel):
             values["relationships"] = []
         if "key" not in values:
             values["key"] = ""
-        if values.get("source_investigation_ids") is None:
-            values["source_investigation_ids"] = set()
-        if "source_investigation_ids" not in values:
-            values["source_investigation_ids"] = set()
-        source_ids = values.get("source_investigation_ids") or set()
-        if not source_ids:
-            origin = values.get("origin_investigation_id")
-            if isinstance(origin, str) and origin:
-                source_ids = {origin}
-        values["source_investigation_ids"] = source_ids
         return values
 
     @model_validator(mode="after")
@@ -368,24 +344,7 @@ class ObservableLink(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     observable_key: str
-    origin_investigation_id: str
-    source_investigation_ids: set[str] = Field(...)
     propagation_mode: PropagationMode = PropagationMode.LOCAL_ONLY
-
-    @model_validator(mode="before")
-    @classmethod
-    def ensure_audit_defaults(cls, values: Any) -> Any:
-        if not isinstance(values, dict):
-            return values
-        source_ids = values.get("source_investigation_ids")
-        if source_ids is None:
-            source_ids = set()
-        if not source_ids:
-            origin = values.get("origin_investigation_id")
-            if isinstance(origin, str) and origin:
-                source_ids = {origin}
-        values["source_investigation_ids"] = source_ids
-        return values
 
 
 class Check(BaseModel):
@@ -406,7 +365,6 @@ class Check(BaseModel):
     score: Decimal = Field(...)
     level: Level = Field(...)
     origin_investigation_id: str = Field(...)
-    source_investigation_ids: set[str] = Field(...)
     observable_links: list[ObservableLink] = Field(...)
     key: str = Field(...)
 
@@ -442,10 +400,6 @@ class Check(BaseModel):
             values["comment"] = ""
         if "observable_links" not in values:
             values["observable_links"] = []
-        if values.get("source_investigation_ids") is None:
-            values["source_investigation_ids"] = set()
-        if "source_investigation_ids" not in values:
-            values["source_investigation_ids"] = set()
         if "key" not in values:
             values["key"] = ""
         return values
@@ -455,8 +409,6 @@ class Check(BaseModel):
         """Generate key."""
         if not self.key:
             self.key = keys.generate_check_key(self.check_id, self.scope)
-        if not self.source_investigation_ids:
-            self.source_investigation_ids = {self.origin_investigation_id}
         return self
 
     @field_serializer("score")
@@ -482,8 +434,6 @@ class Enrichment(BaseModel):
     name: str
     data: Any = Field(...)
     context: str = Field(...)
-    origin_investigation_id: str | None = Field(default=None)
-    source_investigation_ids: set[str] = Field(default_factory=set)
     key: str = Field(...)
 
     @model_validator(mode="after")
@@ -504,16 +454,6 @@ class Enrichment(BaseModel):
             values["context"] = ""
         if "key" not in values:
             values["key"] = ""
-        if values.get("source_investigation_ids") is None:
-            values["source_investigation_ids"] = set()
-        if "source_investigation_ids" not in values:
-            values["source_investigation_ids"] = set()
-        source_ids = values.get("source_investigation_ids") or set()
-        if not source_ids:
-            origin = values.get("origin_investigation_id")
-            if isinstance(origin, str) and origin:
-                source_ids = {origin}
-        values["source_investigation_ids"] = source_ids
         return values
 
 
@@ -531,8 +471,6 @@ class Container(BaseModel):
     description: str = ""
     checks: list[Check] = Field(...)
     sub_containers: dict[str, Container] = Field(...)
-    origin_investigation_id: str | None = Field(default=None)
-    source_investigation_ids: set[str] = Field(default_factory=set)
     key: str = Field(...)
 
     @model_validator(mode="after")
@@ -553,16 +491,6 @@ class Container(BaseModel):
             values["sub_containers"] = {}
         if "key" not in values:
             values["key"] = ""
-        if values.get("source_investigation_ids") is None:
-            values["source_investigation_ids"] = set()
-        if "source_investigation_ids" not in values:
-            values["source_investigation_ids"] = set()
-        source_ids = values.get("source_investigation_ids") or set()
-        if not source_ids:
-            origin = values.get("origin_investigation_id")
-            if isinstance(origin, str) and origin:
-                source_ids = {origin}
-        values["source_investigation_ids"] = source_ids
         return values
 
     @computed_field(return_type=Decimal)

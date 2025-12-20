@@ -24,8 +24,6 @@ export type ObjectKey = string | null;
  * Append-only investigation audit log.
  */
 export type EventLog = AuditEvent[];
-export type OriginInvestigationId = string | null;
-export type SourceInvestigationIds = string[];
 export type ThreatIntels = string[];
 /**
  * Direction of a relationship between observables.
@@ -36,23 +34,15 @@ export type Relationships = Relationship[];
  * Checks that currently link to this observable (navigation-only).
  */
 export type CheckLinks = string[];
-export type SourceInvestigationIds1 = string[];
-export type SourceInvestigationIds2 = string[];
 /**
  * Controls how a Check↔Observable link propagates across merged investigations.
  */
 export type PropagationMode = "LOCAL_ONLY" | "GLOBAL";
 export type ObservableLinks = ObservableLink[];
-export type OriginInvestigationId1 = string | null;
-export type SourceInvestigationIds3 = string[];
 export type Taxonomies = {
   [k: string]: unknown;
 }[];
-export type OriginInvestigationId2 = string | null;
-export type SourceInvestigationIds4 = string[];
 export type Checks1 = string[];
-export type OriginInvestigationId3 = string | null;
-export type SourceInvestigationIds5 = string[];
 /**
  * Root observable type used during data extraction.
  */
@@ -155,8 +145,6 @@ export interface Observable {
   extra: Extra;
   score: number;
   level: Level;
-  origin_investigation_id?: OriginInvestigationId;
-  source_investigation_ids?: SourceInvestigationIds;
   threat_intels: ThreatIntels;
   relationships: Relationships;
   key: string;
@@ -197,7 +185,6 @@ export interface Check {
   score: number;
   level: Level;
   origin_investigation_id: string;
-  source_investigation_ids: SourceInvestigationIds1;
   observable_links: ObservableLinks;
   key: string;
   score_display: string;
@@ -211,8 +198,6 @@ export interface Extra1 {
  */
 export interface ObservableLink {
   observable_key: string;
-  origin_investigation_id: string;
-  source_investigation_ids: SourceInvestigationIds2;
   propagation_mode?: PropagationMode;
 }
 /**
@@ -240,8 +225,6 @@ export interface ThreatIntel {
   extra: Extra2;
   score: number;
   level: Level;
-  origin_investigation_id?: OriginInvestigationId1;
-  source_investigation_ids?: SourceInvestigationIds3;
   taxonomies: Taxonomies;
   key: string;
   score_display: string;
@@ -266,8 +249,6 @@ export interface Enrichment {
   name: string;
   data: Data;
   context: string;
-  origin_investigation_id?: OriginInvestigationId2;
-  source_investigation_ids?: SourceInvestigationIds4;
   key: string;
   [k: string]: unknown;
 }
@@ -291,8 +272,6 @@ export interface Container {
   description?: string;
   checks: Checks1;
   sub_containers: SubContainers;
-  origin_investigation_id?: OriginInvestigationId3;
-  source_investigation_ids?: SourceInvestigationIds5;
   key: string;
   aggregated_score: number;
   aggregated_level: Level;

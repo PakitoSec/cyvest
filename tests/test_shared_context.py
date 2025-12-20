@@ -946,14 +946,14 @@ def test_get_global_score():
     assert initial_score == Decimal("0")
 
     with shared.create_cyvest() as cy:
-        cy.check("test", "test", description="test").link_observable(cy.root())
+        cy.check("test", "test", description="test").link_observable(cy.root(), propagation_mode="GLOBAL")
 
     # Directly add threat to main investigation's root
     root = inv.get_root()
     ti = ThreatIntel(source="DirectThreat", observable_key=root.key, score=Decimal("7"))
     inv.add_threat_intel(ti, root)
 
-    # Score should be updated (root propagates to checks now)
+    # Score should be updated (root propagates to checks)
     score = shared.get_global_score()
     assert isinstance(score, Decimal)
     assert score >= Decimal("7")

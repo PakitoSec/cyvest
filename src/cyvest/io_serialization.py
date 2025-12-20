@@ -365,8 +365,6 @@ def load_investigation_json(filepath: str | Path) -> Cyvest:
             "extra": obs_info.get("extra", {}),
             "score": Decimal(str(obs_info.get("score", 0))),
             "level": obs_info.get("level", "INFO"),
-            "origin_investigation_id": obs_info.get("origin_investigation_id"),
-            "source_investigation_ids": obs_info.get("source_investigation_ids"),
             "key": obs_info.get("key", ""),
             "relationships": [Relationship.model_validate(rel) for rel in obs_info.get("relationships", [])],
         }
@@ -384,8 +382,6 @@ def load_investigation_json(filepath: str | Path) -> Cyvest:
             "extra": root_obs_info.get("extra", data_payload),
             "score": Decimal(str(root_obs_info.get("score", 0))),
             "level": root_obs_info.get("level", "INFO"),
-            "origin_investigation_id": root_obs_info.get("origin_investigation_id"),
-            "source_investigation_ids": root_obs_info.get("source_investigation_ids"),
             "key": new_root_key,
             "relationships": [Relationship.model_validate(rel) for rel in root_obs_info.get("relationships", [])],
         }
@@ -401,8 +397,6 @@ def load_investigation_json(filepath: str | Path) -> Cyvest:
             "extra": ti_info.get("extra", {}),
             "score": Decimal(str(ti_info.get("score", 0))),
             "level": ti_info.get("level", "INFO"),
-            "origin_investigation_id": ti_info.get("origin_investigation_id"),
-            "source_investigation_ids": ti_info.get("source_investigation_ids"),
             "taxonomies": ti_info.get("taxonomies", []),
             "key": ti_info.get("key", ""),
         }
@@ -414,6 +408,18 @@ def load_investigation_json(filepath: str | Path) -> Cyvest:
     # Checks - leverage Pydantic model_validate
     for scope_checks in data.get("checks", {}).values():
         for check_info in scope_checks:
+            raw_links = check_info.get("observable_links", []) or []
+            normalized_links = []
+            for link in raw_links:
+                if isinstance(link, dict):
+                    normalized_links.append(
+                        {
+                            "observable_key": link.get("observable_key", ""),
+                            "propagation_mode": link.get("propagation_mode", "LOCAL_ONLY"),
+                        }
+                    )
+                else:
+                    normalized_links.append(link)
             check_data = {
                 "check_id": check_info.get("check_id", ""),
                 "scope": check_info.get("scope", ""),
@@ -422,9 +428,9 @@ def load_investigation_json(filepath: str | Path) -> Cyvest:
                 "extra": check_info.get("extra", {}),
                 "score": Decimal(str(check_info.get("score", 0))),
                 "level": check_info.get("level", "NONE"),
-                "origin_investigation_id": check_info.get("origin_investigation_id"),
-                "source_investigation_ids": check_info.get("source_investigation_ids"),
-                "observable_links": check_info.get("observable_links", []),
+                "origin_investigation_id": check_info.get("origin_investigation_id")
+                or cv._investigation.investigation_id,
+                "observable_links": normalized_links,
                 "key": check_info.get("key", ""),
             }
             check = Check.model_validate(check_data)
@@ -436,8 +442,6 @@ def load_investigation_json(filepath: str | Path) -> Cyvest:
             "name": enr_info.get("name", ""),
             "data": enr_info.get("data", {}),
             "context": enr_info.get("context", ""),
-            "origin_investigation_id": enr_info.get("origin_investigation_id"),
-            "source_investigation_ids": enr_info.get("source_investigation_ids"),
             "key": enr_info.get("key", ""),
         }
         enrichment = Enrichment.model_validate(enr_data)
@@ -448,8 +452,6 @@ def load_investigation_json(filepath: str | Path) -> Cyvest:
         container_data = {
             "path": container_info.get("path", ""),
             "description": container_info.get("description", ""),
-            "origin_investigation_id": container_info.get("origin_investigation_id"),
-            "source_investigation_ids": container_info.get("source_investigation_ids"),
             "key": container_info.get("key", ""),
         }
         container = Container.model_validate(container_data)

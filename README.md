@@ -229,13 +229,13 @@ Scores and levels are automatically calculated and propagated:
   - **INBOUND relationships**: source scores propagate to target (target is parent)
   - **BIDIRECTIONAL relationships**: no hierarchical propagation
 - **Observable → Check (provenance-aware)**: Check score/level only considers observables reachable through *effective* links (`observable_links`)
-  - A link is effective when `propagation_mode="GLOBAL"` or when `origin_investigation_id == check.origin_investigation_id`
+  - A link is effective when `propagation_mode="GLOBAL"` or when the check's `origin_investigation_id` matches the current investigation id
 - **Check → Global**: All check scores sum to global investigation score
 
 **Provenance model**
 
 - `Investigation.investigation_id` is a stable ULID included in exports.
-- Checks and links keep a *canonical origin* (`origin_investigation_id`) used for scoring, plus an audit set (`source_investigation_ids`) that records which investigations contributed data during merges.
+- Checks keep a *canonical origin* (`origin_investigation_id`) for LOCAL_ONLY propagation; it is compared against the current investigation id.
 
 **Audit log**
 

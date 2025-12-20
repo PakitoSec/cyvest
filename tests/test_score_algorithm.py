@@ -338,13 +338,12 @@ def test_global_link_can_affect_foreign_check() -> None:
     assert loaded_foreign.level == Level.MALICIOUS
 
 
-def test_check_reconciliation_rewrites_link_origin_and_preserves_audit_sources() -> None:
-    """Merging the same check key rewrites incoming link origins to the canonical check origin while preserving audit."""  # noqa: E501
+def test_check_reconciliation_preserves_origin_and_links() -> None:
+    """Merging the same check key keeps the original check origin and merges links."""
     cv1 = Cyvest()
     cv2 = Cyvest()
 
     cv1_id = cv1._investigation.investigation_id
-    cv2_id = cv2._investigation.investigation_id
 
     obs1 = cv1.observable_create("ip", "10.0.0.60")
     cv1.observable_add_threat_intel(obs1.key, source="s1", score=Decimal("4.0"))
@@ -361,38 +360,46 @@ def test_check_reconciliation_rewrites_link_origin_and_preserves_audit_sources()
     merged = cv1.check_get(check1.key)
     assert merged is not None
     assert merged.origin_investigation_id == cv1_id
-    assert {cv1_id, cv2_id} <= merged.source_investigation_ids
 
-    # Incoming link is rewritten to the canonical origin but keeps audit attribution.
-    link_to_obs2 = next(link for link in merged.observable_links if link.observable_key == obs2.key)
-    assert link_to_obs2.origin_investigation_id == cv1_id
-    assert cv2_id in link_to_obs2.source_investigation_ids
+    merged_keys = {link.observable_key for link in merged.observable_links}
+    assert {obs1.key, obs2.key} <= merged_keys
 
     # Both links are effective after reconciliation, so the check takes the max score.
     assert merged.score == Decimal("9.0")
     assert merged.level == Level.MALICIOUS
 
 
-def test_local_only_links_preserve_behavior_after_merge() -> None:
-    """Checks keep being influenced by links created in their origin investigation after merges."""
+def test_foreign_check_global_updates_local_only_freezes_after_merge() -> None:
+    """Foreign checks update via GLOBAL links but ignore LOCAL_ONLY changes after merges."""
     cv_main = Cyvest()
     cv_other = Cyvest()
 
-    obs = cv_other.observable_create("ip", "10.0.0.51")
-    cv_other.observable_add_threat_intel(obs.key, source="source1", score=Decimal("4.0"))
-    check = cv_other.check_create("local", "scope", "Local check")
-    cv_other.check_link_observable(check.key, obs.key)
-
+    foreign_check = cv_other.check_create("foreign", "scope", "Created in other investigation")
     cv_main.merge_investigation(cv_other)
 
-    merged_check = cv_main.check_get(check.key)
+    obs_local = cv_main.observable_create("ip", "10.0.0.51")
+    cv_main.observable_add_threat_intel(obs_local.key, source="source1", score=Decimal("2.0"))
+    cv_main.check_link_observable(foreign_check.key, obs_local.key)
+
+    obs_global = cv_main.observable_create("ip", "10.0.0.52")
+    cv_main.observable_add_threat_intel(obs_global.key, source="source1", score=Decimal("4.0"))
+    cv_main.check_link_observable(foreign_check.key, obs_global.key, propagation_mode="GLOBAL")
+
+    merged_check = cv_main.check_get(foreign_check.key)
     assert merged_check is not None
     assert merged_check.score == Decimal("4.0")
     assert merged_check.level == Level.SUSPICIOUS
 
-    # Updating the globally merged observable still affects the check via its effective LOCAL_ONLY link.
-    cv_main.observable_add_threat_intel(obs.key, source="source2", score=Decimal("7.0"))
-    assert merged_check.score == Decimal("7.0")
+    cv_later = Cyvest()
+    obs_local_later = cv_later.observable_create("ip", "10.0.0.51")
+    cv_later.observable_add_threat_intel(obs_local_later.key, source="source2", score=Decimal("8.0"))
+    obs_global_later = cv_later.observable_create("ip", "10.0.0.52")
+    cv_later.observable_add_threat_intel(obs_global_later.key, source="source2", score=Decimal("6.0"))
+    cv_main.merge_investigation(cv_later)
+
+    merged_check = cv_main.check_get(foreign_check.key)
+    assert merged_check is not None
+    assert merged_check.score == Decimal("6.0")
     assert merged_check.level == Level.MALICIOUS
 
 

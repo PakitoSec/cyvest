@@ -153,7 +153,7 @@ Scores are **Decimal** values with automatic propagation:
 1. **Threat Intel → Observable**: Observable score = **max** of all threat intel scores (not sum)
 2. **Child Observable → Parent**: Child scores aggregate to parents based on scoring mode
 3. **Observable → Check (provenance-aware)**: Check score/level only considers observables reachable through *effective* links (`observable_links`)
-   - A link is effective when `propagation_mode="GLOBAL"` or when `origin_investigation_id == check.origin_investigation_id`
+   - A link is effective when `propagation_mode="GLOBAL"` or when the check's `origin_investigation_id` matches the current investigation id
 4. **All Checks → Global**: Check scores sum to global score
 
 To override the default local-only behavior for a single link:
@@ -162,16 +162,11 @@ To override the default local-only behavior for a single link:
 cy.check_link_observable(check.key, observable.key, propagation_mode="GLOBAL")
 ```
 
-### Provenance (checks and links)
+### Provenance (checks)
 
-Cyvest keeps two provenance concepts:
+Checks carry a **canonical origin** (`origin_investigation_id`) used by scoring/propagation to decide whether a `LOCAL_ONLY` link is effective in the current investigation.
 
-- **Canonical origin** (`origin_investigation_id`): used by scoring/propagation to decide whether a `LOCAL_ONLY` link is effective.
-- **Audit sources** (`source_investigation_ids`): records which investigations contributed to a check/link during merges; it never affects scoring.
-
-Exports always include `investigation_id` so `origin_investigation_id` and `source_investigation_ids` remain meaningful after serialization.
-
-All mergeable objects (observables, checks, threat intel, enrichments, containers) also carry these two fields for provenance and audit attribution. These fields never affect scoring directly.
+Exports include `investigation_id` so check origins remain meaningful after serialization.
 
 ### Reverse Links (navigation)
 

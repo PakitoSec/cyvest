@@ -1,7 +1,7 @@
 import { resolve } from "node:path";
-import { defineProject } from "vitest/config";
+import { defineConfig } from "vitest/config";
 
-export default defineProject({
+export default defineConfig({
   resolve: {
     alias: {
       "@cyvest/cyvest-js": resolve(__dirname, "../cyvest-js/src/index.ts"),

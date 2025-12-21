@@ -14,9 +14,6 @@ importers:
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
-      vitest:
-        specifier: ^4.0.16
-        version: 4.0.16(@types/node@24.10.1)
 
   packages/cyvest-app:
     dependencies:

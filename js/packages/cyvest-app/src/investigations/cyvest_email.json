@@ -1,15 +1,15 @@
 {
-  "investigation_id": "01KD0KRJ4HM3201FS9AP0XZJA0",
+  "investigation_id": "01KD0NPHN7N24J6M4PHYY4CRRQ",
   "investigation_name": "Email Investigation",
-  "started_at": "2025-12-21T14:07:08.433738Z",
+  "started_at": "2025-12-21T14:40:59.559003Z",
   "score": 36.1,
   "level": "MALICIOUS",
   "whitelisted": false,
   "whitelists": [],
   "event_log": [
     {
-      "event_id": "01KD0KRJ4J0D68DQ5X2NM6NXWN",
-      "timestamp": "2025-12-21T14:07:08.434108Z",
+      "event_id": "01KD0NPHN77CXVZXR24X0A73QV",
+      "timestamp": "2025-12-21T14:40:59.559353Z",
       "event_type": "OBSERVABLE_CREATED",
       "actor": null,
       "reason": null,
@@ -19,8 +19,8 @@
       "details": {}
     },
     {
-      "event_id": "01KD0KRJ4MRKDBH7JZDJ9FAKM8",
-      "timestamp": "2025-12-21T14:07:08.436420Z",
+      "event_id": "01KD0NPHN8BA9Z6KVMYAN9VH3J",
+      "timestamp": "2025-12-21T14:40:59.560826Z",
       "event_type": "SCORE_CHANGED",
       "actor": null,
       "reason": "Merged from obs:artifact:root",
@@ -35,8 +35,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJ4MRXJWDW0FNY4Z3PQ5",
-      "timestamp": "2025-12-21T14:07:08.436462Z",
+      "event_id": "01KD0NPHN8VMXSMZ9493TY6H3R",
+      "timestamp": "2025-12-21T14:40:59.560870Z",
       "event_type": "OBSERVABLE_CREATED",
       "actor": null,
       "reason": null,
@@ -46,8 +46,8 @@
       "details": {}
     },
     {
-      "event_id": "01KD0KRJ4MT9FMW2HRRB4YGY31",
-      "timestamp": "2025-12-21T14:07:08.436470Z",
+      "event_id": "01KD0NPHN8Y4W670E41CRAGW0G",
+      "timestamp": "2025-12-21T14:40:59.560878Z",
       "event_type": "OBSERVABLE_CREATED",
       "actor": null,
       "reason": null,
@@ -57,8 +57,8 @@
       "details": {}
     },
     {
-      "event_id": "01KD0KRJ4MY5SEBVKB84KQ9GYJ",
-      "timestamp": "2025-12-21T14:07:08.436479Z",
+      "event_id": "01KD0NPHN8PQ36BSAX12137QJG",
+      "timestamp": "2025-12-21T14:40:59.560885Z",
       "event_type": "OBSERVABLE_CREATED",
       "actor": null,
       "reason": null,
@@ -68,8 +68,8 @@
       "details": {}
     },
     {
-      "event_id": "01KD0KRJ4MSSRW5EKNBZFJDZ3C",
-      "timestamp": "2025-12-21T14:07:08.436495Z",
+      "event_id": "01KD0NPHN8VCQAJCXXXW7KMYS4",
+      "timestamp": "2025-12-21T14:40:59.560899Z",
       "event_type": "THREAT_INTEL_ATTACHED",
       "actor": null,
       "reason": null,
@@ -82,8 +82,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJ4MZVDJF1BXBXTRP6E7",
-      "timestamp": "2025-12-21T14:07:08.436508Z",
+      "event_id": "01KD0NPHN81BCA7KRFEMH4DFDF",
+      "timestamp": "2025-12-21T14:40:59.560942Z",
       "event_type": "THREAT_INTEL_ATTACHED",
       "actor": null,
       "reason": null,
@@ -96,8 +96,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJ4M8P0J2W819SVB2PAJ",
-      "timestamp": "2025-12-21T14:07:08.436588Z",
+      "event_id": "01KD0NPHN8XHRFPF23J8E0RX97",
+      "timestamp": "2025-12-21T14:40:59.560974Z",
       "event_type": "THREAT_INTEL_ATTACHED",
       "actor": null,
       "reason": null,
@@ -110,8 +110,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJ4MBY9BCFKX1JEZRA4B",
-      "timestamp": "2025-12-21T14:07:08.436612Z",
+      "event_id": "01KD0NPHN85DYRJ4MW67JV21DJ",
+      "timestamp": "2025-12-21T14:40:59.560993Z",
       "event_type": "CHECK_CREATED",
       "actor": null,
       "reason": null,
@@ -121,8 +121,8 @@
       "details": {}
     },
     {
-      "event_id": "01KD0KRJ4MDXAHP9E9C3TMKRWG",
-      "timestamp": "2025-12-21T14:07:08.436621Z",
+      "event_id": "01KD0NPHN83TE2A56TDHYQQYZ7",
+      "timestamp": "2025-12-21T14:40:59.561000Z",
       "event_type": "CONTAINER_CREATED",
       "actor": null,
       "reason": null,
@@ -132,17 +132,17 @@
       "details": {}
     },
     {
-      "event_id": "01KD0KRJ4MR9BZK6ZM4ZPPR7EJ",
-      "timestamp": "2025-12-21T14:07:08.436656Z",
+      "event_id": "01KD0NPHN9B1F2MEDRV8TZQG8J",
+      "timestamp": "2025-12-21T14:40:59.561034Z",
       "event_type": "INVESTIGATION_MERGED",
       "actor": null,
       "reason": null,
       "tool": null,
       "object_type": "investigation",
-      "object_key": "01KD0KRJ4HM3201FS9AP0XZJA0",
+      "object_key": "01KD0NPHN7N24J6M4PHYY4CRRQ",
       "details": {
-        "from_investigation_id": "01KD0KRJ4K5B3PE2555PEJ8PFX",
-        "into_investigation_id": "01KD0KRJ4HM3201FS9AP0XZJA0",
+        "from_investigation_id": "01KD0NPHN7KH5ETG70C3HDYH9W",
+        "into_investigation_id": "01KD0NPHN7N24J6M4PHYY4CRRQ",
         "from_investigation_name": null,
         "into_investigation_name": "Email Investigation",
         "object_changes": [
@@ -206,8 +206,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJ4NZY8ANGD58FSPBHBY",
-      "timestamp": "2025-12-21T14:07:08.437353Z",
+      "event_id": "01KD0NPHNAA34733D2S4KH87T2",
+      "timestamp": "2025-12-21T14:40:59.562219Z",
       "event_type": "SCORE_CHANGED",
       "actor": null,
       "reason": "Merged from obs:email-addr:noreply@dmalicious.com",
@@ -222,8 +222,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJ4N4XXS04XAWYTNGDAZ",
-      "timestamp": "2025-12-21T14:07:08.437399Z",
+      "event_id": "01KD0NPHNA76D011PNX3JTFATK",
+      "timestamp": "2025-12-21T14:40:59.562266Z",
       "event_type": "THREAT_INTEL_ATTACHED",
       "actor": null,
       "reason": null,
@@ -236,8 +236,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJ4NXDQ3XDR38R8WNTQY",
-      "timestamp": "2025-12-21T14:07:08.437409Z",
+      "event_id": "01KD0NPHNA9X0ZTYHE0EZ0JK6B",
+      "timestamp": "2025-12-21T14:40:59.562277Z",
       "event_type": "CHECK_CREATED",
       "actor": null,
       "reason": null,
@@ -247,17 +247,17 @@
       "details": {}
     },
     {
-      "event_id": "01KD0KRJ4NGGAZ68NK40VZXT7G",
-      "timestamp": "2025-12-21T14:07:08.437455Z",
+      "event_id": "01KD0NPHNANRNJWERC6D9SNA2Z",
+      "timestamp": "2025-12-21T14:40:59.562325Z",
       "event_type": "INVESTIGATION_MERGED",
       "actor": null,
       "reason": null,
       "tool": null,
       "object_type": "investigation",
-      "object_key": "01KD0KRJ4HM3201FS9AP0XZJA0",
+      "object_key": "01KD0NPHN7N24J6M4PHYY4CRRQ",
       "details": {
-        "from_investigation_id": "01KD0KRJ4MEDP13HGTYHTKP8R9",
-        "into_investigation_id": "01KD0KRJ4HM3201FS9AP0XZJA0",
+        "from_investigation_id": "01KD0NPHN9K13SVSFVJAX762RP",
+        "into_investigation_id": "01KD0NPHN7N24J6M4PHYY4CRRQ",
         "from_investigation_name": null,
         "into_investigation_name": "Email Investigation",
         "object_changes": [
@@ -303,8 +303,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJ4PQ9NX1JCEAMYM1C6M",
-      "timestamp": "2025-12-21T14:07:08.438851Z",
+      "event_id": "01KD0NPHNB5MFRFQQ7KGRW62NP",
+      "timestamp": "2025-12-21T14:40:59.563699Z",
       "event_type": "OBSERVABLE_CREATED",
       "actor": null,
       "reason": null,
@@ -314,8 +314,8 @@
       "details": {}
     },
     {
-      "event_id": "01KD0KRJ4P62FRXJZ0NJCCR9BK",
-      "timestamp": "2025-12-21T14:07:08.438861Z",
+      "event_id": "01KD0NPHNBQGH0TKYQBMNWF9GF",
+      "timestamp": "2025-12-21T14:40:59.563711Z",
       "event_type": "CHECK_CREATED",
       "actor": null,
       "reason": null,
@@ -325,8 +325,8 @@
       "details": {}
     },
     {
-      "event_id": "01KD0KRJ4PPMK8ZKQFAAKTBNVC",
-      "timestamp": "2025-12-21T14:07:08.438867Z",
+      "event_id": "01KD0NPHNBM3SJH24148XJVA9E",
+      "timestamp": "2025-12-21T14:40:59.563719Z",
       "event_type": "ENRICHMENT_CREATED",
       "actor": null,
       "reason": null,
@@ -336,17 +336,17 @@
       "details": {}
     },
     {
-      "event_id": "01KD0KRJ4P8F7CVGBVED460BJ6",
-      "timestamp": "2025-12-21T14:07:08.438952Z",
+      "event_id": "01KD0NPHNBT6HQH7P23C495RPD",
+      "timestamp": "2025-12-21T14:40:59.563779Z",
       "event_type": "INVESTIGATION_MERGED",
       "actor": null,
       "reason": null,
       "tool": null,
       "object_type": "investigation",
-      "object_key": "01KD0KRJ4HM3201FS9AP0XZJA0",
+      "object_key": "01KD0NPHN7N24J6M4PHYY4CRRQ",
       "details": {
-        "from_investigation_id": "01KD0KRJ4NMYD1ENB82CCJ9K30",
-        "into_investigation_id": "01KD0KRJ4HM3201FS9AP0XZJA0",
+        "from_investigation_id": "01KD0NPHNAKXADNR02HW32RPQJ",
+        "into_investigation_id": "01KD0NPHN7N24J6M4PHYY4CRRQ",
         "from_investigation_name": null,
         "into_investigation_name": "Email Investigation",
         "object_changes": [
@@ -388,8 +388,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJ4S4JB7FKMKSNH7D2C8",
-      "timestamp": "2025-12-21T14:07:08.441329Z",
+      "event_id": "01KD0NPHNDBXMKYSWXKMZ1AASK",
+      "timestamp": "2025-12-21T14:40:59.565538Z",
       "event_type": "OBSERVABLE_CREATED",
       "actor": null,
       "reason": null,
@@ -399,8 +399,8 @@
       "details": {}
     },
     {
-      "event_id": "01KD0KRJ4S9JF48CTA97MBFJTY",
-      "timestamp": "2025-12-21T14:07:08.441337Z",
+      "event_id": "01KD0NPHND0Y5GPQRVPWJ7PQ95",
+      "timestamp": "2025-12-21T14:40:59.565737Z",
       "event_type": "OBSERVABLE_CREATED",
       "actor": null,
       "reason": null,
@@ -410,8 +410,8 @@
       "details": {}
     },
     {
-      "event_id": "01KD0KRJ4S3ER5C64Z9JVDEF1C",
-      "timestamp": "2025-12-21T14:07:08.441343Z",
+      "event_id": "01KD0NPHND6WHWKVECYMVB1V09",
+      "timestamp": "2025-12-21T14:40:59.565746Z",
       "event_type": "OBSERVABLE_CREATED",
       "actor": null,
       "reason": null,
@@ -421,8 +421,8 @@
       "details": {}
     },
     {
-      "event_id": "01KD0KRJ4SJ8CBT177T3TGYMG8",
-      "timestamp": "2025-12-21T14:07:08.441349Z",
+      "event_id": "01KD0NPHNDN4W1Z8R8JTFCC0FY",
+      "timestamp": "2025-12-21T14:40:59.565752Z",
       "event_type": "OBSERVABLE_CREATED",
       "actor": null,
       "reason": null,
@@ -432,8 +432,8 @@
       "details": {}
     },
     {
-      "event_id": "01KD0KRJ4SCC90FTGPZDM3YMAT",
-      "timestamp": "2025-12-21T14:07:08.441422Z",
+      "event_id": "01KD0NPHND288XX9YX1706PC9E",
+      "timestamp": "2025-12-21T14:40:59.565768Z",
       "event_type": "OBSERVABLE_CREATED",
       "actor": null,
       "reason": null,
@@ -443,8 +443,8 @@
       "details": {}
     },
     {
-      "event_id": "01KD0KRJ4S9FVNKEJC4RN35160",
-      "timestamp": "2025-12-21T14:07:08.441435Z",
+      "event_id": "01KD0NPHNDZPX1F0ESJCPMJHYX",
+      "timestamp": "2025-12-21T14:40:59.565785Z",
       "event_type": "THREAT_INTEL_ATTACHED",
       "actor": null,
       "reason": null,
@@ -457,8 +457,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJ4STWJRBT4QZKH2ZTYN",
-      "timestamp": "2025-12-21T14:07:08.441448Z",
+      "event_id": "01KD0NPHND2S8N3T9EMRWAQ8TM",
+      "timestamp": "2025-12-21T14:40:59.565799Z",
       "event_type": "THREAT_INTEL_ATTACHED",
       "actor": null,
       "reason": null,
@@ -471,8 +471,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJ4SNXN77DCFCF3MC1MR",
-      "timestamp": "2025-12-21T14:07:08.441459Z",
+      "event_id": "01KD0NPHNDD6Y4M9GJ9GD8K4VB",
+      "timestamp": "2025-12-21T14:40:59.565811Z",
       "event_type": "THREAT_INTEL_ATTACHED",
       "actor": null,
       "reason": null,
@@ -485,8 +485,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJ4S93EGN714Y8D615V4",
-      "timestamp": "2025-12-21T14:07:08.441469Z",
+      "event_id": "01KD0NPHNDJ1P859W74K2JFGXV",
+      "timestamp": "2025-12-21T14:40:59.565822Z",
       "event_type": "CHECK_CREATED",
       "actor": null,
       "reason": null,
@@ -496,8 +496,8 @@
       "details": {}
     },
     {
-      "event_id": "01KD0KRJ4SMYY4HSZ0GS3WD30W",
-      "timestamp": "2025-12-21T14:07:08.441475Z",
+      "event_id": "01KD0NPHNDXNH1RASC3MHB0BMQ",
+      "timestamp": "2025-12-21T14:40:59.565830Z",
       "event_type": "CHECK_CREATED",
       "actor": null,
       "reason": null,
@@ -507,8 +507,8 @@
       "details": {}
     },
     {
-      "event_id": "01KD0KRJ4SN08VBV7QP8YG0WAD",
-      "timestamp": "2025-12-21T14:07:08.441483Z",
+      "event_id": "01KD0NPHNDR730Y4K6BVXQV79P",
+      "timestamp": "2025-12-21T14:40:59.565838Z",
       "event_type": "CHECK_CREATED",
       "actor": null,
       "reason": null,
@@ -518,8 +518,8 @@
       "details": {}
     },
     {
-      "event_id": "01KD0KRJ4SGWQDZ7EK80JNZX76",
-      "timestamp": "2025-12-21T14:07:08.441490Z",
+      "event_id": "01KD0NPHNDNA2EXA6393AETAFV",
+      "timestamp": "2025-12-21T14:40:59.565845Z",
       "event_type": "CONTAINER_CREATED",
       "actor": null,
       "reason": null,
@@ -529,17 +529,17 @@
       "details": {}
     },
     {
-      "event_id": "01KD0KRJ4SW2Y845VW6K2HR01Q",
-      "timestamp": "2025-12-21T14:07:08.441553Z",
+      "event_id": "01KD0NPHND8222WHAZABHB94EH",
+      "timestamp": "2025-12-21T14:40:59.565914Z",
       "event_type": "INVESTIGATION_MERGED",
       "actor": null,
       "reason": null,
       "tool": null,
       "object_type": "investigation",
-      "object_key": "01KD0KRJ4HM3201FS9AP0XZJA0",
+      "object_key": "01KD0NPHN7N24J6M4PHYY4CRRQ",
       "details": {
-        "from_investigation_id": "01KD0KRJ4QBPD4E73M3YEXPWHA",
-        "into_investigation_id": "01KD0KRJ4HM3201FS9AP0XZJA0",
+        "from_investigation_id": "01KD0NPHNB0R2WTV8683BVTA72",
+        "into_investigation_id": "01KD0NPHN7N24J6M4PHYY4CRRQ",
         "from_investigation_name": null,
         "into_investigation_name": "Email Investigation",
         "object_changes": [
@@ -627,8 +627,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJ4VP4J2DHMC851RWAXH",
-      "timestamp": "2025-12-21T14:07:08.443953Z",
+      "event_id": "01KD0NPHNGV9G3VC26VMNEKYT4",
+      "timestamp": "2025-12-21T14:40:59.568216Z",
       "event_type": "OBSERVABLE_CREATED",
       "actor": null,
       "reason": null,
@@ -638,8 +638,8 @@
       "details": {}
     },
     {
-      "event_id": "01KD0KRJ4WSNNZP3JJCVSFT05D",
-      "timestamp": "2025-12-21T14:07:08.444077Z",
+      "event_id": "01KD0NPHNG7AJYA13KDD0AHSWP",
+      "timestamp": "2025-12-21T14:40:59.568343Z",
       "event_type": "THREAT_INTEL_ATTACHED",
       "actor": null,
       "reason": null,
@@ -652,8 +652,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJ4WEQW5RNZDGR05HVMY",
-      "timestamp": "2025-12-21T14:07:08.444105Z",
+      "event_id": "01KD0NPHNGRTCB6PNE8HS9HDTJ",
+      "timestamp": "2025-12-21T14:40:59.568363Z",
       "event_type": "THREAT_INTEL_ATTACHED",
       "actor": null,
       "reason": null,
@@ -666,8 +666,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJ4WJFDSARKD1WCE2533",
-      "timestamp": "2025-12-21T14:07:08.444142Z",
+      "event_id": "01KD0NPHNGMZFGT45JJJ6Y19DW",
+      "timestamp": "2025-12-21T14:40:59.568376Z",
       "event_type": "CHECK_CREATED",
       "actor": null,
       "reason": null,
@@ -677,8 +677,8 @@
       "details": {}
     },
     {
-      "event_id": "01KD0KRJ4WWDTWBCA0FTZANJAQ",
-      "timestamp": "2025-12-21T14:07:08.444216Z",
+      "event_id": "01KD0NPHNGQ4K8QQBSZ7ND7WP6",
+      "timestamp": "2025-12-21T14:40:59.568386Z",
       "event_type": "CHECK_CREATED",
       "actor": null,
       "reason": null,
@@ -688,8 +688,8 @@
       "details": {}
     },
     {
-      "event_id": "01KD0KRJ4W2GRC61J4Y3CG8WAJ",
-      "timestamp": "2025-12-21T14:07:08.444236Z",
+      "event_id": "01KD0NPHNGX4B6RHB7ETGSKZGA",
+      "timestamp": "2025-12-21T14:40:59.568397Z",
       "event_type": "CONTAINER_CREATED",
       "actor": null,
       "reason": null,
@@ -699,8 +699,8 @@
       "details": {}
     },
     {
-      "event_id": "01KD0KRJ4WK6CTA1KH8MSRFXRH",
-      "timestamp": "2025-12-21T14:07:08.444372Z",
+      "event_id": "01KD0NPHNGSARET2M0TR80RNNC",
+      "timestamp": "2025-12-21T14:40:59.568506Z",
       "event_type": "SCORE_CHANGED",
       "actor": null,
       "reason": "Linked observable obs:domain-name:virus.com updated",
@@ -715,17 +715,17 @@
       }
     },
     {
-      "event_id": "01KD0KRJ4W3RWEGXCTC0RM8ZGS",
-      "timestamp": "2025-12-21T14:07:08.444394Z",
+      "event_id": "01KD0NPHNG27RPVVKN0N1TA7JR",
+      "timestamp": "2025-12-21T14:40:59.568522Z",
       "event_type": "INVESTIGATION_MERGED",
       "actor": null,
       "reason": null,
       "tool": null,
       "object_type": "investigation",
-      "object_key": "01KD0KRJ4HM3201FS9AP0XZJA0",
+      "object_key": "01KD0NPHN7N24J6M4PHYY4CRRQ",
       "details": {
-        "from_investigation_id": "01KD0KRJ4STP1H707PRH8YAEKH",
-        "into_investigation_id": "01KD0KRJ4HM3201FS9AP0XZJA0",
+        "from_investigation_id": "01KD0NPHNETQZC5RQZD7RABT42",
+        "into_investigation_id": "01KD0NPHN7N24J6M4PHYY4CRRQ",
         "from_investigation_name": null,
         "into_investigation_name": "Email Investigation",
         "object_changes": [
@@ -794,8 +794,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJ4XGF4ESQG639YTC10M",
-      "timestamp": "2025-12-21T14:07:08.445652Z",
+      "event_id": "01KD0NPHNHMHZ6WJE7TRZGH6HH",
+      "timestamp": "2025-12-21T14:40:59.569922Z",
       "event_type": "SCORE_CHANGED",
       "actor": null,
       "reason": "Merged from obs:artifact:root",
@@ -810,8 +810,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJ4XFDX067V1K3G14R9N",
-      "timestamp": "2025-12-21T14:07:08.445791Z",
+      "event_id": "01KD0NPHNJ2WBDYEMDANTHBY3X",
+      "timestamp": "2025-12-21T14:40:59.570063Z",
       "event_type": "OBSERVABLE_CREATED",
       "actor": null,
       "reason": null,
@@ -821,8 +821,8 @@
       "details": {}
     },
     {
-      "event_id": "01KD0KRJ4XS6GQFSY90R49J3WR",
-      "timestamp": "2025-12-21T14:07:08.445798Z",
+      "event_id": "01KD0NPHNJ1WFPQYPGRCPVWM09",
+      "timestamp": "2025-12-21T14:40:59.570072Z",
       "event_type": "OBSERVABLE_CREATED",
       "actor": null,
       "reason": null,
@@ -832,8 +832,8 @@
       "details": {}
     },
     {
-      "event_id": "01KD0KRJ4X559MMXEPR49EBJRJ",
-      "timestamp": "2025-12-21T14:07:08.446139Z",
+      "event_id": "01KD0NPHNJXT8GEQZ0Z0GN9CVC",
+      "timestamp": "2025-12-21T14:40:59.570086Z",
       "event_type": "THREAT_INTEL_ATTACHED",
       "actor": null,
       "reason": null,
@@ -846,8 +846,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJ4YPXSFE8FXAMZ0S9PB",
-      "timestamp": "2025-12-21T14:07:08.446166Z",
+      "event_id": "01KD0NPHNJT27VQWW2PDJRYX05",
+      "timestamp": "2025-12-21T14:40:59.570100Z",
       "event_type": "THREAT_INTEL_ATTACHED",
       "actor": null,
       "reason": null,
@@ -860,8 +860,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJ4YJ3JQEYSDEZB2EYK9",
-      "timestamp": "2025-12-21T14:07:08.446176Z",
+      "event_id": "01KD0NPHNJX9FHGK7G6G7AZ8VT",
+      "timestamp": "2025-12-21T14:40:59.570110Z",
       "event_type": "CHECK_CREATED",
       "actor": null,
       "reason": null,
@@ -871,8 +871,8 @@
       "details": {}
     },
     {
-      "event_id": "01KD0KRJ4YPSPXQYEE7H1AXZM9",
-      "timestamp": "2025-12-21T14:07:08.446183Z",
+      "event_id": "01KD0NPHNJ25YY89EPDKX84FRF",
+      "timestamp": "2025-12-21T14:40:59.570117Z",
       "event_type": "CONTAINER_CREATED",
       "actor": null,
       "reason": null,
@@ -882,17 +882,17 @@
       "details": {}
     },
     {
-      "event_id": "01KD0KRJ4YCX38A43ETWH4ZDWQ",
-      "timestamp": "2025-12-21T14:07:08.446325Z",
+      "event_id": "01KD0NPHNJV149WQDEZ8R8DFK5",
+      "timestamp": "2025-12-21T14:40:59.570252Z",
       "event_type": "INVESTIGATION_MERGED",
       "actor": null,
       "reason": null,
       "tool": null,
       "object_type": "investigation",
-      "object_key": "01KD0KRJ4HM3201FS9AP0XZJA0",
+      "object_key": "01KD0NPHN7N24J6M4PHYY4CRRQ",
       "details": {
-        "from_investigation_id": "01KD0KRJ4WH70QJF5ZCZDE389Z",
-        "into_investigation_id": "01KD0KRJ4HM3201FS9AP0XZJA0",
+        "from_investigation_id": "01KD0NPHNG82T7Q08WQBT3FDN8",
+        "into_investigation_id": "01KD0NPHN7N24J6M4PHYY4CRRQ",
         "from_investigation_name": null,
         "into_investigation_name": "Email Investigation",
         "object_changes": [
@@ -944,8 +944,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJ4Z052DYJCR9VX5VRTZ",
-      "timestamp": "2025-12-21T14:07:08.447468Z",
+      "event_id": "01KD0NPHNKFSZJ4YS8043ENK03",
+      "timestamp": "2025-12-21T14:40:59.571357Z",
       "event_type": "CHECK_CREATED",
       "actor": null,
       "reason": null,
@@ -955,8 +955,8 @@
       "details": {}
     },
     {
-      "event_id": "01KD0KRJ4Z8NWKGX2V4BQH5733",
-      "timestamp": "2025-12-21T14:07:08.447484Z",
+      "event_id": "01KD0NPHNKS4016RWEN25AZJS5",
+      "timestamp": "2025-12-21T14:40:59.571368Z",
       "event_type": "CONTAINER_CREATED",
       "actor": null,
       "reason": null,
@@ -966,17 +966,17 @@
       "details": {}
     },
     {
-      "event_id": "01KD0KRJ4Z1JVKQFKY1WNAA39R",
-      "timestamp": "2025-12-21T14:07:08.447612Z",
+      "event_id": "01KD0NPHNKP14XMT1AR91F7NJ1",
+      "timestamp": "2025-12-21T14:40:59.571501Z",
       "event_type": "INVESTIGATION_MERGED",
       "actor": null,
       "reason": null,
       "tool": null,
       "object_type": "investigation",
-      "object_key": "01KD0KRJ4HM3201FS9AP0XZJA0",
+      "object_key": "01KD0NPHN7N24J6M4PHYY4CRRQ",
       "details": {
-        "from_investigation_id": "01KD0KRJ4YZCMR7C34DW62N9G8",
-        "into_investigation_id": "01KD0KRJ4HM3201FS9AP0XZJA0",
+        "from_investigation_id": "01KD0NPHNJ0RV405VG4Y0K76MD",
+        "into_investigation_id": "01KD0NPHN7N24J6M4PHYY4CRRQ",
         "from_investigation_name": null,
         "into_investigation_name": "Email Investigation",
         "object_changes": [
@@ -1004,8 +1004,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJ538Q7VV2DSTF1778PB",
-      "timestamp": "2025-12-21T14:07:08.451369Z",
+      "event_id": "01KD0NPHNM5HYVFV4TZJHVP4XE",
+      "timestamp": "2025-12-21T14:40:59.572175Z",
       "event_type": "CHECK_CREATED",
       "actor": null,
       "reason": null,
@@ -1015,17 +1015,17 @@
       "details": {}
     },
     {
-      "event_id": "01KD0KRJ531WNH552PSGHX4APC",
-      "timestamp": "2025-12-21T14:07:08.451500Z",
+      "event_id": "01KD0NPHNM31FTQ020XG9PAD95",
+      "timestamp": "2025-12-21T14:40:59.572296Z",
       "event_type": "INVESTIGATION_MERGED",
       "actor": null,
       "reason": null,
       "tool": null,
       "object_type": "investigation",
-      "object_key": "01KD0KRJ4HM3201FS9AP0XZJA0",
+      "object_key": "01KD0NPHN7N24J6M4PHYY4CRRQ",
       "details": {
-        "from_investigation_id": "01KD0KRJ4ZA1NS00ACSKFE2CZJ",
-        "into_investigation_id": "01KD0KRJ4HM3201FS9AP0XZJA0",
+        "from_investigation_id": "01KD0NPHNK2N79MP1DZYQRYD9K",
+        "into_investigation_id": "01KD0NPHN7N24J6M4PHYY4CRRQ",
         "from_investigation_name": null,
         "into_investigation_name": "Email Investigation",
         "object_changes": [
@@ -1405,7 +1405,7 @@
         "extra": {},
         "score": 2.0,
         "level": "NOTABLE",
-        "origin_investigation_id": "01KD0KRJ4K5B3PE2555PEJ8PFX",
+        "origin_investigation_id": "01KD0NPHN7KH5ETG70C3HDYH9W",
         "observable_links": [
           {
             "observable_key": "obs:email-addr:noreply@dmalicious.com",
@@ -1423,7 +1423,7 @@
         "extra": {},
         "score": 5.0,
         "level": "MALICIOUS",
-        "origin_investigation_id": "01KD0KRJ4MEDP13HGTYHTKP8R9",
+        "origin_investigation_id": "01KD0NPHN9K13SVSFVJAX762RP",
         "observable_links": [
           {
             "observable_key": "obs:email-addr:noreply@dmalicious.com",
@@ -1441,7 +1441,7 @@
         "extra": {},
         "score": 0.1,
         "level": "NOTABLE",
-        "origin_investigation_id": "01KD0KRJ4NMYD1ENB82CCJ9K30",
+        "origin_investigation_id": "01KD0NPHNAKXADNR02HW32RPQJ",
         "observable_links": [
           {
             "observable_key": "obs:email-addr:user@company.com",
@@ -1461,7 +1461,7 @@
         "extra": {},
         "score": 5.0,
         "level": "MALICIOUS",
-        "origin_investigation_id": "01KD0KRJ4QBPD4E73M3YEXPWHA",
+        "origin_investigation_id": "01KD0NPHNB0R2WTV8683BVTA72",
         "observable_links": [
           {
             "observable_key": "obs:url:https://virus.com/payload.exe",
@@ -1479,7 +1479,7 @@
         "extra": {},
         "score": 3.0,
         "level": "SUSPICIOUS",
-        "origin_investigation_id": "01KD0KRJ4QBPD4E73M3YEXPWHA",
+        "origin_investigation_id": "01KD0NPHNB0R2WTV8683BVTA72",
         "observable_links": [
           {
             "observable_key": "obs:url:https://virus.com/about",
@@ -1497,7 +1497,7 @@
         "extra": {},
         "score": 0.0,
         "level": "INFO",
-        "origin_investigation_id": "01KD0KRJ4QBPD4E73M3YEXPWHA",
+        "origin_investigation_id": "01KD0NPHNB0R2WTV8683BVTA72",
         "observable_links": [
           {
             "observable_key": "obs:url:https://domain.com/ok/toto",
@@ -1515,7 +1515,7 @@
         "extra": {},
         "score": 5.0,
         "level": "MALICIOUS",
-        "origin_investigation_id": "01KD0KRJ4STP1H707PRH8YAEKH",
+        "origin_investigation_id": "01KD0NPHNETQZC5RQZD7RABT42",
         "observable_links": [
           {
             "observable_key": "obs:domain-name:virus.com",
@@ -1533,7 +1533,7 @@
         "extra": {},
         "score": 0.0,
         "level": "INFO",
-        "origin_investigation_id": "01KD0KRJ4STP1H707PRH8YAEKH",
+        "origin_investigation_id": "01KD0NPHNETQZC5RQZD7RABT42",
         "observable_links": [
           {
             "observable_key": "obs:domain-name:domain.com",
@@ -1553,7 +1553,7 @@
         "extra": {},
         "score": 10.0,
         "level": "MALICIOUS",
-        "origin_investigation_id": "01KD0KRJ4WH70QJF5ZCZDE389Z",
+        "origin_investigation_id": "01KD0NPHNG82T7Q08WQBT3FDN8",
         "observable_links": [
           {
             "observable_key": "obs:file:invoice.pdf",
@@ -1573,7 +1573,7 @@
         "extra": {},
         "score": 6.0,
         "level": "MALICIOUS",
-        "origin_investigation_id": "01KD0KRJ4YZCMR7C34DW62N9G8",
+        "origin_investigation_id": "01KD0NPHNJ0RV405VG4Y0K76MD",
         "observable_links": [],
         "key": "chk:email_risk_aggregated:full",
         "score_display": "6.00"
@@ -1586,7 +1586,7 @@
         "extra": {},
         "score": 0.0,
         "level": "MALICIOUS",
-        "origin_investigation_id": "01KD0KRJ4ZA1NS00ACSKFE2CZJ",
+        "origin_investigation_id": "01KD0NPHNK2N79MP1DZYQRYD9K",
         "observable_links": [],
         "key": "chk:ai:full",
         "score_display": "0.00"

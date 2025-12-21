@@ -422,6 +422,10 @@ The repo includes a PNPM workspace under `js/` with three packages:
 - `@cyvest/cyvest-vis`: React components for graph visualization (depends on `@cyvest/cyvest-js`).
 - `@cyvest/cyvest-app`: Vite demo that bundles the JS packages with sample investigations.
 
+The JS packages track the generated schema; serialized investigations should include fields like
+`investigation_id`, `investigation_name`, `started_at`, `score_display`, `check_links`, and
+`observable_links`.
+
 See `docs/js-packages.md` for workspace commands and usage snippets.
 
 ## Contributing

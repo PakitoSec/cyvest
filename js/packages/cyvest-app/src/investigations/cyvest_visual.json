@@ -1,15 +1,15 @@
 {
-  "investigation_id": "01KD0KRJHX45YN5DWJHM7197N9",
+  "investigation_id": "01KD0NPJ2GC1T8YN5XN1ZHDXMW",
   "investigation_name": null,
-  "started_at": "2025-12-21T14:07:08.861349Z",
+  "started_at": "2025-12-21T14:40:59.984434Z",
   "score": 39.5,
   "level": "MALICIOUS",
   "whitelisted": false,
   "whitelists": [],
   "event_log": [
     {
-      "event_id": "01KD0KRJHX8KWDWADFA21KGG0G",
-      "timestamp": "2025-12-21T14:07:08.861673Z",
+      "event_id": "01KD0NPJ2GF2SAFQVHZ047RKNQ",
+      "timestamp": "2025-12-21T14:40:59.984724Z",
       "event_type": "OBSERVABLE_CREATED",
       "actor": null,
       "reason": null,
@@ -19,8 +19,8 @@
       "details": {}
     },
     {
-      "event_id": "01KD0KRJHX6X048JJDGTBPD0G4",
-      "timestamp": "2025-12-21T14:07:08.861702Z",
+      "event_id": "01KD0NPJ2G4CEXHJF7HJ1NVX6T",
+      "timestamp": "2025-12-21T14:40:59.984754Z",
       "event_type": "OBSERVABLE_CREATED",
       "actor": null,
       "reason": null,
@@ -30,8 +30,8 @@
       "details": {}
     },
     {
-      "event_id": "01KD0KRJHXRZNDZ9X282ZAX0Y9",
-      "timestamp": "2025-12-21T14:07:08.861742Z",
+      "event_id": "01KD0NPJ2GD763GZ497ZQVS6DV",
+      "timestamp": "2025-12-21T14:40:59.984797Z",
       "event_type": "SCORE_CHANGED",
       "actor": null,
       "reason": "Threat intel update from VirusTotal",
@@ -46,8 +46,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJHXEJ4TZ57E8JRX9DK3",
-      "timestamp": "2025-12-21T14:07:08.861758Z",
+      "event_id": "01KD0NPJ2G7H99VEPB6TKD7Q7D",
+      "timestamp": "2025-12-21T14:40:59.984814Z",
       "event_type": "THREAT_INTEL_ATTACHED",
       "actor": null,
       "reason": null,
@@ -60,8 +60,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJHXN54BS9P5PB18GZ41",
-      "timestamp": "2025-12-21T14:07:08.861777Z",
+      "event_id": "01KD0NPJ2G996YWW704FJJCKR2",
+      "timestamp": "2025-12-21T14:40:59.984834Z",
       "event_type": "THREAT_INTEL_ATTACHED",
       "actor": null,
       "reason": null,
@@ -74,8 +74,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJHXCV7GBJ0SY0YS6FDG",
-      "timestamp": "2025-12-21T14:07:08.861795Z",
+      "event_id": "01KD0NPJ2GE0X12S2PSZQ7CYZM",
+      "timestamp": "2025-12-21T14:40:59.984851Z",
       "event_type": "OBSERVABLE_CREATED",
       "actor": null,
       "reason": null,
@@ -85,8 +85,8 @@
       "details": {}
     },
     {
-      "event_id": "01KD0KRJHX38KN06C0Z8V7Z4HP",
-      "timestamp": "2025-12-21T14:07:08.861815Z",
+      "event_id": "01KD0NPJ2GP60R3MSTPD1QMXBS",
+      "timestamp": "2025-12-21T14:40:59.984872Z",
       "event_type": "SCORE_CHANGED",
       "actor": null,
       "reason": "Threat intel update from AbuseIPDB",
@@ -101,8 +101,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJHXTX3FGE61R6NXTD86",
-      "timestamp": "2025-12-21T14:07:08.861827Z",
+      "event_id": "01KD0NPJ2GJ6VM7HYE8DQFVGR2",
+      "timestamp": "2025-12-21T14:40:59.984883Z",
       "event_type": "THREAT_INTEL_ATTACHED",
       "actor": null,
       "reason": null,
@@ -115,8 +115,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJHXT88ZGVGVZH5QG125",
-      "timestamp": "2025-12-21T14:07:08.861840Z",
+      "event_id": "01KD0NPJ2G9N9K6Z0Z0H2Z8BZA",
+      "timestamp": "2025-12-21T14:40:59.984897Z",
       "event_type": "RELATIONSHIP_CREATED",
       "actor": null,
       "reason": null,
@@ -130,8 +130,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJHX3FDFD0226GQSE9VF",
-      "timestamp": "2025-12-21T14:07:08.861869Z",
+      "event_id": "01KD0NPJ2GBX5RQZPY97EPHZKM",
+      "timestamp": "2025-12-21T14:40:59.984924Z",
       "event_type": "OBSERVABLE_CREATED",
       "actor": null,
       "reason": null,
@@ -141,8 +141,8 @@
       "details": {}
     },
     {
-      "event_id": "01KD0KRJHX312YDJCKYSEXCJAG",
-      "timestamp": "2025-12-21T14:07:08.861889Z",
+      "event_id": "01KD0NPJ2GHZHC5TPJ6CMV28XT",
+      "timestamp": "2025-12-21T14:40:59.984945Z",
       "event_type": "SCORE_CHANGED",
       "actor": null,
       "reason": "Threat intel update from VirusTotal",
@@ -157,8 +157,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJHXKQ3Y648PCBVSJNPF",
-      "timestamp": "2025-12-21T14:07:08.861899Z",
+      "event_id": "01KD0NPJ2GR4KJWXVBE6Z4D1XH",
+      "timestamp": "2025-12-21T14:40:59.984955Z",
       "event_type": "THREAT_INTEL_ATTACHED",
       "actor": null,
       "reason": null,
@@ -171,8 +171,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJHXF6S4NK4R8A5BEGFE",
-      "timestamp": "2025-12-21T14:07:08.861915Z",
+      "event_id": "01KD0NPJ2G3FJHH28NP53AX94K",
+      "timestamp": "2025-12-21T14:40:59.984971Z",
       "event_type": "OBSERVABLE_CREATED",
       "actor": null,
       "reason": null,
@@ -182,8 +182,8 @@
       "details": {}
     },
     {
-      "event_id": "01KD0KRJHXZMACTFVCZPGXAQKH",
-      "timestamp": "2025-12-21T14:07:08.861932Z",
+      "event_id": "01KD0NPJ2G06TKN7XN044RWG5M",
+      "timestamp": "2025-12-21T14:40:59.984988Z",
       "event_type": "SCORE_CHANGED",
       "actor": null,
       "reason": "Threat intel update from Shodan",
@@ -198,8 +198,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJHX2ZDPS4R7DJKPZ2GD",
-      "timestamp": "2025-12-21T14:07:08.861940Z",
+      "event_id": "01KD0NPJ2GSE9N87DDFN9XXMSZ",
+      "timestamp": "2025-12-21T14:40:59.984997Z",
       "event_type": "THREAT_INTEL_ATTACHED",
       "actor": null,
       "reason": null,
@@ -212,8 +212,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJHXT9Y3N3R8QJ5NCNVW",
-      "timestamp": "2025-12-21T14:07:08.861950Z",
+      "event_id": "01KD0NPJ2HXTKECVVNVM7SGCXS",
+      "timestamp": "2025-12-21T14:40:59.985007Z",
       "event_type": "RELATIONSHIP_CREATED",
       "actor": null,
       "reason": null,
@@ -227,8 +227,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJHX8ENCXRHHT2F73VAS",
-      "timestamp": "2025-12-21T14:07:08.861978Z",
+      "event_id": "01KD0NPJ2HQTMAZPBH2AKQKF9G",
+      "timestamp": "2025-12-21T14:40:59.985035Z",
       "event_type": "OBSERVABLE_CREATED",
       "actor": null,
       "reason": null,
@@ -238,8 +238,8 @@
       "details": {}
     },
     {
-      "event_id": "01KD0KRJHXNPDC6MMEEG01A5J6",
-      "timestamp": "2025-12-21T14:07:08.861994Z",
+      "event_id": "01KD0NPJ2HSAPDAQNDGPWP0RDQ",
+      "timestamp": "2025-12-21T14:40:59.985052Z",
       "event_type": "SCORE_CHANGED",
       "actor": null,
       "reason": "Threat intel update from EmailRep",
@@ -254,8 +254,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJHYYGE0THW47PZ5JE9D",
-      "timestamp": "2025-12-21T14:07:08.862002Z",
+      "event_id": "01KD0NPJ2HXNEVB8JJP47S0Y5T",
+      "timestamp": "2025-12-21T14:40:59.985061Z",
       "event_type": "THREAT_INTEL_ATTACHED",
       "actor": null,
       "reason": null,
@@ -268,8 +268,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJHY0BARM4AN2GW4XMJD",
-      "timestamp": "2025-12-21T14:07:08.862012Z",
+      "event_id": "01KD0NPJ2HFENP54RV7FHTY176",
+      "timestamp": "2025-12-21T14:40:59.985071Z",
       "event_type": "RELATIONSHIP_CREATED",
       "actor": null,
       "reason": null,
@@ -283,8 +283,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJHYWWTWKGFVAB9B1PD4",
-      "timestamp": "2025-12-21T14:07:08.862038Z",
+      "event_id": "01KD0NPJ2HDNRX9DAQMY3RQ447",
+      "timestamp": "2025-12-21T14:40:59.985097Z",
       "event_type": "OBSERVABLE_CREATED",
       "actor": null,
       "reason": null,
@@ -294,8 +294,8 @@
       "details": {}
     },
     {
-      "event_id": "01KD0KRJHY92ZHGTWJJE4H3P45",
-      "timestamp": "2025-12-21T14:07:08.862053Z",
+      "event_id": "01KD0NPJ2H7TJ9Z82AGR84HSVT",
+      "timestamp": "2025-12-21T14:40:59.985113Z",
       "event_type": "SCORE_CHANGED",
       "actor": null,
       "reason": "Threat intel update from Internal Whitelist",
@@ -310,8 +310,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJHY3658HFEZNAXYGTHR",
-      "timestamp": "2025-12-21T14:07:08.862062Z",
+      "event_id": "01KD0NPJ2H74XZQW3MT61ZPXQ2",
+      "timestamp": "2025-12-21T14:40:59.985121Z",
       "event_type": "THREAT_INTEL_ATTACHED",
       "actor": null,
       "reason": null,
@@ -324,8 +324,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJHY2NAZRP49RG3WNDQW",
-      "timestamp": "2025-12-21T14:07:08.862079Z",
+      "event_id": "01KD0NPJ2H2XWD426RN6EDWMSE",
+      "timestamp": "2025-12-21T14:40:59.985139Z",
       "event_type": "OBSERVABLE_CREATED",
       "actor": null,
       "reason": null,
@@ -335,8 +335,8 @@
       "details": {}
     },
     {
-      "event_id": "01KD0KRJHYVG4VKW9V8FJTFJS3",
-      "timestamp": "2025-12-21T14:07:08.862088Z",
+      "event_id": "01KD0NPJ2HP1J65RZQK72KF71N",
+      "timestamp": "2025-12-21T14:40:59.985149Z",
       "event_type": "RELATIONSHIP_CREATED",
       "actor": null,
       "reason": null,
@@ -350,8 +350,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJHYQ9B6SFZGB0S3Q4D8",
-      "timestamp": "2025-12-21T14:07:08.862121Z",
+      "event_id": "01KD0NPJ2HTENZYBFTZHTPPVFP",
+      "timestamp": "2025-12-21T14:40:59.985182Z",
       "event_type": "RELATIONSHIP_CREATED",
       "actor": null,
       "reason": null,
@@ -365,8 +365,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJHYM51N0RR0Y6BT9ZZ7",
-      "timestamp": "2025-12-21T14:07:08.862170Z",
+      "event_id": "01KD0NPJ2H3FJYG4GAV9E1BXY5",
+      "timestamp": "2025-12-21T14:40:59.985231Z",
       "event_type": "THREAT_INTEL_ATTACHED",
       "actor": null,
       "reason": null,
@@ -379,8 +379,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJHYMQSB7HW03P222ZSH",
-      "timestamp": "2025-12-21T14:07:08.862186Z",
+      "event_id": "01KD0NPJ2H5JNA396WBWQR2MG6",
+      "timestamp": "2025-12-21T14:40:59.985247Z",
       "event_type": "OBSERVABLE_CREATED",
       "actor": null,
       "reason": null,
@@ -390,8 +390,8 @@
       "details": {}
     },
     {
-      "event_id": "01KD0KRJHY31BSSXBCHY6DQ924",
-      "timestamp": "2025-12-21T14:07:08.862204Z",
+      "event_id": "01KD0NPJ2HE441RHY9FBMWP20D",
+      "timestamp": "2025-12-21T14:40:59.985266Z",
       "event_type": "SCORE_CHANGED",
       "actor": null,
       "reason": "Threat intel update from URLhaus",
@@ -406,8 +406,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJHYE3WC7WYS85MR6BA6",
-      "timestamp": "2025-12-21T14:07:08.862214Z",
+      "event_id": "01KD0NPJ2H60QWKX3T8VMFPGDK",
+      "timestamp": "2025-12-21T14:40:59.985275Z",
       "event_type": "THREAT_INTEL_ATTACHED",
       "actor": null,
       "reason": null,
@@ -420,8 +420,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJHYW7F4J04HXR5BSDV1",
-      "timestamp": "2025-12-21T14:07:08.862222Z",
+      "event_id": "01KD0NPJ2H22G1QT2ZP8137364",
+      "timestamp": "2025-12-21T14:40:59.985284Z",
       "event_type": "RELATIONSHIP_CREATED",
       "actor": null,
       "reason": null,
@@ -435,8 +435,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJHYENBE6JY6ANKQDSYP",
-      "timestamp": "2025-12-21T14:07:08.862264Z",
+      "event_id": "01KD0NPJ2H7374Z7RXM3FMHC8S",
+      "timestamp": "2025-12-21T14:40:59.985327Z",
       "event_type": "OBSERVABLE_CREATED",
       "actor": null,
       "reason": null,
@@ -446,8 +446,8 @@
       "details": {}
     },
     {
-      "event_id": "01KD0KRJHY3Z2BA9YABKJ4S7MK",
-      "timestamp": "2025-12-21T14:07:08.862283Z",
+      "event_id": "01KD0NPJ2HHRWEGVXBJZXJHDAH",
+      "timestamp": "2025-12-21T14:40:59.985345Z",
       "event_type": "SCORE_CHANGED",
       "actor": null,
       "reason": "Threat intel update from URLhaus",
@@ -462,8 +462,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJHYTFQWYK2Z0DPK0NE8",
-      "timestamp": "2025-12-21T14:07:08.862292Z",
+      "event_id": "01KD0NPJ2HJJJ3QRSG3ZR8XC6W",
+      "timestamp": "2025-12-21T14:40:59.985355Z",
       "event_type": "THREAT_INTEL_ATTACHED",
       "actor": null,
       "reason": null,
@@ -476,8 +476,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJHYS78H3CNE151KTSD4",
-      "timestamp": "2025-12-21T14:07:08.862300Z",
+      "event_id": "01KD0NPJ2HNJHX6GWH5BCVTQZA",
+      "timestamp": "2025-12-21T14:40:59.985364Z",
       "event_type": "RELATIONSHIP_CREATED",
       "actor": null,
       "reason": null,
@@ -491,8 +491,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJHYCHDVWMNRHDMKZHMR",
-      "timestamp": "2025-12-21T14:07:08.862349Z",
+      "event_id": "01KD0NPJ2HZRP30EH718FGPZ1G",
+      "timestamp": "2025-12-21T14:40:59.985414Z",
       "event_type": "RELATIONSHIP_CREATED",
       "actor": null,
       "reason": null,
@@ -506,8 +506,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJHYE8S8JF3WHBDZ4VXA",
-      "timestamp": "2025-12-21T14:07:08.862404Z",
+      "event_id": "01KD0NPJ2HFSSYE2XDVTP0CNEA",
+      "timestamp": "2025-12-21T14:40:59.985467Z",
       "event_type": "RELATIONSHIP_CREATED",
       "actor": null,
       "reason": null,
@@ -521,8 +521,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJHYRZ3B63NV4B4Q3261",
-      "timestamp": "2025-12-21T14:07:08.862460Z",
+      "event_id": "01KD0NPJ2HJY3ZNGYY13HS1J98",
+      "timestamp": "2025-12-21T14:40:59.985523Z",
       "event_type": "OBSERVABLE_CREATED",
       "actor": null,
       "reason": null,
@@ -532,8 +532,8 @@
       "details": {}
     },
     {
-      "event_id": "01KD0KRJHYF3FHQRP1GYAKXX93",
-      "timestamp": "2025-12-21T14:07:08.862477Z",
+      "event_id": "01KD0NPJ2HQSVE1EHQ6Q5HDJHD",
+      "timestamp": "2025-12-21T14:40:59.985540Z",
       "event_type": "SCORE_CHANGED",
       "actor": null,
       "reason": "Threat intel update from VirusTotal",
@@ -548,8 +548,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJHYTHSZD34BF15WQ8KS",
-      "timestamp": "2025-12-21T14:07:08.862486Z",
+      "event_id": "01KD0NPJ2HEBG1GC1PK9K9AD9T",
+      "timestamp": "2025-12-21T14:40:59.985549Z",
       "event_type": "THREAT_INTEL_ATTACHED",
       "actor": null,
       "reason": null,
@@ -562,8 +562,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJHYE9KYZYPAB4Z4T9JN",
-      "timestamp": "2025-12-21T14:07:08.862495Z",
+      "event_id": "01KD0NPJ2HCETE680DK041WQRH",
+      "timestamp": "2025-12-21T14:40:59.985562Z",
       "event_type": "RELATIONSHIP_CREATED",
       "actor": null,
       "reason": null,
@@ -577,8 +577,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJHYD5Z32F447VA8D71E",
-      "timestamp": "2025-12-21T14:07:08.862561Z",
+      "event_id": "01KD0NPJ2HKF9AW5DZGHWZF62K",
+      "timestamp": "2025-12-21T14:40:59.985627Z",
       "event_type": "RELATIONSHIP_CREATED",
       "actor": null,
       "reason": null,
@@ -592,8 +592,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJHY5Q8YXZENVF95ETZE",
-      "timestamp": "2025-12-21T14:07:08.862631Z",
+      "event_id": "01KD0NPJ2HEWKRHZ897SVH3TX3",
+      "timestamp": "2025-12-21T14:40:59.985695Z",
       "event_type": "OBSERVABLE_CREATED",
       "actor": null,
       "reason": null,
@@ -603,8 +603,8 @@
       "details": {}
     },
     {
-      "event_id": "01KD0KRJHYVB7EJC233QRJPYGC",
-      "timestamp": "2025-12-21T14:07:08.862650Z",
+      "event_id": "01KD0NPJ2HA69EF5HS7WDKA1DV",
+      "timestamp": "2025-12-21T14:40:59.985713Z",
       "event_type": "SCORE_CHANGED",
       "actor": null,
       "reason": "Threat intel update from Internal Whitelist",
@@ -619,8 +619,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJHYA4BT0AWWE2JQD1FY",
-      "timestamp": "2025-12-21T14:07:08.862660Z",
+      "event_id": "01KD0NPJ2HSQ30AS6W54G4XAPH",
+      "timestamp": "2025-12-21T14:40:59.985723Z",
       "event_type": "THREAT_INTEL_ATTACHED",
       "actor": null,
       "reason": null,
@@ -633,8 +633,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJHYV32VBEZ7TXBKRR3M",
-      "timestamp": "2025-12-21T14:07:08.862678Z",
+      "event_id": "01KD0NPJ2HEJG23G2ZRZRHD2WW",
+      "timestamp": "2025-12-21T14:40:59.985735Z",
       "event_type": "OBSERVABLE_CREATED",
       "actor": null,
       "reason": null,
@@ -644,8 +644,8 @@
       "details": {}
     },
     {
-      "event_id": "01KD0KRJHYHC1FTCVHXFAFVGHK",
-      "timestamp": "2025-12-21T14:07:08.862694Z",
+      "event_id": "01KD0NPJ2H3ZKQAGEZK40B8RYF",
+      "timestamp": "2025-12-21T14:40:59.985750Z",
       "event_type": "SCORE_CHANGED",
       "actor": null,
       "reason": "Threat intel update from Passive DNS",
@@ -660,8 +660,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJHYJTXX2DC8RS76KYSN",
-      "timestamp": "2025-12-21T14:07:08.862703Z",
+      "event_id": "01KD0NPJ2HNWEVG2ZHWWFBSH6G",
+      "timestamp": "2025-12-21T14:40:59.985760Z",
       "event_type": "THREAT_INTEL_ATTACHED",
       "actor": null,
       "reason": null,
@@ -674,8 +674,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJHY9WWDWKTG3XPBG53F",
-      "timestamp": "2025-12-21T14:07:08.862721Z",
+      "event_id": "01KD0NPJ2HMAXVEMY6ZCD6N2KG",
+      "timestamp": "2025-12-21T14:40:59.985779Z",
       "event_type": "CHECK_CREATED",
       "actor": null,
       "reason": null,
@@ -685,8 +685,8 @@
       "details": {}
     },
     {
-      "event_id": "01KD0KRJHYPBSZ159C2CHQGDDC",
-      "timestamp": "2025-12-21T14:07:08.862733Z",
+      "event_id": "01KD0NPJ2HKMZ5FQW19FVBFZFN",
+      "timestamp": "2025-12-21T14:40:59.985792Z",
       "event_type": "CHECK_LINKED_TO_OBSERVABLE",
       "actor": null,
       "reason": null,
@@ -699,8 +699,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJHYGEJ8849SPSDXVKGD",
-      "timestamp": "2025-12-21T14:07:08.862745Z",
+      "event_id": "01KD0NPJ2HZVZ04BH9ZXH50WMX",
+      "timestamp": "2025-12-21T14:40:59.985804Z",
       "event_type": "LEVEL_UPDATED",
       "actor": null,
       "reason": "Effective link added",
@@ -714,8 +714,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJHYAXT80GXAY8FZNT3N",
-      "timestamp": "2025-12-21T14:07:08.862824Z",
+      "event_id": "01KD0NPJ2HDD24FJFG88AB5J07",
+      "timestamp": "2025-12-21T14:40:59.985885Z",
       "event_type": "SCORE_CHANGED",
       "actor": null,
       "reason": "Linked observable obs:email-message:phishing email - invoice #12345 updated",
@@ -730,8 +730,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJHYK6GFBQ1Q2NXH0BDP",
-      "timestamp": "2025-12-21T14:07:08.862839Z",
+      "event_id": "01KD0NPJ2H0V5W863AVWRBNPPA",
+      "timestamp": "2025-12-21T14:40:59.985900Z",
       "event_type": "CHECK_LINKED_TO_OBSERVABLE",
       "actor": null,
       "reason": null,
@@ -744,8 +744,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJHYT9K1DEBGA83JZR9W",
-      "timestamp": "2025-12-21T14:07:08.862853Z",
+      "event_id": "01KD0NPJ2HZ3PDX22QD8FJM9WW",
+      "timestamp": "2025-12-21T14:40:59.985914Z",
       "event_type": "CHECK_LINKED_TO_OBSERVABLE",
       "actor": null,
       "reason": null,
@@ -758,8 +758,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJHYFT6QKS83XGZCZFAH",
-      "timestamp": "2025-12-21T14:07:08.862867Z",
+      "event_id": "01KD0NPJ2H6PAAR7B386XYH82H",
+      "timestamp": "2025-12-21T14:40:59.985929Z",
       "event_type": "SCORE_CHANGED",
       "actor": null,
       "reason": "",
@@ -774,8 +774,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJHY614PT5Y068WT1X6E",
-      "timestamp": "2025-12-21T14:07:08.862886Z",
+      "event_id": "01KD0NPJ2HNDFSJJ6X1M7Q1XVG",
+      "timestamp": "2025-12-21T14:40:59.985948Z",
       "event_type": "CONTAINER_CREATED",
       "actor": null,
       "reason": null,
@@ -785,8 +785,8 @@
       "details": {}
     },
     {
-      "event_id": "01KD0KRJHY3R46G9HVKQX9DMHS",
-      "timestamp": "2025-12-21T14:07:08.862893Z",
+      "event_id": "01KD0NPJ2HP2EWF0RM48AXR8NC",
+      "timestamp": "2025-12-21T14:40:59.985956Z",
       "event_type": "CONTAINER_CHECK_ADDED",
       "actor": null,
       "reason": null,
@@ -798,8 +798,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJHYHSS90KSHK17TP3FQ",
-      "timestamp": "2025-12-21T14:07:08.862905Z",
+      "event_id": "01KD0NPJ2HBQF9D4Y26N3H112S",
+      "timestamp": "2025-12-21T14:40:59.985968Z",
       "event_type": "CHECK_CREATED",
       "actor": null,
       "reason": null,
@@ -809,8 +809,8 @@
       "details": {}
     },
     {
-      "event_id": "01KD0KRJHYCBPYZX7AW8GJ56YN",
-      "timestamp": "2025-12-21T14:07:08.862914Z",
+      "event_id": "01KD0NPJ2HRPGAY7DG4Y7CFHAZ",
+      "timestamp": "2025-12-21T14:40:59.985977Z",
       "event_type": "CHECK_LINKED_TO_OBSERVABLE",
       "actor": null,
       "reason": null,
@@ -823,8 +823,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJHY2BZAXP7RWWZCWSFE",
-      "timestamp": "2025-12-21T14:07:08.862922Z",
+      "event_id": "01KD0NPJ2HG2C6FWWS9N2TM83G",
+      "timestamp": "2025-12-21T14:40:59.985985Z",
       "event_type": "LEVEL_UPDATED",
       "actor": null,
       "reason": "Effective link added",
@@ -838,8 +838,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJHY0ZAEHV62YGKTJFRX",
-      "timestamp": "2025-12-21T14:07:08.862932Z",
+      "event_id": "01KD0NPJ2H550MGZ0ZW2TJKJJS",
+      "timestamp": "2025-12-21T14:40:59.985996Z",
       "event_type": "SCORE_CHANGED",
       "actor": null,
       "reason": "Linked observable obs:url:https://evil-phishing.com/login updated",
@@ -854,8 +854,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJHYAV9SA7J56EH4TMMZ",
-      "timestamp": "2025-12-21T14:07:08.862943Z",
+      "event_id": "01KD0NPJ2JNR6877282X74VN9N",
+      "timestamp": "2025-12-21T14:40:59.986008Z",
       "event_type": "CHECK_LINKED_TO_OBSERVABLE",
       "actor": null,
       "reason": null,
@@ -868,8 +868,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJHYVAVBMTCZYHYMF0JH",
-      "timestamp": "2025-12-21T14:07:08.862955Z",
+      "event_id": "01KD0NPJ2JF8BG49SY3G22C3F4",
+      "timestamp": "2025-12-21T14:40:59.986020Z",
       "event_type": "SCORE_CHANGED",
       "actor": null,
       "reason": "",
@@ -884,8 +884,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJHYSKX4CVS16AE5HEMF",
-      "timestamp": "2025-12-21T14:07:08.862965Z",
+      "event_id": "01KD0NPJ2JEBZC4414H4B00WWR",
+      "timestamp": "2025-12-21T14:40:59.986031Z",
       "event_type": "CONTAINER_CREATED",
       "actor": null,
       "reason": null,
@@ -895,8 +895,8 @@
       "details": {}
     },
     {
-      "event_id": "01KD0KRJHYESAEB82C7Z4HXDJR",
-      "timestamp": "2025-12-21T14:07:08.862973Z",
+      "event_id": "01KD0NPJ2JQVEA5EW6676P4WA8",
+      "timestamp": "2025-12-21T14:40:59.986038Z",
       "event_type": "CONTAINER_CHECK_ADDED",
       "actor": null,
       "reason": null,
@@ -908,8 +908,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJHYM307SV6T289SMGTX",
-      "timestamp": "2025-12-21T14:07:08.862984Z",
+      "event_id": "01KD0NPJ2JTHFSWSM4CKDX2N03",
+      "timestamp": "2025-12-21T14:40:59.986049Z",
       "event_type": "CHECK_CREATED",
       "actor": null,
       "reason": null,
@@ -919,8 +919,8 @@
       "details": {}
     },
     {
-      "event_id": "01KD0KRJHY1TSD0MC8SQHYFF6B",
-      "timestamp": "2025-12-21T14:07:08.862992Z",
+      "event_id": "01KD0NPJ2J8XW9BMM8K16PJCHD",
+      "timestamp": "2025-12-21T14:40:59.986058Z",
       "event_type": "CHECK_LINKED_TO_OBSERVABLE",
       "actor": null,
       "reason": null,
@@ -933,8 +933,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJHYMWA368XYAC0Y597Z",
-      "timestamp": "2025-12-21T14:07:08.863000Z",
+      "event_id": "01KD0NPJ2JVCSGQWTPBGJQ4RB1",
+      "timestamp": "2025-12-21T14:40:59.986065Z",
       "event_type": "LEVEL_UPDATED",
       "actor": null,
       "reason": "Effective link added",
@@ -948,8 +948,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJHZVYH7BFTWNX48PJ85",
-      "timestamp": "2025-12-21T14:07:08.863009Z",
+      "event_id": "01KD0NPJ2JTFJQ009RN4V1FFJY",
+      "timestamp": "2025-12-21T14:40:59.986075Z",
       "event_type": "SCORE_CHANGED",
       "actor": null,
       "reason": "Linked observable obs:domain-name:evil-phishing.com updated",
@@ -964,8 +964,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJHZ7YZZVRK5CR0JNVDS",
-      "timestamp": "2025-12-21T14:07:08.863024Z",
+      "event_id": "01KD0NPJ2JPYWHG6SFCTGRG5XA",
+      "timestamp": "2025-12-21T14:40:59.986088Z",
       "event_type": "CHECK_LINKED_TO_OBSERVABLE",
       "actor": null,
       "reason": null,
@@ -978,8 +978,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJHZDAQ1WN589C15Y7T2",
-      "timestamp": "2025-12-21T14:07:08.863035Z",
+      "event_id": "01KD0NPJ2JFWRCY5FA676CXBM7",
+      "timestamp": "2025-12-21T14:40:59.986099Z",
       "event_type": "SCORE_CHANGED",
       "actor": null,
       "reason": "Linked observable obs:ipv4-addr:185.220.101.50 updated",
@@ -994,8 +994,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJHZKY5FE411E75J1Q9G",
-      "timestamp": "2025-12-21T14:07:08.863120Z",
+      "event_id": "01KD0NPJ2JHGGT89Z04CCY0ABY",
+      "timestamp": "2025-12-21T14:40:59.986187Z",
       "event_type": "SCORE_CHANGED",
       "actor": null,
       "reason": "Linked observable obs:email-addr:attacker@evil-phishing.com updated",
@@ -1010,8 +1010,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJHZZ8V2Z8H905HM8ZF6",
-      "timestamp": "2025-12-21T14:07:08.863136Z",
+      "event_id": "01KD0NPJ2JM9GAQ2MJBTNEJHJA",
+      "timestamp": "2025-12-21T14:40:59.986204Z",
       "event_type": "SCORE_CHANGED",
       "actor": null,
       "reason": "Linked observable obs:url:https://evil-phishing.com/login updated",
@@ -1026,8 +1026,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJHZYXR17PVQVBP4CRGV",
-      "timestamp": "2025-12-21T14:07:08.863149Z",
+      "event_id": "01KD0NPJ2JD12C7B8P1JSYKJ55",
+      "timestamp": "2025-12-21T14:40:59.986216Z",
       "event_type": "CONTAINER_CHECK_ADDED",
       "actor": null,
       "reason": null,
@@ -1039,8 +1039,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJHZMM0Z6DKC54EYYF6F",
-      "timestamp": "2025-12-21T14:07:08.863159Z",
+      "event_id": "01KD0NPJ2J1BSW3N08N46APMG6",
+      "timestamp": "2025-12-21T14:40:59.986227Z",
       "event_type": "CHECK_CREATED",
       "actor": null,
       "reason": null,
@@ -1050,8 +1050,8 @@
       "details": {}
     },
     {
-      "event_id": "01KD0KRJHZTDJFGANWKVRCY70V",
-      "timestamp": "2025-12-21T14:07:08.863170Z",
+      "event_id": "01KD0NPJ2J1E4B2809A8XRN2QA",
+      "timestamp": "2025-12-21T14:40:59.986239Z",
       "event_type": "CHECK_LINKED_TO_OBSERVABLE",
       "actor": null,
       "reason": null,
@@ -1064,8 +1064,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJHZGWAEYKYNB5JD8VR7",
-      "timestamp": "2025-12-21T14:07:08.863178Z",
+      "event_id": "01KD0NPJ2J2NJHWC49XM4BTQ8M",
+      "timestamp": "2025-12-21T14:40:59.986247Z",
       "event_type": "LEVEL_UPDATED",
       "actor": null,
       "reason": "Effective link added",
@@ -1079,8 +1079,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJHZCPAS7X72H7WNEGEA",
-      "timestamp": "2025-12-21T14:07:08.863188Z",
+      "event_id": "01KD0NPJ2J37E77MXYBBPQBK33",
+      "timestamp": "2025-12-21T14:40:59.986258Z",
       "event_type": "SCORE_CHANGED",
       "actor": null,
       "reason": "Linked observable obs:file:invoice.exe updated",
@@ -1095,8 +1095,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJHZRJ1FW7H4YB0VQ7MR",
-      "timestamp": "2025-12-21T14:07:08.863201Z",
+      "event_id": "01KD0NPJ2JSDCNDVFS8F230M4N",
+      "timestamp": "2025-12-21T14:40:59.986270Z",
       "event_type": "CONTAINER_CREATED",
       "actor": null,
       "reason": null,
@@ -1106,8 +1106,8 @@
       "details": {}
     },
     {
-      "event_id": "01KD0KRJHZAQAVWWEDFBGNJSQP",
-      "timestamp": "2025-12-21T14:07:08.863207Z",
+      "event_id": "01KD0NPJ2J8TAYF816Y8SQQRHR",
+      "timestamp": "2025-12-21T14:40:59.986276Z",
       "event_type": "CONTAINER_CHECK_ADDED",
       "actor": null,
       "reason": null,
@@ -1119,8 +1119,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJHZ70Q17V1J8D2PGK2A",
-      "timestamp": "2025-12-21T14:07:08.863239Z",
+      "event_id": "01KD0NPJ2JSZ2C9CBH2ZZ8Y17H",
+      "timestamp": "2025-12-21T14:40:59.986310Z",
       "event_type": "RELATIONSHIP_CREATED",
       "actor": null,
       "reason": "Finalize relationships",
@@ -1134,8 +1134,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJHZCBPQ4Y4DH134YBH2",
-      "timestamp": "2025-12-21T14:07:08.863249Z",
+      "event_id": "01KD0NPJ2JA2RAFHK7VGP16C6M",
+      "timestamp": "2025-12-21T14:40:59.986321Z",
       "event_type": "RELATIONSHIP_CREATED",
       "actor": null,
       "reason": "Finalize relationships",
@@ -1149,8 +1149,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJHZZQTP9JHR9D3PQ9QA",
-      "timestamp": "2025-12-21T14:07:08.863257Z",
+      "event_id": "01KD0NPJ2J1V3Q50KK16WW1RQE",
+      "timestamp": "2025-12-21T14:40:59.986329Z",
       "event_type": "RELATIONSHIP_CREATED",
       "actor": null,
       "reason": "Finalize relationships",
@@ -1164,8 +1164,8 @@
       }
     },
     {
-      "event_id": "01KD0KRJHZZM6TZ7TY7A8H2THC",
-      "timestamp": "2025-12-21T14:07:08.863266Z",
+      "event_id": "01KD0NPJ2J10R4678VJF3XZF7E",
+      "timestamp": "2025-12-21T14:40:59.986338Z",
       "event_type": "RELATIONSHIP_CREATED",
       "actor": null,
       "reason": "Finalize relationships",
@@ -1510,7 +1510,7 @@
         "extra": {},
         "score": 10.0,
         "level": "MALICIOUS",
-        "origin_investigation_id": "01KD0KRJHX45YN5DWJHM7197N9",
+        "origin_investigation_id": "01KD0NPJ2GC1T8YN5XN1ZHDXMW",
         "observable_links": [
           {
             "observable_key": "obs:email-message:phishing email - invoice #12345",
@@ -1538,7 +1538,7 @@
         "extra": {},
         "score": 10.0,
         "level": "MALICIOUS",
-        "origin_investigation_id": "01KD0KRJHX45YN5DWJHM7197N9",
+        "origin_investigation_id": "01KD0NPJ2GC1T8YN5XN1ZHDXMW",
         "observable_links": [
           {
             "observable_key": "obs:url:https://evil-phishing.com/login",
@@ -1560,7 +1560,7 @@
         "extra": {},
         "score": 9.5,
         "level": "MALICIOUS",
-        "origin_investigation_id": "01KD0KRJHX45YN5DWJHM7197N9",
+        "origin_investigation_id": "01KD0NPJ2GC1T8YN5XN1ZHDXMW",
         "observable_links": [
           {
             "observable_key": "obs:domain-name:evil-phishing.com",
@@ -1584,7 +1584,7 @@
         "extra": {},
         "score": 10.0,
         "level": "MALICIOUS",
-        "origin_investigation_id": "01KD0KRJHX45YN5DWJHM7197N9",
+        "origin_investigation_id": "01KD0NPJ2GC1T8YN5XN1ZHDXMW",
         "observable_links": [
           {
             "observable_key": "obs:file:invoice.exe",

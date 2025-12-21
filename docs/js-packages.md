@@ -2,6 +2,10 @@
 
 Cyvest ships a small JavaScript/TypeScript workspace alongside the Python API. Use these packages to validate serialized investigations, power UI integrations, or explore the data model in a browser.
 
+The JS packages follow the generated schema. Serialized investigations should include the
+schema-required fields such as `investigation_id`, `investigation_name`, `started_at`,
+`score_display`, `check_links`, and `observable_links`.
+
 ## Packages
 
 - **@cyvest/cyvest-js** — Generated types, schema validation, graph builders, and helper functions for Cyvest investigation JSON. Ships ESM/CJS builds and `.d.ts` files.

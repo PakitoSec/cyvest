@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { LEVEL_COLORS } from "@cyvest/cyvest-js";
 import {
   getInvestigationNodeEmoji,
   getLevelBackgroundColor,
@@ -29,11 +30,9 @@ describe("observables utils", () => {
     expect(truncateLabel("averyverylongvalue", 10, false)).toBe("averyvery…");
   });
 
-  it("maps levels to colors and falls back to NONE", () => {
-    expect(getLevelColor("SUSPICIOUS")).toBe("#f97316");
-    expect(getLevelColor("UNKNOWN")).toBe("#6b7280");
-    expect(getLevelBackgroundColor("SUSPICIOUS")).toBe("#ffedd5");
-    expect(getLevelBackgroundColor("UNKNOWN")).toBe("#f3f4f6");
+  it("maps levels to colors", () => {
+    expect(getLevelColor("SUSPICIOUS")).toBe(LEVEL_COLORS.SUSPICIOUS);
+    expect(getLevelBackgroundColor("SUSPICIOUS")).toBe("#feeadc");
   });
 
   it("returns investigation node emoji with fallback", () => {

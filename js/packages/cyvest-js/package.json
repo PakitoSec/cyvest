@@ -1,7 +1,7 @@
 {
   "name": "@cyvest/cyvest-js",
   "version": "3.2.0",
-  "main": "dist/index.cjs",
+  "main": "dist/index.js",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
   "sideEffects": false,
@@ -16,10 +16,10 @@
     "ajv-formats": "^3.0.1"
   },
   "devDependencies": {
-    "json-schema-to-typescript": "^13.1.1",
-    "tsup": "^8.0.0",
-    "typescript": "^5.6.0",
-    "vitest": "^2.0.0"
+    "json-schema-to-typescript": "^15.0.4",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.16"
   },
   "engines": {
     "node": ">=20"

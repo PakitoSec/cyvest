@@ -498,8 +498,9 @@ class AI(BaseRule):
 @click.option("-w", "--workers", type=int, default=1)
 @click.option("--browser", "browser", is_flag=True, default=False)
 @click.option("--stats", "stats", is_flag=True, default=False)
+@click.option("--audit", "audit", is_flag=True, default=False)
 @click.option("-o", "--output", type=click.Path(dir_okay=False, path_type=Path), default=None)
-def main(workers, browser, stats, output):
+def main(workers, browser, stats, audit, output):
     """Main execution demonstrating multi-threaded investigation."""
 
     # Prepare input data
@@ -554,7 +555,7 @@ def main(workers, browser, stats, output):
     # Display results
     logger.info("Investigation complete - displaying summary - score should be 36.1")
 
-    cy.display_summary()
+    cy.display_summary(show_audit_log=audit)
     if stats:
         cy.display_statistics()
     cy.display_network(open_browser=browser)

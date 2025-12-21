@@ -107,9 +107,7 @@ class SharedInvestigationContext:
         self._main_investigation = root_cyvest._investigation
 
         self._root_type = (
-            "artifact"
-            if self._main_investigation._root_observable.obs_type == ObservableType.ARTIFACT
-            else "file"
+            "artifact" if self._main_investigation._root_observable.obs_type == ObservableType.ARTIFACT else "file"
         )
         self._score_mode = self._main_investigation._score_engine._score_mode
 

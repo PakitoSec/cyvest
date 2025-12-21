@@ -377,9 +377,7 @@ def test_override_data_in_create_cyvest():
 
 def test_shared_context_with_checks_and_observables():
     """Test that both checks and observables are properly shared."""
-    root_cy = Cyvest(
-        {"email": "phishing@malicious.com", "url": "https://malicious.com/payload"}, root_type="artifact"
-    )
+    root_cy = Cyvest({"email": "phishing@malicious.com", "url": "https://malicious.com/payload"}, root_type="artifact")
     shared = SharedInvestigationContext(root_cy)
 
     # Task 1: Analyze email

@@ -176,5 +176,4 @@ def test_display_summary_audit_log_table() -> None:
     rendered = output.getvalue()
 
     assert "Audit Log" in rendered
-    assert "Threat intel update from virustotal" in rendered
-    assert "bump" in rendered
+    assert "virustotal" in rendered

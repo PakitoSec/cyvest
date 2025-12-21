@@ -229,11 +229,30 @@ def _render_audit_log_table(
 
         return f"Merge: {from_label} → {into_label}"
 
+    def _render_threat_intel_attached(details: dict[str, Any]) -> str:
+        source = details.get("source")
+        score = details.get("score")
+        level = details.get("level")
+        parts: list[str] = []
+        if source:
+            parts.append(f"Source: [cyan]{escape(str(source))}[/cyan]")
+        if level is not None:
+            level_enum = normalize_level(level)
+            level_color = get_color_level(level_enum)
+            parts.append(f"Level: [{level_color}]{level_enum.name}[/{level_color}]")
+        if score is not None:
+            score_value = score if isinstance(score, Decimal) else Decimal(str(score))
+            score_color = get_color_score(score_value)
+            score_str = f"[{score_color}]{_format_score_decimal(score_value)}[/{score_color}]"
+            parts.append(f"Score: {score_str}")
+        return " | ".join(parts) if parts else "[dim]-[/dim]"
+
     detail_renderers: dict[str, Callable[[dict[str, Any]], str]] = {
         "SCORE_CHANGED": _render_score_change,
         "SCORE_RECALCULATED": _render_score_change,
         "LEVEL_UPDATED": _render_level_change,
         "INVESTIGATION_MERGED": _render_merge_event,
+        "THREAT_INTEL_ATTACHED": _render_threat_intel_attached,
     }
 
     def _coerce_utc(value: datetime) -> datetime:
@@ -296,7 +315,7 @@ def _render_audit_log_table(
             elif details == "[dim]-[/dim]":
                 context = reason
             else:
-                context = f"{reason} | {details}"
+                context = details
 
             table.add_row(
                 str(row_idx),

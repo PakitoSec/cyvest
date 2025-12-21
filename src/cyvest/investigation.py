@@ -666,7 +666,12 @@ class Investigation:
                 event_type="THREAT_INTEL_ATTACHED",
                 object_type="observable",
                 object_key=observable.key,
-                details={"threat_intel_key": merged_ti.key, "source": merged_ti.source},
+                details={
+                    "threat_intel_key": merged_ti.key,
+                    "source": merged_ti.source,
+                    "score": merged_ti.score,
+                    "level": merged_ti.level,
+                },
             )
             return merged_ti
 
@@ -684,7 +689,12 @@ class Investigation:
             event_type="THREAT_INTEL_ATTACHED",
             object_type="observable",
             object_key=observable.key,
-            details={"threat_intel_key": ti.key, "source": ti.source},
+            details={
+                "threat_intel_key": ti.key,
+                "source": ti.source,
+                "score": ti.score,
+                "level": ti.level,
+            },
         )
         return ti
 

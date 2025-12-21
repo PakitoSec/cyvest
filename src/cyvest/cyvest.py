@@ -10,13 +10,15 @@ and investigation export (io_to_invest, io_to_markdown) methods.
 
 from __future__ import annotations
 
+import threading
 from collections.abc import Iterable
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Final, Literal, overload
 
 from logurich import logger
 
+from cyvest import keys
 from cyvest.investigation import Investigation, InvestigationWhitelist
 from cyvest.io_rich import display_statistics, display_summary
 from cyvest.io_serialization import (
@@ -27,10 +29,14 @@ from cyvest.io_serialization import (
     serialize_investigation,
 )
 from cyvest.levels import Level
-from cyvest.model import Check, CheckScorePolicy, Container, Enrichment, Observable, ThreatIntel
+from cyvest.model import Check, Container, Enrichment, Observable, ThreatIntel
+from cyvest.model_enums import ObservableType, PropagationMode, RelationshipDirection, RelationshipType
 from cyvest.model_schema import InvestigationSchema, StatisticsSchema
 from cyvest.proxies import CheckProxy, ContainerProxy, EnrichmentProxy, ObservableProxy, ThreatIntelProxy
 from cyvest.score import ScoreMode
+
+if TYPE_CHECKING:
+    from cyvest.shared import SharedInvestigationContext
 
 
 class Cyvest:
@@ -41,11 +47,18 @@ class Cyvest:
     and containers, with automatic score propagation and statistics tracking.
     """
 
+    OBS: Final[type[ObservableType]] = ObservableType
+    REL: Final[type[RelationshipType]] = RelationshipType
+    DIR: Final[type[RelationshipDirection]] = RelationshipDirection
+    PROP: Final[type[PropagationMode]] = PropagationMode
+    LVL: Final[type[Level]] = Level
+
     def __init__(
         self,
         data: Any = None,
         root_type: Literal["file", "artifact"] = "file",
-        score_mode: ScoreMode | Literal["max", "sum"] = ScoreMode.MAX,
+        score_mode: ScoreMode = ScoreMode.MAX,
+        investigation_name: str | None = None,
     ) -> None:
         """
         Initialize a new investigation.
@@ -54,9 +67,15 @@ class Cyvest:
             data: The data being investigated (optional)
             root_type: Type of root observable ("file" or "artifact")
             score_mode: Score calculation mode (MAX or SUM)
+            investigation_name: Optional human-readable investigation name
         """
-        normalized_score_mode = ScoreMode.normalize(score_mode)
-        self._investigation = Investigation(data, root_type=root_type, score_mode=normalized_score_mode)
+        normalized_score_mode = score_mode
+        self._investigation = Investigation(
+            data,
+            root_type=root_type,
+            score_mode=normalized_score_mode,
+            investigation_name=investigation_name,
+        )
 
     def __enter__(self) -> Cyvest:
         """Context manager entry."""
@@ -87,6 +106,23 @@ class Cyvest:
             >>> cv = Cyvest.io_load_json("/absolute/path/to/investigation.json")
         """
         return load_investigation_json(filepath)
+
+    def shared_context(
+        self,
+        *,
+        lock: threading.RLock | None = None,
+        max_async_workers: int | None = None,
+    ) -> SharedInvestigationContext:
+        """
+        Create a SharedInvestigationContext tied to this Cyvest instance.
+
+        Args:
+            lock: Optional shared lock for advanced synchronization scenarios.
+            max_async_workers: Optional limit for concurrent async reconciliation workers.
+        """
+        from cyvest.shared import SharedInvestigationContext
+
+        return SharedInvestigationContext(self, lock=lock, max_async_workers=max_async_workers)
 
     # Internal helpers -------------------------------------------------
 
@@ -119,8 +155,8 @@ class Cyvest:
     def _resolve_key(value: Observable | ObservableProxy | str) -> str:
         if isinstance(value, str):
             return value
-        if hasattr(value, "key"):
-            return value.key  # type: ignore[return-value]
+        if isinstance(value, (Observable, ObservableProxy)):
+            return value.key
         raise TypeError("Expected an observable key, ObservableProxy, or Observable instance.")
 
     # Investigation-level helpers
@@ -136,6 +172,18 @@ class Cyvest:
             True
         """
         return self._investigation.is_whitelisted()
+
+    def investigation_get_name(self) -> str | None:
+        """Return the human-readable investigation name (if set)."""
+        return self._investigation.investigation_name
+
+    def investigation_set_name(self, name: str | None, reason: str | None = None) -> None:
+        """Set or clear the human-readable investigation name."""
+        self._investigation.set_investigation_name(name, reason=reason)
+
+    def investigation_get_audit_log(self) -> tuple:
+        """Return the investigation-level audit log."""
+        return tuple(self._investigation.get_event_log())
 
     def investigation_add_whitelist(
         self, identifier: str, name: str, justification: str | None = None
@@ -172,38 +220,24 @@ class Cyvest:
         """
         return tuple(self._investigation.get_whitelists())
 
-    def investigation_set_whitelisted(self, whitelisted: bool = True, reason: str | None = None) -> bool:
-        """
-        Compatibility helper: clears all whitelists when False; adds/updates a default entry when True.
-
-        Args:
-            whitelisted: Whether to mark whitelisted.
-            reason: Optional justification used for the default entry.
-        """
-        if not whitelisted:
-            self.investigation_clear_whitelists()
-            return False
-        self.investigation_add_whitelist("default", "Whitelisted", reason)
-        return True
-
     # Observable methods
 
     def observable_create(
         self,
-        obs_type: str,
+        obs_type: ObservableType,
         value: str,
         internal: bool = False,
         whitelisted: bool = False,
         comment: str = "",
         extra: dict[str, Any] | None = None,
         score: Decimal | float | None = None,
-        level: Level | str | None = None,
+        level: Level | None = None,
     ) -> ObservableProxy:
         """
         Create a new observable or return existing one.
 
         Args:
-            obs_type: Type of observable (ip, url, domain, hash, etc.)
+            obs_type: Type of observable
             value: Value of the observable
             internal: Whether this is an internal asset
             whitelisted: Whether this is whitelisted
@@ -232,16 +266,57 @@ class Cyvest:
         obs_result, _ = self._investigation.add_observable(obs)
         return self._observable_proxy(obs_result)
 
+    @overload
     def observable_get(self, key: str) -> ObservableProxy | None:
+        """Get an observable by full key string."""
+        ...
+
+    @overload
+    def observable_get(self, obs_type: ObservableType, value: str) -> ObservableProxy | None:
+        """Get an observable by type and value."""
+        ...
+
+    def observable_get(self, *args, **kwargs) -> ObservableProxy | None:
         """
-        Get an observable by key.
+        Get an observable by key or by type and value.
 
         Args:
-            key: Observable key
+            key: Observable key (single argument)
+            obs_type: Observable type (when using two arguments)
+            value: Observable value (when using two arguments)
 
         Returns:
             Observable if found, None otherwise
+
+        Raises:
+            ValueError: If arguments are invalid or key generation fails
         """
+        if kwargs:
+            if not args and set(kwargs) == {"key"}:
+                key = kwargs["key"]
+            elif not args and set(kwargs) == {"obs_type", "value"}:
+                obs_type = kwargs["obs_type"]
+                value = kwargs["value"]
+                try:
+                    key = keys.generate_observable_key(obs_type.value, value)
+                except Exception as e:
+                    raise ValueError(
+                        f"Failed to generate observable key for type='{obs_type}', value='{value}': {e}"
+                    ) from e
+            else:
+                raise ValueError("observable_get() accepts either (key: str) or (obs_type: ObservableType, value: str)")
+        elif len(args) == 1:
+            key = args[0]
+        elif len(args) == 2:
+            obs_type, value = args
+            try:
+                key = keys.generate_observable_key(obs_type.value, value)
+            except Exception as e:
+                raise ValueError(
+                    f"Failed to generate observable key for type='{obs_type}', value='{value}': {e}"
+                ) from e
+        else:
+            raise ValueError("observable_get() accepts either (key: str) or (obs_type: ObservableType, value: str)")
         return self._observable_proxy(self._investigation.get_observable(key))
 
     def observable_get_root(self) -> ObservableProxy:
@@ -257,8 +332,8 @@ class Cyvest:
         self,
         source: Observable | ObservableProxy | str,
         target: Observable | ObservableProxy | str,
-        relationship_type: str,
-        direction: str | None = None,
+        relationship_type: RelationshipType,
+        direction: RelationshipDirection | None = None,
     ) -> ObservableProxy | None:
         """
         Add a relationship between observables.
@@ -279,19 +354,19 @@ class Cyvest:
 
     def observable_add_threat_intel(
         self,
-        observable_key: str,
+        observable: Observable | ObservableProxy | str,
         source: str,
         score: Decimal | float,
         comment: str = "",
         extra: dict[str, Any] | None = None,
-        level: Level | str | None = None,
+        level: Level | None = None,
         taxonomies: list[dict[str, Any]] | None = None,
     ) -> ThreatIntelProxy | None:
         """
         Add threat intelligence to an observable.
 
         Args:
-            observable_key: Key of the observable
+            observable: Observable, ObservableProxy, or its key
             source: Threat intel source name
             score: Score from threat intel
             comment: Optional comment
@@ -302,6 +377,7 @@ class Cyvest:
         Returns:
             The created threat intel if observable found, None otherwise
         """
+        observable_key = self._resolve_key(observable)
         observable = self._investigation.get_observable(observable_key)
         if not observable:
             return None
@@ -320,30 +396,32 @@ class Cyvest:
         result = self._investigation.add_threat_intel(ti, observable)
         return self._threat_intel_proxy(result)
 
-    def observable_set_level(self, observable_key: str, level: Level | str) -> ObservableProxy | None:
+    def observable_set_level(
+        self,
+        observable: Observable | ObservableProxy | str,
+        level: Level,
+        reason: str | None = None,
+    ) -> ObservableProxy | None:
         """
         Explicitly set an observable's level via the service layer.
 
         Args:
-            observable_key: Key of the observable to update
+            observable: Observable, ObservableProxy, or its key
             level: Level to apply
 
         Returns:
             Updated observable proxy if found, None otherwise
         """
-        observable = self._investigation.get_observable(observable_key)
-        if not observable:
+        observable_key = self._resolve_key(observable)
+        model_observable = self._investigation.get_observable(observable_key)
+        if not model_observable:
             return None
-        observable.set_level(level)
-        return self._observable_proxy(observable)
-
-    def observable_finalize_relationships(self) -> None:
-        """
-        Finalize observable relationships by linking orphans to root.
-
-        Any observable without parent relationships is automatically linked to root.
-        """
-        self._investigation.finalize_relationships()
+        self._investigation.apply_level_change(
+            model_observable,
+            level,
+            reason=reason or "Manual level update",
+        )
+        return self._observable_proxy(model_observable)
 
     # Check methods
 
@@ -355,8 +433,7 @@ class Cyvest:
         comment: str = "",
         extra: dict[str, Any] | None = None,
         score: Decimal | float | None = None,
-        level: Level | str | None = None,
-        score_policy: CheckScorePolicy | Literal["auto", "manual"] | None = None,
+        level: Level | None = None,
     ) -> CheckProxy:
         """
         Create a new check.
@@ -369,7 +446,6 @@ class Cyvest:
             extra: Optional extra data
             score: Optional explicit score
             level: Optional explicit level
-            score_policy: Whether observables can update the check (AUTO|MANUAL)
 
         Returns:
             The created check
@@ -380,40 +456,87 @@ class Cyvest:
             "description": description,
             "comment": comment,
             "extra": extra or {},
+            "origin_investigation_id": self._investigation.investigation_id,
         }
         if score is not None:
             check_kwargs["score"] = Decimal(str(score))
         if level is not None:
             check_kwargs["level"] = level
-        if score_policy is not None:
-            check_kwargs["score_policy"] = score_policy
         check = Check(**check_kwargs)
         return self._check_proxy(self._investigation.add_check(check))
 
+    @overload
     def check_get(self, key: str) -> CheckProxy | None:
+        """Get a check by full key string."""
+        ...
+
+    @overload
+    def check_get(self, check_id: str, scope: str) -> CheckProxy | None:
+        """Get a check by ID and scope."""
+        ...
+
+    def check_get(self, *args, **kwargs) -> CheckProxy | None:
         """
-        Get a check by key.
+        Get a check by key or by check ID and scope.
 
         Args:
-            key: Check key
+            key: Check key (single argument)
+            check_id: Check identifier (when using two arguments)
+            scope: Check scope (when using two arguments)
 
         Returns:
             Check if found, None otherwise
+
+        Raises:
+            ValueError: If arguments are invalid or key generation fails
         """
+        if kwargs:
+            if not args and set(kwargs) == {"key"}:
+                key = kwargs["key"]
+            elif not args and set(kwargs) == {"check_id", "scope"}:
+                check_id = kwargs["check_id"]
+                scope = kwargs["scope"]
+                try:
+                    key = keys.generate_check_key(check_id, scope)
+                except Exception as e:
+                    raise ValueError(
+                        f"Failed to generate check key for check_id='{check_id}', scope='{scope}': {e}"
+                    ) from e
+            else:
+                raise ValueError("check_get() accepts either (key: str) or (check_id: str, scope: str)")
+        elif len(args) == 1:
+            key = args[0]
+        elif len(args) == 2:
+            check_id, scope = args
+            try:
+                key = keys.generate_check_key(check_id, scope)
+            except Exception as e:
+                raise ValueError(f"Failed to generate check key for check_id='{check_id}', scope='{scope}': {e}") from e
+        else:
+            raise ValueError("check_get() accepts either (key: str) or (check_id: str, scope: str)")
         return self._check_proxy(self._investigation.get_check(key))
 
-    def check_link_observable(self, check_key: str, observable_key: str) -> CheckProxy | None:
+    def check_link_observable(
+        self,
+        check_key: str,
+        observable: Observable | ObservableProxy | str,
+        propagation_mode: PropagationMode = PropagationMode.LOCAL_ONLY,
+    ) -> CheckProxy | None:
         """
         Link an observable to a check.
 
         Args:
             check_key: Key of the check
-            observable_key: Key of the observable
+            observable: Observable, ObservableProxy, or its key
+            propagation_mode: Propagation behavior for this link
 
         Returns:
             The check if found, None otherwise
         """
-        return self._check_proxy(self._investigation.link_check_observable(check_key, observable_key))
+        observable_key = self._resolve_key(observable)
+        return self._check_proxy(
+            self._investigation.link_check_observable(check_key, observable_key, propagation_mode=propagation_mode)
+        )
 
     def check_update_score(self, check_key: str, score: Decimal | float, reason: str = "") -> CheckProxy | None:
         """
@@ -429,7 +552,7 @@ class Cyvest:
         """
         check = self._investigation.get_check(check_key)
         if check:
-            check.update_score(Decimal(str(score)), reason)
+            self._investigation.apply_score_change(check, Decimal(str(score)), reason=reason)
         return self._check_proxy(check)
 
     # Container methods
@@ -448,16 +571,42 @@ class Cyvest:
         container = Container(path=path, description=description)
         return self._container_proxy(self._investigation.add_container(container))
 
-    def container_get(self, key: str) -> ContainerProxy | None:
+    def container_get(self, *args, **kwargs) -> ContainerProxy | None:
         """
-        Get a container by key.
+        Get a container by key or by path.
 
         Args:
-            key: Container key
+            key: Container key (single argument, prefixed with ctr:)
+            path: Container path (single argument without prefix)
 
         Returns:
             Container if found, None otherwise
+
+        Raises:
+            ValueError: If arguments are invalid or key generation fails
         """
+        if kwargs:
+            if not args and set(kwargs) == {"key"}:
+                key = kwargs["key"]
+            elif not args and set(kwargs) == {"path"}:
+                path = kwargs["path"]
+                try:
+                    key = keys.generate_container_key(path)
+                except Exception as e:
+                    raise ValueError(f"Failed to generate container key for path='{path}': {e}") from e
+            else:
+                raise ValueError("container_get() accepts either (key: str) or (path: str)")
+        elif len(args) == 1:
+            key_or_path = args[0]
+            if isinstance(key_or_path, str) and key_or_path.startswith("ctr:"):
+                key = key_or_path
+            else:
+                try:
+                    key = keys.generate_container_key(key_or_path)
+                except Exception as e:
+                    raise ValueError(f"Failed to generate container key for path='{key_or_path}': {e}") from e
+        else:
+            raise ValueError("container_get() accepts either (key: str) or (path: str)")
         return self._container_proxy(self._investigation.get_container(key))
 
     def container_add_check(self, container_key: str, check_key: str) -> ContainerProxy | None:
@@ -503,16 +652,79 @@ class Cyvest:
         enrichment = Enrichment(name=name, data=data, context=context)
         return self._enrichment_proxy(self._investigation.add_enrichment(enrichment))
 
+    @overload
     def enrichment_get(self, key: str) -> EnrichmentProxy | None:
+        """Get an enrichment by full key string."""
+        ...
+
+    @overload
+    def enrichment_get(self, name: str, context: str = "") -> EnrichmentProxy | None:
+        """Get an enrichment by name and optional context."""
+        ...
+
+    def enrichment_get(self, *args, **kwargs) -> EnrichmentProxy | None:
         """
-        Get an enrichment by key.
+        Get an enrichment by key or by name and context.
 
         Args:
-            key: Enrichment key
+            key: Enrichment key (single argument, prefixed with enr:)
+            name: Enrichment name (when using one or two arguments)
+            context: Optional context (second argument or context= kw)
 
         Returns:
             Enrichment if found, None otherwise
+
+        Raises:
+            ValueError: If arguments are invalid or key generation fails
         """
+        if kwargs:
+            if not args and set(kwargs) == {"key"}:
+                key = kwargs["key"]
+            elif not args and set(kwargs) == {"name"}:
+                name = kwargs["name"]
+                try:
+                    key = keys.generate_enrichment_key(name)
+                except Exception as e:
+                    raise ValueError(f"Failed to generate enrichment key for name='{name}': {e}") from e
+            elif not args and set(kwargs) == {"name", "context"}:
+                name = kwargs["name"]
+                context = kwargs["context"]
+                try:
+                    key = keys.generate_enrichment_key(name, context)
+                except Exception as e:
+                    raise ValueError(
+                        f"Failed to generate enrichment key for name='{name}', context='{context}': {e}"
+                    ) from e
+            elif len(args) == 1 and set(kwargs) == {"context"}:
+                name = args[0]
+                context = kwargs["context"]
+                try:
+                    key = keys.generate_enrichment_key(name, context)
+                except Exception as e:
+                    raise ValueError(
+                        f"Failed to generate enrichment key for name='{name}', context='{context}': {e}"
+                    ) from e
+            else:
+                raise ValueError('enrichment_get() accepts either (key: str) or (name: str, context: str = "")')
+        elif len(args) == 1:
+            key_or_name = args[0]
+            if isinstance(key_or_name, str) and key_or_name.startswith("enr:"):
+                key = key_or_name
+            else:
+                try:
+                    key = keys.generate_enrichment_key(key_or_name)
+                except Exception as e:
+                    raise ValueError(f"Failed to generate enrichment key for name='{key_or_name}': {e}") from e
+        elif len(args) == 2:
+            name, context = args
+            try:
+                key = keys.generate_enrichment_key(name, context)
+            except Exception as e:
+                raise ValueError(
+                    f"Failed to generate enrichment key for name='{name}', context='{context}': {e}"
+                ) from e
+        else:
+            raise ValueError('enrichment_get() accepts either (key: str) or (name: str, context: str = "")')
         return self._enrichment_proxy(self._investigation.get_enrichment(key))
 
     # Score and statistics methods
@@ -700,15 +912,15 @@ class Cyvest:
     def display_summary(
         self,
         show_graph: bool = True,
-        exclude_levels: Level | str | Iterable[Level | str] = Level.NONE,
-        show_score_history: bool = False,
+        exclude_levels: Level | Iterable[Level] = Level.NONE,
+        show_audit_log: bool = False,
     ) -> None:
         display_summary(
             self,
             lambda renderables: logger.rich("INFO", renderables),
             show_graph=show_graph,
             exclude_levels=exclude_levels,
-            show_score_history=show_score_history,
+            show_audit_log=show_audit_log,
         )
 
     def display_statistics(self) -> None:
@@ -718,8 +930,8 @@ class Cyvest:
         self,
         output_dir: str | None = None,
         open_browser: bool = True,
-        min_level: Level | str | None = None,
-        observable_types: list[str] | None = None,
+        min_level: Level | None = None,
+        observable_types: list[ObservableType] | None = None,
         physics: bool = True,
         group_by_type: bool = False,
         max_label_length: int = 60,
@@ -752,19 +964,13 @@ class Cyvest:
             '/tmp/cyvest_12345/cyvest_network.html'
         """
         from cyvest.io_visualization import generate_network_graph
-        from cyvest.model import ObservableType
-
-        # Convert string types to ObservableType enums if provided
-        obs_types_enum = None
-        if observable_types is not None:
-            obs_types_enum = [ObservableType(t) for t in observable_types]
 
         return generate_network_graph(
             self,
             output_dir=output_dir,
             open_browser=open_browser,
             min_level=min_level,
-            observable_types=obs_types_enum,
+            observable_types=observable_types,
             physics=physics,
             group_by_type=group_by_type,
             max_label_length=max_label_length,
@@ -775,14 +981,14 @@ class Cyvest:
 
     def observable(
         self,
-        obs_type: str,
+        obs_type: ObservableType,
         value: str,
         internal: bool = False,
         whitelisted: bool = False,
         comment: str = "",
         extra: dict[str, Any] | None = None,
         score: Decimal | float | None = None,
-        level: Level | str | None = None,
+        level: Level | None = None,
     ) -> ObservableProxy:
         """
         Create (or fetch) an observable with fluent helper methods.
@@ -810,8 +1016,7 @@ class Cyvest:
         comment: str = "",
         extra: dict[str, Any] | None = None,
         score: Decimal | float | None = None,
-        level: Level | str | None = None,
-        score_policy: CheckScorePolicy | Literal["auto", "manual"] | None = None,
+        level: Level | None = None,
     ) -> CheckProxy:
         """
         Create a check with fluent helper methods.
@@ -824,12 +1029,11 @@ class Cyvest:
             extra: Optional extra data
             score: Optional explicit score
             level: Optional explicit level
-            score_policy: Whether observables can update the check (AUTO|MANUAL)
 
         Returns:
             Check proxy exposing mutation helpers for chaining
         """
-        return self.check_create(check_id, scope, description, comment, extra, score, level, score_policy)
+        return self.check_create(check_id, scope, description, comment, extra, score, level)
 
     def container(self, path: str, description: str = "") -> ContainerProxy:
         """

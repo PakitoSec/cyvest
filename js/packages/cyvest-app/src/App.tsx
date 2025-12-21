@@ -59,7 +59,16 @@ export const App: React.FC = () => {
         <div style={{ padding: 16 }}>Loading…</div>
       ) : investigation ? (
         <>
-          <h2 style={{ margin: 0, padding: "0 16px" }}>Score {investigation.score} • Level {investigation.level}</h2>
+          <div style={{ padding: "0 16px 8px" }}>
+            <h2 style={{ margin: 0 }}>
+              {investigation.investigation_name ?? investigation.investigation_id}
+            </h2>
+            <div style={{ color: "#6b7280", fontSize: 13, marginTop: 4 }}>
+              <span>Score {investigation.score_display}</span>
+              <span> | Level {investigation.level}</span>
+              <span> | Started {investigation.started_at}</span>
+            </div>
+          </div>
 
           <div style={{ flex: 1, minHeight: 0 }}>
             <CyvestGraph

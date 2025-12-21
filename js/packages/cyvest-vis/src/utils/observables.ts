@@ -2,6 +2,7 @@
  * Utility functions for observable visualization.
  */
 
+import { getColorForLevel, type Level } from "@cyvest/cyvest-js";
 import type { ObservableShape } from "../types";
 
 /**
@@ -118,33 +119,33 @@ export function truncateLabel(
 /**
  * Get color for security level.
  */
-export function getLevelColor(level: string): string {
-  const colors: Record<string, string> = {
-    NONE: "#6b7280", // gray-500
-    TRUSTED: "#22c55e", // green-500
-    INFO: "#3b82f6", // blue-500
-    SAFE: "#22c55e", // green-500
-    NOTABLE: "#eab308", // yellow-500
-    SUSPICIOUS: "#f97316", // orange-500
-    MALICIOUS: "#ef4444", // red-500
-  };
-  return colors[level] ?? colors.NONE;
+export function getLevelColor(level: Level): string {
+  return getColorForLevel(level);
+}
+
+function lightenHexColor(hex: string, amount: number): string {
+  const normalized = hex.startsWith("#") ? hex.slice(1) : hex;
+  if (normalized.length !== 6) {
+    return hex;
+  }
+
+  const r = parseInt(normalized.slice(0, 2), 16);
+  const g = parseInt(normalized.slice(2, 4), 16);
+  const b = parseInt(normalized.slice(4, 6), 16);
+
+  const mix = (channel: number) =>
+    Math.max(0, Math.min(255, Math.round(channel + (255 - channel) * amount)));
+
+  const toHex = (channel: number) => channel.toString(16).padStart(2, "0");
+
+  return `#${toHex(mix(r))}${toHex(mix(g))}${toHex(mix(b))}`;
 }
 
 /**
  * Get background color for security level (lighter version).
  */
-export function getLevelBackgroundColor(level: string): string {
-  const colors: Record<string, string> = {
-    NONE: "#f3f4f6", // gray-100
-    TRUSTED: "#dcfce7", // green-100
-    INFO: "#dbeafe", // blue-100
-    SAFE: "#dcfce7", // green-100
-    NOTABLE: "#fef9c3", // yellow-100
-    SUSPICIOUS: "#ffedd5", // orange-100
-    MALICIOUS: "#fee2e2", // red-100
-  };
-  return colors[level] ?? colors.NONE;
+export function getLevelBackgroundColor(level: Level): string {
+  return lightenHexColor(getLevelColor(level), 0.85);
 }
 
 /**

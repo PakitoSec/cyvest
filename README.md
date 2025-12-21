@@ -14,7 +14,7 @@
 - 🏷️ **Typed Helpers**: Built-in enums for observable types and relationships with autocomplete
 - 📈 **Real-time Statistics**: Live metrics and aggregations throughout the investigation
 - 🔄 **Investigation Merging**: Combine investigations from multiple threads or processes
-- 🧵 **Multi-Threading Support**: Advanced thread-safe shared context available via `cyvest.investigation` module
+- 🧵 **Multi-Threading Support**: Advanced thread-safe shared context available via `cyvest.shared`
 - 💾 **Multiple Export Formats**: JSON and Markdown output for reporting and LLM consumption
 - 🎨 **Rich Console Output**: Beautiful terminal displays with the Rich library
 - 🧩 **Fluent helpers**: Convenient API with method chaining for rapid development
@@ -51,15 +51,15 @@ pip install -e .
 
 ```python
 from decimal import Decimal
-from cyvest import Cyvest, Level, ObservableType, RelationshipType
+from cyvest import Cyvest
 
 # Create an investigation
 with Cyvest(data={"type": "email"}) as cv:
     # Create observables
     url = (
-        cv.observable(ObservableType.URL, "https://phishing-site.com", internal=False)
-        .with_ti("virustotal", score=Decimal("8.5"), level=Level.MALICIOUS)
-        .relate_to(cv.root(), RelationshipType.RELATED_TO)
+        cv.observable(cv.OBS.URL, "https://phishing-site.com", internal=False)
+        .with_ti("virustotal", score=Decimal("8.5"), level=cv.LVL.MALICIOUS)
+        .relate_to(cv.root(), cv.REL.RELATED_TO)
     )
 
     # Create checks
@@ -80,9 +80,9 @@ with Cyvest(data={"type": "email"}) as cv:
 Cyvest only exposes immutable model proxies. Helpers like `observable_create`, `check_create`, and the
 fluent `cv.observable()`/`cv.check()` convenience methods return `ObservableProxy`, `CheckProxy`, `ContainerProxy`, etc.
 These proxies reflect the live investigation state but raise `AttributeError` if you try to assign to their attributes.
-Use the facade helpers (`cv.observable_set_level`, `cv.check_update_score`, `cv.observable_add_threat_intel`) or the
-built-in fluent methods on the proxies themselves (`with_ti`, `relate_to`, `link_observable`, `with_score`, …) so the
-score engine runs automatically.
+All mutations are routed through the Investigation layer, so use the facade helpers (`cv.observable_set_level`,
+`cv.check_update_score`, `cv.observable_add_threat_intel`) or the built-in fluent methods on the proxies themselves
+(`with_ti`, `relate_to`, `link_observable`, `with_score`, …) so the score engine and audit log stay consistent.
 
 Safe metadata fields like `comment`, `extra`, or `internal` can be updated through the proxies without breaking score
 consistency:
@@ -101,27 +101,24 @@ Dictionary fields merge by default; pass `merge_extra=False` (or `merge_data=Fal
 Observables represent cyber artifacts (URLs, IPs, domains, hashes, files, etc.).
 
 ```python
-from cyvest import ObservableType, RelationshipType, RelationshipDirection
+from cyvest import Cyvest
 
-url_obs = cv.observable_create(
-    ObservableType.URL,
-    "https://malicious.com",
-    internal=False
-)
+cv = Cyvest()
 
-ip_obs = cv.observable_create("ipv4-addr", "192.0.2.1", internal=False)
+url_obs = cv.observable_create(cv.OBS.URL, "https://malicious.com", internal=False)
+
+ip_obs = cv.observable_create(cv.OBS.IPV4_ADDR, "192.0.2.1", internal=False)
 
 cv.observable_add_relationship(
     url_obs,  # Can pass ObservableProxy directly
     ip_obs,   # Or use .key for string keys
-    RelationshipType.RELATED_TO,
-    RelationshipDirection.BIDIRECTIONAL,
+    cv.REL.RELATED_TO,
+    cv.DIR.BIDIRECTIONAL,
 )
 ```
 
-Cyvest ships enums for the most common observable types; you can still pass strings for custom types.
-Relationships are intentionally simple for now: use `RelationshipType.RELATED_TO` to link observables
-and optionally choose a direction (`OUTBOUND`, `INBOUND`, or `BIDIRECTIONAL`) to control score propagation.
+Cyvest exposes enums for observable types and relationships via the facade (`cv.OBS`, `cv.REL`, `cv.DIR`)
+so IDEs can autocomplete the official vocabulary without extra imports.
 
 ### Checks
 
@@ -133,7 +130,7 @@ check = cv.check_create(
     scope="endpoint",
     description="Verify file hash against threat intel",
     score=Decimal("8.0"),
-    level=Level.MALICIOUS
+    level=cv.LVL.MALICIOUS
 )
 
 # Link observables to checks
@@ -149,7 +146,7 @@ cv.observable_add_threat_intel(
     observable.key,
     source="virustotal",
     score=Decimal("7.5"),
-    level=Level.SUSPICIOUS,
+    level=cv.LVL.SUSPICIOUS,
     comment="15/70 vendors flagged as malicious",
     taxonomies=[{"malware-type": "trojan"}]
 )
@@ -163,28 +160,50 @@ Containers organize checks hierarchically:
 with cv.container("network_analysis") as network:
     with network.sub_container("c2_detection") as c2:
         check = cv.check("beacon_detection", "network", "Detect C2 beacons")
-        c2.add_check(check.get())
+        c2.add_check(check)
 ```
+
+### Lookup Helpers
+
+Use facade getters with either key strings or component parameters:
+
+```python
+url_obs = cv.observable_create(cv.OBS.URL, "https://malicious.com")
+same_url = cv.observable_get(cv.OBS.URL, "https://malicious.com")
+same_url_by_key = cv.observable_get(url_obs.key)
+
+check = cv.check_create("malware_detection", "endpoint", "Verify file hash")
+same_check = cv.check_get("malware_detection", "endpoint")
+same_check_by_key = cv.check_get(check.key)
+
+container = cv.container_create("network_analysis")
+same_container = cv.container_get("network_analysis")
+same_container_by_key = cv.container_get(container.key)
+
+enrichment = cv.enrichment_create("whois", {"registrar": "Example Inc"})
+same_enrichment = cv.enrichment_get("whois")
+same_enrichment_by_key = cv.enrichment_get(enrichment.key)
+```
+
+Low-level `Investigation` getters accept keys only; use the facade for component-based lookups.
 
 ### Multi-Threaded Investigations
 
-**Advanced Feature**: Use `SharedInvestigationContext` (imported directly from `cyvest.shared`) for safe parallel task execution with automatic observable sharing:
+**Advanced Feature**: Use `Cyvest.shared_context()` (or `SharedInvestigationContext` from `cyvest.shared`) for safe parallel task execution with automatic observable sharing:
 
 ```python
 from cyvest import Cyvest
-from cyvest.investigation import Investigation
-from cyvest.shared import SharedInvestigationContext
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 def email_analysis(shared_context):
     # create_cyvest() yields a task-local Cyvest that auto-merges on context exit
     with shared_context.create_cyvest() as cy:
         data = cy.root().extra
-        cy.observable(ObservableType.DOMAIN_NAME, data.get("domain"))
+        cy.observable(cy.OBS.DOMAIN_NAME, data.get("domain"))
 
 # Create shared context
-main_inv = Investigation(email_data, root_type="artifact")
-shared = SharedInvestigationContext(main_inv)
+main_cy = Cyvest(email_data, root_type="artifact")
+shared = main_cy.shared_context()
 
 # Run tasks in parallel - they can reference each other's observables
 with ThreadPoolExecutor(max_workers=4) as executor:
@@ -192,8 +211,8 @@ with ThreadPoolExecutor(max_workers=4) as executor:
     for future in as_completed(futures):
         future.result()  # Auto-reconciled
 
-# Get merged investigation (same object passed to SharedInvestigationContext)
-final_investigation = main_inv
+# Get merged investigation (same object passed to shared_context)
+final_cy = main_cy
 ```
 
 See `examples/04_email.py` for a complete multi-threaded investigation example.
@@ -207,9 +226,27 @@ Scores and levels are automatically calculated and propagated:
   - **OUTBOUND relationships**: target scores propagate to source (source is parent)
   - **INBOUND relationships**: source scores propagate to target (target is parent)
   - **BIDIRECTIONAL relationships**: no hierarchical propagation
-- **Observable → Check**: Check score = **max** of all linked observables' scores and check's current score
-- **Manual checks**: Set `score_policy=CheckScorePolicy.MANUAL` (or `check.disable_auto_score()`) to prevent observable-driven score/level changes
+- **Observable → Check (provenance-aware)**: Check score/level only considers observables reachable through *effective* links (`observable_links`)
+  - A link is effective when `propagation_mode="GLOBAL"` or when the check's `origin_investigation_id` matches the current investigation id
 - **Check → Global**: All check scores sum to global investigation score
+
+**Provenance model**
+
+- `Investigation.investigation_id` is a stable ULID included in exports.
+- Checks keep a *canonical origin* (`origin_investigation_id`) for LOCAL_ONLY propagation; it is compared against the current investigation id.
+
+**Audit log**
+
+- All meaningful changes (including score/level changes) are recorded in the investigation-level audit log.
+- Per-object histories are not stored; use `cv.investigation_get_audit_log()` to review changes.
+
+To force cross-investigation propagation for a specific link, use a GLOBAL link:
+
+```python
+cv.check_link_observable(check.key, observable.key, propagation_mode="GLOBAL")
+# or fluent:
+cv.check("id", "scope", "desc").link_observable(observable, propagation_mode="GLOBAL")
+```
 
 Score to Level mapping:
 
@@ -226,9 +263,9 @@ The SAFE level has special protection for trusted/whitelisted observables:
 ```python
 # Mark a known-good domain as SAFE
 trusted = cv.observable_create(
-    "domain",
+    cv.OBS.DOMAIN_NAME,
     "trusted.example.com",
-    level=Level.SAFE
+    level=cv.LVL.SAFE
 )
 
 # Adding low-score threat intel won't downgrade to TRUSTED or INFO
@@ -240,12 +277,12 @@ cv.observable_add_threat_intel(trusted.key, "source2", score=Decimal("6.0"))
 # Level upgrades to MALICIOUS, score updates to 6.0
 
 # Threat intel with SAFE level can also mark observables as SAFE
-uncertain = cv.observable_create("domain", "example.com")
+uncertain = cv.observable_create(cv.OBS.DOMAIN_NAME, "example.com")
 cv.observable_add_threat_intel(
     uncertain.key,
     "whitelist_service",
     score=Decimal("0"),
-    level=Level.SAFE
+    level=cv.LVL.SAFE
 )
 # Observable upgraded to SAFE level with automatic downgrade protection
 ```
@@ -382,6 +419,10 @@ The repo includes a PNPM workspace under `js/` with three packages:
 - `@cyvest/cyvest-js`: TypeScript types, schema validation, and helpers for Cyvest investigations.
 - `@cyvest/cyvest-vis`: React components for graph visualization (depends on `@cyvest/cyvest-js`).
 - `@cyvest/cyvest-app`: Vite demo that bundles the JS packages with sample investigations.
+
+The JS packages track the generated schema; serialized investigations should include fields like
+`investigation_id`, `investigation_name`, `started_at`, `score_display`, `check_links`, and
+`observable_links`.
 
 See `docs/js-packages.md` for workspace commands and usage snippets.
 

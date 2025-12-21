@@ -21,7 +21,7 @@ import {
 import "@xyflow/react/dist/style.css";
 
 import type { CyvestInvestigation } from "@cyvest/cyvest-js";
-import { getObservableGraph, findRootObservables } from "@cyvest/cyvest-js";
+import { getObservableGraph } from "@cyvest/cyvest-js";
 
 import type {
   ObservablesGraphProps,
@@ -344,24 +344,29 @@ const ObservablesGraphInner: React.FC<
 export const ObservablesGraph: React.FC<ObservablesGraphProps> = (props) => {
   const { investigation } = props;
 
-  // Find root observables
-  const rootObservables = useMemo(() => {
-    const roots = findRootObservables(investigation);
-    return new Set(roots.map((r) => r.key));
-  }, [investigation]);
+  const { rootKeys, primaryRootId } = useMemo(() => {
+    const rootType = investigation.data_extraction.root_type;
+    if (!rootType) {
+      return { rootKeys: new Set<string>(), primaryRootId: undefined };
+    }
 
-  // Get first root for centering
-  const primaryRootId = useMemo(() => {
-    const roots = findRootObservables(investigation);
-    return roots.length > 0 ? roots[0].key : undefined;
+    const normalizedRootType = rootType.toLowerCase().trim();
+    const rootsByType = Object.values(investigation.observables).filter(
+      (obs) => obs.type.toLowerCase() === normalizedRootType
+    );
+
+    return {
+      rootKeys: new Set(rootsByType.map((obs) => obs.key)),
+      primaryRootId: rootsByType[0]?.key,
+    };
   }, [investigation]);
 
   // Create initial nodes and edges
   const { initialNodes, initialEdges } = useMemo(() => {
-    const nodes = createObservableNodes(investigation, rootObservables);
+    const nodes = createObservableNodes(investigation, rootKeys);
     const edges = createObservableEdges(investigation);
     return { initialNodes: nodes, initialEdges: edges };
-  }, [investigation, rootObservables]);
+  }, [investigation, rootKeys]);
 
   return (
     <ReactFlowProvider>

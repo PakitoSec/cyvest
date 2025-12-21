@@ -1,6 +1,10 @@
 // AUTO-GENERATED FROM cyvest.schema.json — DO NOT EDIT
 
 /**
+ * Optional human-readable investigation name.
+ */
+export type InvestigationName = string | null;
+/**
  * Security level classification for checks, observables, and threat intelligence.
  *
  * Levels are ordered from lowest (NONE) to highest (MALICIOUS) severity.
@@ -11,6 +15,15 @@ export type Justification = string | null;
  * List of whitelist entries applied to this investigation.
  */
 export type Whitelists = InvestigationWhitelist[];
+export type Actor = string | null;
+export type Reason = string | null;
+export type Tool = string | null;
+export type ObjectType = string | null;
+export type ObjectKey = string | null;
+/**
+ * Append-only investigation audit log.
+ */
+export type EventLog = AuditEvent[];
 export type ThreatIntels = string[];
 /**
  * Direction of a relationship between observables.
@@ -18,14 +31,14 @@ export type ThreatIntels = string[];
 export type RelationshipDirection = "outbound" | "inbound" | "bidirectional";
 export type Relationships = Relationship[];
 /**
- * Checks that generated this observable.
+ * Checks that currently link to this observable (navigation-only).
  */
-export type GeneratedByChecks = string[];
-export type Observables1 = string[];
+export type CheckLinks = string[];
 /**
- * Controls how a check reacts to linked observables.
+ * Controls how a Check↔Observable link propagates across merged investigations.
  */
-export type CheckScorePolicy = "auto" | "manual";
+export type PropagationMode = "LOCAL_ONLY" | "GLOBAL";
+export type ObservableLinks = ObservableLink[];
 export type Taxonomies = {
   [k: string]: unknown;
 }[];
@@ -51,6 +64,11 @@ export type ScoreMode = "max" | "sum";
  */
 export interface CyvestInvestigation {
   /**
+   * Stable investigation identity (ULID).
+   */
+  investigation_id: string;
+  investigation_name?: InvestigationName;
+  /**
    * Investigation start time (UTC).
    */
   started_at: string;
@@ -64,6 +82,7 @@ export interface CyvestInvestigation {
    */
   whitelisted: boolean;
   whitelists: Whitelists;
+  event_log?: EventLog;
   observables: Observables;
   checks: Checks;
   checks_by_level: ChecksByLevel;
@@ -85,6 +104,24 @@ export interface InvestigationWhitelist {
   identifier: string;
   name: string;
   justification?: Justification;
+  [k: string]: unknown;
+}
+/**
+ * Centralized audit event for investigation-level changes.
+ */
+export interface AuditEvent {
+  event_id: string;
+  timestamp: string;
+  event_type: string;
+  actor?: Actor;
+  reason?: Reason;
+  tool?: Tool;
+  object_type?: ObjectType;
+  object_key?: ObjectKey;
+  details?: Details;
+  [k: string]: unknown;
+}
+export interface Details {
   [k: string]: unknown;
 }
 /**
@@ -111,7 +148,7 @@ export interface Observable {
   threat_intels: ThreatIntels;
   relationships: Relationships;
   key: string;
-  generated_by_checks: GeneratedByChecks;
+  check_links: CheckLinks;
   score_display: string;
   [k: string]: unknown;
 }
@@ -147,14 +184,21 @@ export interface Check {
   extra: Extra1;
   score: number;
   level: Level;
-  observables: Observables1;
-  score_policy?: CheckScorePolicy;
+  origin_investigation_id: string;
+  observable_links: ObservableLinks;
   key: string;
   score_display: string;
   [k: string]: unknown;
 }
 export interface Extra1 {
   [k: string]: unknown;
+}
+/**
+ * Edge metadata for a Check↔Observable association.
+ */
+export interface ObservableLink {
+  observable_key: string;
+  propagation_mode?: PropagationMode;
 }
 /**
  * Check keys organized by level name.

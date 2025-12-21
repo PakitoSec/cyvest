@@ -1,19 +1,1195 @@
 {
+  "investigation_id": "01KD15RPPKH3YHQNWSYNYYRYF7",
+  "investigation_name": null,
+  "started_at": "2025-12-21T19:21:47.475055Z",
   "score": 39.5,
   "level": "MALICIOUS",
   "whitelisted": false,
   "whitelists": [],
+  "event_log": [
+    {
+      "event_id": "01KD15RPPKRTAQV5BXCHEAW39Q",
+      "timestamp": "2025-12-21T19:21:47.475394Z",
+      "event_type": "OBSERVABLE_CREATED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:file:root",
+      "details": {}
+    },
+    {
+      "event_id": "01KD15RPPKDKS4QAKJ550644CB",
+      "timestamp": "2025-12-21T19:21:47.475423Z",
+      "event_type": "OBSERVABLE_CREATED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:domain-name:evil-phishing.com",
+      "details": {}
+    },
+    {
+      "event_id": "01KD15RPPKB0629158TV7PWS0G",
+      "timestamp": "2025-12-21T19:21:47.475465Z",
+      "event_type": "SCORE_CHANGED",
+      "actor": null,
+      "reason": "Threat intel update from VirusTotal",
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:domain-name:evil-phishing.com",
+      "details": {
+        "old_score": 0.0,
+        "new_score": 9.0,
+        "old_level": "INFO",
+        "new_level": "MALICIOUS"
+      }
+    },
+    {
+      "event_id": "01KD15RPPKZ54ESS5EXDF8PP5T",
+      "timestamp": "2025-12-21T19:21:47.475481Z",
+      "event_type": "THREAT_INTEL_ATTACHED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:domain-name:evil-phishing.com",
+      "details": {
+        "threat_intel_key": "ti:virustotal:obs:domain-name:evil-phishing.com",
+        "source": "VirusTotal"
+      }
+    },
+    {
+      "event_id": "01KD15RPPKQNHSWMZREKZ362C4",
+      "timestamp": "2025-12-21T19:21:47.475505Z",
+      "event_type": "THREAT_INTEL_ATTACHED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:domain-name:evil-phishing.com",
+      "details": {
+        "threat_intel_key": "ti:alienvault otx:obs:domain-name:evil-phishing.com",
+        "source": "AlienVault OTX"
+      }
+    },
+    {
+      "event_id": "01KD15RPPK10Z3ZWP7N4VWK3SD",
+      "timestamp": "2025-12-21T19:21:47.475523Z",
+      "event_type": "OBSERVABLE_CREATED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:ipv4-addr:185.220.101.50",
+      "details": {}
+    },
+    {
+      "event_id": "01KD15RPPKT83PJNGAPW340CV9",
+      "timestamp": "2025-12-21T19:21:47.475544Z",
+      "event_type": "SCORE_CHANGED",
+      "actor": null,
+      "reason": "Threat intel update from AbuseIPDB",
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:ipv4-addr:185.220.101.50",
+      "details": {
+        "old_score": 0.0,
+        "new_score": 9.5,
+        "old_level": "INFO",
+        "new_level": "MALICIOUS"
+      }
+    },
+    {
+      "event_id": "01KD15RPPKM25X59CZEX5V4NWV",
+      "timestamp": "2025-12-21T19:21:47.475555Z",
+      "event_type": "THREAT_INTEL_ATTACHED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:ipv4-addr:185.220.101.50",
+      "details": {
+        "threat_intel_key": "ti:abuseipdb:obs:ipv4-addr:185.220.101.50",
+        "source": "AbuseIPDB"
+      }
+    },
+    {
+      "event_id": "01KD15RPPKK32ZVGG4A9EWYRMH",
+      "timestamp": "2025-12-21T19:21:47.475569Z",
+      "event_type": "RELATIONSHIP_CREATED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:ipv4-addr:185.220.101.50",
+      "details": {
+        "target_key": "obs:domain-name:evil-phishing.com",
+        "relationship_type": "related-to",
+        "direction": "outbound"
+      }
+    },
+    {
+      "event_id": "01KD15RPPK09R20WC97M3S32G8",
+      "timestamp": "2025-12-21T19:21:47.475595Z",
+      "event_type": "OBSERVABLE_CREATED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:domain-name:sketchy-site.net",
+      "details": {}
+    },
+    {
+      "event_id": "01KD15RPPKB3X12373VXB6GM7K",
+      "timestamp": "2025-12-21T19:21:47.475614Z",
+      "event_type": "SCORE_CHANGED",
+      "actor": null,
+      "reason": "Threat intel update from VirusTotal",
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:domain-name:sketchy-site.net",
+      "details": {
+        "old_score": 0.0,
+        "new_score": 4.5,
+        "old_level": "INFO",
+        "new_level": "SUSPICIOUS"
+      }
+    },
+    {
+      "event_id": "01KD15RPPK5BWCKTN425JTZBD8",
+      "timestamp": "2025-12-21T19:21:47.475625Z",
+      "event_type": "THREAT_INTEL_ATTACHED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:domain-name:sketchy-site.net",
+      "details": {
+        "threat_intel_key": "ti:virustotal:obs:domain-name:sketchy-site.net",
+        "source": "VirusTotal"
+      }
+    },
+    {
+      "event_id": "01KD15RPPKM7TS77QYE0B0WSE9",
+      "timestamp": "2025-12-21T19:21:47.475645Z",
+      "event_type": "OBSERVABLE_CREATED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:ipv4-addr:192.168.100.5",
+      "details": {}
+    },
+    {
+      "event_id": "01KD15RPPK3BQ9ENP42PXV0N1V",
+      "timestamp": "2025-12-21T19:21:47.475662Z",
+      "event_type": "SCORE_CHANGED",
+      "actor": null,
+      "reason": "Threat intel update from Shodan",
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:ipv4-addr:192.168.100.5",
+      "details": {
+        "old_score": 0.0,
+        "new_score": 3.0,
+        "old_level": "INFO",
+        "new_level": "SUSPICIOUS"
+      }
+    },
+    {
+      "event_id": "01KD15RPPKFPTFN45FS0791BBC",
+      "timestamp": "2025-12-21T19:21:47.475671Z",
+      "event_type": "THREAT_INTEL_ATTACHED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:ipv4-addr:192.168.100.5",
+      "details": {
+        "threat_intel_key": "ti:shodan:obs:ipv4-addr:192.168.100.5",
+        "source": "Shodan"
+      }
+    },
+    {
+      "event_id": "01KD15RPPKC1EQY30NAY3EJDQ7",
+      "timestamp": "2025-12-21T19:21:47.475680Z",
+      "event_type": "RELATIONSHIP_CREATED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:domain-name:sketchy-site.net",
+      "details": {
+        "target_key": "obs:ipv4-addr:192.168.100.5",
+        "relationship_type": "related-to",
+        "direction": "outbound"
+      }
+    },
+    {
+      "event_id": "01KD15RPPKDJHA62ZQ9YD7R14E",
+      "timestamp": "2025-12-21T19:21:47.475709Z",
+      "event_type": "OBSERVABLE_CREATED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:email-addr:attacker@evil-phishing.com",
+      "details": {}
+    },
+    {
+      "event_id": "01KD15RPPKN5QEH0ZPW067WJZF",
+      "timestamp": "2025-12-21T19:21:47.475726Z",
+      "event_type": "SCORE_CHANGED",
+      "actor": null,
+      "reason": "Threat intel update from EmailRep",
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:email-addr:attacker@evil-phishing.com",
+      "details": {
+        "old_score": 0.0,
+        "new_score": 8.0,
+        "old_level": "INFO",
+        "new_level": "MALICIOUS"
+      }
+    },
+    {
+      "event_id": "01KD15RPPKJH5CQGN7GVP6MM0R",
+      "timestamp": "2025-12-21T19:21:47.475734Z",
+      "event_type": "THREAT_INTEL_ATTACHED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:email-addr:attacker@evil-phishing.com",
+      "details": {
+        "threat_intel_key": "ti:emailrep:obs:email-addr:attacker@evil-phishing.com",
+        "source": "EmailRep"
+      }
+    },
+    {
+      "event_id": "01KD15RPPKZ86PR7P5ZKWSQGXE",
+      "timestamp": "2025-12-21T19:21:47.475744Z",
+      "event_type": "RELATIONSHIP_CREATED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:email-addr:attacker@evil-phishing.com",
+      "details": {
+        "target_key": "obs:domain-name:evil-phishing.com",
+        "relationship_type": "related-to",
+        "direction": null
+      }
+    },
+    {
+      "event_id": "01KD15RPPK6K4Q1H2YX54JFXJA",
+      "timestamp": "2025-12-21T19:21:47.475770Z",
+      "event_type": "OBSERVABLE_CREATED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:email-addr:victim@company.com",
+      "details": {}
+    },
+    {
+      "event_id": "01KD15RPPKXP9K1HSMJWM5VPFZ",
+      "timestamp": "2025-12-21T19:21:47.475785Z",
+      "event_type": "SCORE_CHANGED",
+      "actor": null,
+      "reason": "Threat intel update from Internal Whitelist",
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:email-addr:victim@company.com",
+      "details": {
+        "old_score": 0.0,
+        "new_score": -1.0,
+        "old_level": "INFO",
+        "new_level": "TRUSTED"
+      }
+    },
+    {
+      "event_id": "01KD15RPPK8RK5BYHX4QPSV6KY",
+      "timestamp": "2025-12-21T19:21:47.475796Z",
+      "event_type": "THREAT_INTEL_ATTACHED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:email-addr:victim@company.com",
+      "details": {
+        "threat_intel_key": "ti:internal whitelist:obs:email-addr:victim@company.com",
+        "source": "Internal Whitelist"
+      }
+    },
+    {
+      "event_id": "01KD15RPPKX3V908SVPBA1XDK2",
+      "timestamp": "2025-12-21T19:21:47.475811Z",
+      "event_type": "OBSERVABLE_CREATED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:email-message:phishing email - invoice #12345",
+      "details": {}
+    },
+    {
+      "event_id": "01KD15RPPKN5QR0NF6VNE63457",
+      "timestamp": "2025-12-21T19:21:47.475821Z",
+      "event_type": "RELATIONSHIP_CREATED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:email-message:phishing email - invoice #12345",
+      "details": {
+        "target_key": "obs:email-addr:attacker@evil-phishing.com",
+        "relationship_type": "related-to",
+        "direction": "outbound"
+      }
+    },
+    {
+      "event_id": "01KD15RPPKJEYW8SNXZF8J52XA",
+      "timestamp": "2025-12-21T19:21:47.475856Z",
+      "event_type": "RELATIONSHIP_CREATED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:email-message:phishing email - invoice #12345",
+      "details": {
+        "target_key": "obs:email-addr:victim@company.com",
+        "relationship_type": "related-to",
+        "direction": "outbound"
+      }
+    },
+    {
+      "event_id": "01KD15RPPKMEHZQG4AYZ12EQ84",
+      "timestamp": "2025-12-21T19:21:47.475905Z",
+      "event_type": "THREAT_INTEL_ATTACHED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:email-message:phishing email - invoice #12345",
+      "details": {
+        "threat_intel_key": "ti:email gateway:obs:email-message:phishing email - invoice #12345",
+        "source": "Email Gateway"
+      }
+    },
+    {
+      "event_id": "01KD15RPPKBK672WF47A4NMQJQ",
+      "timestamp": "2025-12-21T19:21:47.475920Z",
+      "event_type": "OBSERVABLE_CREATED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:url:https://evil-phishing.com/login",
+      "details": {}
+    },
+    {
+      "event_id": "01KD15RPPKWAERM3XJ89PR00AP",
+      "timestamp": "2025-12-21T19:21:47.475939Z",
+      "event_type": "SCORE_CHANGED",
+      "actor": null,
+      "reason": "Threat intel update from URLhaus",
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:url:https://evil-phishing.com/login",
+      "details": {
+        "old_score": 0.0,
+        "new_score": 9.0,
+        "old_level": "INFO",
+        "new_level": "MALICIOUS"
+      }
+    },
+    {
+      "event_id": "01KD15RPPK2EMPMMR0SRJFMEWY",
+      "timestamp": "2025-12-21T19:21:47.475949Z",
+      "event_type": "THREAT_INTEL_ATTACHED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:url:https://evil-phishing.com/login",
+      "details": {
+        "threat_intel_key": "ti:urlhaus:obs:url:https://evil-phishing.com/login",
+        "source": "URLhaus"
+      }
+    },
+    {
+      "event_id": "01KD15RPPKVGTW2M8QE3QTZFBQ",
+      "timestamp": "2025-12-21T19:21:47.475957Z",
+      "event_type": "RELATIONSHIP_CREATED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:url:https://evil-phishing.com/login",
+      "details": {
+        "target_key": "obs:domain-name:evil-phishing.com",
+        "relationship_type": "related-to",
+        "direction": "outbound"
+      }
+    },
+    {
+      "event_id": "01KD15RPPK19ZA84VR4A9CEQZB",
+      "timestamp": "2025-12-21T19:21:47.475998Z",
+      "event_type": "OBSERVABLE_CREATED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:url:https://evil-phishing.com/verify",
+      "details": {}
+    },
+    {
+      "event_id": "01KD15RPPMMVGYV6FFXXMS6YAN",
+      "timestamp": "2025-12-21T19:21:47.476018Z",
+      "event_type": "SCORE_CHANGED",
+      "actor": null,
+      "reason": "Threat intel update from URLhaus",
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:url:https://evil-phishing.com/verify",
+      "details": {
+        "old_score": 0.0,
+        "new_score": 8.5,
+        "old_level": "INFO",
+        "new_level": "MALICIOUS"
+      }
+    },
+    {
+      "event_id": "01KD15RPPMMCHJV93KJ33VKB3P",
+      "timestamp": "2025-12-21T19:21:47.476027Z",
+      "event_type": "THREAT_INTEL_ATTACHED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:url:https://evil-phishing.com/verify",
+      "details": {
+        "threat_intel_key": "ti:urlhaus:obs:url:https://evil-phishing.com/verify",
+        "source": "URLhaus"
+      }
+    },
+    {
+      "event_id": "01KD15RPPMJR5220R92ET00HJG",
+      "timestamp": "2025-12-21T19:21:47.476036Z",
+      "event_type": "RELATIONSHIP_CREATED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:url:https://evil-phishing.com/verify",
+      "details": {
+        "target_key": "obs:domain-name:evil-phishing.com",
+        "relationship_type": "related-to",
+        "direction": "outbound"
+      }
+    },
+    {
+      "event_id": "01KD15RPPMRZTW3FCH1W9Y18B4",
+      "timestamp": "2025-12-21T19:21:47.476085Z",
+      "event_type": "RELATIONSHIP_CREATED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:email-message:phishing email - invoice #12345",
+      "details": {
+        "target_key": "obs:url:https://evil-phishing.com/login",
+        "relationship_type": "related-to",
+        "direction": "outbound"
+      }
+    },
+    {
+      "event_id": "01KD15RPPMXFXE8P41TW8SSSMQ",
+      "timestamp": "2025-12-21T19:21:47.476141Z",
+      "event_type": "RELATIONSHIP_CREATED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:email-message:phishing email - invoice #12345",
+      "details": {
+        "target_key": "obs:url:https://evil-phishing.com/verify",
+        "relationship_type": "related-to",
+        "direction": "outbound"
+      }
+    },
+    {
+      "event_id": "01KD15RPPM0B3T2HQX3MVM1VBM",
+      "timestamp": "2025-12-21T19:21:47.476197Z",
+      "event_type": "OBSERVABLE_CREATED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:file:invoice.exe",
+      "details": {}
+    },
+    {
+      "event_id": "01KD15RPPMK0H7SP4TAZ7E6SZB",
+      "timestamp": "2025-12-21T19:21:47.476216Z",
+      "event_type": "SCORE_CHANGED",
+      "actor": null,
+      "reason": "Threat intel update from VirusTotal",
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:file:invoice.exe",
+      "details": {
+        "old_score": 0.0,
+        "new_score": 10.0,
+        "old_level": "INFO",
+        "new_level": "MALICIOUS"
+      }
+    },
+    {
+      "event_id": "01KD15RPPMET6M2WEEDAK53DGF",
+      "timestamp": "2025-12-21T19:21:47.476226Z",
+      "event_type": "THREAT_INTEL_ATTACHED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:file:invoice.exe",
+      "details": {
+        "threat_intel_key": "ti:virustotal:obs:file:invoice.exe",
+        "source": "VirusTotal"
+      }
+    },
+    {
+      "event_id": "01KD15RPPMD59TY19C1W7WAAYC",
+      "timestamp": "2025-12-21T19:21:47.476234Z",
+      "event_type": "RELATIONSHIP_CREATED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:file:invoice.exe",
+      "details": {
+        "target_key": "obs:url:https://evil-phishing.com/login",
+        "relationship_type": "related-to",
+        "direction": "inbound"
+      }
+    },
+    {
+      "event_id": "01KD15RPPMRAW2G2SAFRQMNP5Z",
+      "timestamp": "2025-12-21T19:21:47.476300Z",
+      "event_type": "RELATIONSHIP_CREATED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:file:invoice.exe",
+      "details": {
+        "target_key": "obs:ipv4-addr:185.220.101.50",
+        "relationship_type": "related-to",
+        "direction": "bidirectional"
+      }
+    },
+    {
+      "event_id": "01KD15RPPM3YXZBBV8D61HGJET",
+      "timestamp": "2025-12-21T19:21:47.476368Z",
+      "event_type": "OBSERVABLE_CREATED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:domain-name:google.com",
+      "details": {}
+    },
+    {
+      "event_id": "01KD15RPPMEPFZ61X1Y5PAQP7Q",
+      "timestamp": "2025-12-21T19:21:47.476386Z",
+      "event_type": "SCORE_CHANGED",
+      "actor": null,
+      "reason": "Threat intel update from Internal Whitelist",
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:domain-name:google.com",
+      "details": {
+        "old_score": 0.0,
+        "new_score": -2.0,
+        "old_level": "INFO",
+        "new_level": "TRUSTED"
+      }
+    },
+    {
+      "event_id": "01KD15RPPMQ793R6YK807SKJ0D",
+      "timestamp": "2025-12-21T19:21:47.476396Z",
+      "event_type": "THREAT_INTEL_ATTACHED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:domain-name:google.com",
+      "details": {
+        "threat_intel_key": "ti:internal whitelist:obs:domain-name:google.com",
+        "source": "Internal Whitelist"
+      }
+    },
+    {
+      "event_id": "01KD15RPPMQWX97D6XJF4MFF7S",
+      "timestamp": "2025-12-21T19:21:47.476408Z",
+      "event_type": "OBSERVABLE_CREATED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:domain-name:new-service.cloud",
+      "details": {}
+    },
+    {
+      "event_id": "01KD15RPPM8Q45GDVH8ZXXXEY1",
+      "timestamp": "2025-12-21T19:21:47.476423Z",
+      "event_type": "SCORE_CHANGED",
+      "actor": null,
+      "reason": "Threat intel update from Passive DNS",
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:domain-name:new-service.cloud",
+      "details": {
+        "old_score": 0.0,
+        "new_score": 2.0,
+        "old_level": "INFO",
+        "new_level": "NOTABLE"
+      }
+    },
+    {
+      "event_id": "01KD15RPPMSPKQEM275WR3JYV0",
+      "timestamp": "2025-12-21T19:21:47.476432Z",
+      "event_type": "THREAT_INTEL_ATTACHED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:domain-name:new-service.cloud",
+      "details": {
+        "threat_intel_key": "ti:passive dns:obs:domain-name:new-service.cloud",
+        "source": "Passive DNS"
+      }
+    },
+    {
+      "event_id": "01KD15RPPM6NVC1A2T5QEQFFHW",
+      "timestamp": "2025-12-21T19:21:47.476449Z",
+      "event_type": "CHECK_CREATED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "check",
+      "object_key": "chk:email_analysis:email",
+      "details": {}
+    },
+    {
+      "event_id": "01KD15RPPMJCCCF6QFRJRYBTX3",
+      "timestamp": "2025-12-21T19:21:47.476463Z",
+      "event_type": "CHECK_LINKED_TO_OBSERVABLE",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "check",
+      "object_key": "chk:email_analysis:email",
+      "details": {
+        "observable_key": "obs:email-message:phishing email - invoice #12345",
+        "propagation_mode": "LOCAL_ONLY"
+      }
+    },
+    {
+      "event_id": "01KD15RPPMZ7RH8CNR13TS654X",
+      "timestamp": "2025-12-21T19:21:47.476474Z",
+      "event_type": "LEVEL_UPDATED",
+      "actor": null,
+      "reason": "Effective link added",
+      "tool": null,
+      "object_type": "check",
+      "object_key": "chk:email_analysis:email",
+      "details": {
+        "old_level": "NONE",
+        "new_level": "INFO",
+        "score": 0.0
+      }
+    },
+    {
+      "event_id": "01KD15RPPMPWNJYK1HMQ2BY9TX",
+      "timestamp": "2025-12-21T19:21:47.476555Z",
+      "event_type": "SCORE_CHANGED",
+      "actor": null,
+      "reason": "Linked observable obs:email-message:phishing email - invoice #12345 updated",
+      "tool": null,
+      "object_type": "check",
+      "object_key": "chk:email_analysis:email",
+      "details": {
+        "old_score": 0.0,
+        "new_score": 10.0,
+        "old_level": "INFO",
+        "new_level": "MALICIOUS"
+      }
+    },
+    {
+      "event_id": "01KD15RPPMZN8ACWJTB32042WC",
+      "timestamp": "2025-12-21T19:21:47.476568Z",
+      "event_type": "CHECK_LINKED_TO_OBSERVABLE",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "check",
+      "object_key": "chk:email_analysis:email",
+      "details": {
+        "observable_key": "obs:email-addr:attacker@evil-phishing.com",
+        "propagation_mode": "LOCAL_ONLY"
+      }
+    },
+    {
+      "event_id": "01KD15RPPMTJ6FNDKGTEQX1WSV",
+      "timestamp": "2025-12-21T19:21:47.476582Z",
+      "event_type": "CHECK_LINKED_TO_OBSERVABLE",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "check",
+      "object_key": "chk:email_analysis:email",
+      "details": {
+        "observable_key": "obs:email-addr:victim@company.com",
+        "propagation_mode": "LOCAL_ONLY"
+      }
+    },
+    {
+      "event_id": "01KD15RPPMRJNNWYEJ642897MH",
+      "timestamp": "2025-12-21T19:21:47.476596Z",
+      "event_type": "SCORE_CHANGED",
+      "actor": null,
+      "reason": "",
+      "tool": null,
+      "object_type": "check",
+      "object_key": "chk:email_analysis:email",
+      "details": {
+        "old_score": 10.0,
+        "new_score": 8.0,
+        "old_level": "MALICIOUS",
+        "new_level": "MALICIOUS"
+      }
+    },
+    {
+      "event_id": "01KD15RPPM917EKPZ7Y1F919FZ",
+      "timestamp": "2025-12-21T19:21:47.476615Z",
+      "event_type": "CONTAINER_CREATED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "container",
+      "object_key": "ctr:phishing_investigation/email",
+      "details": {}
+    },
+    {
+      "event_id": "01KD15RPPM7J3F7F5110W2N2G0",
+      "timestamp": "2025-12-21T19:21:47.476622Z",
+      "event_type": "CONTAINER_CHECK_ADDED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "container",
+      "object_key": "ctr:phishing_investigation/email",
+      "details": {
+        "check_key": "chk:email_analysis:email"
+      }
+    },
+    {
+      "event_id": "01KD15RPPMHPE5D6T9P4KZVGS7",
+      "timestamp": "2025-12-21T19:21:47.476634Z",
+      "event_type": "CHECK_CREATED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "check",
+      "object_key": "chk:url_analysis:network",
+      "details": {}
+    },
+    {
+      "event_id": "01KD15RPPMRFWDKEFNY12BS72H",
+      "timestamp": "2025-12-21T19:21:47.476643Z",
+      "event_type": "CHECK_LINKED_TO_OBSERVABLE",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "check",
+      "object_key": "chk:url_analysis:network",
+      "details": {
+        "observable_key": "obs:url:https://evil-phishing.com/login",
+        "propagation_mode": "LOCAL_ONLY"
+      }
+    },
+    {
+      "event_id": "01KD15RPPMZ5NQSEZG11P490YZ",
+      "timestamp": "2025-12-21T19:21:47.476651Z",
+      "event_type": "LEVEL_UPDATED",
+      "actor": null,
+      "reason": "Effective link added",
+      "tool": null,
+      "object_type": "check",
+      "object_key": "chk:url_analysis:network",
+      "details": {
+        "old_level": "NONE",
+        "new_level": "INFO",
+        "score": 0.0
+      }
+    },
+    {
+      "event_id": "01KD15RPPM4P2V3C01WKG149XB",
+      "timestamp": "2025-12-21T19:21:47.476661Z",
+      "event_type": "SCORE_CHANGED",
+      "actor": null,
+      "reason": "Linked observable obs:url:https://evil-phishing.com/login updated",
+      "tool": null,
+      "object_type": "check",
+      "object_key": "chk:url_analysis:network",
+      "details": {
+        "old_score": 0.0,
+        "new_score": 10.0,
+        "old_level": "INFO",
+        "new_level": "MALICIOUS"
+      }
+    },
+    {
+      "event_id": "01KD15RPPMHQRJBXPHTJESGNQE",
+      "timestamp": "2025-12-21T19:21:47.476672Z",
+      "event_type": "CHECK_LINKED_TO_OBSERVABLE",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "check",
+      "object_key": "chk:url_analysis:network",
+      "details": {
+        "observable_key": "obs:url:https://evil-phishing.com/verify",
+        "propagation_mode": "LOCAL_ONLY"
+      }
+    },
+    {
+      "event_id": "01KD15RPPMBQ826HHWPH4S9H12",
+      "timestamp": "2025-12-21T19:21:47.476685Z",
+      "event_type": "SCORE_CHANGED",
+      "actor": null,
+      "reason": "",
+      "tool": null,
+      "object_type": "check",
+      "object_key": "chk:url_analysis:network",
+      "details": {
+        "old_score": 10.0,
+        "new_score": 9.0,
+        "old_level": "MALICIOUS",
+        "new_level": "MALICIOUS"
+      }
+    },
+    {
+      "event_id": "01KD15RPPMCG294V47SVTPJ9WZ",
+      "timestamp": "2025-12-21T19:21:47.476695Z",
+      "event_type": "CONTAINER_CREATED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "container",
+      "object_key": "ctr:phishing_investigation/network",
+      "details": {}
+    },
+    {
+      "event_id": "01KD15RPPM0623P0KNYH627NRE",
+      "timestamp": "2025-12-21T19:21:47.476703Z",
+      "event_type": "CONTAINER_CHECK_ADDED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "container",
+      "object_key": "ctr:phishing_investigation/network",
+      "details": {
+        "check_key": "chk:url_analysis:network"
+      }
+    },
+    {
+      "event_id": "01KD15RPPMBXXFW81FW8CBZ32E",
+      "timestamp": "2025-12-21T19:21:47.476714Z",
+      "event_type": "CHECK_CREATED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "check",
+      "object_key": "chk:infrastructure:network",
+      "details": {}
+    },
+    {
+      "event_id": "01KD15RPPMFEV4XE7QKQ9G9MB4",
+      "timestamp": "2025-12-21T19:21:47.476722Z",
+      "event_type": "CHECK_LINKED_TO_OBSERVABLE",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "check",
+      "object_key": "chk:infrastructure:network",
+      "details": {
+        "observable_key": "obs:domain-name:evil-phishing.com",
+        "propagation_mode": "LOCAL_ONLY"
+      }
+    },
+    {
+      "event_id": "01KD15RPPMM3KS16AHMRPTZ2CF",
+      "timestamp": "2025-12-21T19:21:47.476730Z",
+      "event_type": "LEVEL_UPDATED",
+      "actor": null,
+      "reason": "Effective link added",
+      "tool": null,
+      "object_type": "check",
+      "object_key": "chk:infrastructure:network",
+      "details": {
+        "old_level": "NONE",
+        "new_level": "INFO",
+        "score": 0.0
+      }
+    },
+    {
+      "event_id": "01KD15RPPMEMBE6TQJKK6K5KCG",
+      "timestamp": "2025-12-21T19:21:47.476740Z",
+      "event_type": "SCORE_CHANGED",
+      "actor": null,
+      "reason": "Linked observable obs:domain-name:evil-phishing.com updated",
+      "tool": null,
+      "object_type": "check",
+      "object_key": "chk:infrastructure:network",
+      "details": {
+        "old_score": 0.0,
+        "new_score": 9.0,
+        "old_level": "INFO",
+        "new_level": "MALICIOUS"
+      }
+    },
+    {
+      "event_id": "01KD15RPPM59MSQ3DAF70BE6BF",
+      "timestamp": "2025-12-21T19:21:47.476753Z",
+      "event_type": "CHECK_LINKED_TO_OBSERVABLE",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "check",
+      "object_key": "chk:infrastructure:network",
+      "details": {
+        "observable_key": "obs:ipv4-addr:185.220.101.50",
+        "propagation_mode": "LOCAL_ONLY"
+      }
+    },
+    {
+      "event_id": "01KD15RPPM7PMER4MHKTV2QG69",
+      "timestamp": "2025-12-21T19:21:47.476764Z",
+      "event_type": "SCORE_CHANGED",
+      "actor": null,
+      "reason": "Linked observable obs:ipv4-addr:185.220.101.50 updated",
+      "tool": null,
+      "object_type": "check",
+      "object_key": "chk:infrastructure:network",
+      "details": {
+        "old_score": 9.0,
+        "new_score": 9.5,
+        "old_level": "MALICIOUS",
+        "new_level": "MALICIOUS"
+      }
+    },
+    {
+      "event_id": "01KD15RPPM707XA9EFE3FTQ3B3",
+      "timestamp": "2025-12-21T19:21:47.476850Z",
+      "event_type": "SCORE_CHANGED",
+      "actor": null,
+      "reason": "Linked observable obs:email-addr:attacker@evil-phishing.com updated",
+      "tool": null,
+      "object_type": "check",
+      "object_key": "chk:email_analysis:email",
+      "details": {
+        "old_score": 8.0,
+        "new_score": 10.0,
+        "old_level": "MALICIOUS",
+        "new_level": "MALICIOUS"
+      }
+    },
+    {
+      "event_id": "01KD15RPPMG061FP31QW5XNP29",
+      "timestamp": "2025-12-21T19:21:47.476867Z",
+      "event_type": "SCORE_CHANGED",
+      "actor": null,
+      "reason": "Linked observable obs:url:https://evil-phishing.com/login updated",
+      "tool": null,
+      "object_type": "check",
+      "object_key": "chk:url_analysis:network",
+      "details": {
+        "old_score": 9.0,
+        "new_score": 10.0,
+        "old_level": "MALICIOUS",
+        "new_level": "MALICIOUS"
+      }
+    },
+    {
+      "event_id": "01KD15RPPM9XCM0G6AQYZ2V2BY",
+      "timestamp": "2025-12-21T19:21:47.476879Z",
+      "event_type": "CONTAINER_CHECK_ADDED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "container",
+      "object_key": "ctr:phishing_investigation/network",
+      "details": {
+        "check_key": "chk:infrastructure:network"
+      }
+    },
+    {
+      "event_id": "01KD15RPPMNB71KW5SD1YADBMX",
+      "timestamp": "2025-12-21T19:21:47.476890Z",
+      "event_type": "CHECK_CREATED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "check",
+      "object_key": "chk:malware_detection:file",
+      "details": {}
+    },
+    {
+      "event_id": "01KD15RPPM88XAFJ2NQC1SCWG6",
+      "timestamp": "2025-12-21T19:21:47.476901Z",
+      "event_type": "CHECK_LINKED_TO_OBSERVABLE",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "check",
+      "object_key": "chk:malware_detection:file",
+      "details": {
+        "observable_key": "obs:file:invoice.exe",
+        "propagation_mode": "LOCAL_ONLY"
+      }
+    },
+    {
+      "event_id": "01KD15RPPMS9E191M67RWWRV0K",
+      "timestamp": "2025-12-21T19:21:47.476909Z",
+      "event_type": "LEVEL_UPDATED",
+      "actor": null,
+      "reason": "Effective link added",
+      "tool": null,
+      "object_type": "check",
+      "object_key": "chk:malware_detection:file",
+      "details": {
+        "old_level": "NONE",
+        "new_level": "INFO",
+        "score": 0.0
+      }
+    },
+    {
+      "event_id": "01KD15RPPMZCJA5FZ7Q3HS05C3",
+      "timestamp": "2025-12-21T19:21:47.476919Z",
+      "event_type": "SCORE_CHANGED",
+      "actor": null,
+      "reason": "Linked observable obs:file:invoice.exe updated",
+      "tool": null,
+      "object_type": "check",
+      "object_key": "chk:malware_detection:file",
+      "details": {
+        "old_score": 0.0,
+        "new_score": 10.0,
+        "old_level": "INFO",
+        "new_level": "MALICIOUS"
+      }
+    },
+    {
+      "event_id": "01KD15RPPMVZ8KJKR16A2MGTJ9",
+      "timestamp": "2025-12-21T19:21:47.476932Z",
+      "event_type": "CONTAINER_CREATED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "container",
+      "object_key": "ctr:phishing_investigation/malware",
+      "details": {}
+    },
+    {
+      "event_id": "01KD15RPPMB4B072BQ09H85HQ1",
+      "timestamp": "2025-12-21T19:21:47.476938Z",
+      "event_type": "CONTAINER_CHECK_ADDED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "container",
+      "object_key": "ctr:phishing_investigation/malware",
+      "details": {
+        "check_key": "chk:malware_detection:file"
+      }
+    },
+    {
+      "event_id": "01KD15RPPM852TMKSX904K2XBH",
+      "timestamp": "2025-12-21T19:21:47.476974Z",
+      "event_type": "RELATIONSHIP_CREATED",
+      "actor": null,
+      "reason": "Finalize relationships",
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:file:root",
+      "details": {
+        "target_key": "obs:email-message:phishing email - invoice #12345",
+        "relationship_type": "related-to",
+        "direction": "bidirectional"
+      }
+    },
+    {
+      "event_id": "01KD15RPPMJZX5ZFPQGJGSV4H7",
+      "timestamp": "2025-12-21T19:21:47.476986Z",
+      "event_type": "RELATIONSHIP_CREATED",
+      "actor": null,
+      "reason": "Finalize relationships",
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:file:root",
+      "details": {
+        "target_key": "obs:domain-name:sketchy-site.net",
+        "relationship_type": "related-to",
+        "direction": "bidirectional"
+      }
+    },
+    {
+      "event_id": "01KD15RPPM85QRVPFVF2RQB7NK",
+      "timestamp": "2025-12-21T19:21:47.476995Z",
+      "event_type": "RELATIONSHIP_CREATED",
+      "actor": null,
+      "reason": "Finalize relationships",
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:file:root",
+      "details": {
+        "target_key": "obs:domain-name:google.com",
+        "relationship_type": "related-to",
+        "direction": "bidirectional"
+      }
+    },
+    {
+      "event_id": "01KD15RPPN8PVNFNAM9VN9NWVV",
+      "timestamp": "2025-12-21T19:21:47.477003Z",
+      "event_type": "RELATIONSHIP_CREATED",
+      "actor": null,
+      "reason": "Finalize relationships",
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:file:root",
+      "details": {
+        "target_key": "obs:domain-name:new-service.cloud",
+        "relationship_type": "related-to",
+        "direction": "bidirectional"
+      }
+    }
+  ],
   "observables": {
     "obs:file:root": {
-      "key": "obs:file:root",
       "type": "file",
       "value": "root",
       "internal": false,
       "whitelisted": false,
       "comment": "Root observable for investigation",
-      "extra": null,
+      "extra": {},
       "score": 0.0,
       "level": "INFO",
+      "threat_intels": [],
       "relationships": [
         {
           "target_key": "obs:email-message:phishing email - invoice #12345",
@@ -36,11 +1212,11 @@
           "direction": "bidirectional"
         }
       ],
-      "threat_intels": [],
-      "generated_by_checks": []
+      "key": "obs:file:root",
+      "check_links": [],
+      "score_display": "0.00"
     },
     "obs:domain-name:evil-phishing.com": {
-      "key": "obs:domain-name:evil-phishing.com",
       "type": "domain-name",
       "value": "evil-phishing.com",
       "internal": false,
@@ -49,17 +1225,18 @@
       "extra": {},
       "score": 9.0,
       "level": "MALICIOUS",
-      "relationships": [],
       "threat_intels": [
         "ti:virustotal:obs:domain-name:evil-phishing.com",
         "ti:alienvault otx:obs:domain-name:evil-phishing.com"
       ],
-      "generated_by_checks": [
+      "relationships": [],
+      "key": "obs:domain-name:evil-phishing.com",
+      "check_links": [
         "chk:infrastructure:network"
-      ]
+      ],
+      "score_display": "9.00"
     },
     "obs:ipv4-addr:185.220.101.50": {
-      "key": "obs:ipv4-addr:185.220.101.50",
       "type": "ipv4-addr",
       "value": "185.220.101.50",
       "internal": false,
@@ -68,6 +1245,9 @@
       "extra": {},
       "score": 9.5,
       "level": "MALICIOUS",
+      "threat_intels": [
+        "ti:abuseipdb:obs:ipv4-addr:185.220.101.50"
+      ],
       "relationships": [
         {
           "target_key": "obs:domain-name:evil-phishing.com",
@@ -75,15 +1255,13 @@
           "direction": "outbound"
         }
       ],
-      "threat_intels": [
-        "ti:abuseipdb:obs:ipv4-addr:185.220.101.50"
-      ],
-      "generated_by_checks": [
+      "key": "obs:ipv4-addr:185.220.101.50",
+      "check_links": [
         "chk:infrastructure:network"
-      ]
+      ],
+      "score_display": "9.50"
     },
     "obs:domain-name:sketchy-site.net": {
-      "key": "obs:domain-name:sketchy-site.net",
       "type": "domain-name",
       "value": "sketchy-site.net",
       "internal": false,
@@ -92,6 +1270,9 @@
       "extra": {},
       "score": 4.5,
       "level": "SUSPICIOUS",
+      "threat_intels": [
+        "ti:virustotal:obs:domain-name:sketchy-site.net"
+      ],
       "relationships": [
         {
           "target_key": "obs:ipv4-addr:192.168.100.5",
@@ -99,13 +1280,11 @@
           "direction": "outbound"
         }
       ],
-      "threat_intels": [
-        "ti:virustotal:obs:domain-name:sketchy-site.net"
-      ],
-      "generated_by_checks": []
+      "key": "obs:domain-name:sketchy-site.net",
+      "check_links": [],
+      "score_display": "4.50"
     },
     "obs:ipv4-addr:192.168.100.5": {
-      "key": "obs:ipv4-addr:192.168.100.5",
       "type": "ipv4-addr",
       "value": "192.168.100.5",
       "internal": false,
@@ -114,14 +1293,15 @@
       "extra": {},
       "score": 3.0,
       "level": "SUSPICIOUS",
-      "relationships": [],
       "threat_intels": [
         "ti:shodan:obs:ipv4-addr:192.168.100.5"
       ],
-      "generated_by_checks": []
+      "relationships": [],
+      "key": "obs:ipv4-addr:192.168.100.5",
+      "check_links": [],
+      "score_display": "3.00"
     },
     "obs:email-addr:attacker@evil-phishing.com": {
-      "key": "obs:email-addr:attacker@evil-phishing.com",
       "type": "email-addr",
       "value": "attacker@evil-phishing.com",
       "internal": false,
@@ -130,6 +1310,9 @@
       "extra": {},
       "score": 8.0,
       "level": "MALICIOUS",
+      "threat_intels": [
+        "ti:emailrep:obs:email-addr:attacker@evil-phishing.com"
+      ],
       "relationships": [
         {
           "target_key": "obs:domain-name:evil-phishing.com",
@@ -137,15 +1320,13 @@
           "direction": "bidirectional"
         }
       ],
-      "threat_intels": [
-        "ti:emailrep:obs:email-addr:attacker@evil-phishing.com"
-      ],
-      "generated_by_checks": [
+      "key": "obs:email-addr:attacker@evil-phishing.com",
+      "check_links": [
         "chk:email_analysis:email"
-      ]
+      ],
+      "score_display": "8.00"
     },
     "obs:email-addr:victim@company.com": {
-      "key": "obs:email-addr:victim@company.com",
       "type": "email-addr",
       "value": "victim@company.com",
       "internal": true,
@@ -154,16 +1335,17 @@
       "extra": {},
       "score": -1.0,
       "level": "TRUSTED",
-      "relationships": [],
       "threat_intels": [
         "ti:internal whitelist:obs:email-addr:victim@company.com"
       ],
-      "generated_by_checks": [
+      "relationships": [],
+      "key": "obs:email-addr:victim@company.com",
+      "check_links": [
         "chk:email_analysis:email"
-      ]
+      ],
+      "score_display": "-1.00"
     },
     "obs:email-message:phishing email - invoice #12345": {
-      "key": "obs:email-message:phishing email - invoice #12345",
       "type": "email-message",
       "value": "Phishing Email - Invoice #12345",
       "internal": false,
@@ -172,6 +1354,9 @@
       "extra": {},
       "score": 10.0,
       "level": "MALICIOUS",
+      "threat_intels": [
+        "ti:email gateway:obs:email-message:phishing email - invoice #12345"
+      ],
       "relationships": [
         {
           "target_key": "obs:email-addr:attacker@evil-phishing.com",
@@ -194,15 +1379,13 @@
           "direction": "outbound"
         }
       ],
-      "threat_intels": [
-        "ti:email gateway:obs:email-message:phishing email - invoice #12345"
-      ],
-      "generated_by_checks": [
+      "key": "obs:email-message:phishing email - invoice #12345",
+      "check_links": [
         "chk:email_analysis:email"
-      ]
+      ],
+      "score_display": "10.00"
     },
     "obs:url:https://evil-phishing.com/login": {
-      "key": "obs:url:https://evil-phishing.com/login",
       "type": "url",
       "value": "https://evil-phishing.com/login",
       "internal": false,
@@ -211,6 +1394,9 @@
       "extra": {},
       "score": 10.0,
       "level": "MALICIOUS",
+      "threat_intels": [
+        "ti:urlhaus:obs:url:https://evil-phishing.com/login"
+      ],
       "relationships": [
         {
           "target_key": "obs:domain-name:evil-phishing.com",
@@ -218,15 +1404,13 @@
           "direction": "outbound"
         }
       ],
-      "threat_intels": [
-        "ti:urlhaus:obs:url:https://evil-phishing.com/login"
-      ],
-      "generated_by_checks": [
+      "key": "obs:url:https://evil-phishing.com/login",
+      "check_links": [
         "chk:url_analysis:network"
-      ]
+      ],
+      "score_display": "10.00"
     },
     "obs:url:https://evil-phishing.com/verify": {
-      "key": "obs:url:https://evil-phishing.com/verify",
       "type": "url",
       "value": "https://evil-phishing.com/verify",
       "internal": false,
@@ -235,6 +1419,9 @@
       "extra": {},
       "score": 9.0,
       "level": "MALICIOUS",
+      "threat_intels": [
+        "ti:urlhaus:obs:url:https://evil-phishing.com/verify"
+      ],
       "relationships": [
         {
           "target_key": "obs:domain-name:evil-phishing.com",
@@ -242,15 +1429,13 @@
           "direction": "outbound"
         }
       ],
-      "threat_intels": [
-        "ti:urlhaus:obs:url:https://evil-phishing.com/verify"
-      ],
-      "generated_by_checks": [
+      "key": "obs:url:https://evil-phishing.com/verify",
+      "check_links": [
         "chk:url_analysis:network"
-      ]
+      ],
+      "score_display": "9.00"
     },
     "obs:file:invoice.exe": {
-      "key": "obs:file:invoice.exe",
       "type": "file",
       "value": "invoice.exe",
       "internal": false,
@@ -259,6 +1444,9 @@
       "extra": {},
       "score": 10.0,
       "level": "MALICIOUS",
+      "threat_intels": [
+        "ti:virustotal:obs:file:invoice.exe"
+      ],
       "relationships": [
         {
           "target_key": "obs:url:https://evil-phishing.com/login",
@@ -271,15 +1459,13 @@
           "direction": "bidirectional"
         }
       ],
-      "threat_intels": [
-        "ti:virustotal:obs:file:invoice.exe"
-      ],
-      "generated_by_checks": [
+      "key": "obs:file:invoice.exe",
+      "check_links": [
         "chk:malware_detection:file"
-      ]
+      ],
+      "score_display": "10.00"
     },
     "obs:domain-name:google.com": {
-      "key": "obs:domain-name:google.com",
       "type": "domain-name",
       "value": "google.com",
       "internal": false,
@@ -288,14 +1474,15 @@
       "extra": {},
       "score": -2.0,
       "level": "TRUSTED",
-      "relationships": [],
       "threat_intels": [
         "ti:internal whitelist:obs:domain-name:google.com"
       ],
-      "generated_by_checks": []
+      "relationships": [],
+      "key": "obs:domain-name:google.com",
+      "check_links": [],
+      "score_display": "-2.00"
     },
     "obs:domain-name:new-service.cloud": {
-      "key": "obs:domain-name:new-service.cloud",
       "type": "domain-name",
       "value": "new-service.cloud",
       "internal": false,
@@ -304,17 +1491,18 @@
       "extra": {},
       "score": 2.0,
       "level": "NOTABLE",
-      "relationships": [],
       "threat_intels": [
         "ti:passive dns:obs:domain-name:new-service.cloud"
       ],
-      "generated_by_checks": []
+      "relationships": [],
+      "key": "obs:domain-name:new-service.cloud",
+      "check_links": [],
+      "score_display": "2.00"
     }
   },
   "checks": {
     "email": [
       {
-        "key": "chk:email_analysis:email",
         "check_id": "email_analysis",
         "scope": "email",
         "description": "Phishing email analysis",
@@ -322,17 +1510,27 @@
         "extra": {},
         "score": 10.0,
         "level": "MALICIOUS",
-        "score_policy": "auto",
-        "observables": [
-          "obs:email-message:phishing email - invoice #12345",
-          "obs:email-addr:attacker@evil-phishing.com",
-          "obs:email-addr:victim@company.com"
-        ]
+        "origin_investigation_id": "01KD15RPPKH3YHQNWSYNYYRYF7",
+        "observable_links": [
+          {
+            "observable_key": "obs:email-message:phishing email - invoice #12345",
+            "propagation_mode": "LOCAL_ONLY"
+          },
+          {
+            "observable_key": "obs:email-addr:attacker@evil-phishing.com",
+            "propagation_mode": "LOCAL_ONLY"
+          },
+          {
+            "observable_key": "obs:email-addr:victim@company.com",
+            "propagation_mode": "LOCAL_ONLY"
+          }
+        ],
+        "key": "chk:email_analysis:email",
+        "score_display": "10.00"
       }
     ],
     "network": [
       {
-        "key": "chk:url_analysis:network",
         "check_id": "url_analysis",
         "scope": "network",
         "description": "Malicious URLs found in email",
@@ -340,14 +1538,21 @@
         "extra": {},
         "score": 10.0,
         "level": "MALICIOUS",
-        "score_policy": "auto",
-        "observables": [
-          "obs:url:https://evil-phishing.com/login",
-          "obs:url:https://evil-phishing.com/verify"
-        ]
+        "origin_investigation_id": "01KD15RPPKH3YHQNWSYNYYRYF7",
+        "observable_links": [
+          {
+            "observable_key": "obs:url:https://evil-phishing.com/login",
+            "propagation_mode": "LOCAL_ONLY"
+          },
+          {
+            "observable_key": "obs:url:https://evil-phishing.com/verify",
+            "propagation_mode": "LOCAL_ONLY"
+          }
+        ],
+        "key": "chk:url_analysis:network",
+        "score_display": "10.00"
       },
       {
-        "key": "chk:infrastructure:network",
         "check_id": "infrastructure",
         "scope": "network",
         "description": "Malicious infrastructure identified",
@@ -355,16 +1560,23 @@
         "extra": {},
         "score": 9.5,
         "level": "MALICIOUS",
-        "score_policy": "auto",
-        "observables": [
-          "obs:domain-name:evil-phishing.com",
-          "obs:ipv4-addr:185.220.101.50"
-        ]
+        "origin_investigation_id": "01KD15RPPKH3YHQNWSYNYYRYF7",
+        "observable_links": [
+          {
+            "observable_key": "obs:domain-name:evil-phishing.com",
+            "propagation_mode": "LOCAL_ONLY"
+          },
+          {
+            "observable_key": "obs:ipv4-addr:185.220.101.50",
+            "propagation_mode": "LOCAL_ONLY"
+          }
+        ],
+        "key": "chk:infrastructure:network",
+        "score_display": "9.50"
       }
     ],
     "file": [
       {
-        "key": "chk:malware_detection:file",
         "check_id": "malware_detection",
         "scope": "file",
         "description": "Malware file analysis",
@@ -372,10 +1584,15 @@
         "extra": {},
         "score": 10.0,
         "level": "MALICIOUS",
-        "score_policy": "auto",
-        "observables": [
-          "obs:file:invoice.exe"
-        ]
+        "origin_investigation_id": "01KD15RPPKH3YHQNWSYNYYRYF7",
+        "observable_links": [
+          {
+            "observable_key": "obs:file:invoice.exe",
+            "propagation_mode": "LOCAL_ONLY"
+          }
+        ],
+        "key": "chk:malware_detection:file",
+        "score_display": "10.00"
       }
     ]
   },
@@ -389,151 +1606,163 @@
   },
   "threat_intels": {
     "ti:virustotal:obs:domain-name:evil-phishing.com": {
-      "key": "ti:virustotal:obs:domain-name:evil-phishing.com",
       "source": "VirusTotal",
       "observable_key": "obs:domain-name:evil-phishing.com",
       "comment": "Known phishing domain",
       "extra": {},
       "score": 9.0,
       "level": "MALICIOUS",
-      "taxonomies": []
+      "taxonomies": [],
+      "key": "ti:virustotal:obs:domain-name:evil-phishing.com",
+      "score_display": "9.00"
     },
     "ti:alienvault otx:obs:domain-name:evil-phishing.com": {
-      "key": "ti:alienvault otx:obs:domain-name:evil-phishing.com",
       "source": "AlienVault OTX",
       "observable_key": "obs:domain-name:evil-phishing.com",
       "comment": "Recently reported",
       "extra": {},
       "score": 8.5,
       "level": "MALICIOUS",
-      "taxonomies": []
+      "taxonomies": [],
+      "key": "ti:alienvault otx:obs:domain-name:evil-phishing.com",
+      "score_display": "8.50"
     },
     "ti:abuseipdb:obs:ipv4-addr:185.220.101.50": {
-      "key": "ti:abuseipdb:obs:ipv4-addr:185.220.101.50",
       "source": "AbuseIPDB",
       "observable_key": "obs:ipv4-addr:185.220.101.50",
       "comment": "C2 server",
       "extra": {},
       "score": 9.5,
       "level": "MALICIOUS",
-      "taxonomies": []
+      "taxonomies": [],
+      "key": "ti:abuseipdb:obs:ipv4-addr:185.220.101.50",
+      "score_display": "9.50"
     },
     "ti:virustotal:obs:domain-name:sketchy-site.net": {
-      "key": "ti:virustotal:obs:domain-name:sketchy-site.net",
       "source": "VirusTotal",
       "observable_key": "obs:domain-name:sketchy-site.net",
       "comment": "Some detections",
       "extra": {},
       "score": 4.5,
       "level": "SUSPICIOUS",
-      "taxonomies": []
+      "taxonomies": [],
+      "key": "ti:virustotal:obs:domain-name:sketchy-site.net",
+      "score_display": "4.50"
     },
     "ti:shodan:obs:ipv4-addr:192.168.100.5": {
-      "key": "ti:shodan:obs:ipv4-addr:192.168.100.5",
       "source": "Shodan",
       "observable_key": "obs:ipv4-addr:192.168.100.5",
       "comment": "",
       "extra": {},
       "score": 3.0,
       "level": "SUSPICIOUS",
-      "taxonomies": []
+      "taxonomies": [],
+      "key": "ti:shodan:obs:ipv4-addr:192.168.100.5",
+      "score_display": "3.00"
     },
     "ti:emailrep:obs:email-addr:attacker@evil-phishing.com": {
-      "key": "ti:emailrep:obs:email-addr:attacker@evil-phishing.com",
       "source": "EmailRep",
       "observable_key": "obs:email-addr:attacker@evil-phishing.com",
       "comment": "Suspicious sender",
       "extra": {},
       "score": 8.0,
       "level": "MALICIOUS",
-      "taxonomies": []
+      "taxonomies": [],
+      "key": "ti:emailrep:obs:email-addr:attacker@evil-phishing.com",
+      "score_display": "8.00"
     },
     "ti:internal whitelist:obs:email-addr:victim@company.com": {
-      "key": "ti:internal whitelist:obs:email-addr:victim@company.com",
       "source": "Internal Whitelist",
       "observable_key": "obs:email-addr:victim@company.com",
       "comment": "Known employee",
       "extra": {},
       "score": -1.0,
       "level": "TRUSTED",
-      "taxonomies": []
+      "taxonomies": [],
+      "key": "ti:internal whitelist:obs:email-addr:victim@company.com",
+      "score_display": "-1.00"
     },
     "ti:email gateway:obs:email-message:phishing email - invoice #12345": {
-      "key": "ti:email gateway:obs:email-message:phishing email - invoice #12345",
       "source": "Email Gateway",
       "observable_key": "obs:email-message:phishing email - invoice #12345",
       "comment": "Flagged as suspicious",
       "extra": {},
       "score": 7.0,
       "level": "MALICIOUS",
-      "taxonomies": []
+      "taxonomies": [],
+      "key": "ti:email gateway:obs:email-message:phishing email - invoice #12345",
+      "score_display": "7.00"
     },
     "ti:urlhaus:obs:url:https://evil-phishing.com/login": {
-      "key": "ti:urlhaus:obs:url:https://evil-phishing.com/login",
       "source": "URLhaus",
       "observable_key": "obs:url:https://evil-phishing.com/login",
       "comment": "",
       "extra": {},
       "score": 9.0,
       "level": "MALICIOUS",
-      "taxonomies": []
+      "taxonomies": [],
+      "key": "ti:urlhaus:obs:url:https://evil-phishing.com/login",
+      "score_display": "9.00"
     },
     "ti:urlhaus:obs:url:https://evil-phishing.com/verify": {
-      "key": "ti:urlhaus:obs:url:https://evil-phishing.com/verify",
       "source": "URLhaus",
       "observable_key": "obs:url:https://evil-phishing.com/verify",
       "comment": "",
       "extra": {},
       "score": 8.5,
       "level": "MALICIOUS",
-      "taxonomies": []
+      "taxonomies": [],
+      "key": "ti:urlhaus:obs:url:https://evil-phishing.com/verify",
+      "score_display": "8.50"
     },
     "ti:virustotal:obs:file:invoice.exe": {
-      "key": "ti:virustotal:obs:file:invoice.exe",
       "source": "VirusTotal",
       "observable_key": "obs:file:invoice.exe",
       "comment": "Detected by 45/70 engines",
       "extra": {},
       "score": 10.0,
       "level": "MALICIOUS",
-      "taxonomies": []
+      "taxonomies": [],
+      "key": "ti:virustotal:obs:file:invoice.exe",
+      "score_display": "10.00"
     },
     "ti:internal whitelist:obs:domain-name:google.com": {
-      "key": "ti:internal whitelist:obs:domain-name:google.com",
       "source": "Internal Whitelist",
       "observable_key": "obs:domain-name:google.com",
       "comment": "Known good domain",
       "extra": {},
       "score": -2.0,
       "level": "TRUSTED",
-      "taxonomies": []
+      "taxonomies": [],
+      "key": "ti:internal whitelist:obs:domain-name:google.com",
+      "score_display": "-2.00"
     },
     "ti:passive dns:obs:domain-name:new-service.cloud": {
-      "key": "ti:passive dns:obs:domain-name:new-service.cloud",
       "source": "Passive DNS",
       "observable_key": "obs:domain-name:new-service.cloud",
       "comment": "Recently registered domain",
       "extra": {},
       "score": 2.0,
       "level": "NOTABLE",
-      "taxonomies": []
+      "taxonomies": [],
+      "key": "ti:passive dns:obs:domain-name:new-service.cloud",
+      "score_display": "2.00"
     }
   },
   "enrichments": {},
   "containers": {
     "ctr:phishing_investigation/email": {
-      "key": "ctr:phishing_investigation/email",
       "path": "phishing_investigation/email",
       "description": "",
       "checks": [
         "chk:email_analysis:email"
       ],
       "sub_containers": {},
+      "key": "ctr:phishing_investigation/email",
       "aggregated_score": 10.0,
       "aggregated_level": "MALICIOUS"
     },
     "ctr:phishing_investigation/network": {
-      "key": "ctr:phishing_investigation/network",
       "path": "phishing_investigation/network",
       "description": "",
       "checks": [
@@ -541,17 +1770,18 @@
         "chk:infrastructure:network"
       ],
       "sub_containers": {},
+      "key": "ctr:phishing_investigation/network",
       "aggregated_score": 19.5,
       "aggregated_level": "MALICIOUS"
     },
     "ctr:phishing_investigation/malware": {
-      "key": "ctr:phishing_investigation/malware",
       "path": "phishing_investigation/malware",
       "description": "",
       "checks": [
         "chk:malware_detection:file"
       ],
       "sub_containers": {},
+      "key": "ctr:phishing_investigation/malware",
       "aggregated_score": 10.0,
       "aggregated_level": "MALICIOUS"
     }
@@ -639,5 +1869,6 @@
   "data_extraction": {
     "root_type": "file",
     "score_mode": "max"
-  }
+  },
+  "score_display": "39.50"
 }

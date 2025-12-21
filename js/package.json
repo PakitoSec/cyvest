@@ -2,13 +2,12 @@
   "name": "@cyvest/workspace",
   "private": true,
   "scripts": {
-    "schema:export": "cd .. && uv run cyvest schema -o schema/cyvest.schema.json",
     "types:generate": "pnpm --filter @cyvest/cyvest-js run generate:types",
     "build": "pnpm -r run build",
     "test:ci": "pnpm -r run test:ci"
   },
   "devDependencies": {
-    "json-schema-to-typescript": "^13.1.2",
-    "typescript": "^5.6.0"
+    "json-schema-to-typescript": "^15.0.4",
+    "typescript": "^5.9.3"
   }
 }

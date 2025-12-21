@@ -7,7 +7,7 @@ and InvestigationWhitelist using Pydantic BaseModel.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from typing import Annotated, Any
 
@@ -24,11 +24,11 @@ from pydantic import (
 from typing_extensions import Self
 
 from cyvest import keys
-from cyvest.level_score_rules import apply_creation_score_level_defaults, recalculate_level_for_score
+from cyvest.level_score_rules import apply_creation_score_level_defaults
 from cyvest.levels import Level, get_level_from_score, normalize_level
 from cyvest.model_enums import (
-    CheckScorePolicy,
     ObservableType,
+    PropagationMode,
     RelationshipDirection,
     RelationshipType,
 )
@@ -36,7 +36,9 @@ from cyvest.model_enums import (
 _DEFAULT_SCORE_PLACES = 2
 
 
-def _format_score_decimal(value: Decimal, *, places: int = _DEFAULT_SCORE_PLACES) -> str:
+def _format_score_decimal(value: Decimal | None, *, places: int = _DEFAULT_SCORE_PLACES) -> str:
+    if value is None:
+        return "-"
     if places < 0:
         raise ValueError("places must be >= 0")
     quantizer = Decimal("1").scaleb(-places)
@@ -46,29 +48,20 @@ def _format_score_decimal(value: Decimal, *, places: int = _DEFAULT_SCORE_PLACES
         return str(value)
 
 
-class ScoreChange(BaseModel):
-    """Record of a score change for audit trail."""
+class AuditEvent(BaseModel):
+    """Centralized audit event for investigation-level changes."""
 
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+    model_config = ConfigDict(arbitrary_types_allowed=True, extra="allow")
 
+    event_id: str
     timestamp: datetime
-    old_score: Decimal
-    new_score: Decimal
-    old_level: Level
-    new_level: Level
-    reason: str
-
-    @field_serializer("old_score", "new_score")
-    def serialize_decimal(self, v: Decimal) -> float:
-        return float(v)
-
-    @property
-    def display_old_score(self) -> str:
-        return _format_score_decimal(self.old_score)
-
-    @property
-    def display_new_score(self) -> str:
-        return _format_score_decimal(self.new_score)
+    event_type: str
+    actor: str | None = None
+    reason: str | None = None
+    tool: str | None = None
+    object_type: str | None = None
+    object_key: str | None = None
+    details: dict[str, Any] = Field(default_factory=dict)
 
 
 class InvestigationWhitelist(BaseModel):
@@ -194,7 +187,11 @@ class ThreatIntel(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def ensure_defaults(cls, values: Any) -> Any:
-        values = apply_creation_score_level_defaults(values, default_level_no_score=Level.INFO)
+        values = apply_creation_score_level_defaults(
+            values,
+            default_level_no_score=Level.INFO,
+            require_score=True,
+        )
         if not isinstance(values, dict):
             return values
 
@@ -225,15 +222,6 @@ class ThreatIntel(BaseModel):
     def score_display(self) -> str:
         return _format_score_decimal(self.score)
 
-    def set_level(self, level: Level | str) -> None:
-        """
-        Set the level.
-
-        Args:
-            level: The level to set
-        """
-        self.level = normalize_level(level)
-
 
 class Observable(BaseModel):
     """
@@ -256,8 +244,7 @@ class Observable(BaseModel):
     threat_intels: list[ThreatIntel] = Field(...)
     relationships: list[Relationship] = Field(...)
     key: str = Field(...)
-    _score_history: list[ScoreChange] = PrivateAttr(default_factory=list)
-    _generated_by_checks: list[str] = PrivateAttr(default_factory=list)
+    _check_links: list[str] = PrivateAttr(default_factory=list)
     _from_shared_context: bool = PrivateAttr(default=False)
 
     @field_validator("obs_type", mode="before")
@@ -341,104 +328,23 @@ class Observable(BaseModel):
 
     @computed_field
     @property
-    def generated_by_checks(self) -> list[str]:
-        """Checks that generated this observable."""
-        return self._generated_by_checks
-
-    def update_score(self, new_score: Decimal, reason: str = "", *, record_history: bool = True) -> None:
-        """
-        Update the observable's score and recalculate level.
-
-        Args:
-            new_score: The new score value
-            reason: Reason for the score change
-        """
-        if not isinstance(new_score, Decimal):
-            new_score = Decimal(str(new_score))
-
-        old_score = self.score
-        old_level = self.level
-
-        self.score = new_score
-        self.level = recalculate_level_for_score(old_level, new_score)
-
-        if record_history:
-            change = ScoreChange(
-                timestamp=datetime.now(timezone.utc),
-                old_score=old_score,
-                new_score=new_score,
-                old_level=old_level,
-                new_level=self.level,
-                reason=reason,
-            )
-            self._score_history.append(change)
-
-    def set_level(self, level: Level | str) -> None:
-        """
-        Set the level.
-
-        Args:
-            level: The level to set
-        """
-        self.level = normalize_level(level)
-
-    def add_threat_intel(self, ti: ThreatIntel) -> None:
-        """
-        Add threat intelligence to this observable.
-
-        Args:
-            ti: The threat intel to add
-        """
-        if ti not in self.threat_intels:
-            self.threat_intels.append(ti)
-
-    def _add_relationship_internal(
-        self,
-        target_key: str,
-        relationship_type: RelationshipType | str,
-        direction: RelationshipDirection | str | None = None,
-    ) -> None:
-        """
-        Internal method to add a relationship without validation.
-
-        This should only be called by the Investigation layer after validating
-        that the target observable exists.
-
-        Args:
-            target_key: Key of the target observable
-            relationship_type: Type of relationship
-            direction: Direction of the relationship (None = use semantic default for relationship type)
-        """
-        rel = Relationship(target_key=target_key, relationship_type=relationship_type, direction=direction)
-        # Check for duplicates using target_key, relationship_type, and direction
-        rel_tuple = (rel.target_key, rel.relationship_type, rel.direction)
-        existing_rels = {(r.target_key, r.relationship_type, r.direction) for r in self.relationships}
-        if rel_tuple not in existing_rels:
-            self.relationships.append(rel)
-
-    def mark_generated_by_check(self, check_key: str) -> None:
-        """
-        Mark this observable as generated by a specific check.
-
-        Args:
-            check_key: Key of the check that generated this observable
-        """
-        if check_key not in self._generated_by_checks:
-            self._generated_by_checks.append(check_key)
-
-    def get_score_history(self) -> list[ScoreChange]:
-        """
-        Get the score history for this observable.
-
-        Returns:
-            List of score changes with timestamps, old/new scores and levels, and reasons
-        """
-        return self._score_history
+    def check_links(self) -> list[str]:
+        """Checks that currently link to this observable (navigation-only)."""
+        return list(self._check_links)
 
     @computed_field(return_type=str)
     @property
     def score_display(self) -> str:
         return _format_score_decimal(self.score)
+
+
+class ObservableLink(BaseModel):
+    """Edge metadata for a Check↔Observable association."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    observable_key: str
+    propagation_mode: PropagationMode = PropagationMode.LOCAL_ONLY
 
 
 class Check(BaseModel):
@@ -458,10 +364,9 @@ class Check(BaseModel):
     extra: dict[str, Any] = Field(...)
     score: Decimal = Field(...)
     level: Level = Field(...)
-    observables: list[Observable] = Field(...)
-    score_policy: CheckScorePolicy = CheckScorePolicy.AUTO
+    origin_investigation_id: str = Field(...)
+    observable_links: list[ObservableLink] = Field(...)
     key: str = Field(...)
-    _score_history: list[ScoreChange] = PrivateAttr(default_factory=list)
 
     @field_validator("extra", mode="before")
     @classmethod
@@ -493,18 +398,11 @@ class Check(BaseModel):
             values["extra"] = {}
         if "comment" not in values:
             values["comment"] = ""
-        if "observables" not in values:
-            values["observables"] = []
+        if "observable_links" not in values:
+            values["observable_links"] = []
         if "key" not in values:
             values["key"] = ""
         return values
-
-    @field_validator("score_policy", mode="before")
-    @classmethod
-    def coerce_score_policy(cls, v: Any) -> CheckScorePolicy:
-        if isinstance(v, CheckScorePolicy):
-            return v
-        return CheckScorePolicy(v)
 
     @model_validator(mode="after")
     def generate_key(self) -> Self:
@@ -516,80 +414,6 @@ class Check(BaseModel):
     @field_serializer("score")
     def serialize_score(self, v: Decimal) -> float:
         return float(v)
-
-    @field_serializer("observables")
-    def serialize_observables(self, value: list[Observable]) -> list[str]:
-        """Serialize observables as keys only."""
-        return [obs.key for obs in value]
-
-    def update_score(self, new_score: Decimal, reason: str = "", *, record_history: bool = True) -> None:
-        """
-        Update the check's score and recalculate level.
-
-        Args:
-            new_score: The new score value
-            reason: Reason for the score change
-        """
-        if not isinstance(new_score, Decimal):
-            new_score = Decimal(str(new_score))
-
-        old_score = self.score
-        old_level = self.level
-
-        self.score = new_score
-        self.level = recalculate_level_for_score(old_level, new_score)
-
-        if record_history:
-            change = ScoreChange(
-                timestamp=datetime.now(timezone.utc),
-                old_score=old_score,
-                new_score=new_score,
-                old_level=old_level,
-                new_level=self.level,
-                reason=reason,
-            )
-            self._score_history.append(change)
-
-    def set_level(self, level: Level | str) -> None:
-        """
-        Set the level.
-
-        Args:
-            level: The level to set
-        """
-        self.level = normalize_level(level)
-
-    def set_score_policy(self, policy: CheckScorePolicy | str) -> None:
-        """
-        Control whether observables can update this check's score/level.
-        """
-        self.score_policy = CheckScorePolicy(policy)
-
-    def add_observable(self, observable: Observable) -> None:
-        """
-        Add an observable to this check.
-
-        When an observable is added to a check with level NONE, the check's level
-        is automatically upgraded to INFO to indicate that the check is now classified.
-
-        Args:
-            observable: The observable to link
-        """
-        if observable not in self.observables:
-            self.observables.append(observable)
-
-            # Auto-upgrade level from NONE to INFO when first observable is added
-            if self.level == Level.NONE:
-                self.set_level(Level.INFO)
-
-    def get_score_history(self) -> list[ScoreChange]:
-        """
-        Get the score history for this check.
-
-        Returns:
-            List of score changes with timestamps, old/new scores and levels, and reasons
-        """
-        return self._score_history
 
     @computed_field(return_type=str)
     @property
@@ -668,25 +492,6 @@ class Container(BaseModel):
         if "key" not in values:
             values["key"] = ""
         return values
-
-    def add_check(self, check: Check) -> None:
-        """
-        Add a check to this container.
-
-        Args:
-            check: The check to add
-        """
-        if check not in self.checks:
-            self.checks.append(check)
-
-    def add_sub_container(self, container: Container) -> None:
-        """
-        Add a sub-container.
-
-        Args:
-            container: The sub-container to add
-        """
-        self.sub_containers[container.key] = container
 
     @computed_field(return_type=Decimal)
     @property

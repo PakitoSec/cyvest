@@ -3,15 +3,15 @@ Tests for relationship validation through Investigation layer.
 """
 
 from cyvest import Cyvest
-from cyvest.model import Observable
+from cyvest.model import Observable, Relationship
 
 
 def test_add_relationship_with_valid_target() -> None:
     """Test adding relationship when both source and target exist."""
     cv = Cyvest()
 
-    source = cv.observable_create("domain", "example.com")
-    target = cv.observable_create("ip", "192.0.2.1")
+    source = cv.observable_create(Cyvest.OBS.DOMAIN_NAME, "example.com")
+    target = cv.observable_create(Cyvest.OBS.IPV4_ADDR, "192.0.2.1")
 
     result = cv.observable_add_relationship(source, target, "related-to")
 
@@ -25,8 +25,8 @@ def test_add_relationship_with_keys() -> None:
     """Test adding relationship using string keys."""
     cv = Cyvest()
 
-    source = cv.observable_create("domain", "example.com")
-    target = cv.observable_create("ip", "192.0.2.1")
+    source = cv.observable_create(Cyvest.OBS.DOMAIN_NAME, "example.com")
+    target = cv.observable_create(Cyvest.OBS.IPV4_ADDR, "192.0.2.1")
 
     result = cv.observable_add_relationship(source.key, target.key, "related-to")
 
@@ -40,15 +40,15 @@ def test_add_relationship_mixed_params() -> None:
     """Test adding relationship with mixed Observable and string parameters."""
     cv = Cyvest()
 
-    source = cv.observable_create("domain", "example.com")
-    target = cv.observable_create("ip", "192.0.2.1")
+    source = cv.observable_create(Cyvest.OBS.DOMAIN_NAME, "example.com")
+    target = cv.observable_create(Cyvest.OBS.IPV4_ADDR, "192.0.2.1")
 
     # Source as Observable, target as string
     result = cv.observable_add_relationship(source, target.key, "related-to")
     assert result is not None
     assert len(source.relationships) == 1
 
-    source2 = cv.observable_create("domain", "test.com")
+    source2 = cv.observable_create(Cyvest.OBS.DOMAIN_NAME, "test.com")
     # Source as string, target as Observable
     result2 = cv.observable_add_relationship(source2.key, target, "related-to")
     assert result2 is not None
@@ -59,7 +59,7 @@ def test_add_relationship_nonexistent_source() -> None:
     """Test adding relationship when source doesn't exist returns None."""
     cv = Cyvest()
 
-    target = cv.observable_create("ip", "192.0.2.1")
+    target = cv.observable_create(Cyvest.OBS.IPV4_ADDR, "192.0.2.1")
 
     result = cv.observable_add_relationship("obs:domain:nonexistent.com", target, "related-to")
 
@@ -70,7 +70,7 @@ def test_add_relationship_nonexistent_target() -> None:
     """Test adding relationship when target doesn't exist returns None and doesn't add relationship."""
     cv = Cyvest()
 
-    source = cv.observable_create("domain", "example.com")
+    source = cv.observable_create(Cyvest.OBS.DOMAIN_NAME, "example.com")
 
     result = cv.observable_add_relationship(source, "obs:ip:192.0.2.1", "related-to")
 
@@ -91,8 +91,8 @@ def test_relationship_deduplication() -> None:
     """Test that duplicate relationships are not added."""
     cv = Cyvest()
 
-    source = cv.observable_create("domain", "example.com")
-    target = cv.observable_create("ip", "192.0.2.1")
+    source = cv.observable_create(Cyvest.OBS.DOMAIN_NAME, "example.com")
+    target = cv.observable_create(Cyvest.OBS.IPV4_ADDR, "192.0.2.1")
 
     # Add same relationship twice
     cv.observable_add_relationship(source, target, "related-to")
@@ -107,11 +107,14 @@ def test_merge_filters_invalid_relationships() -> None:
     cv = Cyvest()
 
     # Create observable with relationship to non-existent target
-    obs = Observable(obs_type="domain", value="example.com")
-    obs._add_relationship_internal("obs:ip:nonexistent", "related-to")
+    obs = Observable(
+        obs_type=Cyvest.OBS.DOMAIN_NAME,
+        value="example.com",
+        relationships=[Relationship(target_key="obs:ip:nonexistent", relationship_type="related-to")],
+    )
 
     # Add it to investigation - the relationship should be filtered during merge
-    cv.observable_create("domain", "example.com")
+    cv.observable_create(Cyvest.OBS.DOMAIN_NAME, "example.com")
     merged, deferred = cv._investigation.add_observable(obs)
 
     # The relationship should not have been merged (deferred because target doesn't exist)
@@ -126,11 +129,14 @@ def test_merge_keeps_valid_relationships() -> None:
     cv = Cyvest()
 
     # Create target first
-    target = cv.observable_create("ip", "192.0.2.1")
+    target = cv.observable_create(Cyvest.OBS.IPV4_ADDR, "192.0.2.1")
 
     # Create observable with relationship to existing target
-    obs = Observable(obs_type="domain", value="example.com")
-    obs._add_relationship_internal(target.key, "related-to")
+    obs = Observable(
+        obs_type="domain",
+        value="example.com",
+        relationships=[Relationship(target_key=target.key, relationship_type="related-to")],
+    )
 
     # Add it to investigation - the relationship should be kept
     merged, deferred = cv._investigation.add_observable(obs)
@@ -146,8 +152,8 @@ def test_investigation_add_relationship_with_observables() -> None:
     """Test Investigation.add_relationship with Observable objects."""
     cv = Cyvest()
 
-    source = cv.observable_create("domain", "example.com")
-    target = cv.observable_create("ip", "192.0.2.1")
+    source = cv.observable_create(Cyvest.OBS.DOMAIN_NAME, "example.com")
+    target = cv.observable_create(Cyvest.OBS.IPV4_ADDR, "192.0.2.1")
     source_model = cv._investigation.get_observable(source.key)
     target_model = cv._investigation.get_observable(target.key)
     assert source_model is not None

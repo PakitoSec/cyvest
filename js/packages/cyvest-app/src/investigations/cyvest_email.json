@@ -1,11 +1,1054 @@
 {
+  "investigation_id": "01KD15RP8XFZRYECKFQAD3RWHC",
+  "investigation_name": "Email Investigation",
+  "started_at": "2025-12-21T19:21:47.037205Z",
   "score": 36.1,
   "level": "MALICIOUS",
   "whitelisted": false,
   "whitelists": [],
+  "event_log": [
+    {
+      "event_id": "01KD15RP8XW256NTS4CP91XM8Z",
+      "timestamp": "2025-12-21T19:21:47.037869Z",
+      "event_type": "OBSERVABLE_CREATED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:artifact:root",
+      "details": {}
+    },
+    {
+      "event_id": "01KD15RP8ZGN85TQ7EM1T0JH0R",
+      "timestamp": "2025-12-21T19:21:47.039772Z",
+      "event_type": "SCORE_CHANGED",
+      "actor": null,
+      "reason": "Merged from obs:artifact:root",
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:artifact:root",
+      "details": {
+        "old_score": 0.0,
+        "new_score": 2.0,
+        "old_level": "INFO",
+        "new_level": "NOTABLE"
+      }
+    },
+    {
+      "event_id": "01KD15RP8Z69ACWNNSJYN01HSN",
+      "timestamp": "2025-12-21T19:21:47.039821Z",
+      "event_type": "OBSERVABLE_CREATED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:email-addr:noreply@dmalicious.com",
+      "details": {}
+    },
+    {
+      "event_id": "01KD15RP8ZEP82HGZNGQWY72WQ",
+      "timestamp": "2025-12-21T19:21:47.039829Z",
+      "event_type": "OBSERVABLE_CREATED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:domain-name:dmalicious.com",
+      "details": {}
+    },
+    {
+      "event_id": "01KD15RP8ZW9KTMSMXAFXZYX0M",
+      "timestamp": "2025-12-21T19:21:47.039836Z",
+      "event_type": "OBSERVABLE_CREATED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:ipv4-addr:8.1.2.3",
+      "details": {}
+    },
+    {
+      "event_id": "01KD15RP8ZB7Y6YV5YHC8QEYX5",
+      "timestamp": "2025-12-21T19:21:47.039849Z",
+      "event_type": "THREAT_INTEL_ATTACHED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:domain-name:dmalicious.com",
+      "details": {
+        "threat_intel_key": "ti:vt:obs:domain-name:dmalicious.com",
+        "source": "VT"
+      }
+    },
+    {
+      "event_id": "01KD15RP8ZX699R3RKHFAG9KKX",
+      "timestamp": "2025-12-21T19:21:47.039860Z",
+      "event_type": "THREAT_INTEL_ATTACHED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:ipv4-addr:8.1.2.3",
+      "details": {
+        "threat_intel_key": "ti:abuseipdb:obs:ipv4-addr:8.1.2.3",
+        "source": "ABUSEIPDB"
+      }
+    },
+    {
+      "event_id": "01KD15RP8ZKSVB6QN26QKYNF0X",
+      "timestamp": "2025-12-21T19:21:47.039876Z",
+      "event_type": "THREAT_INTEL_ATTACHED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:email-addr:noreply@dmalicious.com",
+      "details": {
+        "threat_intel_key": "ti:vt:obs:email-addr:noreply@dmalicious.com",
+        "source": "VT"
+      }
+    },
+    {
+      "event_id": "01KD15RP8ZRNDT713DYM7JSEF2",
+      "timestamp": "2025-12-21T19:21:47.039890Z",
+      "event_type": "CHECK_CREATED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "check",
+      "object_key": "chk:from:header",
+      "details": {}
+    },
+    {
+      "event_id": "01KD15RP8ZZXS69GNJ8ZDF4CZ7",
+      "timestamp": "2025-12-21T19:21:47.039896Z",
+      "event_type": "CONTAINER_CREATED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "container",
+      "object_key": "ctr:emails",
+      "details": {}
+    },
+    {
+      "event_id": "01KD15RP8Z51E24FWE96V1TCCH",
+      "timestamp": "2025-12-21T19:21:47.039926Z",
+      "event_type": "INVESTIGATION_MERGED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "investigation",
+      "object_key": "01KD15RP8XFZRYECKFQAD3RWHC",
+      "details": {
+        "from_investigation_id": "01KD15RP8YM9HZ8EH1RGM6NSZ1",
+        "into_investigation_id": "01KD15RP8XFZRYECKFQAD3RWHC",
+        "from_investigation_name": null,
+        "into_investigation_name": "Email Investigation",
+        "object_changes": [
+          {
+            "object_type": "observable",
+            "object_key": "obs:artifact:root",
+            "action": "merged",
+            "changed_fields": [
+              "comment"
+            ]
+          },
+          {
+            "object_type": "observable",
+            "object_key": "obs:email-addr:noreply@dmalicious.com",
+            "action": "created",
+            "changed_fields": []
+          },
+          {
+            "object_type": "observable",
+            "object_key": "obs:domain-name:dmalicious.com",
+            "action": "created",
+            "changed_fields": []
+          },
+          {
+            "object_type": "observable",
+            "object_key": "obs:ipv4-addr:8.1.2.3",
+            "action": "created",
+            "changed_fields": []
+          },
+          {
+            "object_type": "threat_intel",
+            "object_key": "ti:vt:obs:domain-name:dmalicious.com",
+            "action": "created",
+            "changed_fields": []
+          },
+          {
+            "object_type": "threat_intel",
+            "object_key": "ti:abuseipdb:obs:ipv4-addr:8.1.2.3",
+            "action": "created",
+            "changed_fields": []
+          },
+          {
+            "object_type": "threat_intel",
+            "object_key": "ti:vt:obs:email-addr:noreply@dmalicious.com",
+            "action": "created",
+            "changed_fields": []
+          },
+          {
+            "object_type": "check",
+            "object_key": "chk:from:header",
+            "action": "created",
+            "changed_fields": []
+          },
+          {
+            "object_type": "container",
+            "object_key": "ctr:emails",
+            "action": "created",
+            "changed_fields": []
+          }
+        ]
+      }
+    },
+    {
+      "event_id": "01KD15RP90FD9KTG6X2KJ95Q4J",
+      "timestamp": "2025-12-21T19:21:47.040735Z",
+      "event_type": "SCORE_CHANGED",
+      "actor": null,
+      "reason": "Merged from obs:email-addr:noreply@dmalicious.com",
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:email-addr:noreply@dmalicious.com",
+      "details": {
+        "old_score": 2.0,
+        "new_score": 5.0,
+        "old_level": "NOTABLE",
+        "new_level": "MALICIOUS"
+      }
+    },
+    {
+      "event_id": "01KD15RP90ZS9RNEVYJTCE3GW3",
+      "timestamp": "2025-12-21T19:21:47.040781Z",
+      "event_type": "THREAT_INTEL_ATTACHED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:email-addr:noreply@dmalicious.com",
+      "details": {
+        "threat_intel_key": "ti:proofpoint:obs:email-addr:noreply@dmalicious.com",
+        "source": "PROOFPOINT"
+      }
+    },
+    {
+      "event_id": "01KD15RP909RWFMQK21VRVNFPN",
+      "timestamp": "2025-12-21T19:21:47.040791Z",
+      "event_type": "CHECK_CREATED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "check",
+      "object_key": "chk:from-proofpoint:header",
+      "details": {}
+    },
+    {
+      "event_id": "01KD15RP90V9VCK3TK54F434A8",
+      "timestamp": "2025-12-21T19:21:47.040838Z",
+      "event_type": "INVESTIGATION_MERGED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "investigation",
+      "object_key": "01KD15RP8XFZRYECKFQAD3RWHC",
+      "details": {
+        "from_investigation_id": "01KD15RP90XJW9DAGWGDW1JHVD",
+        "into_investigation_id": "01KD15RP8XFZRYECKFQAD3RWHC",
+        "from_investigation_name": null,
+        "into_investigation_name": "Email Investigation",
+        "object_changes": [
+          {
+            "object_type": "observable",
+            "object_key": "obs:artifact:root",
+            "action": "merged",
+            "changed_fields": [
+              "comment"
+            ]
+          },
+          {
+            "object_type": "observable",
+            "object_key": "obs:email-addr:noreply@dmalicious.com",
+            "action": "merged",
+            "changed_fields": [
+              "score",
+              "level",
+              "threat_intels"
+            ]
+          },
+          {
+            "object_type": "threat_intel",
+            "object_key": "ti:proofpoint:obs:email-addr:noreply@dmalicious.com",
+            "action": "created",
+            "changed_fields": []
+          },
+          {
+            "object_type": "check",
+            "object_key": "chk:from-proofpoint:header",
+            "action": "created",
+            "changed_fields": []
+          },
+          {
+            "object_type": "container",
+            "object_key": "ctr:emails",
+            "action": "merged",
+            "changed_fields": [
+              "checks"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "event_id": "01KD15RP91WE4N21NNVN6GFXHF",
+      "timestamp": "2025-12-21T19:21:47.041847Z",
+      "event_type": "OBSERVABLE_CREATED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:email-addr:user@company.com",
+      "details": {}
+    },
+    {
+      "event_id": "01KD15RP91ECTDP44WTSBCQ83J",
+      "timestamp": "2025-12-21T19:21:47.041859Z",
+      "event_type": "CHECK_CREATED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "check",
+      "object_key": "chk:receiver:header",
+      "details": {}
+    },
+    {
+      "event_id": "01KD15RP91TX5THE8KE0R06P0V",
+      "timestamp": "2025-12-21T19:21:47.041867Z",
+      "event_type": "ENRICHMENT_CREATED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "enrichment",
+      "object_key": "enr:receiver:1528478e",
+      "details": {}
+    },
+    {
+      "event_id": "01KD15RP91GD89CQ6VX7XZ1Q0C",
+      "timestamp": "2025-12-21T19:21:47.041930Z",
+      "event_type": "INVESTIGATION_MERGED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "investigation",
+      "object_key": "01KD15RP8XFZRYECKFQAD3RWHC",
+      "details": {
+        "from_investigation_id": "01KD15RP90RE1XFNN9S7BY5FZY",
+        "into_investigation_id": "01KD15RP8XFZRYECKFQAD3RWHC",
+        "from_investigation_name": null,
+        "into_investigation_name": "Email Investigation",
+        "object_changes": [
+          {
+            "object_type": "observable",
+            "object_key": "obs:artifact:root",
+            "action": "merged",
+            "changed_fields": [
+              "comment"
+            ]
+          },
+          {
+            "object_type": "observable",
+            "object_key": "obs:email-addr:user@company.com",
+            "action": "created",
+            "changed_fields": []
+          },
+          {
+            "object_type": "check",
+            "object_key": "chk:receiver:header",
+            "action": "created",
+            "changed_fields": []
+          },
+          {
+            "object_type": "enrichment",
+            "object_key": "enr:receiver:1528478e",
+            "action": "created",
+            "changed_fields": []
+          },
+          {
+            "object_type": "container",
+            "object_key": "ctr:emails",
+            "action": "merged",
+            "changed_fields": [
+              "checks"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "event_id": "01KD15RP93HBGZEY8M06T9KB52",
+      "timestamp": "2025-12-21T19:21:47.043558Z",
+      "event_type": "OBSERVABLE_CREATED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:url:https://virus.com/payload.exe",
+      "details": {}
+    },
+    {
+      "event_id": "01KD15RP93HJ62SWVQA0CE18YS",
+      "timestamp": "2025-12-21T19:21:47.043567Z",
+      "event_type": "OBSERVABLE_CREATED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:domain-name:virus.com",
+      "details": {}
+    },
+    {
+      "event_id": "01KD15RP93BXMF061R53T6T8C7",
+      "timestamp": "2025-12-21T19:21:47.043574Z",
+      "event_type": "OBSERVABLE_CREATED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:url:https://virus.com/about",
+      "details": {}
+    },
+    {
+      "event_id": "01KD15RP93DB1XXENMAMHX09QK",
+      "timestamp": "2025-12-21T19:21:47.043581Z",
+      "event_type": "OBSERVABLE_CREATED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:url:https://domain.com/ok/toto",
+      "details": {}
+    },
+    {
+      "event_id": "01KD15RP933VE9Y9AW4SE0SMRG",
+      "timestamp": "2025-12-21T19:21:47.043588Z",
+      "event_type": "OBSERVABLE_CREATED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:domain-name:domain.com",
+      "details": {}
+    },
+    {
+      "event_id": "01KD15RP93VX3P72QYH16FQ04R",
+      "timestamp": "2025-12-21T19:21:47.043659Z",
+      "event_type": "THREAT_INTEL_ATTACHED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:url:https://virus.com/payload.exe",
+      "details": {
+        "threat_intel_key": "ti:vt:obs:url:https://virus.com/payload.exe",
+        "source": "VT"
+      }
+    },
+    {
+      "event_id": "01KD15RP93S6HQMPQA7TAE035Y",
+      "timestamp": "2025-12-21T19:21:47.043673Z",
+      "event_type": "THREAT_INTEL_ATTACHED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:url:https://virus.com/about",
+      "details": {
+        "threat_intel_key": "ti:vt:obs:url:https://virus.com/about",
+        "source": "VT"
+      }
+    },
+    {
+      "event_id": "01KD15RP93N52N0QSGGCQE71HH",
+      "timestamp": "2025-12-21T19:21:47.043686Z",
+      "event_type": "THREAT_INTEL_ATTACHED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:url:https://domain.com/ok/toto",
+      "details": {
+        "threat_intel_key": "ti:vt:obs:url:https://domain.com/ok/toto",
+        "source": "VT"
+      }
+    },
+    {
+      "event_id": "01KD15RP93AP4K59V83H54N3K6",
+      "timestamp": "2025-12-21T19:21:47.043830Z",
+      "event_type": "CHECK_CREATED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "check",
+      "object_key": "chk:body-url-https://virus.com/payload.exe:body",
+      "details": {}
+    },
+    {
+      "event_id": "01KD15RP93KBB1H5SYGH2THNBX",
+      "timestamp": "2025-12-21T19:21:47.043839Z",
+      "event_type": "CHECK_CREATED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "check",
+      "object_key": "chk:body-url-https://virus.com/about:body",
+      "details": {}
+    },
+    {
+      "event_id": "01KD15RP93YXX73DQNQX3096CX",
+      "timestamp": "2025-12-21T19:21:47.043846Z",
+      "event_type": "CHECK_CREATED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "check",
+      "object_key": "chk:body-url-https://domain.com/ok/toto:body",
+      "details": {}
+    },
+    {
+      "event_id": "01KD15RP93V8TVVZKM48NVPXB5",
+      "timestamp": "2025-12-21T19:21:47.043853Z",
+      "event_type": "CONTAINER_CREATED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "container",
+      "object_key": "ctr:bodies-urls",
+      "details": {}
+    },
+    {
+      "event_id": "01KD15RP93Z9R1GBVMYNG1JPJB",
+      "timestamp": "2025-12-21T19:21:47.043920Z",
+      "event_type": "INVESTIGATION_MERGED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "investigation",
+      "object_key": "01KD15RP8XFZRYECKFQAD3RWHC",
+      "details": {
+        "from_investigation_id": "01KD15RP92MC6KS2BC3S51XDDE",
+        "into_investigation_id": "01KD15RP8XFZRYECKFQAD3RWHC",
+        "from_investigation_name": null,
+        "into_investigation_name": "Email Investigation",
+        "object_changes": [
+          {
+            "object_type": "observable",
+            "object_key": "obs:artifact:root",
+            "action": "merged",
+            "changed_fields": [
+              "comment"
+            ]
+          },
+          {
+            "object_type": "observable",
+            "object_key": "obs:url:https://virus.com/payload.exe",
+            "action": "created",
+            "changed_fields": []
+          },
+          {
+            "object_type": "observable",
+            "object_key": "obs:domain-name:virus.com",
+            "action": "created",
+            "changed_fields": []
+          },
+          {
+            "object_type": "observable",
+            "object_key": "obs:url:https://virus.com/about",
+            "action": "created",
+            "changed_fields": []
+          },
+          {
+            "object_type": "observable",
+            "object_key": "obs:url:https://domain.com/ok/toto",
+            "action": "created",
+            "changed_fields": []
+          },
+          {
+            "object_type": "observable",
+            "object_key": "obs:domain-name:domain.com",
+            "action": "created",
+            "changed_fields": []
+          },
+          {
+            "object_type": "threat_intel",
+            "object_key": "ti:vt:obs:url:https://virus.com/payload.exe",
+            "action": "created",
+            "changed_fields": []
+          },
+          {
+            "object_type": "threat_intel",
+            "object_key": "ti:vt:obs:url:https://virus.com/about",
+            "action": "created",
+            "changed_fields": []
+          },
+          {
+            "object_type": "threat_intel",
+            "object_key": "ti:vt:obs:url:https://domain.com/ok/toto",
+            "action": "created",
+            "changed_fields": []
+          },
+          {
+            "object_type": "check",
+            "object_key": "chk:body-url-https://virus.com/payload.exe:body",
+            "action": "created",
+            "changed_fields": []
+          },
+          {
+            "object_type": "check",
+            "object_key": "chk:body-url-https://virus.com/about:body",
+            "action": "created",
+            "changed_fields": []
+          },
+          {
+            "object_type": "check",
+            "object_key": "chk:body-url-https://domain.com/ok/toto:body",
+            "action": "created",
+            "changed_fields": []
+          },
+          {
+            "object_type": "container",
+            "object_key": "ctr:bodies-urls",
+            "action": "created",
+            "changed_fields": []
+          }
+        ]
+      }
+    },
+    {
+      "event_id": "01KD15RP957KK8GNWXC93JAK5T",
+      "timestamp": "2025-12-21T19:21:47.045556Z",
+      "event_type": "OBSERVABLE_CREATED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:file:body/html",
+      "details": {}
+    },
+    {
+      "event_id": "01KD15RP95VVM78GYV0VPBKT6B",
+      "timestamp": "2025-12-21T19:21:47.045668Z",
+      "event_type": "THREAT_INTEL_ATTACHED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:domain-name:virus.com",
+      "details": {
+        "threat_intel_key": "ti:vt:obs:domain-name:virus.com",
+        "source": "VT"
+      }
+    },
+    {
+      "event_id": "01KD15RP95QGP0MAFQC6QQR30W",
+      "timestamp": "2025-12-21T19:21:47.045687Z",
+      "event_type": "THREAT_INTEL_ATTACHED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:domain-name:domain.com",
+      "details": {
+        "threat_intel_key": "ti:vt:obs:domain-name:domain.com",
+        "source": "VT"
+      }
+    },
+    {
+      "event_id": "01KD15RP95Q0HHD1VKAMKC2SDQ",
+      "timestamp": "2025-12-21T19:21:47.045700Z",
+      "event_type": "CHECK_CREATED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "check",
+      "object_key": "chk:body-domain-virus.com:body",
+      "details": {}
+    },
+    {
+      "event_id": "01KD15RP95FHXQTKGPND7EC3E4",
+      "timestamp": "2025-12-21T19:21:47.045711Z",
+      "event_type": "CHECK_CREATED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "check",
+      "object_key": "chk:body-domain-domain.com:body",
+      "details": {}
+    },
+    {
+      "event_id": "01KD15RP95AQYW44BBV77ZEPBV",
+      "timestamp": "2025-12-21T19:21:47.045722Z",
+      "event_type": "CONTAINER_CREATED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "container",
+      "object_key": "ctr:bodies-domains",
+      "details": {}
+    },
+    {
+      "event_id": "01KD15RP95GMD7PA7CT8HHSG10",
+      "timestamp": "2025-12-21T19:21:47.045835Z",
+      "event_type": "SCORE_CHANGED",
+      "actor": null,
+      "reason": "Linked observable obs:domain-name:virus.com updated",
+      "tool": null,
+      "object_type": "check",
+      "object_key": "chk:body-domain-virus.com:body",
+      "details": {
+        "old_score": 3.0,
+        "new_score": 5.0,
+        "old_level": "SUSPICIOUS",
+        "new_level": "MALICIOUS"
+      }
+    },
+    {
+      "event_id": "01KD15RP95X7XD9BJ0YGTZN8RN",
+      "timestamp": "2025-12-21T19:21:47.045852Z",
+      "event_type": "INVESTIGATION_MERGED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "investigation",
+      "object_key": "01KD15RP8XFZRYECKFQAD3RWHC",
+      "details": {
+        "from_investigation_id": "01KD15RP9481RT6HEMRBS4GYHC",
+        "into_investigation_id": "01KD15RP8XFZRYECKFQAD3RWHC",
+        "from_investigation_name": null,
+        "into_investigation_name": "Email Investigation",
+        "object_changes": [
+          {
+            "object_type": "observable",
+            "object_key": "obs:artifact:root",
+            "action": "merged",
+            "changed_fields": [
+              "comment"
+            ]
+          },
+          {
+            "object_type": "observable",
+            "object_key": "obs:domain-name:virus.com",
+            "action": "merged",
+            "changed_fields": [
+              "threat_intels"
+            ]
+          },
+          {
+            "object_type": "observable",
+            "object_key": "obs:file:body/html",
+            "action": "created",
+            "changed_fields": []
+          },
+          {
+            "object_type": "observable",
+            "object_key": "obs:domain-name:domain.com",
+            "action": "merged",
+            "changed_fields": [
+              "threat_intels",
+              "relationships"
+            ]
+          },
+          {
+            "object_type": "threat_intel",
+            "object_key": "ti:vt:obs:domain-name:virus.com",
+            "action": "created",
+            "changed_fields": []
+          },
+          {
+            "object_type": "threat_intel",
+            "object_key": "ti:vt:obs:domain-name:domain.com",
+            "action": "created",
+            "changed_fields": []
+          },
+          {
+            "object_type": "check",
+            "object_key": "chk:body-domain-virus.com:body",
+            "action": "created",
+            "changed_fields": []
+          },
+          {
+            "object_type": "check",
+            "object_key": "chk:body-domain-domain.com:body",
+            "action": "created",
+            "changed_fields": []
+          },
+          {
+            "object_type": "container",
+            "object_key": "ctr:bodies-domains",
+            "action": "created",
+            "changed_fields": []
+          }
+        ]
+      }
+    },
+    {
+      "event_id": "01KD15RP961SNYNA5KJZ8PND2Q",
+      "timestamp": "2025-12-21T19:21:47.046735Z",
+      "event_type": "SCORE_CHANGED",
+      "actor": null,
+      "reason": "Merged from obs:artifact:root",
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:artifact:root",
+      "details": {
+        "old_score": 5.0,
+        "new_score": 10.0,
+        "old_level": "MALICIOUS",
+        "new_level": "MALICIOUS"
+      }
+    },
+    {
+      "event_id": "01KD15RP962PTYFPB6JM2F8FZ6",
+      "timestamp": "2025-12-21T19:21:47.046934Z",
+      "event_type": "OBSERVABLE_CREATED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:file:invoice.pdf",
+      "details": {}
+    },
+    {
+      "event_id": "01KD15RP96TA9HWWX6K11XMP8V",
+      "timestamp": "2025-12-21T19:21:47.046945Z",
+      "event_type": "OBSERVABLE_CREATED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:file:md5:d41d8cd98f00b204e9800998ecf8427e",
+      "details": {}
+    },
+    {
+      "event_id": "01KD15RP96B6CVHKEP1CWGKJ2R",
+      "timestamp": "2025-12-21T19:21:47.046960Z",
+      "event_type": "THREAT_INTEL_ATTACHED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:file:md5:d41d8cd98f00b204e9800998ecf8427e",
+      "details": {
+        "threat_intel_key": "ti:vt:obs:file:md5:d41d8cd98f00b204e9800998ecf8427e",
+        "source": "VT"
+      }
+    },
+    {
+      "event_id": "01KD15RP96DAPQQXJ5RERY9XHV",
+      "timestamp": "2025-12-21T19:21:47.046974Z",
+      "event_type": "THREAT_INTEL_ATTACHED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "observable",
+      "object_key": "obs:file:invoice.pdf",
+      "details": {
+        "threat_intel_key": "ti:malwarebazaar:obs:file:invoice.pdf",
+        "source": "MALWAREBAZAAR"
+      }
+    },
+    {
+      "event_id": "01KD15RP968593T5Z9HDEEARWY",
+      "timestamp": "2025-12-21T19:21:47.046986Z",
+      "event_type": "CHECK_CREATED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "check",
+      "object_key": "chk:attachment-invoice.pdf:attachment",
+      "details": {}
+    },
+    {
+      "event_id": "01KD15RP96NBGK3SZKMQT0951Z",
+      "timestamp": "2025-12-21T19:21:47.046995Z",
+      "event_type": "CONTAINER_CREATED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "container",
+      "object_key": "ctr:attachments",
+      "details": {}
+    },
+    {
+      "event_id": "01KD15RP97SYWG7ZPHRBR0KFJA",
+      "timestamp": "2025-12-21T19:21:47.047123Z",
+      "event_type": "INVESTIGATION_MERGED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "investigation",
+      "object_key": "01KD15RP8XFZRYECKFQAD3RWHC",
+      "details": {
+        "from_investigation_id": "01KD15RP962KCHESMBJN2C7KSF",
+        "into_investigation_id": "01KD15RP8XFZRYECKFQAD3RWHC",
+        "from_investigation_name": null,
+        "into_investigation_name": "Email Investigation",
+        "object_changes": [
+          {
+            "object_type": "observable",
+            "object_key": "obs:artifact:root",
+            "action": "merged",
+            "changed_fields": [
+              "comment"
+            ]
+          },
+          {
+            "object_type": "observable",
+            "object_key": "obs:file:invoice.pdf",
+            "action": "created",
+            "changed_fields": []
+          },
+          {
+            "object_type": "observable",
+            "object_key": "obs:file:md5:d41d8cd98f00b204e9800998ecf8427e",
+            "action": "created",
+            "changed_fields": []
+          },
+          {
+            "object_type": "threat_intel",
+            "object_key": "ti:vt:obs:file:md5:d41d8cd98f00b204e9800998ecf8427e",
+            "action": "created",
+            "changed_fields": []
+          },
+          {
+            "object_type": "threat_intel",
+            "object_key": "ti:malwarebazaar:obs:file:invoice.pdf",
+            "action": "created",
+            "changed_fields": []
+          },
+          {
+            "object_type": "check",
+            "object_key": "chk:attachment-invoice.pdf:attachment",
+            "action": "created",
+            "changed_fields": []
+          },
+          {
+            "object_type": "container",
+            "object_key": "ctr:attachments",
+            "action": "created",
+            "changed_fields": []
+          }
+        ]
+      }
+    },
+    {
+      "event_id": "01KD15RP98SFT9PEVZP5BK4PNE",
+      "timestamp": "2025-12-21T19:21:47.048008Z",
+      "event_type": "CHECK_CREATED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "check",
+      "object_key": "chk:email_risk_aggregated:full",
+      "details": {}
+    },
+    {
+      "event_id": "01KD15RP98V1TNMF1MMV2BB0V1",
+      "timestamp": "2025-12-21T19:21:47.048017Z",
+      "event_type": "CONTAINER_CREATED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "container",
+      "object_key": "ctr:risk_assessment",
+      "details": {}
+    },
+    {
+      "event_id": "01KD15RP98JDME9H6PWWKCNK8A",
+      "timestamp": "2025-12-21T19:21:47.048141Z",
+      "event_type": "INVESTIGATION_MERGED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "investigation",
+      "object_key": "01KD15RP8XFZRYECKFQAD3RWHC",
+      "details": {
+        "from_investigation_id": "01KD15RP97T6T9XVA34X4E7BGN",
+        "into_investigation_id": "01KD15RP8XFZRYECKFQAD3RWHC",
+        "from_investigation_name": null,
+        "into_investigation_name": "Email Investigation",
+        "object_changes": [
+          {
+            "object_type": "observable",
+            "object_key": "obs:artifact:root",
+            "action": "merged",
+            "changed_fields": [
+              "comment"
+            ]
+          },
+          {
+            "object_type": "check",
+            "object_key": "chk:email_risk_aggregated:full",
+            "action": "created",
+            "changed_fields": []
+          },
+          {
+            "object_type": "container",
+            "object_key": "ctr:risk_assessment",
+            "action": "created",
+            "changed_fields": []
+          }
+        ]
+      }
+    },
+    {
+      "event_id": "01KD15RP98FH9DVF12Y42XB5QV",
+      "timestamp": "2025-12-21T19:21:47.048743Z",
+      "event_type": "CHECK_CREATED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "check",
+      "object_key": "chk:ai:full",
+      "details": {}
+    },
+    {
+      "event_id": "01KD15RP9832QF1W4TATYGQZCQ",
+      "timestamp": "2025-12-21T19:21:47.048871Z",
+      "event_type": "INVESTIGATION_MERGED",
+      "actor": null,
+      "reason": null,
+      "tool": null,
+      "object_type": "investigation",
+      "object_key": "01KD15RP8XFZRYECKFQAD3RWHC",
+      "details": {
+        "from_investigation_id": "01KD15RP98BZW44YHMXCAHS5C8",
+        "into_investigation_id": "01KD15RP8XFZRYECKFQAD3RWHC",
+        "from_investigation_name": null,
+        "into_investigation_name": "Email Investigation",
+        "object_changes": [
+          {
+            "object_type": "observable",
+            "object_key": "obs:artifact:root",
+            "action": "merged",
+            "changed_fields": [
+              "comment"
+            ]
+          },
+          {
+            "object_type": "check",
+            "object_key": "chk:ai:full",
+            "action": "created",
+            "changed_fields": []
+          }
+        ]
+      }
+    }
+  ],
   "observables": {
     "obs:artifact:root": {
-      "key": "obs:artifact:root",
       "type": "artifact",
       "value": "root",
       "internal": false,
@@ -57,12 +1100,13 @@
       },
       "score": 10.0,
       "level": "MALICIOUS",
-      "relationships": [],
       "threat_intels": [],
-      "generated_by_checks": []
+      "relationships": [],
+      "key": "obs:artifact:root",
+      "check_links": [],
+      "score_display": "10.00"
     },
     "obs:email-addr:noreply@dmalicious.com": {
-      "key": "obs:email-addr:noreply@dmalicious.com",
       "type": "email-addr",
       "value": "noreply@dmalicious.com",
       "internal": false,
@@ -71,6 +1115,10 @@
       "extra": {},
       "score": 5.0,
       "level": "MALICIOUS",
+      "threat_intels": [
+        "ti:vt:obs:email-addr:noreply@dmalicious.com",
+        "ti:proofpoint:obs:email-addr:noreply@dmalicious.com"
+      ],
       "relationships": [
         {
           "target_key": "obs:artifact:root",
@@ -83,17 +1131,14 @@
           "direction": "outbound"
         }
       ],
-      "threat_intels": [
-        "ti:vt:obs:email-addr:noreply@dmalicious.com",
-        "ti:proofpoint:obs:email-addr:noreply@dmalicious.com"
+      "key": "obs:email-addr:noreply@dmalicious.com",
+      "check_links": [
+        "chk:from-proofpoint:header",
+        "chk:from:header"
       ],
-      "generated_by_checks": [
-        "chk:from:header",
-        "chk:from-proofpoint:header"
-      ]
+      "score_display": "5.00"
     },
     "obs:domain-name:dmalicious.com": {
-      "key": "obs:domain-name:dmalicious.com",
       "type": "domain-name",
       "value": "dmalicious.com",
       "internal": false,
@@ -102,6 +1147,9 @@
       "extra": {},
       "score": 2.0,
       "level": "NOTABLE",
+      "threat_intels": [
+        "ti:vt:obs:domain-name:dmalicious.com"
+      ],
       "relationships": [
         {
           "target_key": "obs:ipv4-addr:8.1.2.3",
@@ -109,13 +1157,11 @@
           "direction": "outbound"
         }
       ],
-      "threat_intels": [
-        "ti:vt:obs:domain-name:dmalicious.com"
-      ],
-      "generated_by_checks": []
+      "key": "obs:domain-name:dmalicious.com",
+      "check_links": [],
+      "score_display": "2.00"
     },
     "obs:ipv4-addr:8.1.2.3": {
-      "key": "obs:ipv4-addr:8.1.2.3",
       "type": "ipv4-addr",
       "value": "8.1.2.3",
       "internal": false,
@@ -124,14 +1170,15 @@
       "extra": {},
       "score": 2.0,
       "level": "NOTABLE",
-      "relationships": [],
       "threat_intels": [
         "ti:abuseipdb:obs:ipv4-addr:8.1.2.3"
       ],
-      "generated_by_checks": []
+      "relationships": [],
+      "key": "obs:ipv4-addr:8.1.2.3",
+      "check_links": [],
+      "score_display": "2.00"
     },
     "obs:email-addr:user@company.com": {
-      "key": "obs:email-addr:user@company.com",
       "type": "email-addr",
       "value": "user@company.com",
       "internal": false,
@@ -140,6 +1187,7 @@
       "extra": {},
       "score": 0.0,
       "level": "INFO",
+      "threat_intels": [],
       "relationships": [
         {
           "target_key": "obs:artifact:root",
@@ -147,13 +1195,13 @@
           "direction": "inbound"
         }
       ],
-      "threat_intels": [],
-      "generated_by_checks": [
+      "key": "obs:email-addr:user@company.com",
+      "check_links": [
         "chk:receiver:header"
-      ]
+      ],
+      "score_display": "0.00"
     },
     "obs:url:https://virus.com/payload.exe": {
-      "key": "obs:url:https://virus.com/payload.exe",
       "type": "url",
       "value": "https://virus.com/payload.exe",
       "internal": false,
@@ -162,6 +1210,9 @@
       "extra": {},
       "score": 5.0,
       "level": "MALICIOUS",
+      "threat_intels": [
+        "ti:vt:obs:url:https://virus.com/payload.exe"
+      ],
       "relationships": [
         {
           "target_key": "obs:domain-name:virus.com",
@@ -169,15 +1220,13 @@
           "direction": "inbound"
         }
       ],
-      "threat_intels": [
-        "ti:vt:obs:url:https://virus.com/payload.exe"
-      ],
-      "generated_by_checks": [
+      "key": "obs:url:https://virus.com/payload.exe",
+      "check_links": [
         "chk:body-url-https://virus.com/payload.exe:body"
-      ]
+      ],
+      "score_display": "5.00"
     },
     "obs:domain-name:virus.com": {
-      "key": "obs:domain-name:virus.com",
       "type": "domain-name",
       "value": "virus.com",
       "internal": false,
@@ -186,6 +1235,9 @@
       "extra": {},
       "score": 5.0,
       "level": "MALICIOUS",
+      "threat_intels": [
+        "ti:vt:obs:domain-name:virus.com"
+      ],
       "relationships": [
         {
           "target_key": "obs:file:body/html",
@@ -193,15 +1245,13 @@
           "direction": "inbound"
         }
       ],
-      "threat_intels": [
-        "ti:vt:obs:domain-name:virus.com"
-      ],
-      "generated_by_checks": [
+      "key": "obs:domain-name:virus.com",
+      "check_links": [
         "chk:body-domain-virus.com:body"
-      ]
+      ],
+      "score_display": "5.00"
     },
     "obs:url:https://virus.com/about": {
-      "key": "obs:url:https://virus.com/about",
       "type": "url",
       "value": "https://virus.com/about",
       "internal": false,
@@ -210,6 +1260,9 @@
       "extra": {},
       "score": 3.0,
       "level": "SUSPICIOUS",
+      "threat_intels": [
+        "ti:vt:obs:url:https://virus.com/about"
+      ],
       "relationships": [
         {
           "target_key": "obs:domain-name:virus.com",
@@ -217,15 +1270,13 @@
           "direction": "inbound"
         }
       ],
-      "threat_intels": [
-        "ti:vt:obs:url:https://virus.com/about"
-      ],
-      "generated_by_checks": [
+      "key": "obs:url:https://virus.com/about",
+      "check_links": [
         "chk:body-url-https://virus.com/about:body"
-      ]
+      ],
+      "score_display": "3.00"
     },
     "obs:url:https://domain.com/ok/toto": {
-      "key": "obs:url:https://domain.com/ok/toto",
       "type": "url",
       "value": "https://domain.com/ok/toto",
       "internal": false,
@@ -234,6 +1285,9 @@
       "extra": {},
       "score": -1.0,
       "level": "TRUSTED",
+      "threat_intels": [
+        "ti:vt:obs:url:https://domain.com/ok/toto"
+      ],
       "relationships": [
         {
           "target_key": "obs:domain-name:domain.com",
@@ -241,15 +1295,13 @@
           "direction": "inbound"
         }
       ],
-      "threat_intels": [
-        "ti:vt:obs:url:https://domain.com/ok/toto"
-      ],
-      "generated_by_checks": [
+      "key": "obs:url:https://domain.com/ok/toto",
+      "check_links": [
         "chk:body-url-https://domain.com/ok/toto:body"
-      ]
+      ],
+      "score_display": "-1.00"
     },
     "obs:domain-name:domain.com": {
-      "key": "obs:domain-name:domain.com",
       "type": "domain-name",
       "value": "domain.com",
       "internal": false,
@@ -258,6 +1310,9 @@
       "extra": {},
       "score": 0.0,
       "level": "INFO",
+      "threat_intels": [
+        "ti:vt:obs:domain-name:domain.com"
+      ],
       "relationships": [
         {
           "target_key": "obs:file:body/html",
@@ -265,15 +1320,13 @@
           "direction": "inbound"
         }
       ],
-      "threat_intels": [
-        "ti:vt:obs:domain-name:domain.com"
-      ],
-      "generated_by_checks": [
+      "key": "obs:domain-name:domain.com",
+      "check_links": [
         "chk:body-domain-domain.com:body"
-      ]
+      ],
+      "score_display": "0.00"
     },
     "obs:file:body/html": {
-      "key": "obs:file:body/html",
       "type": "file",
       "value": "BODY/HTML",
       "internal": false,
@@ -282,6 +1335,7 @@
       "extra": {},
       "score": 5.0,
       "level": "MALICIOUS",
+      "threat_intels": [],
       "relationships": [
         {
           "target_key": "obs:artifact:root",
@@ -289,11 +1343,11 @@
           "direction": "inbound"
         }
       ],
-      "threat_intels": [],
-      "generated_by_checks": []
+      "key": "obs:file:body/html",
+      "check_links": [],
+      "score_display": "5.00"
     },
     "obs:file:invoice.pdf": {
-      "key": "obs:file:invoice.pdf",
       "type": "file",
       "value": "invoice.pdf",
       "internal": false,
@@ -302,6 +1356,9 @@
       "extra": {},
       "score": 10.0,
       "level": "MALICIOUS",
+      "threat_intels": [
+        "ti:malwarebazaar:obs:file:invoice.pdf"
+      ],
       "relationships": [
         {
           "target_key": "obs:artifact:root",
@@ -314,15 +1371,13 @@
           "direction": "bidirectional"
         }
       ],
-      "threat_intels": [
-        "ti:malwarebazaar:obs:file:invoice.pdf"
-      ],
-      "generated_by_checks": [
+      "key": "obs:file:invoice.pdf",
+      "check_links": [
         "chk:attachment-invoice.pdf:attachment"
-      ]
+      ],
+      "score_display": "10.00"
     },
     "obs:file:md5:d41d8cd98f00b204e9800998ecf8427e": {
-      "key": "obs:file:md5:d41d8cd98f00b204e9800998ecf8427e",
       "type": "file",
       "value": "MD5:d41d8cd98f00b204e9800998ecf8427e",
       "internal": false,
@@ -331,17 +1386,18 @@
       "extra": {},
       "score": 10.0,
       "level": "MALICIOUS",
-      "relationships": [],
       "threat_intels": [
         "ti:vt:obs:file:md5:d41d8cd98f00b204e9800998ecf8427e"
       ],
-      "generated_by_checks": []
+      "relationships": [],
+      "key": "obs:file:md5:d41d8cd98f00b204e9800998ecf8427e",
+      "check_links": [],
+      "score_display": "10.00"
     }
   },
   "checks": {
     "header": [
       {
-        "key": "chk:from:header",
         "check_id": "from",
         "scope": "header",
         "description": "test email vt 10",
@@ -349,13 +1405,17 @@
         "extra": {},
         "score": 2.0,
         "level": "NOTABLE",
-        "score_policy": "manual",
-        "observables": [
-          "obs:email-addr:noreply@dmalicious.com"
-        ]
+        "origin_investigation_id": "01KD15RP8YM9HZ8EH1RGM6NSZ1",
+        "observable_links": [
+          {
+            "observable_key": "obs:email-addr:noreply@dmalicious.com",
+            "propagation_mode": "LOCAL_ONLY"
+          }
+        ],
+        "key": "chk:from:header",
+        "score_display": "2.00"
       },
       {
-        "key": "chk:from-proofpoint:header",
         "check_id": "from-proofpoint",
         "scope": "header",
         "description": "test email vt 10",
@@ -363,13 +1423,17 @@
         "extra": {},
         "score": 5.0,
         "level": "MALICIOUS",
-        "score_policy": "auto",
-        "observables": [
-          "obs:email-addr:noreply@dmalicious.com"
-        ]
+        "origin_investigation_id": "01KD15RP90XJW9DAGWGDW1JHVD",
+        "observable_links": [
+          {
+            "observable_key": "obs:email-addr:noreply@dmalicious.com",
+            "propagation_mode": "LOCAL_ONLY"
+          }
+        ],
+        "key": "chk:from-proofpoint:header",
+        "score_display": "5.00"
       },
       {
-        "key": "chk:receiver:header",
         "check_id": "receiver",
         "scope": "header",
         "description": "description",
@@ -377,15 +1441,19 @@
         "extra": {},
         "score": 0.1,
         "level": "NOTABLE",
-        "score_policy": "auto",
-        "observables": [
-          "obs:email-addr:user@company.com"
-        ]
+        "origin_investigation_id": "01KD15RP90RE1XFNN9S7BY5FZY",
+        "observable_links": [
+          {
+            "observable_key": "obs:email-addr:user@company.com",
+            "propagation_mode": "LOCAL_ONLY"
+          }
+        ],
+        "key": "chk:receiver:header",
+        "score_display": "0.10"
       }
     ],
     "body": [
       {
-        "key": "chk:body-url-https://virus.com/payload.exe:body",
         "check_id": "body-url-https://virus.com/payload.exe",
         "scope": "body",
         "description": "URL analysis https://virus.com/payload.exe",
@@ -393,13 +1461,17 @@
         "extra": {},
         "score": 5.0,
         "level": "MALICIOUS",
-        "score_policy": "auto",
-        "observables": [
-          "obs:url:https://virus.com/payload.exe"
-        ]
+        "origin_investigation_id": "01KD15RP92MC6KS2BC3S51XDDE",
+        "observable_links": [
+          {
+            "observable_key": "obs:url:https://virus.com/payload.exe",
+            "propagation_mode": "LOCAL_ONLY"
+          }
+        ],
+        "key": "chk:body-url-https://virus.com/payload.exe:body",
+        "score_display": "5.00"
       },
       {
-        "key": "chk:body-url-https://virus.com/about:body",
         "check_id": "body-url-https://virus.com/about",
         "scope": "body",
         "description": "URL analysis https://virus.com/about",
@@ -407,13 +1479,17 @@
         "extra": {},
         "score": 3.0,
         "level": "SUSPICIOUS",
-        "score_policy": "auto",
-        "observables": [
-          "obs:url:https://virus.com/about"
-        ]
+        "origin_investigation_id": "01KD15RP92MC6KS2BC3S51XDDE",
+        "observable_links": [
+          {
+            "observable_key": "obs:url:https://virus.com/about",
+            "propagation_mode": "LOCAL_ONLY"
+          }
+        ],
+        "key": "chk:body-url-https://virus.com/about:body",
+        "score_display": "3.00"
       },
       {
-        "key": "chk:body-url-https://domain.com/ok/toto:body",
         "check_id": "body-url-https://domain.com/ok/toto",
         "scope": "body",
         "description": "URL analysis https://domain.com/ok/toto",
@@ -421,13 +1497,17 @@
         "extra": {},
         "score": 0.0,
         "level": "INFO",
-        "score_policy": "auto",
-        "observables": [
-          "obs:url:https://domain.com/ok/toto"
-        ]
+        "origin_investigation_id": "01KD15RP92MC6KS2BC3S51XDDE",
+        "observable_links": [
+          {
+            "observable_key": "obs:url:https://domain.com/ok/toto",
+            "propagation_mode": "LOCAL_ONLY"
+          }
+        ],
+        "key": "chk:body-url-https://domain.com/ok/toto:body",
+        "score_display": "0.00"
       },
       {
-        "key": "chk:body-domain-virus.com:body",
         "check_id": "body-domain-virus.com",
         "scope": "body",
         "description": "Domain analysis virus.com",
@@ -435,13 +1515,17 @@
         "extra": {},
         "score": 5.0,
         "level": "MALICIOUS",
-        "score_policy": "auto",
-        "observables": [
-          "obs:domain-name:virus.com"
-        ]
+        "origin_investigation_id": "01KD15RP9481RT6HEMRBS4GYHC",
+        "observable_links": [
+          {
+            "observable_key": "obs:domain-name:virus.com",
+            "propagation_mode": "GLOBAL"
+          }
+        ],
+        "key": "chk:body-domain-virus.com:body",
+        "score_display": "5.00"
       },
       {
-        "key": "chk:body-domain-domain.com:body",
         "check_id": "body-domain-domain.com",
         "scope": "body",
         "description": "Domain analysis domain.com",
@@ -449,15 +1533,19 @@
         "extra": {},
         "score": 0.0,
         "level": "INFO",
-        "score_policy": "auto",
-        "observables": [
-          "obs:domain-name:domain.com"
-        ]
+        "origin_investigation_id": "01KD15RP9481RT6HEMRBS4GYHC",
+        "observable_links": [
+          {
+            "observable_key": "obs:domain-name:domain.com",
+            "propagation_mode": "GLOBAL"
+          }
+        ],
+        "key": "chk:body-domain-domain.com:body",
+        "score_display": "0.00"
       }
     ],
     "attachment": [
       {
-        "key": "chk:attachment-invoice.pdf:attachment",
         "check_id": "attachment-invoice.pdf",
         "scope": "attachment",
         "description": "File: invoice.pdf (1024 bytes)",
@@ -465,27 +1553,32 @@
         "extra": {},
         "score": 10.0,
         "level": "MALICIOUS",
-        "score_policy": "auto",
-        "observables": [
-          "obs:file:invoice.pdf"
-        ]
+        "origin_investigation_id": "01KD15RP962KCHESMBJN2C7KSF",
+        "observable_links": [
+          {
+            "observable_key": "obs:file:invoice.pdf",
+            "propagation_mode": "LOCAL_ONLY"
+          }
+        ],
+        "key": "chk:attachment-invoice.pdf:attachment",
+        "score_display": "10.00"
       }
     ],
     "full": [
       {
-        "key": "chk:email_risk_aggregated:full",
         "check_id": "email_risk_aggregated",
         "scope": "full",
         "description": "Aggregated Email Risk Assessment",
-        "comment": "> **Aggregated Risk Assessment**\n> Total risk score: 6.0\n> Indicators analyzed: 2\n>\n> **Risk Factors:**\n> - Suspicious URLs detected (max score: 5)\n> - Malicious attachment detected (score: 10)\n>\n> **Component Analysis:**\n> - Header checks: 2\n> - URL checks: 3\n> - Attachment checks: 1\n",
+        "comment": "> **Aggregated Risk Assessment**\n> Total risk score: 6.0\n> Indicators analyzed: 2\n>\n> **Risk Factors:**\n> - Suspicious URLs detected (max score: 5)\n> - Malicious attachment detected (score: 10)\n>\n> **Component Analysis:**\n> - Header checks: 2\n> - URL checks: 3\n> - Attachment checks: 3\n",
         "extra": {},
         "score": 6.0,
         "level": "MALICIOUS",
-        "score_policy": "auto",
-        "observables": []
+        "origin_investigation_id": "01KD15RP97T6T9XVA34X4E7BGN",
+        "observable_links": [],
+        "key": "chk:email_risk_aggregated:full",
+        "score_display": "6.00"
       },
       {
-        "key": "chk:ai:full",
         "check_id": "ai",
         "scope": "full",
         "description": "ai",
@@ -493,8 +1586,10 @@
         "extra": {},
         "score": 0.0,
         "level": "MALICIOUS",
-        "score_policy": "auto",
-        "observables": []
+        "origin_investigation_id": "01KD15RP98BZW44YHMXCAHS5C8",
+        "observable_links": [],
+        "key": "chk:ai:full",
+        "score_display": "0.00"
       }
     ]
   },
@@ -521,131 +1616,141 @@
   },
   "threat_intels": {
     "ti:vt:obs:domain-name:dmalicious.com": {
-      "key": "ti:vt:obs:domain-name:dmalicious.com",
       "source": "VT",
       "observable_key": "obs:domain-name:dmalicious.com",
       "comment": "",
       "extra": {},
       "score": 1.0,
       "level": "NOTABLE",
-      "taxonomies": []
+      "taxonomies": [],
+      "key": "ti:vt:obs:domain-name:dmalicious.com",
+      "score_display": "1.00"
     },
     "ti:abuseipdb:obs:ipv4-addr:8.1.2.3": {
-      "key": "ti:abuseipdb:obs:ipv4-addr:8.1.2.3",
       "source": "ABUSEIPDB",
       "observable_key": "obs:ipv4-addr:8.1.2.3",
       "comment": "",
       "extra": {},
       "score": 2.0,
       "level": "NOTABLE",
-      "taxonomies": []
+      "taxonomies": [],
+      "key": "ti:abuseipdb:obs:ipv4-addr:8.1.2.3",
+      "score_display": "2.00"
     },
     "ti:vt:obs:email-addr:noreply@dmalicious.com": {
-      "key": "ti:vt:obs:email-addr:noreply@dmalicious.com",
       "source": "VT",
       "observable_key": "obs:email-addr:noreply@dmalicious.com",
       "comment": "> test",
       "extra": {},
       "score": 0.0,
       "level": "INFO",
-      "taxonomies": []
+      "taxonomies": [],
+      "key": "ti:vt:obs:email-addr:noreply@dmalicious.com",
+      "score_display": "0.00"
     },
     "ti:proofpoint:obs:email-addr:noreply@dmalicious.com": {
-      "key": "ti:proofpoint:obs:email-addr:noreply@dmalicious.com",
       "source": "PROOFPOINT",
       "observable_key": "obs:email-addr:noreply@dmalicious.com",
       "comment": "> test",
       "extra": {},
       "score": 5.0,
       "level": "MALICIOUS",
-      "taxonomies": []
+      "taxonomies": [],
+      "key": "ti:proofpoint:obs:email-addr:noreply@dmalicious.com",
+      "score_display": "5.00"
     },
     "ti:vt:obs:url:https://virus.com/payload.exe": {
-      "key": "ti:vt:obs:url:https://virus.com/payload.exe",
       "source": "VT",
       "observable_key": "obs:url:https://virus.com/payload.exe",
       "comment": "",
       "extra": {},
       "score": 5.0,
       "level": "MALICIOUS",
-      "taxonomies": []
+      "taxonomies": [],
+      "key": "ti:vt:obs:url:https://virus.com/payload.exe",
+      "score_display": "5.00"
     },
     "ti:vt:obs:url:https://virus.com/about": {
-      "key": "ti:vt:obs:url:https://virus.com/about",
       "source": "VT",
       "observable_key": "obs:url:https://virus.com/about",
       "comment": "",
       "extra": {},
       "score": 3.0,
       "level": "SUSPICIOUS",
-      "taxonomies": []
+      "taxonomies": [],
+      "key": "ti:vt:obs:url:https://virus.com/about",
+      "score_display": "3.00"
     },
     "ti:vt:obs:url:https://domain.com/ok/toto": {
-      "key": "ti:vt:obs:url:https://domain.com/ok/toto",
       "source": "VT",
       "observable_key": "obs:url:https://domain.com/ok/toto",
       "comment": "",
       "extra": {},
       "score": -1.0,
       "level": "TRUSTED",
-      "taxonomies": []
+      "taxonomies": [],
+      "key": "ti:vt:obs:url:https://domain.com/ok/toto",
+      "score_display": "-1.00"
     },
     "ti:vt:obs:domain-name:virus.com": {
-      "key": "ti:vt:obs:domain-name:virus.com",
       "source": "VT",
       "observable_key": "obs:domain-name:virus.com",
       "comment": "",
       "extra": {},
       "score": 3.0,
       "level": "SUSPICIOUS",
-      "taxonomies": []
+      "taxonomies": [],
+      "key": "ti:vt:obs:domain-name:virus.com",
+      "score_display": "3.00"
     },
     "ti:vt:obs:domain-name:domain.com": {
-      "key": "ti:vt:obs:domain-name:domain.com",
       "source": "VT",
       "observable_key": "obs:domain-name:domain.com",
       "comment": "",
       "extra": {},
       "score": 0.0,
       "level": "INFO",
-      "taxonomies": []
+      "taxonomies": [],
+      "key": "ti:vt:obs:domain-name:domain.com",
+      "score_display": "0.00"
     },
     "ti:vt:obs:file:md5:d41d8cd98f00b204e9800998ecf8427e": {
-      "key": "ti:vt:obs:file:md5:d41d8cd98f00b204e9800998ecf8427e",
       "source": "VT",
       "observable_key": "obs:file:md5:d41d8cd98f00b204e9800998ecf8427e",
       "comment": "MD5 hash analysis",
       "extra": {},
       "score": 10.0,
       "level": "MALICIOUS",
-      "taxonomies": []
+      "taxonomies": [],
+      "key": "ti:vt:obs:file:md5:d41d8cd98f00b204e9800998ecf8427e",
+      "score_display": "10.00"
     },
     "ti:malwarebazaar:obs:file:invoice.pdf": {
-      "key": "ti:malwarebazaar:obs:file:invoice.pdf",
       "source": "MALWAREBAZAAR",
       "observable_key": "obs:file:invoice.pdf",
       "comment": "Known malware: invoice.pdf",
       "extra": {},
       "score": 10.0,
       "level": "MALICIOUS",
-      "taxonomies": []
+      "taxonomies": [],
+      "key": "ti:malwarebazaar:obs:file:invoice.pdf",
+      "score_display": "10.00"
     }
   },
   "enrichments": {
     "enr:receiver:1528478e": {
-      "key": "enr:receiver:1528478e",
       "name": "receiver",
       "data": {
         "receiver": [
           "ok"
         ]
       },
-      "context": "from splunk"
+      "context": "from splunk",
+      "key": "enr:receiver:1528478e"
     }
   },
   "containers": {
     "ctr:emails": {
-      "key": "ctr:emails",
       "path": "emails",
       "description": "",
       "checks": [
@@ -654,11 +1759,11 @@
         "chk:receiver:header"
       ],
       "sub_containers": {},
+      "key": "ctr:emails",
       "aggregated_score": 7.1,
       "aggregated_level": "MALICIOUS"
     },
     "ctr:bodies-urls": {
-      "key": "ctr:bodies-urls",
       "path": "bodies-urls",
       "description": "Bodies URLs Analysis",
       "checks": [
@@ -667,11 +1772,11 @@
         "chk:body-url-https://domain.com/ok/toto:body"
       ],
       "sub_containers": {},
+      "key": "ctr:bodies-urls",
       "aggregated_score": 8.0,
       "aggregated_level": "MALICIOUS"
     },
     "ctr:bodies-domains": {
-      "key": "ctr:bodies-domains",
       "path": "bodies-domains",
       "description": "Bodies Domains Analysis",
       "checks": [
@@ -679,28 +1784,29 @@
         "chk:body-domain-domain.com:body"
       ],
       "sub_containers": {},
+      "key": "ctr:bodies-domains",
       "aggregated_score": 5.0,
       "aggregated_level": "MALICIOUS"
     },
     "ctr:attachments": {
-      "key": "ctr:attachments",
       "path": "attachments",
       "description": "Email Attachments Analysis",
       "checks": [
         "chk:attachment-invoice.pdf:attachment"
       ],
       "sub_containers": {},
+      "key": "ctr:attachments",
       "aggregated_score": 10.0,
       "aggregated_level": "MALICIOUS"
     },
     "ctr:risk_assessment": {
-      "key": "ctr:risk_assessment",
       "path": "risk_assessment",
       "description": "Aggregated Risk Analysis",
       "checks": [
         "chk:email_risk_aggregated:full"
       ],
       "sub_containers": {},
+      "key": "ctr:risk_assessment",
       "aggregated_score": 6.0,
       "aggregated_level": "MALICIOUS"
     }
@@ -787,5 +1893,6 @@
   "data_extraction": {
     "root_type": "artifact",
     "score_mode": "max"
-  }
+  },
+  "score_display": "36.10"
 }

@@ -84,6 +84,8 @@ class SharedInvestigationContext:
     """
     Shared context for cross-task observable/check/enrichment sharing.
 
+    Initialize with a Cyvest instance; the canonical state is its investigation.
+
     Invariants:
     - The canonical state lives in `_main_investigation`.
     - All merges are atomic: merge + registry refresh happen in a single critical section.
@@ -93,18 +95,21 @@ class SharedInvestigationContext:
 
     def __init__(
         self,
-        root_investigation: Investigation,
+        root_cyvest: Cyvest,
         *,
         lock: threading.RLock | None = None,
         max_async_workers: int | None = None,
     ) -> None:
+        if not isinstance(root_cyvest, Cyvest):
+            raise TypeError("SharedInvestigationContext expects a Cyvest instance. Use Cyvest.shared_context().")
         self._lock = _SharedLock(lock, max_async_workers=max_async_workers)
-        self._main_investigation = root_investigation
+        self._main_cyvest = root_cyvest
+        self._main_investigation = root_cyvest._investigation
 
         self._root_type = (
-            "artifact" if root_investigation._root_observable.obs_type == ObservableType.ARTIFACT else "file"
+            "artifact" if self._main_investigation._root_observable.obs_type == ObservableType.ARTIFACT else "file"
         )
-        self._score_mode = root_investigation._score_engine._score_mode
+        self._score_mode = self._main_investigation._score_engine._score_mode
 
         self._observable_registry: dict[str, Observable] = {}
         self._check_registry: dict[str, Check] = {}
@@ -223,11 +228,11 @@ class SharedInvestigationContext:
     # Lookups (deep-copied snapshots only)
     # ---------------------------------------------------------------------
 
-    def observable_get(self, obs_type: str | ObservableType, value: str) -> Observable | None:
+    def observable_get(self, obs_type: ObservableType, value: str) -> Observable | None:
         key = self._observable_key(obs_type, value)
         return self._lock.run(self._get_observable_by_key_unlocked, key)
 
-    async def observable_aget(self, obs_type: str | ObservableType, value: str) -> Observable | None:
+    async def observable_aget(self, obs_type: ObservableType, value: str) -> Observable | None:
         key = self._observable_key(obs_type, value)
         return await self._lock.arun(self._get_observable_by_key_unlocked, key)
 
@@ -239,11 +244,9 @@ class SharedInvestigationContext:
         copy._from_shared_context = True
         return copy
 
-    def _observable_key(self, obs_type: str | ObservableType, value: str) -> str:
-        if isinstance(obs_type, ObservableType):
-            obs_type = obs_type.value
+    def _observable_key(self, obs_type: ObservableType, value: str) -> str:
         try:
-            return keys.generate_observable_key(obs_type, value)
+            return keys.generate_observable_key(obs_type.value, value)
         except Exception as e:
             raise ValueError(f"Failed to generate observable key for type='{obs_type}', value='{value}': {e}") from e
 
@@ -305,18 +308,14 @@ class SharedInvestigationContext:
     async def aget_global_level(self) -> Level:
         return await self._lock.arun(self._main_investigation.get_global_level)
 
-    def observables_list_by_type(self, obs_type: ObservableType | str) -> list[Observable]:
+    def observables_list_by_type(self, obs_type: ObservableType) -> list[Observable]:
         return self._lock.run(self._observables_list_by_type_unlocked, obs_type)
 
-    async def observables_alist_by_type(self, obs_type: ObservableType | str) -> list[Observable]:
+    async def observables_alist_by_type(self, obs_type: ObservableType) -> list[Observable]:
         return await self._lock.arun(self._observables_list_by_type_unlocked, obs_type)
 
-    def _observables_list_by_type_unlocked(self, obs_type: ObservableType | str) -> list[Observable]:
-        if isinstance(obs_type, ObservableType):
-            matches = [obs for obs in self._observable_registry.values() if obs.obs_type == obs_type]
-        else:
-            normalized = obs_type.strip().lower()
-            matches = [obs for obs in self._observable_registry.values() if obs.obs_type.value == normalized]
+    def _observables_list_by_type_unlocked(self, obs_type: ObservableType) -> list[Observable]:
+        matches = [obs for obs in self._observable_registry.values() if obs.obs_type == obs_type]
 
         results: list[Observable] = []
         for obs in matches:

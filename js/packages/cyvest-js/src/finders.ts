@@ -288,24 +288,6 @@ export function findChecksByCheckId(
   return result;
 }
 
-/**
- * Find checks with score policy set to manual.
- *
- * @param inv - The investigation to search
- * @returns Array of manually scored checks
- */
-export function findManuallyScored(inv: CyvestInvestigation): Check[] {
-  const result: Check[] = [];
-  for (const checks of Object.values(inv.checks)) {
-    for (const check of checks) {
-      if (check.score_policy === "manual") {
-        result.push(check);
-      }
-    }
-  }
-  return result;
-}
-
 // ============================================================================
 // Threat Intel Finders
 // ============================================================================
@@ -434,12 +416,34 @@ export function getChecksForObservable(
   observableKey: string
 ): Check[] {
   const result: Check[] = [];
+  const seen = new Set<string>();
+  const checkLookup = new Map<string, Check>();
 
   for (const checks of Object.values(inv.checks)) {
     for (const check of checks) {
-      if (check.observables.includes(observableKey)) {
+      checkLookup.set(check.key, check);
+    }
+  }
+
+  const observable = inv.observables[observableKey];
+  if (observable) {
+    for (const checkKey of observable.check_links) {
+      const check = checkLookup.get(checkKey);
+      if (check && !seen.has(check.key)) {
         result.push(check);
+        seen.add(check.key);
       }
+    }
+  }
+
+  for (const check of checkLookup.values()) {
+    if (seen.has(check.key)) {
+      continue;
+    }
+
+    if (check.observable_links.some((link) => link.observable_key === observableKey)) {
+      result.push(check);
+      seen.add(check.key);
     }
   }
 
@@ -486,7 +490,12 @@ export function getObservablesForCheck(
   for (const checks of Object.values(inv.checks)) {
     for (const check of checks) {
       if (check.key === checkKey) {
-        return check.observables
+        const keys = new Set<string>();
+        for (const link of check.observable_links) {
+          keys.add(link.observable_key);
+        }
+
+        return Array.from(keys)
           .map((obsKey) => inv.observables[obsKey])
           .filter((obs): obs is Observable => obs !== undefined);
       }

@@ -4,11 +4,10 @@ Tests for the JSON Schema generator and CLI command.
 
 from __future__ import annotations
 
-from jsonschema import Draft202012Validator
+import pytest
 
 from cyvest import Cyvest
 from cyvest.io_schema import get_investigation_schema
-from cyvest.levels import Level
 from cyvest.model import Check, Container, Observable, ThreatIntel
 from cyvest.model_schema import InvestigationSchema
 
@@ -16,13 +15,15 @@ from cyvest.model_schema import InvestigationSchema
 def _sample_investigation() -> Cyvest:
     """Create a minimal investigation for schema validation."""
     cv = Cyvest()
-    obs = cv.observable("domain-name", "example.com", internal=False)
+    obs = cv.observable(Cyvest.OBS.DOMAIN_NAME, "example.com", internal=False)
     cv.check("domain_check", "network", "Validate domain").link_observable(obs)
     return cv
 
 
 def test_schema_validates_serialized_output() -> None:
     """Schema accepts data produced by the serializer."""
+    jsonschema = pytest.importorskip("jsonschema")
+    Draft202012Validator = jsonschema.Draft202012Validator
     schema = get_investigation_schema()
     validator = Draft202012Validator(schema)
     investigation_schema = _sample_investigation().io_to_invest()
@@ -47,7 +48,7 @@ def test_level_required_in_serialization_schema() -> None:
         if model is Observable:
             assert {"score", "threat_intels", "relationships", "internal", "whitelisted"} <= required
         if model is Check:
-            assert {"observables", "score"} <= required
+            assert {"origin_investigation_id", "observable_links", "score"} <= required
 
 
 def test_container_aggregated_level_schema() -> None:
@@ -69,7 +70,7 @@ def test_container_aggregated_level_schema() -> None:
         if "$ref" in subschema:
             return str(subschema["$ref"]).endswith("Level")
         if "enum" in subschema:
-            return set(subschema["enum"]) >= {level.value for level in Level}
+            return set(subschema["enum"]) >= {level.value for level in Cyvest.LVL}
         return False
 
     if "allOf" in agg_level_schema:
@@ -87,6 +88,7 @@ def test_investigation_schema_level_required_and_defaults() -> None:
 
     required = set(schema.get("required", []))
     assert {
+        "investigation_id",
         "started_at",
         "level",
         "whitelists",
@@ -100,6 +102,7 @@ def test_investigation_schema_level_required_and_defaults() -> None:
 
     inst = InvestigationSchema.model_validate(
         {
+            "investigation_id": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
             "started_at": "2020-01-01T00:00:00+00:00",
             "score": 0.0,
             "whitelisted": False,
@@ -124,7 +127,7 @@ def test_investigation_schema_level_required_and_defaults() -> None:
             "data_extraction": {"root_type": None, "score_mode": "max"},
         }
     )
-    assert inst.level == Level.NONE
+    assert inst.level == Cyvest.LVL.NONE
     assert inst.whitelists == []
     assert inst.observables == {}
     assert inst.checks == {}

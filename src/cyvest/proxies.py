@@ -12,19 +12,20 @@ from __future__ import annotations
 
 from copy import deepcopy
 from decimal import Decimal
-from typing import TYPE_CHECKING, Any, Generic, Literal, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
-from cyvest.levels import Level, normalize_level
+from cyvest.levels import Level
 from cyvest.model import (
     Check,
-    CheckScorePolicy,
     Container,
     Enrichment,
     Observable,
+    ObservableLink,
     ObservableType,
     Relationship,
     ThreatIntel,
 )
+from cyvest.model_enums import PropagationMode, RelationshipDirection, RelationshipType
 
 if TYPE_CHECKING:
     from cyvest.investigation import Investigation
@@ -59,8 +60,6 @@ class _ReadOnlyProxy(Generic[_T]):
     def _read_attr(self, name: str):
         """Resolve and deep-copy a public attribute from the model."""
         model = self._resolve()
-        if not hasattr(model, name):
-            raise AttributeError(f"{self.__class__.__name__} exposes no attribute '{name}'")
         value = getattr(model, name)
         if callable(value):
             raise AttributeError(
@@ -142,18 +141,14 @@ class ObservableProxy(_ReadOnlyProxy[Observable]):
         return self._read_attr("relationships")
 
     @property
-    def _generated_by_checks(self) -> list[str]:
-        return self._read_attr("_generated_by_checks")
+    def check_links(self) -> list[str]:
+        """Checks that currently link to this observable."""
+        return self._read_attr("check_links")
 
-    @property
-    def generated_by_checks(self) -> list[str]:
-        """Alias for generated-by checks with a stable public name."""
-        return deepcopy(self._generated_by_checks)
-
-    def get_score_history(self) -> tuple:
-        """Return a copy of the score change history."""
-        history = self._call_readonly("get_score_history")
-        return tuple(history)
+    def get_audit_events(self) -> tuple:
+        """Return audit events for this observable."""
+        events = self._get_investigation().get_audit_events(object_type="observable", object_key=self.key)
+        return tuple(events)
 
     def update_metadata(
         self,
@@ -194,17 +189,14 @@ class ObservableProxy(_ReadOnlyProxy[Observable]):
     def with_ti(
         self,
         source: str,
-        score: Decimal | float | None = None,
+        score: Decimal | float,
         comment: str = "",
         extra: dict[str, Any] | None = None,
-        level: Level | str | None = None,
+        level: Level | None = None,
         taxonomies: list[dict[str, Any]] | None = None,
     ) -> ObservableProxy:
         """
         Attach threat intelligence to this observable.
-
-        Mirrors the previous DSL handler convenience method but keeps mutations
-        under the proxy wrapper.
         """
         observable = self._resolve()
         ti_kwargs: dict[str, Any] = {
@@ -212,12 +204,11 @@ class ObservableProxy(_ReadOnlyProxy[Observable]):
             "observable_key": self.key,
             "comment": comment,
             "extra": extra or {},
+            "score": Decimal(str(score)),
             "taxonomies": taxonomies or [],
         }
-        if score is not None:
-            ti_kwargs["score"] = Decimal(str(score))
         if level is not None:
-            ti_kwargs["level"] = normalize_level(level)
+            ti_kwargs["level"] = level
         ti = ThreatIntel(**ti_kwargs)
         self._get_investigation().add_threat_intel(ti, observable)
         return self
@@ -225,10 +216,10 @@ class ObservableProxy(_ReadOnlyProxy[Observable]):
     def add_ti(
         self,
         source: str,
-        score: Decimal | float = 0,
+        score: Decimal | float,
         comment: str = "",
         extra: dict[str, Any] | None = None,
-        level: Level | str | None = None,
+        level: Level | None = None,
         taxonomies: list[dict[str, Any]] | None = None,
     ) -> ObservableProxy:
         """Alias for :meth:`with_ti`."""
@@ -237,8 +228,8 @@ class ObservableProxy(_ReadOnlyProxy[Observable]):
     def relate_to(
         self,
         target: Observable | ObservableProxy | str,
-        relationship_type: str,
-        direction: str | None = None,
+        relationship_type: RelationshipType,
+        direction: RelationshipDirection | None = None,
     ) -> ObservableProxy:
         """Create a relationship to another observable."""
         if isinstance(target, ObservableProxy):
@@ -253,7 +244,12 @@ class ObservableProxy(_ReadOnlyProxy[Observable]):
         self._get_investigation().add_relationship(self.key, resolved_target, relationship_type, direction)
         return self
 
-    def link_check(self, check: Check | CheckProxy | str) -> ObservableProxy:
+    def link_check(
+        self,
+        check: Check | CheckProxy | str,
+        *,
+        propagation_mode: PropagationMode = PropagationMode.LOCAL_ONLY,
+    ) -> ObservableProxy:
         """Link this observable to a check."""
         if isinstance(check, CheckProxy):
             check_key = check.key
@@ -264,7 +260,7 @@ class ObservableProxy(_ReadOnlyProxy[Observable]):
         else:
             raise TypeError("Check must provide a key.")
 
-        self._get_investigation().link_check_observable(check_key, self.key)
+        self._get_investigation().link_check_observable(check_key, self.key, propagation_mode=propagation_mode)
         return self
 
 
@@ -310,17 +306,17 @@ class CheckProxy(_ReadOnlyProxy[Check]):
         return self._read_attr("level")
 
     @property
-    def observables(self) -> list[Observable]:
-        return self._read_attr("observables")
+    def origin_investigation_id(self) -> str:
+        return self._read_attr("origin_investigation_id")
 
     @property
-    def score_policy(self) -> CheckScorePolicy:
-        return self._read_attr("score_policy")
+    def observable_links(self) -> list[ObservableLink]:
+        return self._read_attr("observable_links")
 
-    def get_score_history(self) -> tuple:
-        """Return a copy of the score change history."""
-        history = self._call_readonly("get_score_history")
-        return tuple(history)
+    def get_audit_events(self) -> tuple:
+        """Return audit events for this check."""
+        events = self._get_investigation().get_audit_events(object_type="check", object_key=self.key)
+        return tuple(events)
 
     def update_metadata(
         self,
@@ -328,7 +324,6 @@ class CheckProxy(_ReadOnlyProxy[Check]):
         comment: str | None = None,
         description: str | None = None,
         extra: dict[str, Any] | None = None,
-        score_policy: CheckScorePolicy | Literal["auto", "manual"] | None = None,
         merge_extra: bool = True,
     ) -> CheckProxy:
         """Update mutable metadata on the check."""
@@ -339,8 +334,6 @@ class CheckProxy(_ReadOnlyProxy[Check]):
             updates["description"] = description
         if extra is not None:
             updates["extra"] = extra
-        if score_policy is not None:
-            updates["score_policy"] = score_policy
 
         if not updates:
             return self
@@ -348,19 +341,6 @@ class CheckProxy(_ReadOnlyProxy[Check]):
         dict_merge = {"extra": merge_extra} if extra is not None else None
         self._get_investigation().update_model_metadata("check", self.key, updates, dict_merge=dict_merge)
         return self
-
-    def set_score_policy(self, policy: CheckScorePolicy | Literal["auto", "manual"]) -> CheckProxy:
-        """Switch between AUTO (default) and MANUAL scoring behavior."""
-        self.update_metadata(score_policy=policy)
-        return self
-
-    def disable_auto_score(self) -> CheckProxy:
-        """Convenience: prevent observables from updating this check."""
-        return self.set_score_policy(CheckScorePolicy.MANUAL)
-
-    def enable_auto_score(self) -> CheckProxy:
-        """Convenience: allow observables to update this check (default)."""
-        return self.set_score_policy(CheckScorePolicy.AUTO)
 
     def in_container(self, container: Container | ContainerProxy | str) -> CheckProxy:
         """Add this check to a container."""
@@ -376,7 +356,12 @@ class CheckProxy(_ReadOnlyProxy[Check]):
         self._get_investigation().add_check_to_container(container_key, self.key)
         return self
 
-    def link_observable(self, observable: Observable | ObservableProxy | str) -> CheckProxy:
+    def link_observable(
+        self,
+        observable: Observable | ObservableProxy | str,
+        *,
+        propagation_mode: PropagationMode = PropagationMode.LOCAL_ONLY,
+    ) -> CheckProxy:
         """Link an observable to this check."""
         if isinstance(observable, ObservableProxy):
             observable_key = observable.key
@@ -387,13 +372,13 @@ class CheckProxy(_ReadOnlyProxy[Check]):
         else:
             raise TypeError("Observable must provide a key.")
 
-        self._get_investigation().link_check_observable(self.key, observable_key)
+        self._get_investigation().link_check_observable(self.key, observable_key, propagation_mode=propagation_mode)
         return self
 
     def with_score(self, score: Decimal | float, reason: str = "") -> CheckProxy:
         """Update the check's score."""
         check = self._resolve()
-        check.update_score(Decimal(str(score)), reason)
+        self._get_investigation().apply_score_change(check, Decimal(str(score)), reason=reason)
         return self
 
 
@@ -515,7 +500,7 @@ class ThreatIntelProxy(_ReadOnlyProxy[ThreatIntel]):
         *,
         comment: str | None = None,
         extra: dict[str, Any] | None = None,
-        level: Level | str | None = None,
+        level: Level | None = None,
         merge_extra: bool = True,
     ) -> ThreatIntelProxy:
         """Update mutable metadata on the threat intel entry."""
@@ -525,7 +510,7 @@ class ThreatIntelProxy(_ReadOnlyProxy[ThreatIntel]):
         if extra is not None:
             updates["extra"] = extra
         if level is not None:
-            updates["level"] = normalize_level(level)
+            updates["level"] = level
 
         if not updates:
             return self

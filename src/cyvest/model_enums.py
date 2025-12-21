@@ -72,8 +72,8 @@ class RelationshipType(str, Enum):
         return RelationshipDirection.BIDIRECTIONAL
 
 
-class CheckScorePolicy(str, Enum):
-    """Controls how a check reacts to linked observables."""
+class PropagationMode(str, Enum):
+    """Controls how a Check↔Observable link propagates across merged investigations."""
 
-    AUTO = "auto"  # Default: observables can update the check score/level
-    MANUAL = "manual"  # Score/level only change via explicit check updates
+    LOCAL_ONLY = "LOCAL_ONLY"
+    GLOBAL = "GLOBAL"

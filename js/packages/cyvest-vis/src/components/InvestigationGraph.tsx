@@ -18,7 +18,6 @@ import {
 import "@xyflow/react/dist/style.css";
 
 import type { CyvestInvestigation, Check, Container } from "@cyvest/cyvest-js";
-import { findRootObservables } from "@cyvest/cyvest-js";
 
 import type {
   InvestigationGraphProps,
@@ -67,13 +66,21 @@ function createInvestigationGraph(
   const nodes: Node<InvestigationNodeData>[] = [];
   const edges: Edge[] = [];
 
-  // Find root observable(s)
-  const roots = findRootObservables(investigation);
-  const primaryRoot = roots.length > 0 ? roots[0] : null;
+  const rootType = investigation.data_extraction.root_type;
+  const normalizedRootType = rootType?.toLowerCase().trim();
+  const rootsByType = normalizedRootType
+    ? Object.values(investigation.observables).filter(
+        (obs) => obs.type.toLowerCase() === normalizedRootType
+      )
+    : [];
+  const primaryRoot = rootsByType[0] ?? null;
 
   // If no root found, use the first observable or create a placeholder
-  const rootKey = primaryRoot?.key ?? "investigation-root";
-  const rootValue = primaryRoot?.value ?? "Investigation";
+  const rootKey = primaryRoot?.key ?? investigation.investigation_id;
+  const rootValue =
+    primaryRoot?.value ??
+    investigation.investigation_name ??
+    investigation.investigation_id;
   const rootLevel = primaryRoot?.level ?? investigation.level;
 
   // Create root node

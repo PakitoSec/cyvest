@@ -1,13 +1,14 @@
 # SharedInvestigationContext
 
-> **Note**: This is an advanced feature that requires direct import from `cyvest.shared`. It is not part of the main `Cyvest` facade API.
+> **Note**: This is an advanced feature. You can create it via `Cyvest.shared_context()` or import `SharedInvestigationContext` directly.
 
 ## Overview
 
 The `SharedInvestigationContext` enables safe sharing of observables and checks across concurrent tasks (threads or asyncio). This allows tasks to reuse and reference observables created by other tasks, preventing duplication and enabling aggregated checks.
 
-**Usage**: Import directly from the shared module:
+**Usage**: Create from a Cyvest instance or import directly from the shared module:
 ```python
+from cyvest import Cyvest
 from cyvest.shared import SharedInvestigationContext
 ```
 
@@ -23,18 +24,17 @@ from cyvest.shared import SharedInvestigationContext
 ## Basic Usage
 
 ```python
-from cyvest.shared import SharedInvestigationContext
-from cyvest import ObservableType
-from concurrent.futures import ThreadPoolExecutor
+from cyvest import Cyvest
 
-# Create a shared context from the main investigation
-shared_context = SharedInvestigationContext(main_investigation)
+# Create a shared context from the main Cyvest instance
+main_cy = Cyvest(main_data, root_type="artifact")
+shared_context = main_cy.shared_context()
 
 # Use in a worker with auto-reconcile
 def my_worker(shared_context):
     with shared_context.create_cyvest() as cy:
         data = cy.root().extra
-        cy.observable(ObservableType.EMAIL_ADDR, data.get("email"))
+        cy.observable(cy.OBS.EMAIL_ADDR, data.get("email"))
 ```
 
 ## Cross-Task Observable Sharing
@@ -42,22 +42,20 @@ def my_worker(shared_context):
 Tasks can access observables created by other tasks:
 
 ```python
-from cyvest import ObservableType, RelationshipType
-
 def email_from(shared_context):
     with shared_context.create_cyvest() as cy:
         data = cy.root().extra
-        cy.observable(ObservableType.DOMAIN_NAME, data.get("domain"))
+        cy.observable(cy.OBS.DOMAIN_NAME, data.get("domain"))
 
 
 def bodies_url(shared_context):
     with shared_context.create_cyvest() as cy:
         data = cy.root().extra
-        domain_info = shared_context.observable_get(ObservableType.DOMAIN_NAME, "malicious.com")
+        domain_info = shared_context.observable_get(cy.OBS.DOMAIN_NAME, "malicious.com")
         if domain_info:
-            cy.observable(ObservableType.URL, data.get("url")).relate_to(
-                cy.observable(ObservableType.DOMAIN_NAME, domain_info.value),
-                RelationshipType.RELATED_TO,
+            cy.observable(cy.OBS.URL, data.get("url")).relate_to(
+                cy.observable(cy.OBS.DOMAIN_NAME, domain_info.value),
+                cy.REL.RELATED_TO,
             )
 ```
 
@@ -68,13 +66,13 @@ def bodies_url(shared_context):
 #### Constructor
 ```python
 SharedInvestigationContext(
-    main_investigation: Investigation,
+    main_cyvest: Cyvest,
     *,
     lock: threading.RLock | None = None,
     max_async_workers: int | None = None,
 )
 ```
-Creates a shared context from a main investigation. Automatically inherits `root_type`, `score_mode`, and `data`.
+Creates a shared context from a main Cyvest instance. Automatically inherits `root_type`, `score_mode`, and `data`.
 `max_async_workers` (optional) limits concurrent async callers.
 
 #### Methods
@@ -83,7 +81,7 @@ Creates a shared context from a main investigation. Automatically inherits `root
 Returns a context manager that creates a `Cyvest` instance and auto-reconciles on exit.
 
 **Parameters:**
-- `data`: Optional override data (defaults to main investigation's data)
+- `data`: Optional override data (defaults to the main Cyvest root data)
 
 **Returns:** Context manager yielding a `Cyvest` instance
 
@@ -106,25 +104,27 @@ Manually merges observables and checks from a source into the shared context.
 ##### `areconcile(source: Cyvest | Investigation) -> None`
 Async equivalent of `reconcile()`. Runs the entire critical section in a worker thread.
 
-##### `observable_get(obs_type: str | ObservableType, value: str) -> Observable | None`
+##### `observable_get(obs_type: ObservableType, value: str) -> Observable | None`
 Retrieves a shared observable by type and value.
 
 **Parameters:**
-- `obs_type`: Observable type (string like `"email-addr"` or `ObservableType` enum)
+- `obs_type`: Observable type (use `Cyvest.OBS.*` for the official vocabulary)
 - `value`: Observable value
 
 **Returns:** Deep copy of the observable, or `None` if not found
 
 **Examples:**
 ```python
-domain = shared_context.observable_get(ObservableType.DOMAIN_NAME, "malicious.com")
-email = shared_context.observable_get("email-addr", "user@example.com")
+from cyvest import Cyvest
+
+domain = shared_context.observable_get(Cyvest.OBS.DOMAIN_NAME, "malicious.com")
+email = shared_context.observable_get(Cyvest.OBS.EMAIL_ADDR, "user@example.com")
 
 # Use in task to reference observables from other tasks
 if domain:
-    cy.observable(ObservableType.URL, "https://example.com").relate_to(
-        cy.observable(ObservableType.DOMAIN_NAME, domain.value),
-        RelationshipType.RELATED_TO,
+    cy.observable(cy.OBS.URL, "https://example.com").relate_to(
+        cy.observable(cy.OBS.DOMAIN_NAME, domain.value),
+        cy.REL.RELATED_TO,
     )
 ```
 
@@ -166,7 +166,7 @@ Thread-safe: Uses lock to ensure consistent read of investigation state.
 
 **Examples:**
 ```python
-shared = SharedInvestigationContext(main_inv)
+shared = main_cy.shared_context()
 markdown = shared.io_to_markdown()
 print(markdown)
 ```
@@ -186,7 +186,7 @@ Thread-safe: Uses lock to ensure consistent read. Relative paths are converted t
 
 **Examples:**
 ```python
-shared = SharedInvestigationContext(main_inv)
+shared = main_cy.shared_context()
 path = shared.io_save_markdown("report.md")
 print(path)  # /absolute/path/to/report.md
 
@@ -202,7 +202,7 @@ Thread-safe: Uses lock to ensure consistent read of investigation state.
 
 **Examples:**
 ```python
-shared = SharedInvestigationContext(main_inv)
+shared = main_cy.shared_context()
 schema = shared.io_to_invest()
 print(schema.score, schema.level)
 ```
@@ -219,12 +219,15 @@ Thread-safe: Uses lock to ensure consistent read. Relative paths are converted t
 
 **Examples:**
 ```python
-shared = SharedInvestigationContext(main_inv)
+shared = main_cy.shared_context()
 path = shared.io_save_json("investigation.json")
 print(path)  # /absolute/path/to/investigation.json
 ```
 
-> Access merged results by reusing the original `Investigation` instance you passed to `SharedInvestigationContext`; reconciliation mutates it in place.
+> Access merged results by reusing the original `Cyvest` instance you passed to `SharedInvestigationContext`; reconciliation mutates it in place.
+
+!!! note "Provenance-aware reconciliation"
+    `investigation_id` is serialized and checks carry canonical provenance (`origin_investigation_id`) for LOCAL_ONLY propagation.
 
 ## Thread Safety
 
@@ -243,7 +246,7 @@ from cyvest.shared import SharedInvestigationContext
 
 async def worker(shared: SharedInvestigationContext):
     async with shared.create_cyvest() as cy:
-        cy.observable(ObservableType.DOMAIN_NAME, "example.com")
+        cy.observable(cy.OBS.DOMAIN_NAME, "example.com")
 
 asyncio.run(worker(shared_context))
 ```

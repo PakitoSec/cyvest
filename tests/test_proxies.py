@@ -6,13 +6,13 @@ from decimal import Decimal
 
 import pytest
 
-from cyvest import Cyvest, Level
+from cyvest import Cyvest
 
 
 def test_observable_proxy_update_metadata() -> None:
     """ObservableProxy.update_metadata should patch safe fields in place."""
     cv = Cyvest()
-    obs = cv.observable_create("url", "https://example.com")
+    obs = cv.observable_create(Cyvest.OBS.URL, "https://example.com")
 
     obs.update_metadata(
         comment="Investigated",
@@ -52,7 +52,7 @@ def test_check_proxy_update_metadata() -> None:
 def test_threat_intel_proxy_update_metadata() -> None:
     """ThreatIntelProxy.update_metadata should allow comment/level/extra."""
     cv = Cyvest()
-    obs = cv.observable_create("domain-name", "example.com")
+    obs = cv.observable_create(Cyvest.OBS.DOMAIN_NAME, "example.com")
     ti = cv.observable_add_threat_intel(
         obs.key,
         source="vt",
@@ -62,9 +62,9 @@ def test_threat_intel_proxy_update_metadata() -> None:
     )
     assert ti is not None
 
-    ti.update_metadata(comment="Escalated", level=Level.MALICIOUS, extra={"confidence": "high"})
+    ti.update_metadata(comment="Escalated", level=Cyvest.LVL.MALICIOUS, extra={"confidence": "high"})
     assert ti.comment == "Escalated"
-    assert ti.level == Level.MALICIOUS
+    assert ti.level == Cyvest.LVL.MALICIOUS
     assert ti.extra["confidence"] == "high"
 
 
@@ -94,7 +94,7 @@ def test_container_proxy_update_metadata() -> None:
 def test_proxy_dir_exposes_public_fields() -> None:
     """Proxies should list readable dataclass fields for IDE auto-completion."""
     cv = Cyvest()
-    obs = cv.observable_create("url", "https://example.com")
+    obs = cv.observable_create(Cyvest.OBS.URL, "https://example.com")
     check = cv.check_create("check-id", "scope", "desc")
     container = cv.container_create("root")
     ti = cv.observable_add_threat_intel(obs.key, source="vt", score=Decimal("1"), comment="c")
@@ -111,8 +111,7 @@ def test_proxy_dir_exposes_public_fields() -> None:
             "extra",
             "score",
             "level",
-            "_generated_by_checks",
-            "generated_by_checks",
+            "check_links",
             "key",
         },
         check: {
@@ -123,10 +122,17 @@ def test_proxy_dir_exposes_public_fields() -> None:
             "extra",
             "score",
             "level",
-            "score_policy",
+            "origin_investigation_id",
+            "observable_links",
             "key",
         },
-        container: {"path", "description", "checks", "sub_containers", "key"},
+        container: {
+            "path",
+            "description",
+            "checks",
+            "sub_containers",
+            "key",
+        },
         ti: {
             "source",
             "observable_key",
@@ -152,7 +158,7 @@ def test_proxy_dir_exposes_public_fields() -> None:
 def test_proxy_public_fields_are_deep_copied() -> None:
     """Mutable model data exposed through proxies should be defensive copies."""
     cv = Cyvest()
-    obs = cv.observable_create("domain-name", "example.com")
+    obs = cv.observable_create(Cyvest.OBS.DOMAIN_NAME, "example.com")
     check = cv.check_create("check-id", "scope", "desc")
     linked_check = cv.check_link_observable(check.key, obs.key)
     assert linked_check is not None
@@ -169,10 +175,10 @@ def test_proxy_public_fields_are_deep_copied() -> None:
     extra_copy["owner"] = "secops"
     assert "owner" not in obs.extra
 
-    observables_copy = check.observables
-    assert len(observables_copy) == 1
-    observables_copy.clear()
-    assert len(check.observables) == 1
+    links_copy = check.observable_links
+    assert len(links_copy) == 1
+    links_copy.clear()
+    assert len(check.observable_links) == 1
 
     checks_copy = container.checks
     checks_copy.clear()
@@ -186,7 +192,7 @@ def test_proxy_public_fields_are_deep_copied() -> None:
     data_copy["host"]["ip"] = "10.0.0.2"
     assert enrichment.data["host"]["ip"] == "10.0.0.1"
 
-    generated_copy = obs.generated_by_checks
-    assert check.key in generated_copy
-    generated_copy.append("another-check")
-    assert obs.generated_by_checks == [check.key]
+    linked_copy = obs.check_links
+    assert check.key in linked_copy
+    linked_copy.append("another-check")
+    assert obs.check_links == [check.key]

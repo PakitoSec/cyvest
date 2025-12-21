@@ -74,11 +74,11 @@ Example skeleton:
 def test_observable_merges_by_key() -> None:
     cv = Cyvest()
 
-    first = cv.observable(ObservableType.URL, "https://example.com")
-    second = cv.observable(ObservableType.URL, "https://example.com")
+    first = cv.observable(cv.OBS.URL, "https://example.com")
+    second = cv.observable(cv.OBS.URL, "https://example.com")
 
     assert first.key == second.key
-    assert cv._investigation.get_observable(ObservableType.URL, "https://example.com") is not None
+    assert cv._investigation.get_observable(first.key) is not None
 ```
 
 ---

@@ -8,11 +8,11 @@ Model a complete investigation, link observables, and produce a shareable report
 
 ```python
 from decimal import Decimal
-from cyvest import Cyvest, Level, ObservableType
+from cyvest import Cyvest
 
 with Cyvest(data={"type": "email_analysis"}) as cv:
     phishing_url = cv.observable_create(
-        ObservableType.URL,
+        cv.OBS.URL,
         "https://fake-bank-login.com",
         internal=False,
     )
@@ -21,7 +21,7 @@ with Cyvest(data={"type": "email_analysis"}) as cv:
         phishing_url.key,
         source="virustotal",
         score=Decimal("8.5"),
-        level=Level.MALICIOUS,
+        level=cv.LVL.MALICIOUS,
         comment="Known phishing site",
     )
 
@@ -48,13 +48,13 @@ with Cyvest(data={"type": "email_analysis"}) as cv:
 
 ```python
 from decimal import Decimal
-from cyvest import Cyvest, Level, ObservableType, RelationshipType
+from cyvest import Cyvest
 
 with Cyvest() as cv:
     url = (
-        cv.observable(ObservableType.URL, "https://malicious.com", internal=False)
-        .with_ti("virustotal", score=Decimal("8.5"), level=Level.MALICIOUS)
-        .relate_to(cv.root(), RelationshipType.RELATED_TO)
+        cv.observable(cv.OBS.URL, "https://malicious.com", internal=False)
+        .with_ti("virustotal", score=Decimal("8.5"), level=cv.LVL.MALICIOUS)
+        .relate_to(cv.root(), cv.REL.RELATED_TO)
     )
 
     (
@@ -67,42 +67,42 @@ with Cyvest() as cv:
 **Why the fluent helpers?**
 
 - Deterministic keys let you merge multiple builders without collisions.
-- Relationships default to bidirectional; override direction when you need hierarchy.
+- Relationships use the semantic default direction for known types (e.g., `RELATED_TO` → `BIDIRECTIONAL`); override when you need hierarchy.
 
 ---
 
 ## 3. Capture relationships with intent
 
 ```python
-from cyvest import ObservableType, RelationshipDirection, RelationshipType
+from cyvest import Cyvest
 
 with Cyvest() as cv:
-    url = cv.observable_create(ObservableType.URL, "http://c2-server.com")
-    ip = cv.observable_create(ObservableType.IPV4_ADDR, "192.0.2.100", internal=False)
-    cv.observable_add_relationship(url, ip, RelationshipType.RELATED_TO)  # BIDIRECTIONAL
+    url = cv.observable_create(cv.OBS.URL, "http://c2-server.com")
+    ip = cv.observable_create(cv.OBS.IPV4_ADDR, "192.0.2.100", internal=False)
+    cv.observable_add_relationship(url, ip, cv.REL.RELATED_TO)  # BIDIRECTIONAL
 
     domain = (
-        cv.observable(ObservableType.DOMAIN_NAME, "c2-server.com", internal=False)
-        .relate_to(ip, RelationshipType.RELATED_TO)
+        cv.observable(cv.OBS.DOMAIN_NAME, "c2-server.com", internal=False)
+        .relate_to(ip, cv.REL.RELATED_TO)
     )
 
-    host1 = cv.observable_create(ObservableType.IPV4_ADDR, "10.0.1.10", internal=True)
-    host2 = cv.observable_create(ObservableType.IPV4_ADDR, "10.0.1.20", internal=True)
-    cv.observable_add_relationship(host1, host2, RelationshipType.RELATED_TO)  # BIDIRECTIONAL
+    host1 = cv.observable_create(cv.OBS.IPV4_ADDR, "10.0.1.10", internal=True)
+    host2 = cv.observable_create(cv.OBS.IPV4_ADDR, "10.0.1.20", internal=True)
+    cv.observable_add_relationship(host1, host2, cv.REL.RELATED_TO)  # BIDIRECTIONAL
 
-    malware = cv.observable_create(ObservableType.FILE, "payload.exe", internal=False)
-    cv.observable_add_relationship(malware.key, url.key, RelationshipType.RELATED_TO)  # BIDIRECTIONAL
+    malware = cv.observable_create(cv.OBS.FILE, "payload.exe", internal=False)
+    cv.observable_add_relationship(malware.key, url.key, cv.REL.RELATED_TO)  # BIDIRECTIONAL
 
     cv.observable_add_relationship(
         url.key,
         ip.key,
-        RelationshipType.RELATED_TO,
-        RelationshipDirection.INBOUND,  # explicit override
+        cv.REL.RELATED_TO,
+        cv.DIR.INBOUND,  # explicit override
     )
 ```
 
 !!! info "Default directions"
-    - Default is `BIDIRECTIONAL` when no direction is provided.
+    - Defaults follow the relationship type when available; unknown types fall back to `OUTBOUND`.
     - Use `OUTBOUND`/`INBOUND` to force hierarchy for score propagation.
 
 ---
@@ -133,7 +133,7 @@ Containers keep checks, sub-containers, and metrics scoped. They also enable rep
 
 ```python
 from cyvest.io_rich import display_summary
-from cyvest import Level
+from cyvest import Cyvest
 from rich.console import Console
 
 with Cyvest() as cv:
@@ -143,13 +143,13 @@ with Cyvest() as cv:
     display_summary(cv, console)
 
     # Hide unscored and INFO-level checks
-    display_summary(cv, console, exclude_levels=[Level.NONE, Level.INFO])
+    display_summary(cv, console, exclude_levels=[cv.LVL.NONE, cv.LVL.INFO])
 
     # Show only high-severity checks (SUSPICIOUS and above)
     display_summary(
         cv,
         console,
-        exclude_levels=[Level.NONE, Level.TRUSTED, Level.INFO, Level.SAFE, Level.NOTABLE],
+        exclude_levels=[cv.LVL.NONE, cv.LVL.TRUSTED, cv.LVL.INFO, cv.LVL.SAFE, cv.LVL.NOTABLE],
     )
 
     cv.io_save_json("investigation.json")
@@ -159,13 +159,16 @@ with Cyvest() as cv:
 ```
 
 !!! tip "Filtering checks by severity"
-    Use `exclude_levels` to hide noise tiers. By default, `Level.NONE` is excluded to skip
-    unscored checks; add `Level.INFO` or `Level.NOTABLE` to focus on actionable findings in
+    Use `exclude_levels` to hide noise tiers. By default, `Cyvest.LVL.NONE` is excluded to skip
+    unscored checks; add `Cyvest.LVL.INFO` or `Cyvest.LVL.NOTABLE` to focus on actionable findings in
     larger investigations. Pass an empty list (`exclude_levels=[]`) to show every check,
     including unscored ones.
 
 !!! question "Where do exports live?"
     The docs assume you write to the project root, but automation pipelines typically point to `dist/` (JSON) and `reports/` (Markdown/PDF). Adjust paths to match your workflow.
+
+!!! note "Provenance fields in JSON"
+    Exports include `investigation_id`, optional `investigation_name`, and the investigation-level `event_log`, plus check origins (`origin_investigation_id`) and link fields (`observable_links`, `check_links`) needed for scoring after merges.
 
 ---
 

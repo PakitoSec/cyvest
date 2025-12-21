@@ -197,9 +197,6 @@ class ObservableProxy(_ReadOnlyProxy[Observable]):
     ) -> ObservableProxy:
         """
         Attach threat intelligence to this observable.
-
-        Mirrors the previous DSL handler convenience method but keeps mutations
-        under the proxy wrapper.
         """
         observable = self._resolve()
         ti_kwargs: dict[str, Any] = {

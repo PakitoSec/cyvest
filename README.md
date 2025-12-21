@@ -14,7 +14,7 @@
 - 🏷️ **Typed Helpers**: Built-in enums for observable types and relationships with autocomplete
 - 📈 **Real-time Statistics**: Live metrics and aggregations throughout the investigation
 - 🔄 **Investigation Merging**: Combine investigations from multiple threads or processes
-- 🧵 **Multi-Threading Support**: Advanced thread-safe shared context available via `cyvest.investigation` module
+- 🧵 **Multi-Threading Support**: Advanced thread-safe shared context available via `cyvest.shared`
 - 💾 **Multiple Export Formats**: JSON and Markdown output for reporting and LLM consumption
 - 🎨 **Rich Console Output**: Beautiful terminal displays with the Rich library
 - 🧩 **Fluent helpers**: Convenient API with method chaining for rapid development
@@ -160,7 +160,7 @@ Containers organize checks hierarchically:
 with cv.container("network_analysis") as network:
     with network.sub_container("c2_detection") as c2:
         check = cv.check("beacon_detection", "network", "Detect C2 beacons")
-        c2.add_check(check.get())
+        c2.add_check(check)
 ```
 
 ### Lookup Helpers

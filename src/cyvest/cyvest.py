@@ -199,20 +199,6 @@ class Cyvest:
         """
         return tuple(self._investigation.get_whitelists())
 
-    def investigation_set_whitelisted(self, whitelisted: bool = True, reason: str | None = None) -> bool:
-        """
-        Compatibility helper: clears all whitelists when False; adds/updates a default entry when True.
-
-        Args:
-            whitelisted: Whether to mark whitelisted.
-            reason: Optional justification used for the default entry.
-        """
-        if not whitelisted:
-            self.investigation_clear_whitelists()
-            return False
-        self.investigation_add_whitelist("default", "Whitelisted", reason)
-        return True
-
     # Observable methods
 
     def observable_create(

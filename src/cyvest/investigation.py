@@ -233,7 +233,7 @@ class Investigation:
         obj.level = new_level
 
         if event_type == "SCORE_RECALCULATED":
-            # by passing this event for the moment
+            # Skip audit log entry for recalculated scores.
             return True
 
         details = {

@@ -469,7 +469,7 @@ def display_summary(
     if show_graph and cv.get_all_observables():
         tree = Tree("Observables", hide_root=True)
 
-        # Precompute reverse relationships so we can traverse observables that only
+        # Precompute reverse relationships to traverse observables that only
         # appear as targets (e.g., child → parent links).
         all_observables = cv.get_all_observables()
         reverse_relationships: dict[str, list[tuple[Observable, Relationship]]] = {}

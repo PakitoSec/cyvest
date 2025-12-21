@@ -67,7 +67,7 @@ with Cyvest() as cv:
 **Why the fluent helpers?**
 
 - Deterministic keys let you merge multiple builders without collisions.
-- Relationships default to bidirectional; override direction when you need hierarchy.
+- Relationships use the semantic default direction for known types (e.g., `RELATED_TO` → `BIDIRECTIONAL`); override when you need hierarchy.
 
 ---
 
@@ -102,7 +102,7 @@ with Cyvest() as cv:
 ```
 
 !!! info "Default directions"
-    - Default is `BIDIRECTIONAL` when no direction is provided.
+    - Defaults follow the relationship type when available; unknown types fall back to `OUTBOUND`.
     - Use `OUTBOUND`/`INBOUND` to force hierarchy for score propagation.
 
 ---

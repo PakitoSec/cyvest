@@ -189,12 +189,10 @@ Low-level `Investigation` getters accept keys only; use the facade for component
 
 ### Multi-Threaded Investigations
 
-**Advanced Feature**: Use `SharedInvestigationContext` (imported directly from `cyvest.shared`) for safe parallel task execution with automatic observable sharing:
+**Advanced Feature**: Use `Cyvest.shared_context()` (or `SharedInvestigationContext` from `cyvest.shared`) for safe parallel task execution with automatic observable sharing:
 
 ```python
 from cyvest import Cyvest
-from cyvest.investigation import Investigation
-from cyvest.shared import SharedInvestigationContext
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 def email_analysis(shared_context):
@@ -204,8 +202,8 @@ def email_analysis(shared_context):
         cy.observable(cy.OBS.DOMAIN_NAME, data.get("domain"))
 
 # Create shared context
-main_inv = Investigation(email_data, root_type="artifact")
-shared = SharedInvestigationContext(main_inv)
+main_cy = Cyvest(email_data, root_type="artifact")
+shared = main_cy.shared_context()
 
 # Run tasks in parallel - they can reference each other's observables
 with ThreadPoolExecutor(max_workers=4) as executor:
@@ -213,8 +211,8 @@ with ThreadPoolExecutor(max_workers=4) as executor:
     for future in as_completed(futures):
         future.result()  # Auto-reconciled
 
-# Get merged investigation (same object passed to SharedInvestigationContext)
-final_investigation = main_inv
+# Get merged investigation (same object passed to shared_context)
+final_cy = main_cy
 ```
 
 See `examples/04_email.py` for a complete multi-threaded investigation example.

@@ -10,10 +10,11 @@ and investigation export (io_to_invest, io_to_markdown) methods.
 
 from __future__ import annotations
 
+import threading
 from collections.abc import Iterable
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Final, Literal, overload
+from typing import TYPE_CHECKING, Any, Final, Literal, overload
 
 from logurich import logger
 
@@ -33,6 +34,9 @@ from cyvest.model_enums import ObservableType, PropagationMode, RelationshipDire
 from cyvest.model_schema import InvestigationSchema, StatisticsSchema
 from cyvest.proxies import CheckProxy, ContainerProxy, EnrichmentProxy, ObservableProxy, ThreatIntelProxy
 from cyvest.score import ScoreMode
+
+if TYPE_CHECKING:
+    from cyvest.shared import SharedInvestigationContext
 
 
 class Cyvest:
@@ -102,6 +106,23 @@ class Cyvest:
             >>> cv = Cyvest.io_load_json("/absolute/path/to/investigation.json")
         """
         return load_investigation_json(filepath)
+
+    def shared_context(
+        self,
+        *,
+        lock: threading.RLock | None = None,
+        max_async_workers: int | None = None,
+    ) -> SharedInvestigationContext:
+        """
+        Create a SharedInvestigationContext tied to this Cyvest instance.
+
+        Args:
+            lock: Optional shared lock for advanced synchronization scenarios.
+            max_async_workers: Optional limit for concurrent async reconciliation workers.
+        """
+        from cyvest.shared import SharedInvestigationContext
+
+        return SharedInvestigationContext(self, lock=lock, max_async_workers=max_async_workers)
 
     # Internal helpers -------------------------------------------------
 

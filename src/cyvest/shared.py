@@ -84,6 +84,8 @@ class SharedInvestigationContext:
     """
     Shared context for cross-task observable/check/enrichment sharing.
 
+    Initialize with a Cyvest instance; the canonical state is its investigation.
+
     Invariants:
     - The canonical state lives in `_main_investigation`.
     - All merges are atomic: merge + registry refresh happen in a single critical section.
@@ -93,18 +95,23 @@ class SharedInvestigationContext:
 
     def __init__(
         self,
-        root_investigation: Investigation,
+        root_cyvest: Cyvest,
         *,
         lock: threading.RLock | None = None,
         max_async_workers: int | None = None,
     ) -> None:
+        if not isinstance(root_cyvest, Cyvest):
+            raise TypeError("SharedInvestigationContext expects a Cyvest instance. Use Cyvest.shared_context().")
         self._lock = _SharedLock(lock, max_async_workers=max_async_workers)
-        self._main_investigation = root_investigation
+        self._main_cyvest = root_cyvest
+        self._main_investigation = root_cyvest._investigation
 
         self._root_type = (
-            "artifact" if root_investigation._root_observable.obs_type == ObservableType.ARTIFACT else "file"
+            "artifact"
+            if self._main_investigation._root_observable.obs_type == ObservableType.ARTIFACT
+            else "file"
         )
-        self._score_mode = root_investigation._score_engine._score_mode
+        self._score_mode = self._main_investigation._score_engine._score_mode
 
         self._observable_registry: dict[str, Observable] = {}
         self._check_registry: dict[str, Check] = {}

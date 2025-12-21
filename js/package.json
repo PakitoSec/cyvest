@@ -5,10 +5,12 @@
     "schema:export": "cd .. && uv run cyvest schema -o schema/cyvest.schema.json",
     "types:generate": "pnpm --filter @cyvest/cyvest-js run generate:types",
     "build": "pnpm -r run build",
+    "test": "vitest",
     "test:ci": "pnpm -r run test:ci"
   },
   "devDependencies": {
     "json-schema-to-typescript": "^15.0.4",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.16"
   }
 }

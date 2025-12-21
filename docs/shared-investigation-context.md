@@ -1,13 +1,14 @@
 # SharedInvestigationContext
 
-> **Note**: This is an advanced feature that requires direct import from `cyvest.shared`. It is not part of the main `Cyvest` facade API.
+> **Note**: This is an advanced feature. You can create it via `Cyvest.shared_context()` or import `SharedInvestigationContext` directly.
 
 ## Overview
 
 The `SharedInvestigationContext` enables safe sharing of observables and checks across concurrent tasks (threads or asyncio). This allows tasks to reuse and reference observables created by other tasks, preventing duplication and enabling aggregated checks.
 
-**Usage**: Import directly from the shared module:
+**Usage**: Create from a Cyvest instance or import directly from the shared module:
 ```python
+from cyvest import Cyvest
 from cyvest.shared import SharedInvestigationContext
 ```
 
@@ -23,11 +24,11 @@ from cyvest.shared import SharedInvestigationContext
 ## Basic Usage
 
 ```python
-from cyvest.shared import SharedInvestigationContext
-from concurrent.futures import ThreadPoolExecutor
+from cyvest import Cyvest
 
-# Create a shared context from the main investigation
-shared_context = SharedInvestigationContext(main_investigation)
+# Create a shared context from the main Cyvest instance
+main_cy = Cyvest(main_data, root_type="artifact")
+shared_context = main_cy.shared_context()
 
 # Use in a worker with auto-reconcile
 def my_worker(shared_context):
@@ -65,13 +66,13 @@ def bodies_url(shared_context):
 #### Constructor
 ```python
 SharedInvestigationContext(
-    main_investigation: Investigation,
+    main_cyvest: Cyvest,
     *,
     lock: threading.RLock | None = None,
     max_async_workers: int | None = None,
 )
 ```
-Creates a shared context from a main investigation. Automatically inherits `root_type`, `score_mode`, and `data`.
+Creates a shared context from a main Cyvest instance. Automatically inherits `root_type`, `score_mode`, and `data`.
 `max_async_workers` (optional) limits concurrent async callers.
 
 #### Methods
@@ -80,7 +81,7 @@ Creates a shared context from a main investigation. Automatically inherits `root
 Returns a context manager that creates a `Cyvest` instance and auto-reconciles on exit.
 
 **Parameters:**
-- `data`: Optional override data (defaults to main investigation's data)
+- `data`: Optional override data (defaults to the main Cyvest root data)
 
 **Returns:** Context manager yielding a `Cyvest` instance
 
@@ -165,7 +166,7 @@ Thread-safe: Uses lock to ensure consistent read of investigation state.
 
 **Examples:**
 ```python
-shared = SharedInvestigationContext(main_inv)
+shared = main_cy.shared_context()
 markdown = shared.io_to_markdown()
 print(markdown)
 ```
@@ -185,7 +186,7 @@ Thread-safe: Uses lock to ensure consistent read. Relative paths are converted t
 
 **Examples:**
 ```python
-shared = SharedInvestigationContext(main_inv)
+shared = main_cy.shared_context()
 path = shared.io_save_markdown("report.md")
 print(path)  # /absolute/path/to/report.md
 
@@ -201,7 +202,7 @@ Thread-safe: Uses lock to ensure consistent read of investigation state.
 
 **Examples:**
 ```python
-shared = SharedInvestigationContext(main_inv)
+shared = main_cy.shared_context()
 schema = shared.io_to_invest()
 print(schema.score, schema.level)
 ```
@@ -218,12 +219,12 @@ Thread-safe: Uses lock to ensure consistent read. Relative paths are converted t
 
 **Examples:**
 ```python
-shared = SharedInvestigationContext(main_inv)
+shared = main_cy.shared_context()
 path = shared.io_save_json("investigation.json")
 print(path)  # /absolute/path/to/investigation.json
 ```
 
-> Access merged results by reusing the original `Investigation` instance you passed to `SharedInvestigationContext`; reconciliation mutates it in place.
+> Access merged results by reusing the original `Cyvest` instance you passed to `SharedInvestigationContext`; reconciliation mutates it in place.
 
 !!! note "Provenance-aware reconciliation"
     `investigation_id` is serialized and checks carry canonical provenance (`origin_investigation_id`) for LOCAL_ONLY propagation.

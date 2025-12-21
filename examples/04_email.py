@@ -88,10 +88,8 @@ class RuleExecutor:
         sorted_tasks = sorted(tasks, key=lambda t: t.order)
 
         # Create main investigation and shared context
-        from cyvest.investigation import Investigation
-
-        main_inv = Investigation(data, root_type="artifact", investigation_name="Email Investigation")
-        shared = SharedInvestigationContext(main_inv)
+        main_cy = Cyvest(data, root_type="artifact", investigation_name="Email Investigation")
+        shared = main_cy.shared_context()
 
         logger.info(f"Running {len(sorted_tasks)} tasks in parallel with {self.max_workers} workers")
 
@@ -110,9 +108,7 @@ class RuleExecutor:
                     logger.error(f"Task {task.__class__.__name__} failed: {e}")
 
         # Return final merged investigation as Cyvest
-        final_cy = Cyvest(data, root_type="artifact")
-        final_cy._investigation = main_inv
-        return final_cy
+        return main_cy
 
 
 # ============================================================================

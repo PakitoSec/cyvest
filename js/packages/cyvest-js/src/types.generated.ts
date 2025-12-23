@@ -46,7 +46,7 @@ export type Checks1 = string[];
 /**
  * Root observable type used during data extraction.
  */
-export type RootType = string | null;
+export type RootType = ("file" | "artifact") | null;
 /**
  * Score calculation mode for observables.
  */
@@ -328,5 +328,5 @@ export interface ThreatIntelByLevel {
  */
 export interface DataExtractionSchema {
   root_type?: RootType;
-  score_mode: ScoreMode;
+  score_mode_obs: ScoreMode;
 }

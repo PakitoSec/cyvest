@@ -27,7 +27,7 @@ from cyvest.shared import SharedInvestigationContext
 from cyvest import Cyvest
 
 # Create a shared context from the main Cyvest instance
-main_cy = Cyvest(main_data, root_type="artifact")
+main_cy = Cyvest(root_data=main_data, root_type=Cyvest.OBS.ARTIFACT)
 shared_context = main_cy.shared_context()
 
 # Use in a worker with auto-reconcile
@@ -72,16 +72,16 @@ SharedInvestigationContext(
     max_async_workers: int | None = None,
 )
 ```
-Creates a shared context from a main Cyvest instance. Automatically inherits `root_type`, `score_mode`, and `data`.
+Creates a shared context from a main Cyvest instance. Automatically inherits `root_type`, `score_mode_obs`, and `root_data`.
 `max_async_workers` (optional) limits concurrent async callers.
 
 #### Methods
 
-##### `create_cyvest(data=None) -> _CyvestContextManager`
+##### `create_cyvest(root_data=None) -> _CyvestContextManager`
 Returns a context manager that creates a `Cyvest` instance and auto-reconciles on exit.
 
 **Parameters:**
-- `data`: Optional override data (defaults to the main Cyvest root data)
+- `root_data`: Optional override data (defaults to the main Cyvest root data)
 
 **Returns:** Context manager yielding a `Cyvest` instance
 

@@ -53,8 +53,8 @@ pip install -e .
 from decimal import Decimal
 from cyvest import Cyvest
 
-# Create an investigation
-with Cyvest(data={"type": "email"}) as cv:
+# Create an investigation (root_data becomes the root observable extra)
+with Cyvest(root_data={"type": "email"}) as cv:
     # Create observables
     url = (
         cv.observable(cv.OBS.URL, "https://phishing-site.com", internal=False)
@@ -202,7 +202,7 @@ def email_analysis(shared_context):
         cy.observable(cy.OBS.DOMAIN_NAME, data.get("domain"))
 
 # Create shared context
-main_cy = Cyvest(email_data, root_type="artifact")
+main_cy = Cyvest(root_data=email_data, root_type=Cyvest.OBS.ARTIFACT)
 shared = main_cy.shared_context()
 
 # Run tasks in parallel - they can reference each other's observables
@@ -229,6 +229,16 @@ Scores and levels are automatically calculated and propagated:
 - **Observable → Check (provenance-aware)**: Check score/level only considers observables reachable through *effective* links (`observable_links`)
   - A link is effective when `propagation_mode="GLOBAL"` or when the check's `origin_investigation_id` matches the current investigation id
 - **Check → Global**: All check scores sum to global investigation score
+
+Observable score aggregation is configurable via `score_mode_obs`:
+
+```python
+from cyvest import Cyvest
+from cyvest.score import ScoreMode
+
+cv = Cyvest(score_mode_obs=ScoreMode.MAX)  # default
+cv = Cyvest(score_mode_obs=ScoreMode.SUM)  # accumulative children
+```
 
 **Provenance model**
 

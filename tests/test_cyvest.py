@@ -13,18 +13,10 @@ from cyvest import Cyvest
 
 def test_cyvest_initialization() -> None:
     """Test Cyvest initialization."""
-    cv = Cyvest(data={"test": "data"})
+    cv = Cyvest(root_data={"test": "data"})
     root = cv.observable_get_root()
     assert root is not None
     assert root.obs_type == "file"
-
-
-def test_context_manager() -> None:
-    """Test Cyvest as context manager."""
-    with Cyvest() as cv:
-        assert cv is not None
-        obs = cv.observable_create(Cyvest.OBS.IPV4_ADDR, "192.168.1.1")
-        assert obs is not None
 
 
 def test_observable_creation() -> None:

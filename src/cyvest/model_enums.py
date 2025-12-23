@@ -51,6 +51,24 @@ class ObservableType(str, Enum):
     # X509 Certificate
     X509_CERTIFICATE = "x509-certificate"
 
+    @classmethod
+    def normalize_root_type(cls, root_type: ObservableType | str | None) -> ObservableType:
+        if root_type is None:
+            return cls.FILE
+        if isinstance(root_type, cls):
+            normalized = root_type
+        elif isinstance(root_type, str):
+            try:
+                normalized = cls(root_type.lower())
+            except ValueError as exc:
+                raise ValueError("root_type must be ObservableType.FILE or ObservableType.ARTIFACT") from exc
+        else:
+            raise TypeError("root_type must be ObservableType.FILE or ObservableType.ARTIFACT")
+
+        if normalized not in (cls.FILE, cls.ARTIFACT):
+            raise ValueError("root_type must be ObservableType.FILE or ObservableType.ARTIFACT")
+        return normalized
+
 
 class RelationshipDirection(str, Enum):
     """Direction of a relationship between observables."""

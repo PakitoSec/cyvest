@@ -55,35 +55,26 @@ class Cyvest:
 
     def __init__(
         self,
-        data: Any = None,
-        root_type: Literal["file", "artifact"] = "file",
-        score_mode: ScoreMode = ScoreMode.MAX,
+        root_data: Any = None,
+        root_type: ObservableType | Literal["file", "artifact"] = ObservableType.FILE,
+        score_mode_obs: ScoreMode = ScoreMode.MAX,
         investigation_name: str | None = None,
     ) -> None:
         """
         Initialize a new investigation.
 
         Args:
-            data: The data being investigated (optional)
-            root_type: Type of root observable ("file" or "artifact")
-            score_mode: Score calculation mode (MAX or SUM)
+            root_data: The data being investigated (optional)
+            root_type: Root observable type (ObservableType.FILE or ObservableType.ARTIFACT)
+            score_mode_obs: Observable score calculation mode (MAX or SUM)
             investigation_name: Optional human-readable investigation name
         """
-        normalized_score_mode = score_mode
         self._investigation = Investigation(
-            data,
+            root_data,
             root_type=root_type,
-            score_mode=normalized_score_mode,
+            score_mode_obs=score_mode_obs,
             investigation_name=investigation_name,
         )
-
-    def __enter__(self) -> Cyvest:
-        """Context manager entry."""
-        return self
-
-    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
-        """Context manager exit."""
-        pass
 
     @staticmethod
     def io_load_json(filepath: str | Path) -> Cyvest:

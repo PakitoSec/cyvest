@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field, field_serializer, model_validator
 
@@ -29,6 +29,7 @@ from cyvest.model import (
     ThreatIntel,
     _format_score_decimal,
 )
+from cyvest.model_enums import ObservableType
 from cyvest.score import ScoreMode
 
 
@@ -63,12 +64,12 @@ class DataExtractionSchema(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    root_type: str | None = Field(
+    root_type: Literal[ObservableType.FILE, ObservableType.ARTIFACT] | None = Field(
         default=None,
         description="Root observable type used during data extraction.",
     )
-    score_mode: ScoreMode = Field(
-        description="Score aggregation mode: 'max' takes highest score, 'sum' adds all scores.",
+    score_mode_obs: ScoreMode = Field(
+        description="Observable score aggregation mode: 'max' takes highest score, 'sum' adds all scores.",
     )
 
 

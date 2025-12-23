@@ -5,8 +5,8 @@ from cyvest.model import Container, Enrichment, Observable, ObservableType
 from cyvest.score import ScoreMode
 
 
-def test_serialization_preserves_root_type_and_score_mode(tmp_path) -> None:
-    cv = Cyvest(data={"source": "example"}, root_type="artifact", score_mode=ScoreMode.SUM)
+def test_serialization_preserves_root_type_and_score_mode_obs(tmp_path) -> None:
+    cv = Cyvest(root_data={"source": "example"}, root_type=Cyvest.OBS.ARTIFACT, score_mode_obs=ScoreMode.SUM)
 
     path = tmp_path / "inv.json"
     cv.io_save_json(path)
@@ -16,7 +16,7 @@ def test_serialization_preserves_root_type_and_score_mode(tmp_path) -> None:
     root = loaded.observable_get_root()
     assert root is not None
     assert root.obs_type == ObservableType.ARTIFACT
-    assert loaded._investigation._score_engine._score_mode == ScoreMode.SUM
+    assert loaded._investigation._score_engine._score_mode_obs == ScoreMode.SUM
 
 
 def test_serialization_preserves_whitelisted_flag(tmp_path) -> None:

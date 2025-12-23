@@ -125,7 +125,7 @@ def test_observable_add_relationship_with_enum() -> None:
     """Test adding relationship to observable using enum."""
     from cyvest.investigation import Investigation
 
-    inv = Investigation(data={})
+    inv = Investigation(root_data={})
     obs = Observable(
         obs_type=ObservableType.URL,
         value="https://example.com",

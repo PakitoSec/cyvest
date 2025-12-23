@@ -10,7 +10,7 @@ Model a complete investigation, link observables, and produce a shareable report
 from decimal import Decimal
 from cyvest import Cyvest
 
-with Cyvest(data={"type": "email_analysis"}) as cv:
+with Cyvest(root_data={"type": "email_analysis"}) as cv:
     phishing_url = cv.observable_create(
         cv.OBS.URL,
         "https://fake-bank-login.com",
@@ -37,7 +37,7 @@ with Cyvest(data={"type": "email_analysis"}) as cv:
 ```
 
 !!! tip "Context-first mindset"
-    Pass incident metadata through `Cyvest(data={...})`. Every container, check, and export inherits it so you never lose analyst intent.
+    Pass incident metadata through `Cyvest(root_data={...})`. Every container, check, and export inherits it so you never lose analyst intent.
 
 !!! note "Immutable proxies"
     `observable_create`, `check_create`, and the fluent helpers return read-only proxies (`ObservableProxy`, `CheckProxy`, …). Inspect their attributes freely, but use the Cyvest facade or the proxy helper methods for any updates so the score engine runs automatically.

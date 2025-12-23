@@ -88,7 +88,7 @@ class RuleExecutor:
         sorted_tasks = sorted(tasks, key=lambda t: t.order)
 
         # Create main investigation and shared context
-        main_cy = Cyvest(data, root_type="artifact", investigation_name="Email Investigation")
+        main_cy = Cyvest(root_data=data, root_type=Cyvest.OBS.ARTIFACT, investigation_name="Email Investigation")
         shared = main_cy.shared_context()
 
         logger.info(f"Running {len(sorted_tasks)} tasks in parallel with {self.max_workers} workers")

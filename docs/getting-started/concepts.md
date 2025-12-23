@@ -193,10 +193,10 @@ from cyvest import Cyvest
 from cyvest.score import ScoreMode
 
 # Use MAX mode (default)
-cv = Cyvest(score_mode=ScoreMode.MAX)
+cv = Cyvest(score_mode_obs=ScoreMode.MAX)
 
 # Use SUM mode for accumulative scoring
-cv = Cyvest(score_mode=ScoreMode.SUM)
+cv = Cyvest(score_mode_obs=ScoreMode.SUM)
 ```
 
 ### Audit Log
@@ -663,9 +663,10 @@ root = cv.root()  # or cv.observable_get_root()
 ```
 
 The root observable is automatically created with:
-- **Type**: `cv.OBS.FILE` (default) or `cv.OBS.ARTIFACT` if `root_type="artifact"`
+- **Type**: `cv.OBS.FILE` (default) or `cv.OBS.ARTIFACT` if `root_type=Cyvest.OBS.ARTIFACT`
 - **Value**: `"root"` (fixed identifier)
 - **Key**: `obs:file:root` or `obs:artifact:root` (derived from type + value)
+- **Extra**: `root_data` passed to `Cyvest(root_data=...)`
 - **Purpose**: Entry point for the investigation
 
 ### Root Observable Barrier

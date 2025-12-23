@@ -18,7 +18,7 @@ logger.enable("cyvest")
 
 def main() -> None:
     """Run a URL and IP investigation example."""
-    with Cyvest(data={"type": "network_traffic"}) as cv:
+    with Cyvest(root_data={"type": "network_traffic"}) as cv:
         # Create container for network analysis
         with cv.container("network_analysis", "Analysis of network traffic") as network_ctr:
             # Suspicious URL 1

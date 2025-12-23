@@ -63,8 +63,8 @@ class ScoreMode(Enum):
             try:
                 return cls(value.lower())
             except ValueError as exc:
-                raise ValueError(f"Invalid score_mode: {value}. Must be 'max' or 'sum'.") from exc
-        raise TypeError(f"score_mode must be ScoreMode, str, or None, got {type(value)}")
+                raise ValueError(f"Invalid score_mode_obs: {value}. Must be 'max' or 'sum'.") from exc
+        raise TypeError(f"score_mode_obs must be ScoreMode, str, or None, got {type(value)}")
 
 
 if TYPE_CHECKING:
@@ -130,20 +130,20 @@ class ScoreEngine:
 
     def __init__(
         self,
-        score_mode: ScoreMode | Literal["max", "sum"] = ScoreMode.MAX,
+        score_mode_obs: ScoreMode | Literal["max", "sum"] = ScoreMode.MAX,
         *,
         sink: ScoreChangeSink,
     ) -> None:
         """Initialize the score engine.
 
         Args:
-            score_mode: Score calculation mode (MAX or SUM)
+            score_mode_obs: Observable score calculation mode (MAX or SUM)
             sink: Sink used to apply score/level changes
         """
         self._observables: dict[str, Observable] = {}
         self._checks: dict[str, Check] = {}
         self._check_keys_by_observable_key: dict[str, set[str]] = {}
-        self._score_mode = ScoreMode.normalize(score_mode)
+        self._score_mode_obs = ScoreMode.normalize(score_mode_obs)
         self._sink = sink
         self._investigation_id = sink.investigation_id
 
@@ -303,7 +303,7 @@ class ScoreEngine:
                     child_scores.append(child_score)
 
         # Calculate final score based on mode
-        if self._score_mode == ScoreMode.MAX:
+        if self._score_mode_obs == ScoreMode.MAX:
             # MAX mode: take maximum of all scores (TI + children)
             all_scores = [max_ti_score] + child_scores
             return max(all_scores, default=Decimal("0"))

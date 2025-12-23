@@ -123,7 +123,7 @@ def test_investigation_schema_level_required_and_defaults() -> None:
                 "threat_intel_by_level": {},
                 "total_containers": 0,
             },
-            "data_extraction": {"root_type": None, "score_mode": "max"},
+            "data_extraction": {"root_type": None, "score_mode_obs": "max"},
         }
     )
     assert inst.level == Cyvest.LVL.NONE

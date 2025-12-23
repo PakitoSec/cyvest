@@ -18,7 +18,7 @@ logger.enable("cyvest")
 def main() -> None:
     """Run a basic email investigation example."""
     # Create investigation
-    with Cyvest(data={"type": "email", "subject": "Urgent: Verify Your Account"}) as cv:
+    with Cyvest(root_data={"type": "email", "subject": "Urgent: Verify Your Account"}) as cv:
         # Create email-related observables using the fluent proxy interface
         sender_email = cv.observable(cv.OBS.EMAIL_ADDR, "suspicious@phishing-domain.com", internal=False).with_ti(
             "internal_db", score=Decimal("0"), comment="Unknown sender"

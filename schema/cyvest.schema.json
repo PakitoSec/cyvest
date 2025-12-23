@@ -219,6 +219,10 @@
         "root_type": {
           "anyOf": [
             {
+              "enum": [
+                "file",
+                "artifact"
+              ],
               "type": "string"
             },
             {
@@ -229,13 +233,13 @@
           "description": "Root observable type used during data extraction.",
           "title": "Root Type"
         },
-        "score_mode": {
+        "score_mode_obs": {
           "$ref": "#/$defs/ScoreMode",
-          "description": "Score aggregation mode: 'max' takes highest score, 'sum' adds all scores."
+          "description": "Observable score aggregation mode: 'max' takes highest score, 'sum' adds all scores."
         }
       },
       "required": [
-        "score_mode"
+        "score_mode_obs"
       ],
       "title": "DataExtractionSchema",
       "type": "object"

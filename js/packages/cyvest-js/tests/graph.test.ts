@@ -144,10 +144,6 @@ function createGraphTestInvestigation(): CyvestInvestigation {
       threat_intel_by_level: {},
       total_containers: 0,
     },
-    stats_checks: {
-      checks: 0,
-      applied: 0,
-    },
     data_extraction: {
       root_type: "email-message",
       score_mode: "max",

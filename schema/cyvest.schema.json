@@ -588,28 +588,6 @@
       "title": "StatisticsSchema",
       "type": "object"
     },
-    "StatsChecksSchema": {
-      "additionalProperties": false,
-      "description": "Schema for check statistics summary.",
-      "properties": {
-        "checks": {
-          "minimum": 0,
-          "title": "Checks",
-          "type": "integer"
-        },
-        "applied": {
-          "minimum": 0,
-          "title": "Applied",
-          "type": "integer"
-        }
-      },
-      "required": [
-        "checks",
-        "applied"
-      ],
-      "title": "StatsChecksSchema",
-      "type": "object"
-    },
     "ThreatIntel": {
       "description": "Represents threat intelligence from an external source.\n\nThreat intelligence provides verdicts about observables from sources\nlike VirusTotal, URLScan.io, etc.",
       "properties": {
@@ -787,10 +765,6 @@
       "$ref": "#/$defs/StatisticsSchema",
       "description": "Investigation statistics summary."
     },
-    "stats_checks": {
-      "$ref": "#/$defs/StatsChecksSchema",
-      "description": "Check statistics summary."
-    },
     "data_extraction": {
       "$ref": "#/$defs/DataExtractionSchema",
       "description": "Data extraction metadata."
@@ -816,7 +790,6 @@
     "enrichments",
     "containers",
     "stats",
-    "stats_checks",
     "data_extraction",
     "score_display"
   ],

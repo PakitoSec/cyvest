@@ -58,15 +58,6 @@ class StatisticsSchema(BaseModel):
     total_containers: Annotated[int, Field(ge=0)]
 
 
-class StatsChecksSchema(BaseModel):
-    """Schema for check statistics summary."""
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-    checks: Annotated[int, Field(ge=0)]
-    applied: Annotated[int, Field(ge=0)]
-
-
 class DataExtractionSchema(BaseModel):
     """Schema for data extraction metadata."""
 
@@ -148,7 +139,6 @@ class InvestigationSchema(BaseModel):
         description="Containers keyed by their unique key.",
     )
     stats: StatisticsSchema = Field(description="Investigation statistics summary.")
-    stats_checks: StatsChecksSchema = Field(description="Check statistics summary.")
     data_extraction: DataExtractionSchema = Field(description="Data extraction metadata.")
 
     @field_serializer("score")
@@ -179,21 +169,3 @@ class InvestigationSchema(BaseModel):
 
         return v
 
-
-# Export model references for schema generation
-__all__ = [
-    "InvestigationSchema",
-    "StatisticsSchema",
-    "StatsChecksSchema",
-    "DataExtractionSchema",
-    # Re-export from model.py for convenience
-    "AuditEvent",
-    "Observable",
-    "Check",
-    "ThreatIntel",
-    "Enrichment",
-    "Container",
-    "InvestigationWhitelist",
-    "Level",
-    "ScoreMode",
-]

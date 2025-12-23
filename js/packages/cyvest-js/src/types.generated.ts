@@ -90,7 +90,6 @@ export interface CyvestInvestigation {
   enrichments: Enrichments;
   containers: Containers;
   stats: StatisticsSchema;
-  stats_checks: StatsChecksSchema;
   data_extraction: DataExtractionSchema;
   /**
    * Global investigation score formatted as fixed-point x.xx.
@@ -323,13 +322,6 @@ export interface ThreatIntelBySource {
 }
 export interface ThreatIntelByLevel {
   [k: string]: number;
-}
-/**
- * Schema for check statistics summary.
- */
-export interface StatsChecksSchema {
-  checks: number;
-  applied: number;
 }
 /**
  * Schema for data extraction metadata.

@@ -10,12 +10,12 @@ from cyvest import Cyvest
 def test_merge_local_check() -> None:
     cv_child = Cyvest()
     cv_child.check("C1", "full", "test").link_observable(
-        cv_child.observable(cv_child.OBS.DOMAIN_NAME, "example.com").add_ti("VT", score=2)
+        cv_child.observable(cv_child.OBS.DOMAIN_NAME, "example.com").with_ti("VT", score=2)
     )
 
     main_inv = Cyvest()
     main_inv.check("C2", "full", "test").link_observable(
-        main_inv.observable(main_inv.OBS.DOMAIN_NAME, "example.com").add_ti("OTX", score=4)
+        main_inv.observable(main_inv.OBS.DOMAIN_NAME, "example.com").with_ti("OTX", score=4)
     )
 
     main_inv.merge_investigation(cv_child)
@@ -34,13 +34,13 @@ def test_merge_local_check() -> None:
 def test_merge_global_check() -> None:
     cv_child = Cyvest()
     cv_child.check("C1", "full", "test").link_observable(
-        cv_child.observable(cv_child.OBS.DOMAIN_NAME, "example.com").add_ti("VT", score=2),
+        cv_child.observable(cv_child.OBS.DOMAIN_NAME, "example.com").with_ti("VT", score=2),
         propagation_mode=cv_child.PROP.GLOBAL,
     )
 
     main_inv = Cyvest()
     main_inv.check("C2", "full", "test").link_observable(
-        main_inv.observable(main_inv.OBS.DOMAIN_NAME, "example.com").add_ti("OTX", score=4)
+        main_inv.observable(main_inv.OBS.DOMAIN_NAME, "example.com").with_ti("OTX", score=4)
     )
 
     main_inv.merge_investigation(cv_child)
@@ -59,12 +59,12 @@ def test_merge_global_check() -> None:
 def test_merge_local_check_multiple_child() -> None:
     cv_child = Cyvest()
     cv_child.check("C1", "full", "test").link_observable(
-        cv_child.observable(Cyvest.OBS.DOMAIN_NAME, "example.com").add_ti("VT", score=2)
+        cv_child.observable(Cyvest.OBS.DOMAIN_NAME, "example.com").with_ti("VT", score=2)
     )
 
     cv_child2 = Cyvest()
     cv_child2.check("C1", "full", "test").link_observable(
-        cv_child2.observable(Cyvest.OBS.DOMAIN_NAME, "example.com").add_ti("VT", score=5)
+        cv_child2.observable(Cyvest.OBS.DOMAIN_NAME, "example.com").with_ti("VT", score=5)
     )
 
     main_inv = Cyvest()

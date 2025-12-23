@@ -241,7 +241,7 @@ def test_cross_task_observable_sharing():
     with shared.create_cyvest() as cy1:
         data = cy1.root().extra
         domain = cy1.observable(Cyvest.OBS.DOMAIN_NAME, data["domain"])
-        domain.add_ti("VT", Decimal("8.0"))
+        domain.with_ti("VT", Decimal("8.0"))
 
     # Task 2: Reference domain from Task 1
     with shared.create_cyvest() as cy2:
@@ -272,12 +272,12 @@ def test_thread_safety_parallel_tasks():
     def create_domain_observable(domain: str):
         """Task that creates a domain observable."""
         with shared.create_cyvest() as cy:
-            cy.observable(Cyvest.OBS.DOMAIN_NAME, domain).add_ti("VT", Decimal("5.0"))
+            cy.observable(Cyvest.OBS.DOMAIN_NAME, domain).with_ti("VT", Decimal("5.0"))
 
     def create_ip_observable(ip: str):
         """Task that creates an IP observable."""
         with shared.create_cyvest() as cy:
-            cy.observable(Cyvest.OBS.IPV4_ADDR, ip).add_ti("SEKOIA", Decimal("3.0"))
+            cy.observable(Cyvest.OBS.IPV4_ADDR, ip).with_ti("SEKOIA", Decimal("3.0"))
 
     # Execute tasks in parallel
     with ThreadPoolExecutor(max_workers=6) as executor:
@@ -341,7 +341,7 @@ def test_reconcile_with_investigation_object():
     cy._investigation = other_inv
 
     obs = cy.observable(Cyvest.OBS.FILE, "malware.exe")
-    obs.add_ti("VT", Decimal("10.0"))
+    obs.with_ti("VT", Decimal("10.0"))
 
     # Reconcile the investigation directly
     shared.reconcile(other_inv)
@@ -384,7 +384,7 @@ def test_shared_context_with_checks_and_observables():
     with shared.create_cyvest() as cy:
         data = cy.root().extra
         email_obs = cy.observable(Cyvest.OBS.EMAIL_ADDR, data["email"])
-        email_obs.add_ti("EmailRep", Decimal("7.0"))
+        email_obs.with_ti("EmailRep", Decimal("7.0"))
 
         check = cy.check("email_analysis", "header", "Analyze sender")
         check.link_observable(email_obs)
@@ -393,7 +393,7 @@ def test_shared_context_with_checks_and_observables():
     with shared.create_cyvest() as cy:
         data = cy.root().extra
         url_obs = cy.observable(Cyvest.OBS.URL, data["url"])
-        url_obs.add_ti("VT", Decimal("9.0"))
+        url_obs.with_ti("VT", Decimal("9.0"))
 
         # Verify we can see the email check
         email_check = shared.check_get("email_analysis", "header")
@@ -419,7 +419,7 @@ def test_deep_copy_prevents_modification():
 
     with shared.create_cyvest() as cy:
         obs = cy.observable(Cyvest.OBS.DOMAIN_NAME, "example.com")
-        obs.add_ti("VT", Decimal("5.0"))
+        obs.with_ti("VT", Decimal("5.0"))
 
     # Get observable and modify it
     retrieved1 = shared.observable_get(Cyvest.OBS.DOMAIN_NAME, "example.com")
@@ -553,7 +553,7 @@ def test_parameter_based_api_in_parallel_tasks():
 
     def task1(shared_ctx):
         with shared_ctx.create_cyvest() as cy:
-            cy.observable(Cyvest.OBS.EMAIL_ADDR, "sender@malicious.com").add_ti("EmailRep", Decimal("8.0"))
+            cy.observable(Cyvest.OBS.EMAIL_ADDR, "sender@malicious.com").with_ti("EmailRep", Decimal("8.0"))
             cy.check("sender_check", "header", "Analyze sender")
 
     def task2(shared_ctx):
@@ -610,7 +610,7 @@ def test_prevent_relationship_with_shared_copy():
 
     # Task 1: Create domain observable
     with shared.create_cyvest() as cy1:
-        cy1.observable(Cyvest.OBS.DOMAIN_NAME, "malicious.com").add_ti("VT", 8)
+        cy1.observable(Cyvest.OBS.DOMAIN_NAME, "malicious.com").with_ti("VT", 8)
 
     # Task 2: Try to use the copy (should fail with clear error)
     with shared.create_cyvest() as cy2:
@@ -1015,7 +1015,7 @@ def test_io_to_markdown_basic(tmp_path):
 
     with shared.create_cyvest() as cy:
         obs = cy.observable(Cyvest.OBS.EMAIL_ADDR, "malicious@evil.com")
-        obs.add_ti("VT", Decimal("8.5"))
+        obs.with_ti("VT", Decimal("8.5"))
         cy.check("email_reputation", "header", "Check sender reputation").link_observable(obs).with_score(
             Decimal("7.0")
         )
@@ -1036,7 +1036,7 @@ def test_io_save_markdown_creates_file(tmp_path):
     shared = SharedInvestigationContext(root_cy)
 
     with shared.create_cyvest() as cy:
-        cy.observable(Cyvest.OBS.DOMAIN_NAME, "malicious.com").add_ti("VT", Decimal("9.0"))
+        cy.observable(Cyvest.OBS.DOMAIN_NAME, "malicious.com").with_ti("VT", Decimal("9.0"))
 
     filepath = tmp_path / "shared_report.md"
     result_path = shared.io_save_markdown(filepath)
@@ -1073,7 +1073,7 @@ def test_io_to_invest_basic():
     shared = SharedInvestigationContext(root_cy)
 
     with shared.create_cyvest() as cy:
-        cy.observable(Cyvest.OBS.IPV4_ADDR, "192.168.1.1").add_ti("SEKOIA", Decimal("6.0"))
+        cy.observable(Cyvest.OBS.IPV4_ADDR, "192.168.1.1").with_ti("SEKOIA", Decimal("6.0"))
         cy.check("ip_reputation", "network", "Check IP reputation").with_score(Decimal("5.0"))
 
     schema = shared.io_to_invest()
@@ -1095,7 +1095,7 @@ def test_io_save_json_creates_file(tmp_path):
     shared = SharedInvestigationContext(root_cy)
 
     with shared.create_cyvest() as cy:
-        cy.observable(Cyvest.OBS.URL, "https://malicious.com/payload").add_ti("VT", Decimal("10.0"))
+        cy.observable(Cyvest.OBS.URL, "https://malicious.com/payload").with_ti("VT", Decimal("10.0"))
         cy.check("url_check", "body", "Analyze URL")
 
     filepath = tmp_path / "shared_investigation.json"
@@ -1270,13 +1270,13 @@ def test_export_comprehensive_investigation(tmp_path):
     with shared.create_cyvest() as cy:
         # Observables
         email_obs = cy.observable(Cyvest.OBS.EMAIL_ADDR, "attacker@evil.com")
-        email_obs.add_ti("EmailRep", Decimal("9.5"))
+        email_obs.with_ti("EmailRep", Decimal("9.5"))
 
         domain_obs = cy.observable(Cyvest.OBS.DOMAIN_NAME, "evil.com")
-        domain_obs.add_ti("VT", Decimal("8.0"))
+        domain_obs.with_ti("VT", Decimal("8.0"))
 
         url_obs = cy.observable(Cyvest.OBS.URL, "https://evil.com/phishing")
-        url_obs.add_ti("URLhaus", Decimal("10.0"))
+        url_obs.with_ti("URLhaus", Decimal("10.0"))
 
         # Relationships
         email_obs.relate_to(domain_obs, Cyvest.REL.RELATED_TO)

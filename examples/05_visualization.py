@@ -33,22 +33,22 @@ def main(output: Path | None = None) -> None:
         # Malicious infrastructure
         malicious_domain = (
             cv.observable(cv.OBS.DOMAIN_NAME, "evil-phishing.com")
-            .add_ti("VirusTotal", score=9.0, comment="Known phishing domain")
-            .add_ti("AlienVault OTX", score=8.5, comment="Recently reported")
+            .with_ti("VirusTotal", score=9.0, comment="Known phishing domain")
+            .with_ti("AlienVault OTX", score=8.5, comment="Recently reported")
         )
 
         malicious_ip = (
             cv.observable(cv.OBS.IPV4_ADDR, "185.220.101.50")
-            .add_ti("AbuseIPDB", score=9.5, comment="C2 server")
+            .with_ti("AbuseIPDB", score=9.5, comment="C2 server")
             .relate_to(malicious_domain, cv.REL.RELATED_TO, cv.DIR.OUTBOUND)
         )
 
         # Suspicious infrastructure
         _ = (
             cv.observable(cv.OBS.DOMAIN_NAME, "sketchy-site.net")
-            .add_ti("VirusTotal", score=4.5, comment="Some detections")
+            .with_ti("VirusTotal", score=4.5, comment="Some detections")
             .relate_to(
-                cv.observable(cv.OBS.IPV4_ADDR, "192.168.100.5").add_ti("Shodan", score=3.0),
+                cv.observable(cv.OBS.IPV4_ADDR, "192.168.100.5").with_ti("Shodan", score=3.0),
                 cv.REL.RELATED_TO,
                 cv.DIR.OUTBOUND,
             )
@@ -57,11 +57,11 @@ def main(output: Path | None = None) -> None:
         # Email analysis
         attacker_email = (
             cv.observable(cv.OBS.EMAIL_ADDR, "attacker@evil-phishing.com")
-            .add_ti("EmailRep", score=8.0, comment="Suspicious sender")
+            .with_ti("EmailRep", score=8.0, comment="Suspicious sender")
             .relate_to(malicious_domain, cv.REL.RELATED_TO)
         )
 
-        victim_email = cv.observable(cv.OBS.EMAIL_ADDR, "victim@company.com", internal=True).add_ti(
+        victim_email = cv.observable(cv.OBS.EMAIL_ADDR, "victim@company.com", internal=True).with_ti(
             "Internal Whitelist", score=-1.0, comment="Known employee"
         )
 
@@ -70,19 +70,19 @@ def main(output: Path | None = None) -> None:
             cv.observable(cv.OBS.EMAIL_MESSAGE, "Phishing Email - Invoice #12345")
             .relate_to(attacker_email, cv.REL.RELATED_TO, cv.DIR.OUTBOUND)
             .relate_to(victim_email, cv.REL.RELATED_TO, cv.DIR.OUTBOUND)
-            .add_ti("Email Gateway", score=7.0, comment="Flagged as suspicious")
+            .with_ti("Email Gateway", score=7.0, comment="Flagged as suspicious")
         )
 
         # Malicious URLs in email
         phishing_url1 = (
             cv.observable(cv.OBS.URL, "https://evil-phishing.com/login")
-            .add_ti("URLhaus", score=9.0)
+            .with_ti("URLhaus", score=9.0)
             .relate_to(malicious_domain, cv.REL.RELATED_TO, cv.DIR.OUTBOUND)
         )
 
         phishing_url2 = (
             cv.observable(cv.OBS.URL, "https://evil-phishing.com/verify")
-            .add_ti("URLhaus", score=8.5)
+            .with_ti("URLhaus", score=8.5)
             .relate_to(malicious_domain, cv.REL.RELATED_TO, cv.DIR.OUTBOUND)
         )
 
@@ -93,18 +93,18 @@ def main(output: Path | None = None) -> None:
         # Malware file dropped
         malware_file = (
             cv.observable(cv.OBS.FILE, "invoice.exe")
-            .add_ti("VirusTotal", score=10.0, comment="Detected by 45/70 engines")
+            .with_ti("VirusTotal", score=10.0, comment="Detected by 45/70 engines")
             .relate_to(phishing_url1, cv.REL.RELATED_TO, cv.DIR.INBOUND)
             .relate_to(malicious_ip, cv.REL.RELATED_TO, cv.DIR.BIDIRECTIONAL)
         )
 
         # Safe/whitelisted observables for contrast
-        _ = cv.observable(cv.OBS.DOMAIN_NAME, "google.com", whitelisted=True).add_ti(
+        _ = cv.observable(cv.OBS.DOMAIN_NAME, "google.com", whitelisted=True).with_ti(
             "Internal Whitelist", score=-2.0, comment="Known good domain"
         )
 
         # Notable but not malicious
-        _ = cv.observable(cv.OBS.DOMAIN_NAME, "new-service.cloud").add_ti(
+        _ = cv.observable(cv.OBS.DOMAIN_NAME, "new-service.cloud").with_ti(
             "Passive DNS", score=2.0, comment="Recently registered domain"
         )
 

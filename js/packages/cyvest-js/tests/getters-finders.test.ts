@@ -239,10 +239,6 @@ function createTestInvestigation(): CyvestInvestigation {
       threat_intel_by_level: { MALICIOUS: 1 },
       total_containers: 2,
     },
-    stats_checks: {
-      checks: 3,
-      applied: 2,
-    },
     data_extraction: {
       root_type: "email-message",
       score_mode: "max",

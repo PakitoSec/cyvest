@@ -360,16 +360,6 @@ export function getStats(inv: CyvestInvestigation) {
 }
 
 /**
- * Get the investigation check statistics.
- *
- * @param inv - The investigation
- * @returns Check statistics object
- */
-export function getStatsChecks(inv: CyvestInvestigation) {
-  return inv.stats_checks;
-}
-
-/**
  * Get the data extraction configuration.
  *
  * @param inv - The investigation

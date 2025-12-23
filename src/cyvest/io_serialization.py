@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Any
 
 from cyvest.levels import Level
 from cyvest.model import AuditEvent, Check, Container, Enrichment, Observable, Relationship, ThreatIntel
-from cyvest.model_schema import InvestigationSchema, StatsChecksSchema
+from cyvest.model_schema import InvestigationSchema
 from cyvest.score import ScoreMode
 
 if TYPE_CHECKING:
@@ -84,10 +84,6 @@ def serialize_investigation(inv: Investigation) -> InvestigationSchema:
         enrichments=enrichments,
         containers=containers,
         stats=inv.get_statistics(),
-        stats_checks=StatsChecksSchema(
-            checks=len(inv.get_all_checks()),
-            applied=sum(1 for c in inv.get_all_checks().values() if c.level != Level.NONE),
-        ),
         data_extraction={
             "root_type": root_type_value,
             "score_mode": inv._score_engine._score_mode.value,

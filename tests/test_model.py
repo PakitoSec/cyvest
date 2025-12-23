@@ -6,7 +6,15 @@ from decimal import Decimal
 
 from cyvest.investigation import Investigation
 from cyvest.levels import Level
-from cyvest.model import Check, Container, Enrichment, Observable, RelationshipDirection, ThreatIntel
+from cyvest.model import (
+    Check,
+    Container,
+    Enrichment,
+    Observable,
+    RelationshipDirection,
+    ThreatIntel,
+    _format_score_decimal,
+)
 
 _ORIGIN = "01ARZ3NDEKTSV4RRFFQ69G5FAV"
 
@@ -21,6 +29,11 @@ def test_observable_creation() -> None:
     assert obs.internal is True
     assert obs.whitelisted is False
     assert obs.key.startswith("obs:")
+
+
+def test_score_display_drops_negative_zero() -> None:
+    """Test that formatting does not show negative zero."""
+    assert _format_score_decimal(Decimal("-0.004")) == "0.00"
 
 
 def test_observable_creation_with_score() -> None:

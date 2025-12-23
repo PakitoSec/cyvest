@@ -54,25 +54,26 @@ from decimal import Decimal
 from cyvest import Cyvest
 
 # Create an investigation (root_data becomes the root observable extra)
-with Cyvest(root_data={"type": "email"}) as cv:
-    # Create observables
-    url = (
-        cv.observable(cv.OBS.URL, "https://phishing-site.com", internal=False)
-        .with_ti("virustotal", score=Decimal("8.5"), level=cv.LVL.MALICIOUS)
-        .relate_to(cv.root(), cv.REL.RELATED_TO)
-    )
+cv = Cyvest(root_data={"type": "email"})
 
-    # Create checks
-    check = cv.check("url_analysis", "email_body", "Analyze suspicious URL")
-    check.link_observable(url)
-    check.with_score(Decimal("8.5"), "Malicious URL detected")
+# Create observables
+url = (
+    cv.observable(cv.OBS.URL, "https://phishing-site.com", internal=False)
+    .with_ti("virustotal", score=Decimal("8.5"), level=cv.LVL.MALICIOUS)
+    .relate_to(cv.root(), cv.REL.RELATED_TO)
+)
 
-    # Display results
-    print(f"Global Score: {cv.get_global_score()}")
-    print(f"Global Level: {cv.get_global_level()}")
+# Create checks
+check = cv.check("url_analysis", "email_body", "Analyze suspicious URL")
+check.link_observable(url)
+check.with_score(Decimal("8.5"), "Malicious URL detected")
 
-    # Export
-    cv.io_save_json("investigation.json")
+# Display results
+print(f"Global Score: {cv.get_global_score()}")
+print(f"Global Level: {cv.get_global_level()}")
+
+# Export
+cv.io_save_json("investigation.json")
 ```
 
 ### Model Proxies

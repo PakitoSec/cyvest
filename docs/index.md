@@ -37,20 +37,20 @@ Build, score, and narrate cybersecurity investigations with a single fluent Pyth
 from decimal import Decimal
 from cyvest import Cyvest
 
-with Cyvest(root_data={"type": "email"}) as cv:
-    phishing_url = (
-        cv.observable(cv.OBS.URL, "https://phishing.com", internal=False)
-        .with_ti("virustotal", Decimal("8.5"), level=cv.LVL.MALICIOUS)
-        .relate_to(cv.root(), cv.REL.RELATED_TO)
-    )
+cv = Cyvest(root_data={"type": "email"})
+phishing_url = (
+    cv.observable(cv.OBS.URL, "https://phishing.com", internal=False)
+    .with_ti("virustotal", Decimal("8.5"), level=cv.LVL.MALICIOUS)
+    .relate_to(cv.root(), cv.REL.RELATED_TO)
+)
 
-    (
-        cv.check("email:url", "body", "Analyze embedded URL")
-        .link_observable(phishing_url)
-        .with_score(Decimal("8.5"))
-    )
+(
+    cv.check("email:url", "body", "Analyze embedded URL")
+    .link_observable(phishing_url)
+    .with_score(Decimal("8.5"))
+)
 
-    print(cv.get_global_score(), cv.get_global_level())
+print(cv.get_global_score(), cv.get_global_level())
 ```
 
 !!! tip "Best practice"

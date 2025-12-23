@@ -951,9 +951,9 @@ class Cyvest:
             Path to the generated HTML file
 
         Examples:
-            >>> with Cyvest() as cv:
-            ...     # Create investigation with observables
-            ...     cv.display_network()
+            >>> cv = Cyvest()
+            >>> # Create investigation with observables
+            >>> cv.display_network()
             '/tmp/cyvest_12345/cyvest_network.html'
         """
         from cyvest.io_visualization import generate_network_graph

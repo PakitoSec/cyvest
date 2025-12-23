@@ -168,4 +168,3 @@ class InvestigationSchema(BaseModel):
         v.setdefault("containers", {})
 
         return v
-

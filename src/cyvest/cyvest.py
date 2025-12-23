@@ -319,6 +319,12 @@ class Cyvest:
         """
         return self._observable_proxy(self._investigation.get_root())
 
+    def observable_get_all(self) -> dict[str, ObservableProxy]:
+        """Get read-only proxies for all observables."""
+        return {
+            key: ObservableProxy(self._investigation, key) for key in self._investigation.get_all_observables().keys()
+        }
+
     def observable_add_relationship(
         self,
         source: Observable | ObservableProxy | str,
@@ -414,6 +420,15 @@ class Cyvest:
         )
         return self._observable_proxy(model_observable)
 
+    # Threat intel methods
+
+    def threat_intel_get_all(self) -> dict[str, ThreatIntelProxy]:
+        """Get read-only proxies for all threat intel entries."""
+        return {
+            key: ThreatIntelProxy(self._investigation, key)
+            for key in self._investigation.get_all_threat_intels().keys()
+        }
+
     # Check methods
 
     def check_create(
@@ -507,6 +522,10 @@ class Cyvest:
             raise ValueError("check_get() accepts either (key: str) or (check_id: str, scope: str)")
         return self._check_proxy(self._investigation.get_check(key))
 
+    def check_get_all(self) -> dict[str, CheckProxy]:
+        """Get read-only proxies for all checks."""
+        return {key: CheckProxy(self._investigation, key) for key in self._investigation.get_all_checks().keys()}
+
     def check_link_observable(
         self,
         check_key: str,
@@ -599,6 +618,12 @@ class Cyvest:
         else:
             raise ValueError("container_get() accepts either (key: str) or (path: str)")
         return self._container_proxy(self._investigation.get_container(key))
+
+    def container_get_all(self) -> dict[str, ContainerProxy]:
+        """Get read-only proxies for all containers."""
+        return {
+            key: ContainerProxy(self._investigation, key) for key in self._investigation.get_all_containers().keys()
+        }
 
     def container_add_check(self, container_key: str, check_key: str) -> ContainerProxy | None:
         """
@@ -717,6 +742,12 @@ class Cyvest:
         else:
             raise ValueError('enrichment_get() accepts either (key: str) or (name: str, context: str = "")')
         return self._enrichment_proxy(self._investigation.get_enrichment(key))
+
+    def enrichment_get_all(self) -> dict[str, EnrichmentProxy]:
+        """Get read-only proxies for all enrichments."""
+        return {
+            key: EnrichmentProxy(self._investigation, key) for key in self._investigation.get_all_enrichments().keys()
+        }
 
     # Score and statistics methods
 
@@ -870,35 +901,6 @@ class Cyvest:
         linked by finding the best starting node of each disconnected component.
         """
         self._investigation.finalize_relationships()
-
-    def get_all_observables(self) -> dict[str, ObservableProxy]:
-        """Get read-only proxies for all observables."""
-        return {
-            key: ObservableProxy(self._investigation, key) for key in self._investigation.get_all_observables().keys()
-        }
-
-    def get_all_checks(self) -> dict[str, CheckProxy]:
-        """Get read-only proxies for all checks."""
-        return {key: CheckProxy(self._investigation, key) for key in self._investigation.get_all_checks().keys()}
-
-    def get_all_threat_intels(self) -> dict[str, ThreatIntelProxy]:
-        """Get read-only proxies for all threat intel entries."""
-        return {
-            key: ThreatIntelProxy(self._investigation, key)
-            for key in self._investigation.get_all_threat_intels().keys()
-        }
-
-    def get_all_enrichments(self) -> dict[str, EnrichmentProxy]:
-        """Get read-only proxies for all enrichments."""
-        return {
-            key: EnrichmentProxy(self._investigation, key) for key in self._investigation.get_all_enrichments().keys()
-        }
-
-    def get_all_containers(self) -> dict[str, ContainerProxy]:
-        """Get read-only proxies for all containers."""
-        return {
-            key: ContainerProxy(self._investigation, key) for key in self._investigation.get_all_containers().keys()
-        }
 
     def display_summary(
         self,

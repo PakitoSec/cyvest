@@ -45,7 +45,7 @@ def _format_score_decimal(value: Decimal | None, *, places: int = _DEFAULT_SCORE
     try:
         quantized = value.quantize(quantizer, rounding=ROUND_HALF_UP)
         if quantized == 0:
-            quantized = Decimal("0")
+            quantized = Decimal("0").quantize(quantizer)
         return format(quantized, "f")
     except InvalidOperation:
         return str(value)

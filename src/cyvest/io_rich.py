@@ -350,7 +350,7 @@ def display_summary(
 
     resolved_excluded_levels = _normalize_exclude_levels(exclude_levels)
 
-    all_checks = cv.get_all_checks().values()
+    all_checks = cv.check_get_all().values()
     filtered_checks = [c for c in all_checks if c.level not in resolved_excluded_levels]
     applied_checks = sum(1 for c in filtered_checks if c.level != Level.NONE)
 
@@ -360,7 +360,7 @@ def display_summary(
         excluded_caption = f" (excluding: {excluded_names})"
 
     caption_parts = [
-        f"Total Checks: {len(cv.get_all_checks())}",
+        f"Total Checks: {len(cv.check_get_all())}",
         f"Displayed: {len(filtered_checks)}{excluded_caption}",
         f"Applied: {applied_checks}",
     ]
@@ -379,7 +379,7 @@ def display_summary(
 
     # Organize checks by scope
     checks_by_scope: dict[str, list[Any]] = {}
-    for check in cv.get_all_checks().values():
+    for check in cv.check_get_all().values():
         if check.level in resolved_excluded_levels:
             continue
         if check.scope not in checks_by_scope:
@@ -399,12 +399,12 @@ def display_summary(
             table.add_row(name, score, level)
 
     # Containers section (if any)
-    if cv.get_all_containers():
+    if cv.container_get_all():
         table.add_section()
         rule = Rule("[bold magenta]CONTAINERS[/bold magenta]")
         table.add_row(rule, "-", "-")
 
-        for container in cv.get_all_containers().values():
+        for container in cv.container_get_all().values():
             agg_score = container.get_aggregated_score()
             agg_level = container.get_aggregated_level()
             color_level = get_color_level(agg_level)
@@ -424,7 +424,7 @@ def display_summary(
         if level_enum in resolved_excluded_levels:
             continue
         checks = [
-            c for c in cv.get_all_checks().values() if c.level == level_enum and c.level not in resolved_excluded_levels
+            c for c in cv.check_get_all().values() if c.level == level_enum and c.level not in resolved_excluded_levels
         ]
         checks = sorted(checks, key=_sort_key_by_score)
         if checks:
@@ -443,12 +443,12 @@ def display_summary(
                 table.add_row(name, score, level)
 
     # Enrichments section (if any)
-    if cv.get_all_enrichments():
+    if cv.enrichment_get_all():
         table.add_section()
-        rule = Rule(f"[bold magenta]ENRICHMENTS[/bold magenta]: {len(cv.get_all_enrichments())} enrichments")
+        rule = Rule(f"[bold magenta]ENRICHMENTS[/bold magenta]: {len(cv.enrichment_get_all())} enrichments")
         table.add_row(rule, "-", "-")
 
-        for enr in cv.get_all_enrichments().values():
+        for enr in cv.enrichment_get_all().values():
             table.add_row(f"  {enr.name}", "-", "-")
 
     # Statistics section
@@ -485,12 +485,12 @@ def display_summary(
     rich_print(table)
 
     # Observable graph (if requested)
-    if show_graph and cv.get_all_observables():
+    if show_graph and cv.observable_get_all():
         tree = Tree("Observables", hide_root=True)
 
         # Precompute reverse relationships to traverse observables that only
         # appear as targets (e.g., child → parent links).
-        all_observables = cv.get_all_observables()
+        all_observables = cv.observable_get_all()
         reverse_relationships: dict[str, list[tuple[Observable, Relationship]]] = {}
         for source_obs in all_observables.values():
             for rel in source_obs.relationships:

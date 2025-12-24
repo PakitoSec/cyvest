@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Any
 
 from cyvest.levels import Level
 from cyvest.model import AuditEvent, Check, Container, Enrichment, Observable, Relationship, ThreatIntel
+from cyvest.model_enums import ObservableType
 from cyvest.model_schema import InvestigationSchema
 from cyvest.score import ScoreMode
 
@@ -86,7 +87,7 @@ def serialize_investigation(inv: Investigation) -> InvestigationSchema:
         stats=inv.get_statistics(),
         data_extraction={
             "root_type": root_type_value,
-            "score_mode": inv._score_engine._score_mode.value,
+            "score_mode_obs": inv._score_engine._score_mode_obs.value,
         },
     )
 
@@ -276,29 +277,28 @@ def load_investigation_json(filepath: str | Path) -> Cyvest:
     if not isinstance(investigation_id, str) or not investigation_id.strip():
         raise ValueError("Serialized investigation must include 'investigation_id'.")
 
-    data_payload = data.get("data")
+    root_data = data.get("root_data")
     extraction = data.get("data_extraction", {})
 
     root_type_raw = extraction.get("root_type")
-    root_type = "file"
-    if root_type_raw:
-        root_type = root_type_raw
-    if root_type not in ("file", "artifact"):
-        root_type = "file"
+    try:
+        root_type = ObservableType.normalize_root_type(root_type_raw)
+    except (TypeError, ValueError):
+        root_type = ObservableType.FILE
 
-    score_mode_raw = extraction.get("score_mode")
+    score_mode_raw = extraction.get("score_mode_obs")
     try:
         score_mode = ScoreMode(score_mode_raw) if score_mode_raw else ScoreMode.MAX
     except (TypeError, ValueError):
         score_mode = ScoreMode.MAX
 
-    cv = Cyvest(data=data_payload, root_type=root_type, score_mode=score_mode)
+    cv = Cyvest(root_data=root_data, root_type=root_type, score_mode_obs=score_mode)
 
     # Reset internal state to avoid default root pollution
     cv._investigation = Investigation(
-        data_payload,
+        root_data,
         root_type=root_type,
-        score_mode=score_mode,
+        score_mode_obs=score_mode,
         investigation_id=investigation_id,
     )
     cv._investigation._audit_enabled = False
@@ -375,7 +375,7 @@ def load_investigation_json(filepath: str | Path) -> Cyvest:
             "internal": root_obs_info.get("internal", False),
             "whitelisted": root_obs_info.get("whitelisted", False),
             "comment": root_obs_info.get("comment", ""),
-            "extra": root_obs_info.get("extra", data_payload),
+            "extra": root_obs_info.get("extra", root_data),
             "score": Decimal(str(root_obs_info.get("score", 0))),
             "level": root_obs_info.get("level", "INFO"),
             "key": new_root_key,

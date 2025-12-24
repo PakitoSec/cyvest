@@ -6,7 +6,15 @@ from decimal import Decimal
 
 from cyvest.investigation import Investigation
 from cyvest.levels import Level
-from cyvest.model import Check, Container, Enrichment, Observable, RelationshipDirection, ThreatIntel
+from cyvest.model import (
+    Check,
+    Container,
+    Enrichment,
+    Observable,
+    RelationshipDirection,
+    ThreatIntel,
+    _format_score_decimal,
+)
 
 _ORIGIN = "01ARZ3NDEKTSV4RRFFQ69G5FAV"
 
@@ -23,6 +31,11 @@ def test_observable_creation() -> None:
     assert obs.key.startswith("obs:")
 
 
+def test_score_display_drops_negative_zero() -> None:
+    """Test that formatting does not show negative zero."""
+    assert _format_score_decimal(Decimal("-0.004")) == "0.00"
+
+
 def test_observable_creation_with_score() -> None:
     """Test creating an observable."""
     obs = Observable(obs_type="url", value="https://example.com", score=0.3)
@@ -37,7 +50,7 @@ def test_observable_creation_with_score() -> None:
 
 def test_observable_score_update() -> None:
     """Test updating observable score."""
-    inv = Investigation(data={})
+    inv = Investigation(root_data={})
     obs = Observable(obs_type="ip", value="192.168.1.1")
     inv.add_observable(obs)
     initial_score = obs.score
@@ -49,7 +62,7 @@ def test_observable_score_update() -> None:
 
 def test_observable_relationships() -> None:
     """Test observable relationships."""
-    inv = Investigation(data={})
+    inv = Investigation(root_data={})
     obs1 = Observable(obs_type="url", value="https://example.com")
     obs2 = Observable(obs_type="ip", value="192.168.1.1")
     inv.add_observable(obs1)
@@ -95,7 +108,7 @@ def test_check_creation_with_score() -> None:
 
 def test_check_score_update() -> None:
     """Test updating check score."""
-    inv = Investigation(data={})
+    inv = Investigation(root_data={})
     check = Check(check_id="test", scope="scope", description="desc", origin_investigation_id=inv.investigation_id)
     inv.add_check(check)
     inv.apply_score_change(check, Decimal("3.5"), reason="Update reason")
@@ -105,7 +118,7 @@ def test_check_score_update() -> None:
 
 def test_check_add_observable_link_upgrades_level() -> None:
     """Test that adding an effective observable link to a check with level NONE upgrades it to INFO."""
-    inv = Investigation(data={})
+    inv = Investigation(root_data={})
     check = Check(check_id="test", scope="scope", description="desc", origin_investigation_id=inv.investigation_id)
     inv.add_check(check)
     assert check.level == Level.NONE  # Default level for new checks
@@ -121,7 +134,7 @@ def test_check_add_observable_link_upgrades_level() -> None:
 
 def test_check_add_observable_link_preserves_higher_level() -> None:
     """Test that adding an observable link doesn't downgrade an existing higher level."""
-    inv = Investigation(data={})
+    inv = Investigation(root_data={})
     check = Check(
         check_id="test",
         scope="scope",
@@ -141,7 +154,7 @@ def test_check_add_observable_link_preserves_higher_level() -> None:
 
 def test_check_add_observable_link_no_duplicate() -> None:
     """Test that adding the same observable link twice doesn't create duplicates."""
-    inv = Investigation(data={})
+    inv = Investigation(root_data={})
     check = Check(check_id="test", scope="scope", description="desc", origin_investigation_id=inv.investigation_id)
     inv.add_check(check)
     obs = Observable(obs_type="url", value="https://example.com")
@@ -183,7 +196,7 @@ def test_container_creation() -> None:
 
 def test_container_aggregated_score() -> None:
     """Test container score aggregation."""
-    inv = Investigation(data={})
+    inv = Investigation(root_data={})
     ctr = inv.add_container(Container(path="test"))
     check1 = Check(
         check_id="c1",
@@ -209,7 +222,7 @@ def test_container_aggregated_score() -> None:
 
 def test_container_nested_aggregation() -> None:
     """Test nested container score aggregation."""
-    inv = Investigation(data={})
+    inv = Investigation(root_data={})
     parent = inv.add_container(Container(path="parent"))
     child = inv.add_container(Container(path="parent/child"))
     check1 = Check(
@@ -237,7 +250,7 @@ def test_container_nested_aggregation() -> None:
 
 def test_explicit_level_setting() -> None:
     """Test SAFE level stays sticky unless upgraded by score."""
-    inv = Investigation(data={})
+    inv = Investigation(root_data={})
     obs = Observable(obs_type="url", value="test.com")
     inv.add_observable(obs)
     inv.apply_level_change(obs, Level.SAFE)
@@ -249,7 +262,7 @@ def test_explicit_level_setting() -> None:
 
 def test_string_level_inputs_are_normalized() -> None:
     """String level values should be accepted and normalized."""
-    inv = Investigation(data={})
+    inv = Investigation(root_data={})
     obs = Observable(obs_type="domain-name", value="example.com", level="suspicious")
     assert obs.level == Level.SUSPICIOUS
     inv.add_observable(obs)
@@ -276,7 +289,7 @@ def test_string_level_inputs_are_normalized() -> None:
 
 def test_relationship_direction_default() -> None:
     """Test relationship direction defaults follow semantic mapping."""
-    inv = Investigation(data={})
+    inv = Investigation(root_data={})
     obs1 = Observable(obs_type="url", value="https://example.com")
     obs2 = Observable(obs_type="ip", value="192.168.1.1")
     inv.add_observable(obs1)
@@ -288,7 +301,7 @@ def test_relationship_direction_default() -> None:
 
 def test_relationship_direction_explicit() -> None:
     """Test setting explicit relationship direction."""
-    inv = Investigation(data={})
+    inv = Investigation(root_data={})
     obs1 = Observable(obs_type="url", value="https://example.com")
     obs2 = Observable(obs_type="ip", value="192.168.1.1")
     inv.add_observable(obs1)
@@ -309,7 +322,7 @@ def test_relationship_direction_explicit() -> None:
 
 def test_relationship_direction_string() -> None:
     """Test relationship direction with string values."""
-    inv = Investigation(data={})
+    inv = Investigation(root_data={})
     obs1 = Observable(obs_type="url", value="https://example.com")
     obs2 = Observable(obs_type="ip", value="192.168.1.1")
     inv.add_observable(obs1)
@@ -333,7 +346,7 @@ def test_relationship_auto_direction() -> None:
     """Test that relationships automatically get semantic defaults when direction not specified."""
     from cyvest.model import RelationshipType
 
-    inv = Investigation(data={})
+    inv = Investigation(root_data={})
     obs1 = Observable(obs_type="url", value="https://example.com")
     obs2 = Observable(obs_type="ip", value="192.168.1.1")
     inv.add_observable(obs1)
@@ -348,7 +361,7 @@ def test_relationship_override_default() -> None:
     """Test that explicit direction overrides semantic default."""
     from cyvest.model import RelationshipType
 
-    inv = Investigation(data={})
+    inv = Investigation(root_data={})
     obs1 = Observable(obs_type="url", value="https://example.com")
     obs2 = Observable(obs_type="ip", value="192.168.1.1")
     inv.add_observable(obs1)

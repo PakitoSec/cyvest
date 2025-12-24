@@ -43,7 +43,10 @@ def _format_score_decimal(value: Decimal | None, *, places: int = _DEFAULT_SCORE
         raise ValueError("places must be >= 0")
     quantizer = Decimal("1").scaleb(-places)
     try:
-        return format(value.quantize(quantizer, rounding=ROUND_HALF_UP), "f")
+        quantized = value.quantize(quantizer, rounding=ROUND_HALF_UP)
+        if quantized == 0:
+            quantized = Decimal("0").quantize(quantizer)
+        return format(quantized, "f")
     except InvalidOperation:
         return str(value)
 

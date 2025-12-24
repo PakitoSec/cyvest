@@ -88,7 +88,7 @@ class RuleExecutor:
         sorted_tasks = sorted(tasks, key=lambda t: t.order)
 
         # Create main investigation and shared context
-        main_cy = Cyvest(data, root_type="artifact", investigation_name="Email Investigation")
+        main_cy = Cyvest(root_data=data, root_type=Cyvest.OBS.ARTIFACT, investigation_name="Email Investigation")
         shared = main_cy.shared_context()
 
         logger.info(f"Running {len(sorted_tasks)} tasks in parallel with {self.max_workers} workers")
@@ -144,16 +144,16 @@ class EmailFrom(BaseRule):
             .relate_to(cy.root(), relationship_type=cy.REL.RELATED_TO, direction=cy.DIR.INBOUND)
             .relate_to(
                 cy.observable(cy.OBS.DOMAIN_NAME, from_domain)
-                .add_ti("VT", from_domain_score)
+                .with_ti("VT", from_domain_score)
                 .relate_to(
-                    cy.observable(cy.OBS.IPV4_ADDR, from_ip).add_ti("ABUSEIPDB", from_ip_score),
+                    cy.observable(cy.OBS.IPV4_ADDR, from_ip).with_ti("ABUSEIPDB", from_ip_score),
                     cy.REL.RELATED_TO,
                     direction=cy.DIR.OUTBOUND,
                 ),
                 cy.REL.RELATED_TO,
                 direction=cy.DIR.OUTBOUND,
             )
-            .add_ti("VT", 0, "> test")
+            .with_ti("VT", 0, "> test")
         )
 
         # Create check for header analysis
@@ -184,7 +184,7 @@ class EmailFromBIS(BaseRule):
         logger.info(f"Analyzing email header FROM: {from_addr}")
 
         # Build observable chain with threat intel
-        obs = cy.observable(cy.OBS.EMAIL_ADDR, from_addr).add_ti("PROOFPOINT", 5, "> test")
+        obs = cy.observable(cy.OBS.EMAIL_ADDR, from_addr).with_ti("PROOFPOINT", 5, "> test")
 
         # Create check for header analysis
         (
@@ -259,7 +259,7 @@ class BodiesUrlTask(BaseRule):
                 if domain in url:
                     matching_domain = domain
                     break
-            url_obs = cy.observable(cy.OBS.URL, url).add_ti("VT", score)
+            url_obs = cy.observable(cy.OBS.URL, url).with_ti("VT", score)
             if matching_domain:
                 url_obs.relate_to(
                     cy.observable(cy.OBS.DOMAIN_NAME, matching_domain),
@@ -312,7 +312,7 @@ class BodiesDomainTask(BaseRule):
             # Build Domain observable with relationships
             domain_obs = (
                 cy.observable(cy.OBS.DOMAIN_NAME, domain)
-                .add_ti("VT", score)
+                .with_ti("VT", score)
                 .relate_to(
                     cy.observable(cy.OBS.FILE, "BODY/HTML").relate_to(
                         cy.root(), cy.REL.RELATED_TO, direction=cy.DIR.INBOUND
@@ -370,14 +370,14 @@ class AttachmentTask(BaseRule):
                 cy.observable(cy.OBS.FILE, filename)
                 .relate_to(cy.root(), cy.REL.RELATED_TO, direction=cy.DIR.INBOUND)
                 .relate_to(
-                    cy.observable(cy.OBS.FILE, f"MD5:{md5_hash}").add_ti("VT", score, "MD5 hash analysis"),
+                    cy.observable(cy.OBS.FILE, f"MD5:{md5_hash}").with_ti("VT", score, "MD5 hash analysis"),
                     cy.REL.RELATED_TO,
                 )
             )
 
             # Add threat intel based on score
             if score >= 5:
-                file_obs = file_obs.add_ti("MALWAREBAZAAR", score, f"Known malware: {filename}")
+                file_obs = file_obs.with_ti("MALWAREBAZAAR", score, f"Known malware: {filename}")
 
             # Create check and link to container
             check_desc = f"File: {filename} ({size} bytes)"

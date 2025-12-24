@@ -70,9 +70,9 @@ class Investigation:
 
     def __init__(
         self,
-        data: Any,
-        root_type: str = "file",
-        score_mode: ScoreMode | Literal["max", "sum"] = ScoreMode.MAX,
+        root_data: Any = None,
+        root_type: ObservableType | Literal["file", "artifact"] = ObservableType.FILE,
+        score_mode_obs: ScoreMode | Literal["max", "sum"] = ScoreMode.MAX,
         *,
         investigation_id: str | None = None,
         investigation_name: str | None = None,
@@ -81,8 +81,9 @@ class Investigation:
         Initialize a new investigation.
 
         Args:
-            root_type: Type of root observable ("file" or "artifact")
-            score_mode: Score calculation mode (MAX or SUM)
+            root_data: Data stored on the root observable (optional)
+            root_type: Root observable type (ObservableType.FILE or ObservableType.ARTIFACT)
+            score_mode_obs: Observable score calculation mode (MAX or SUM)
             investigation_name: Optional human-readable investigation name
         """
         self._started_at = datetime.now(timezone.utc)
@@ -99,17 +100,13 @@ class Investigation:
         self._containers: dict[str, Container] = {}
 
         # Internal components
-        normalized_score_mode = ScoreMode.normalize(score_mode)
-        self._score_engine = ScoreEngine(score_mode=normalized_score_mode, sink=self)
+        normalized_score_mode_obs = ScoreMode.normalize(score_mode_obs)
+        self._score_engine = ScoreEngine(score_mode_obs=normalized_score_mode_obs, sink=self)
         self._stats = InvestigationStats()
         self._whitelists: dict[str, InvestigationWhitelist] = {}
 
         # Create root observable
-        obj_type = ObservableType.FILE
-        if root_type == "artifact":
-            obj_type = ObservableType.ARTIFACT
-        elif root_type != "file":
-            raise ValueError(f"root_type {root_type} is not allowed")
+        obj_type = ObservableType.normalize_root_type(root_type)
 
         self._root_observable = Observable(
             obs_type=obj_type,
@@ -117,7 +114,7 @@ class Investigation:
             internal=False,
             whitelisted=False,
             comment="Root observable for investigation",
-            extra=data,
+            extra=root_data,
             score=Decimal("0"),
             level=Level.INFO,
         )

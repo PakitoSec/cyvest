@@ -22,7 +22,7 @@ def test_observable_starts_with_zero_score_info_level() -> None:
 
 def test_max_mode_threat_intel_scores() -> None:
     """Test MAX mode: observable score = max(all TI scores, all child scores)."""
-    cv = Cyvest(score_mode=ScoreMode.MAX)
+    cv = Cyvest(score_mode_obs=ScoreMode.MAX)
 
     # Create observable with multiple threat intel sources
     obs = cv.observable_create(Cyvest.OBS.IPV4_ADDR, "10.0.0.1")
@@ -37,7 +37,7 @@ def test_max_mode_threat_intel_scores() -> None:
 
 def test_sum_mode_threat_intel_scores() -> None:
     """Test SUM mode: observable score = max(TI scores) + sum(child scores)."""
-    cv = Cyvest(score_mode=ScoreMode.SUM)
+    cv = Cyvest(score_mode_obs=ScoreMode.SUM)
 
     # Create observable with multiple threat intel sources
     obs = cv.observable_create(Cyvest.OBS.IPV4_ADDR, "10.0.0.1")
@@ -52,7 +52,7 @@ def test_sum_mode_threat_intel_scores() -> None:
 
 def test_max_mode_hierarchical_scoring() -> None:
     """Test MAX mode with hierarchical relationships."""
-    cv = Cyvest(score_mode=ScoreMode.MAX)
+    cv = Cyvest(score_mode_obs=ScoreMode.MAX)
 
     # Create domain with TI score 2.0
     domain = cv.observable_create(Cyvest.OBS.DOMAIN_NAME, "example.com")
@@ -72,7 +72,7 @@ def test_max_mode_hierarchical_scoring() -> None:
 
 def test_sum_mode_hierarchical_scoring() -> None:
     """Test SUM mode with hierarchical relationships."""
-    cv = Cyvest(score_mode=ScoreMode.SUM)
+    cv = Cyvest(score_mode_obs=ScoreMode.SUM)
 
     # Create domain with TI score 2.0
     domain = cv.observable_create(Cyvest.OBS.DOMAIN_NAME, "example.com")
@@ -92,7 +92,7 @@ def test_sum_mode_hierarchical_scoring() -> None:
 
 def test_max_mode_multiple_children() -> None:
     """Test MAX mode with multiple child observables."""
-    cv = Cyvest(score_mode=ScoreMode.MAX)
+    cv = Cyvest(score_mode_obs=ScoreMode.MAX)
 
     # Create parent with TI score 1.0
     parent = cv.observable_create(Cyvest.OBS.DOMAIN_NAME, "parent.com")
@@ -120,7 +120,7 @@ def test_max_mode_multiple_children() -> None:
 
 def test_sum_mode_multiple_children() -> None:
     """Test SUM mode with multiple child observables."""
-    cv = Cyvest(score_mode=ScoreMode.SUM)
+    cv = Cyvest(score_mode_obs=ScoreMode.SUM)
 
     # Create parent with TI score 1.0
     parent = cv.observable_create(Cyvest.OBS.DOMAIN_NAME, "parent.com")
@@ -301,7 +301,7 @@ def test_check_score_audit_events() -> None:
 
 def test_score_propagation_through_hierarchy() -> None:
     """Test score propagation through multi-level hierarchy in MAX mode."""
-    cv = Cyvest(score_mode=ScoreMode.MAX)
+    cv = Cyvest(score_mode_obs=ScoreMode.MAX)
 
     # Create 3-level hierarchy: grandparent -> parent -> child
     grandparent = cv.observable_create(Cyvest.OBS.DOMAIN_NAME, "grandparent.com")
@@ -329,7 +329,7 @@ def test_score_propagation_through_hierarchy() -> None:
 
 def test_score_propagation_updates_parent() -> None:
     """Test that updating child score propagates to parent."""
-    cv = Cyvest(score_mode=ScoreMode.MAX)
+    cv = Cyvest(score_mode_obs=ScoreMode.MAX)
 
     # Create parent and child
     parent = cv.observable_create(Cyvest.OBS.DOMAIN_NAME, "parent.com")
@@ -355,7 +355,7 @@ def test_score_propagation_updates_parent() -> None:
 
 def test_inbound_relationship_propagation() -> None:
     """Test that INBOUND relationships correctly identify parents for score propagation."""
-    cv = Cyvest(score_mode=ScoreMode.MAX)
+    cv = Cyvest(score_mode_obs=ScoreMode.MAX)
 
     # Create file with INBOUND relationship to URL (file ← URL means URL is parent)
     malware_file = cv.observable_create(Cyvest.OBS.FILE, "malware.exe")
@@ -376,7 +376,7 @@ def test_inbound_relationship_propagation() -> None:
 
 def test_bidirectional_relationship_no_propagation() -> None:
     """Test that BIDIRECTIONAL relationships do not participate in hierarchical score propagation."""
-    cv = Cyvest(score_mode=ScoreMode.MAX)
+    cv = Cyvest(score_mode_obs=ScoreMode.MAX)
 
     # Create two hosts with bidirectional communication
     host1 = cv.observable_create(Cyvest.OBS.IPV4_ADDR, "10.0.1.10")
@@ -396,7 +396,7 @@ def test_bidirectional_relationship_no_propagation() -> None:
 
 def test_outbound_vs_inbound_direction_semantics() -> None:
     """Test that OUTBOUND and INBOUND create opposite parent-child relationships."""
-    cv = Cyvest(score_mode=ScoreMode.MAX)
+    cv = Cyvest(score_mode_obs=ScoreMode.MAX)
 
     # Scenario 1: OUTBOUND - domain → IP (IP is child of domain)
     domain1 = cv.observable_create(Cyvest.OBS.DOMAIN_NAME, "example1.com")
@@ -429,7 +429,7 @@ def test_outbound_vs_inbound_direction_semantics() -> None:
 
 def test_mixed_directions_in_hierarchy() -> None:
     """Test score propagation with mixed OUTBOUND and INBOUND relationships."""
-    cv = Cyvest(score_mode=ScoreMode.MAX)
+    cv = Cyvest(score_mode_obs=ScoreMode.MAX)
 
     # Create a chain: A → B ← C
     # A has OUTBOUND to B (B is child of A)
@@ -460,7 +460,7 @@ def test_mixed_directions_in_hierarchy() -> None:
 
 def test_explicit_direction_override() -> None:
     """Test that explicitly setting direction overrides semantic defaults."""
-    cv = Cyvest(score_mode=ScoreMode.MAX)
+    cv = Cyvest(score_mode_obs=ScoreMode.MAX)
 
     domain = cv.observable_create(Cyvest.OBS.DOMAIN_NAME, "override.com")
     cv.observable_add_threat_intel(domain.key, source="source1", score=Decimal("1.0"))
@@ -481,7 +481,7 @@ def test_explicit_direction_override() -> None:
 
 def test_sum_mode_with_direction_based_children() -> None:
     """Test SUM mode score calculation with direction-based child detection."""
-    cv = Cyvest(score_mode=ScoreMode.SUM)
+    cv = Cyvest(score_mode_obs=ScoreMode.SUM)
 
     # Parent with multiple children via OUTBOUND relationships
     parent = cv.observable_create(Cyvest.OBS.DOMAIN_NAME, "parent.com")
@@ -845,7 +845,7 @@ def test_check_safe_with_multiple_safe_observables() -> None:
 
 def test_max_mode_hierarchical_root_barrier_scoring() -> None:
     """Test MAX mode with root observable as a score propagation barrier."""
-    cv = Cyvest(score_mode=ScoreMode.MAX)
+    cv = Cyvest(score_mode_obs=ScoreMode.MAX)
 
     root = cv.root()
 
@@ -876,7 +876,7 @@ def test_max_mode_hierarchical_root_barrier_scoring() -> None:
 
 def test_sum_mode_hierarchical_root_barrier_scoring() -> None:
     """Test SUM mode with root observable as a score propagation barrier."""
-    cv = Cyvest(score_mode=ScoreMode.SUM)
+    cv = Cyvest(score_mode_obs=ScoreMode.SUM)
 
     root = cv.root()
 
@@ -905,7 +905,7 @@ def test_sum_mode_hierarchical_root_barrier_scoring() -> None:
 
 def test_root_with_threat_intel_only_affects_root() -> None:
     """Test that threat intel added to root only affects root's score."""
-    cv = Cyvest(score_mode=ScoreMode.MAX)
+    cv = Cyvest(score_mode_obs=ScoreMode.MAX)
 
     root = cv.root()
 
@@ -936,7 +936,7 @@ def test_root_with_threat_intel_only_affects_root() -> None:
 
 def test_root_updates_when_child_score_changes() -> None:
     """Ensure root aggregates child score updates while remaining a barrier upward."""
-    cv = Cyvest(score_mode=ScoreMode.MAX)
+    cv = Cyvest(score_mode_obs=ScoreMode.MAX)
 
     root = cv.root()
     child = cv.observable_create(Cyvest.OBS.IPV4_ADDR, "10.0.0.1")
@@ -952,7 +952,7 @@ def test_root_updates_when_child_score_changes() -> None:
 
 def test_root_barrier_with_multiple_levels() -> None:
     """Test root barrier with multi-level observable hierarchy."""
-    cv = Cyvest(score_mode=ScoreMode.MAX)
+    cv = Cyvest(score_mode_obs=ScoreMode.MAX)
 
     root = cv.root()
 
@@ -985,7 +985,7 @@ def test_root_barrier_with_multiple_levels() -> None:
 
 def test_root_propagates_to_checks_not_parents() -> None:
     """Test that root observable score DOES propagate to checks, but NOT to parent observables."""
-    cv = Cyvest(score_mode=ScoreMode.MAX)
+    cv = Cyvest(score_mode_obs=ScoreMode.MAX)
 
     root = cv.root()
 

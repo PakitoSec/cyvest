@@ -19,7 +19,7 @@ logger.enable("cyvest")
 
 def analyze_network_traffic() -> Cyvest:
     """Analyze network traffic (simulating a separate process)."""
-    cv = Cyvest(data={"type": "pcap_analysis", "source": "network_sensor_01"})
+    cv = Cyvest(root_data={"type": "pcap_analysis", "source": "network_sensor_01"})
 
     # Create network-related observables
     malicious_ip = cv.observable_create(cv.OBS.IPV4_ADDR, "203.0.113.50", internal=False)
@@ -42,7 +42,7 @@ def analyze_network_traffic() -> Cyvest:
 
 def analyze_endpoint_logs() -> Cyvest:
     """Analyze endpoint logs (simulating a separate process)."""
-    cv = Cyvest(data={"type": "edr_logs", "source": "endpoint_agent"})
+    cv = Cyvest(root_data={"type": "edr_logs", "source": "endpoint_agent"})
 
     # Create file hash observable
     suspicious_file = cv.observable_create(cv.OBS.ARTIFACT, "e99a18c428cb38d5f260853678922e03", internal=False)
@@ -75,7 +75,7 @@ def analyze_endpoint_logs() -> Cyvest:
 
 def analyze_email_gateway() -> Cyvest:
     """Analyze email gateway logs (simulating a separate process)."""
-    cv = Cyvest(data={"type": "email_gateway", "source": "mail_filter"})
+    cv = Cyvest(root_data={"type": "email_gateway", "source": "mail_filter"})
 
     # Create email observable
     phishing_email = cv.observable_create(cv.OBS.EMAIL_ADDR, "attacker@evil.com", internal=False)
@@ -125,7 +125,7 @@ def main() -> None:
 
     # Create main investigation and merge all sub-investigations
     logger.info("Step 2: Merging all investigations...")
-    main_investigation = Cyvest(data={"type": "incident_response", "incident_id": "INC-2025-001"})
+    main_investigation = Cyvest(root_data={"type": "incident_response", "incident_id": "INC-2025-001"})
 
     main_investigation.merge_investigation(network_investigation)
     main_investigation.merge_investigation(endpoint_investigation)

@@ -213,18 +213,6 @@ class ObservableProxy(_ReadOnlyProxy[Observable]):
         self._get_investigation().add_threat_intel(ti, observable)
         return self
 
-    def add_ti(
-        self,
-        source: str,
-        score: Decimal | float,
-        comment: str = "",
-        extra: dict[str, Any] | None = None,
-        level: Level | None = None,
-        taxonomies: list[dict[str, Any]] | None = None,
-    ) -> ObservableProxy:
-        """Alias for :meth:`with_ti`."""
-        return self.with_ti(source, score, comment, extra, level, taxonomies)
-
     def relate_to(
         self,
         target: Observable | ObservableProxy | str,

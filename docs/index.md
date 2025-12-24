@@ -37,24 +37,24 @@ Build, score, and narrate cybersecurity investigations with a single fluent Pyth
 from decimal import Decimal
 from cyvest import Cyvest
 
-with Cyvest(data={"type": "email"}) as cv:
-    phishing_url = (
-        cv.observable(cv.OBS.URL, "https://phishing.com", internal=False)
-        .with_ti("virustotal", Decimal("8.5"), level=cv.LVL.MALICIOUS)
-        .relate_to(cv.root(), cv.REL.RELATED_TO)
-    )
+cv = Cyvest(root_data={"type": "email"})
+phishing_url = (
+    cv.observable(cv.OBS.URL, "https://phishing.com", internal=False)
+    .with_ti("virustotal", Decimal("8.5"), level=cv.LVL.MALICIOUS)
+    .relate_to(cv.root(), cv.REL.RELATED_TO)
+)
 
-    (
-        cv.check("email:url", "body", "Analyze embedded URL")
-        .link_observable(phishing_url)
-        .with_score(Decimal("8.5"))
-    )
+(
+    cv.check("email:url", "body", "Analyze embedded URL")
+    .link_observable(phishing_url)
+    .with_score(Decimal("8.5"))
+)
 
-    print(cv.get_global_score(), cv.get_global_level())
+print(cv.get_global_score(), cv.get_global_level())
 ```
 
 !!! tip "Best practice"
-    Store the investigation metadata (request ID, analyst, ticket link) in the root observable's `extra` field. It travels with every export format.
+    Store investigation metadata (request ID, analyst, ticket link) in the root observable's `extra` field by passing `root_data` to `Cyvest(...)`.
 
 !!! note "Immutable proxies"
     The objects returned by `cv.observable_*`/`cv.check_*` are read-only `*Proxy` wrappers. Use the facade or their fluent helper methods to apply changes so scoring stays consistent.

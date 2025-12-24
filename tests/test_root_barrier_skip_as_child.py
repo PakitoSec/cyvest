@@ -15,7 +15,7 @@ from cyvest.score import ScoreMode
 
 def test_root_not_included_as_child_in_max_mode() -> None:
     """Test that root is skipped when appearing as a child in MAX mode."""
-    cv = Cyvest(score_mode=ScoreMode.MAX)
+    cv = Cyvest(score_mode_obs=ScoreMode.MAX)
 
     root = cv.root()
 
@@ -48,7 +48,7 @@ def test_root_not_included_as_child_in_max_mode() -> None:
 
 def test_root_not_included_as_child_in_sum_mode() -> None:
     """Test that root is skipped when appearing as a child in SUM mode."""
-    cv = Cyvest(score_mode=ScoreMode.SUM)
+    cv = Cyvest(score_mode_obs=ScoreMode.SUM)
 
     root = cv.root()
 
@@ -84,7 +84,7 @@ def test_root_not_included_as_child_in_sum_mode() -> None:
 
 def test_root_aggregates_its_own_children_normally() -> None:
     """Test that root CAN still aggregate its own children (barrier is one-way)."""
-    cv = Cyvest(score_mode=ScoreMode.MAX)
+    cv = Cyvest(score_mode_obs=ScoreMode.MAX)
 
     root = cv.root()
 
@@ -107,7 +107,7 @@ def test_root_aggregates_its_own_children_normally() -> None:
 
 def test_root_barrier_prevents_cross_contamination() -> None:
     """Test that observables linked through root don't contaminate each other."""
-    cv = Cyvest(score_mode=ScoreMode.MAX)
+    cv = Cyvest(score_mode_obs=ScoreMode.MAX)
 
     root = cv.root()
 
@@ -145,7 +145,7 @@ def test_root_barrier_prevents_cross_contamination() -> None:
 
 def test_multi_level_hierarchy_with_root_as_child() -> None:
     """Test complex hierarchy where root appears as a child in the middle."""
-    cv = Cyvest(score_mode=ScoreMode.MAX)
+    cv = Cyvest(score_mode_obs=ScoreMode.MAX)
 
     root = cv.root()
     cv.observable_add_threat_intel(root.key, source="root_source", score=Decimal("5.0"))

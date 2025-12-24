@@ -31,18 +31,18 @@ from cyvest.shared import SharedInvestigationContext
 
 def test_shared_context_initialization():
     """Test SharedInvestigationContext initialization."""
-    root_cy = Cyvest({"test": "data"}, root_type="artifact")
+    root_cy = Cyvest({"test": "data"}, root_type=Cyvest.OBS.ARTIFACT)
     shared = SharedInvestigationContext(root_cy)
     inv = root_cy._investigation
 
     assert shared._main_investigation is inv
-    assert shared._root_type == "artifact"
+    assert shared._root_type == Cyvest.OBS.ARTIFACT
     assert len(shared._observable_registry) == 1  # root observable is present
     assert len(shared._check_registry) == 0
 
 
 def test_shared_context_from_cyvest_helper():
-    root_cy = Cyvest({"test": "data"}, root_type="artifact")
+    root_cy = Cyvest({"test": "data"}, root_type=Cyvest.OBS.ARTIFACT)
     shared = root_cy.shared_context()
 
     assert isinstance(shared, SharedInvestigationContext)
@@ -51,7 +51,7 @@ def test_shared_context_from_cyvest_helper():
 
 def test_create_cyvest_inherits_config():
     """Test that create_cyvest inherits configuration from main investigation."""
-    root_cy = Cyvest({"email": "test@example.com"}, root_type="artifact")
+    root_cy = Cyvest({"email": "test@example.com"}, root_type=Cyvest.OBS.ARTIFACT)
     shared = SharedInvestigationContext(root_cy)
     inv = root_cy._investigation
 
@@ -68,7 +68,7 @@ def test_create_cyvest_inherits_config():
 
 def test_auto_reconcile_on_context_exit():
     """Test that context manager auto-reconciles on successful exit."""
-    root_cy = Cyvest({"test": "data"}, root_type="artifact")
+    root_cy = Cyvest({"test": "data"}, root_type=Cyvest.OBS.ARTIFACT)
     shared = SharedInvestigationContext(root_cy)
 
     with shared.create_cyvest() as cy:
@@ -82,11 +82,11 @@ def test_auto_reconcile_on_context_exit():
 
 def test_manual_reconcile():
     """Test manual reconciliation of investigation."""
-    root_cy = Cyvest({"test": "data"}, root_type="artifact")
+    root_cy = Cyvest({"test": "data"}, root_type=Cyvest.OBS.ARTIFACT)
     shared = SharedInvestigationContext(root_cy)
 
     # Create Cyvest without auto-reconcile
-    cy = Cyvest({"test": "data"}, root_type="artifact")
+    cy = Cyvest({"test": "data"}, root_type=Cyvest.OBS.ARTIFACT)
     cy.observable(Cyvest.OBS.DOMAIN_NAME, "example.com")
     cy.check("domain_check", "network", "Test")
 
@@ -100,7 +100,7 @@ def test_manual_reconcile():
 
 def test_get_observable():
     """Test retrieving observable from shared context."""
-    root_cy = Cyvest({"test": "data"}, root_type="artifact")
+    root_cy = Cyvest({"test": "data"}, root_type=Cyvest.OBS.ARTIFACT)
     shared = SharedInvestigationContext(root_cy)
 
     with shared.create_cyvest() as cy:
@@ -119,7 +119,7 @@ def test_get_observable():
 
 def test_get_nonexistent_observable():
     """Test retrieving non-existent observable returns None."""
-    root_cy = Cyvest({"test": "data"}, root_type="artifact")
+    root_cy = Cyvest({"test": "data"}, root_type=Cyvest.OBS.ARTIFACT)
     shared = SharedInvestigationContext(root_cy)
 
     result = shared.observable_get(Cyvest.OBS.IPV4_ADDR, "10.0.0.1")
@@ -128,7 +128,7 @@ def test_get_nonexistent_observable():
 
 def test_get_check():
     """Test retrieving check from shared context."""
-    root_cy = Cyvest({"test": "data"}, root_type="artifact")
+    root_cy = Cyvest({"test": "data"}, root_type=Cyvest.OBS.ARTIFACT)
     shared = SharedInvestigationContext(root_cy)
 
     with shared.create_cyvest() as cy:
@@ -147,7 +147,7 @@ def test_get_check():
 
 def test_has_observable():
     """Test checking if observable exists via observable_get()."""
-    root_cy = Cyvest({"test": "data"}, root_type="artifact")
+    root_cy = Cyvest({"test": "data"}, root_type=Cyvest.OBS.ARTIFACT)
     shared = SharedInvestigationContext(root_cy)
 
     with shared.create_cyvest() as cy:
@@ -159,7 +159,7 @@ def test_has_observable():
 
 def test_has_check():
     """Test checking if check exists via check_get()."""
-    root_cy = Cyvest({"test": "data"}, root_type="artifact")
+    root_cy = Cyvest({"test": "data"}, root_type=Cyvest.OBS.ARTIFACT)
     shared = SharedInvestigationContext(root_cy)
 
     with shared.create_cyvest() as cy:
@@ -171,7 +171,7 @@ def test_has_check():
 
 def test_list_observables():
     """Observable listing API removed; validate via direct getter and registry size."""
-    root_cy = Cyvest({"test": "data"}, root_type="artifact")
+    root_cy = Cyvest({"test": "data"}, root_type=Cyvest.OBS.ARTIFACT)
     shared = SharedInvestigationContext(root_cy)
 
     with shared.create_cyvest() as cy:
@@ -187,7 +187,7 @@ def test_list_observables():
 
 def test_list_checks():
     """Checks listing API removed; validate via direct getter."""
-    root_cy = Cyvest({"test": "data"}, root_type="artifact")
+    root_cy = Cyvest({"test": "data"}, root_type=Cyvest.OBS.ARTIFACT)
     shared = SharedInvestigationContext(root_cy)
 
     with shared.create_cyvest() as cy:
@@ -200,7 +200,7 @@ def test_list_checks():
 
 def test_observable_get_and_list_observables():
     """Test observable_get() basic behavior."""
-    root_cy = Cyvest({"test": "data"}, root_type="artifact")
+    root_cy = Cyvest({"test": "data"}, root_type=Cyvest.OBS.ARTIFACT)
     shared = SharedInvestigationContext(root_cy)
 
     with shared.create_cyvest() as cy:
@@ -211,7 +211,7 @@ def test_observable_get_and_list_observables():
 
 
 def test_observables_list_by_type_sync_and_async():
-    root_cy = Cyvest({"test": "data"}, root_type="artifact")
+    root_cy = Cyvest({"test": "data"}, root_type=Cyvest.OBS.ARTIFACT)
     shared = SharedInvestigationContext(root_cy)
 
     with shared.create_cyvest() as cy:
@@ -233,7 +233,7 @@ def test_observables_list_by_type_sync_and_async():
 
 def test_cross_task_observable_sharing():
     """Test that tasks can share observables across execution."""
-    root_cy = Cyvest({"domain": "malicious.com", "url": "https://malicious.com/payload"}, root_type="artifact")
+    root_cy = Cyvest({"domain": "malicious.com", "url": "https://malicious.com/payload"}, root_type=Cyvest.OBS.ARTIFACT)
     shared = SharedInvestigationContext(root_cy)
     inv = root_cy._investigation
 
@@ -241,7 +241,7 @@ def test_cross_task_observable_sharing():
     with shared.create_cyvest() as cy1:
         data = cy1.root().extra
         domain = cy1.observable(Cyvest.OBS.DOMAIN_NAME, data["domain"])
-        domain.add_ti("VT", Decimal("8.0"))
+        domain.with_ti("VT", Decimal("8.0"))
 
     # Task 2: Reference domain from Task 1
     with shared.create_cyvest() as cy2:
@@ -264,7 +264,7 @@ def test_thread_safety_parallel_tasks():
     """Test thread-safe execution of parallel tasks."""
     root_cy = Cyvest(
         {"domains": ["domain1.com", "domain2.com", "domain3.com"], "ips": ["1.1.1.1", "2.2.2.2", "3.3.3.3"]},
-        root_type="artifact",
+        root_type=Cyvest.OBS.ARTIFACT,
     )
     shared = SharedInvestigationContext(root_cy)
     inv = root_cy._investigation
@@ -272,12 +272,12 @@ def test_thread_safety_parallel_tasks():
     def create_domain_observable(domain: str):
         """Task that creates a domain observable."""
         with shared.create_cyvest() as cy:
-            cy.observable(Cyvest.OBS.DOMAIN_NAME, domain).add_ti("VT", Decimal("5.0"))
+            cy.observable(Cyvest.OBS.DOMAIN_NAME, domain).with_ti("VT", Decimal("5.0"))
 
     def create_ip_observable(ip: str):
         """Task that creates an IP observable."""
         with shared.create_cyvest() as cy:
-            cy.observable(Cyvest.OBS.IPV4_ADDR, ip).add_ti("SEKOIA", Decimal("3.0"))
+            cy.observable(Cyvest.OBS.IPV4_ADDR, ip).with_ti("SEKOIA", Decimal("3.0"))
 
     # Execute tasks in parallel
     with ThreadPoolExecutor(max_workers=6) as executor:
@@ -308,7 +308,7 @@ def test_thread_safety_parallel_tasks():
 
 def test_concurrent_reconciliation():
     """Test that concurrent reconciliation maintains data integrity."""
-    root_cy = Cyvest({"test": "data"}, root_type="artifact")
+    root_cy = Cyvest({"test": "data"}, root_type=Cyvest.OBS.ARTIFACT)
     shared = SharedInvestigationContext(root_cy)
 
     def create_check(check_id: str, category: str):
@@ -331,17 +331,17 @@ def test_concurrent_reconciliation():
 
 def test_reconcile_with_investigation_object():
     """Test reconciling with Investigation object instead of Cyvest."""
-    root_cy = Cyvest({"test": "data"}, root_type="artifact")
+    root_cy = Cyvest({"test": "data"}, root_type=Cyvest.OBS.ARTIFACT)
     shared = SharedInvestigationContext(root_cy)
 
     # Create separate investigation
-    other_cy = Cyvest({"other": "data"}, root_type="artifact")
+    other_cy = Cyvest({"other": "data"}, root_type=Cyvest.OBS.ARTIFACT)
     other_inv = other_cy._investigation
-    cy = Cyvest({"other": "data"}, root_type="artifact")
+    cy = Cyvest({"other": "data"}, root_type=Cyvest.OBS.ARTIFACT)
     cy._investigation = other_inv
 
     obs = cy.observable(Cyvest.OBS.FILE, "malware.exe")
-    obs.add_ti("VT", Decimal("10.0"))
+    obs.with_ti("VT", Decimal("10.0"))
 
     # Reconcile the investigation directly
     shared.reconcile(other_inv)
@@ -352,7 +352,7 @@ def test_reconcile_with_investigation_object():
 
 def test_auto_reconcile_on_exception_skipped():
     """Test that auto-reconcile is skipped if exception occurs in context."""
-    root_cy = Cyvest({"test": "data"}, root_type="artifact")
+    root_cy = Cyvest({"test": "data"}, root_type=Cyvest.OBS.ARTIFACT)
     shared = SharedInvestigationContext(root_cy)
 
     try:
@@ -368,23 +368,25 @@ def test_auto_reconcile_on_exception_skipped():
 
 def test_override_data_in_create_cyvest():
     """Test that data can be overridden in create_cyvest."""
-    root_cy = Cyvest({"original": "data"}, root_type="artifact")
+    root_cy = Cyvest({"original": "data"}, root_type=Cyvest.OBS.ARTIFACT)
     shared = SharedInvestigationContext(root_cy)
 
-    with shared.create_cyvest(data={"override": "data"}) as cy:
+    with shared.create_cyvest(root_data={"override": "data"}) as cy:
         assert cy.root().extra == {"override": "data"}
 
 
 def test_shared_context_with_checks_and_observables():
     """Test that both checks and observables are properly shared."""
-    root_cy = Cyvest({"email": "phishing@malicious.com", "url": "https://malicious.com/payload"}, root_type="artifact")
+    root_cy = Cyvest(
+        {"email": "phishing@malicious.com", "url": "https://malicious.com/payload"}, root_type=Cyvest.OBS.ARTIFACT
+    )
     shared = SharedInvestigationContext(root_cy)
 
     # Task 1: Analyze email
     with shared.create_cyvest() as cy:
         data = cy.root().extra
         email_obs = cy.observable(Cyvest.OBS.EMAIL_ADDR, data["email"])
-        email_obs.add_ti("EmailRep", Decimal("7.0"))
+        email_obs.with_ti("EmailRep", Decimal("7.0"))
 
         check = cy.check("email_analysis", "header", "Analyze sender")
         check.link_observable(email_obs)
@@ -393,7 +395,7 @@ def test_shared_context_with_checks_and_observables():
     with shared.create_cyvest() as cy:
         data = cy.root().extra
         url_obs = cy.observable(Cyvest.OBS.URL, data["url"])
-        url_obs.add_ti("VT", Decimal("9.0"))
+        url_obs.with_ti("VT", Decimal("9.0"))
 
         # Verify we can see the email check
         email_check = shared.check_get("email_analysis", "header")
@@ -414,12 +416,12 @@ def test_shared_context_with_checks_and_observables():
 
 def test_deep_copy_prevents_modification():
     """Test that deep copying prevents concurrent modification issues."""
-    root_cy = Cyvest({"test": "data"}, root_type="artifact")
+    root_cy = Cyvest({"test": "data"}, root_type=Cyvest.OBS.ARTIFACT)
     shared = SharedInvestigationContext(root_cy)
 
     with shared.create_cyvest() as cy:
         obs = cy.observable(Cyvest.OBS.DOMAIN_NAME, "example.com")
-        obs.add_ti("VT", Decimal("5.0"))
+        obs.with_ti("VT", Decimal("5.0"))
 
     # Get observable and modify it
     retrieved1 = shared.observable_get(Cyvest.OBS.DOMAIN_NAME, "example.com")
@@ -438,7 +440,7 @@ def test_deep_copy_prevents_modification():
 
 def test_observable_get_with_parameters():
     """Test observable_get using type and value parameters."""
-    root_cy = Cyvest({"test": "data"}, root_type="artifact")
+    root_cy = Cyvest({"test": "data"}, root_type=Cyvest.OBS.ARTIFACT)
     shared = SharedInvestigationContext(root_cy)
 
     with shared.create_cyvest() as cy:
@@ -452,7 +454,7 @@ def test_observable_get_with_parameters():
 
 def test_check_get_with_parameters():
     """Test check_get using check_id and scope parameters."""
-    root_cy = Cyvest({"test": "data"}, root_type="artifact")
+    root_cy = Cyvest({"test": "data"}, root_type=Cyvest.OBS.ARTIFACT)
     shared = SharedInvestigationContext(root_cy)
 
     with shared.create_cyvest() as cy:
@@ -469,7 +471,7 @@ def test_check_get_with_parameters():
 
 def test_existence_checks_via_getters():
     """Use get_* returning None/non-None instead of has_* helpers."""
-    root_cy = Cyvest({"test": "data"}, root_type="artifact")
+    root_cy = Cyvest({"test": "data"}, root_type=Cyvest.OBS.ARTIFACT)
     shared = SharedInvestigationContext(root_cy)
 
     with shared.create_cyvest() as cy:
@@ -484,7 +486,7 @@ def test_existence_checks_via_getters():
 
 def test_cyvest_get_observable_with_parameters():
     """Test Cyvest.observable_get using parameters for API consistency."""
-    cy = Cyvest({"test": "data"}, root_type="artifact")
+    cy = Cyvest({"test": "data"}, root_type=Cyvest.OBS.ARTIFACT)
     obs_proxy = cy.observable(Cyvest.OBS.IPV4_ADDR, "10.0.0.1")
 
     obs = cy.observable_get(Cyvest.OBS.IPV4_ADDR, "10.0.0.1")
@@ -498,7 +500,7 @@ def test_cyvest_get_observable_with_parameters():
 
 def test_cyvest_get_check_with_parameters():
     """Test Cyvest.check_get using parameters for API consistency."""
-    cy = Cyvest({"test": "data"}, root_type="artifact")
+    cy = Cyvest({"test": "data"}, root_type=Cyvest.OBS.ARTIFACT)
     check_proxy = cy.check("dns_lookup", "network", "DNS reputation check")
 
     # Test parameter-based lookup
@@ -513,7 +515,7 @@ def test_cyvest_get_check_with_parameters():
 
 def test_observable_type_enum_conversion():
     """Test that ObservableType enums are properly converted to strings."""
-    root_cy = Cyvest({"test": "data"}, root_type="artifact")
+    root_cy = Cyvest({"test": "data"}, root_type=Cyvest.OBS.ARTIFACT)
     shared = SharedInvestigationContext(root_cy)
 
     with shared.create_cyvest() as cy:
@@ -534,7 +536,7 @@ def test_observable_type_enum_conversion():
 
 def test_getters_invalid_arguments_raise_typeerror():
     """Argument validation is handled by Python signatures."""
-    root_cy = Cyvest({"test": "data"}, root_type="artifact")
+    root_cy = Cyvest({"test": "data"}, root_type=Cyvest.OBS.ARTIFACT)
     shared = SharedInvestigationContext(root_cy)
 
     import pytest
@@ -548,12 +550,12 @@ def test_getters_invalid_arguments_raise_typeerror():
 
 def test_parameter_based_api_in_parallel_tasks():
     """Test parameter-based API works correctly in parallel tasks."""
-    root_cy = Cyvest({"test": "data"}, root_type="artifact")
+    root_cy = Cyvest({"test": "data"}, root_type=Cyvest.OBS.ARTIFACT)
     shared = SharedInvestigationContext(root_cy)
 
     def task1(shared_ctx):
         with shared_ctx.create_cyvest() as cy:
-            cy.observable(Cyvest.OBS.EMAIL_ADDR, "sender@malicious.com").add_ti("EmailRep", Decimal("8.0"))
+            cy.observable(Cyvest.OBS.EMAIL_ADDR, "sender@malicious.com").with_ti("EmailRep", Decimal("8.0"))
             cy.check("sender_check", "header", "Analyze sender")
 
     def task2(shared_ctx):
@@ -581,7 +583,7 @@ def test_parameter_based_api_in_parallel_tasks():
 
 def test_normalization_consistency():
     """Test that parameter-based lookups handle normalization correctly."""
-    root_cy = Cyvest({"test": "data"}, root_type="artifact")
+    root_cy = Cyvest({"test": "data"}, root_type=Cyvest.OBS.ARTIFACT)
     shared = SharedInvestigationContext(root_cy)
 
     with shared.create_cyvest() as cy:
@@ -604,13 +606,13 @@ def test_prevent_relationship_with_shared_copy():
     """Test that using a copied observable from shared context raises helpful error."""
     import pytest
 
-    root_cy = Cyvest({"test": "data"}, root_type="artifact")
+    root_cy = Cyvest({"test": "data"}, root_type=Cyvest.OBS.ARTIFACT)
     shared = SharedInvestigationContext(root_cy)
     inv = root_cy._investigation
 
     # Task 1: Create domain observable
     with shared.create_cyvest() as cy1:
-        cy1.observable(Cyvest.OBS.DOMAIN_NAME, "malicious.com").add_ti("VT", 8)
+        cy1.observable(Cyvest.OBS.DOMAIN_NAME, "malicious.com").with_ti("VT", 8)
 
     # Task 2: Try to use the copy (should fail with clear error)
     with shared.create_cyvest() as cy2:
@@ -652,7 +654,7 @@ def test_prevent_relationship_with_shared_copy():
 
 def test_copied_observable_has_marker():
     """Test that copied observables are marked with _from_shared_context flag."""
-    root_cy = Cyvest({"test": "data"}, root_type="artifact")
+    root_cy = Cyvest({"test": "data"}, root_type=Cyvest.OBS.ARTIFACT)
     shared = SharedInvestigationContext(root_cy)
     inv = root_cy._investigation
 
@@ -681,7 +683,7 @@ def test_copied_observable_has_marker():
 
 
 def test_async_context_manager_auto_reconcile():
-    root_cy = Cyvest({"test": "data"}, root_type="artifact")
+    root_cy = Cyvest({"test": "data"}, root_type=Cyvest.OBS.ARTIFACT)
     shared = SharedInvestigationContext(root_cy)
 
     async def run():
@@ -696,10 +698,10 @@ def test_async_context_manager_auto_reconcile():
 
 
 def test_areconcile_and_observable_aget():
-    root_cy = Cyvest({"test": "data"}, root_type="artifact")
+    root_cy = Cyvest({"test": "data"}, root_type=Cyvest.OBS.ARTIFACT)
     shared = SharedInvestigationContext(root_cy)
 
-    cy = Cyvest({"test": "data"}, root_type="artifact")
+    cy = Cyvest({"test": "data"}, root_type=Cyvest.OBS.ARTIFACT)
     cy.observable(Cyvest.OBS.IPV4_ADDR, "8.8.8.8")
 
     async def run():
@@ -713,7 +715,7 @@ def test_areconcile_and_observable_aget():
 
 def test_get_enrichment_by_key():
     """Test retrieving enrichment by name from shared context."""
-    root_cy = Cyvest({"test": "data"}, root_type="artifact")
+    root_cy = Cyvest({"test": "data"}, root_type=Cyvest.OBS.ARTIFACT)
     shared = SharedInvestigationContext(root_cy)
 
     with shared.create_cyvest() as cy:
@@ -731,7 +733,7 @@ def test_get_enrichment_by_key():
 
 def test_get_enrichment_by_name():
     """Test retrieving enrichment by name from shared context."""
-    root_cy = Cyvest({"test": "data"}, root_type="artifact")
+    root_cy = Cyvest({"test": "data"}, root_type=Cyvest.OBS.ARTIFACT)
     shared = SharedInvestigationContext(root_cy)
 
     with shared.create_cyvest() as cy:
@@ -748,7 +750,7 @@ def test_get_enrichment_by_name():
 
 def test_get_enrichment_with_context():
     """Test retrieving enrichment with context from shared context."""
-    root_cy = Cyvest({"test": "data"}, root_type="artifact")
+    root_cy = Cyvest({"test": "data"}, root_type=Cyvest.OBS.ARTIFACT)
     shared = SharedInvestigationContext(root_cy)
 
     with shared.create_cyvest() as cy:
@@ -771,7 +773,7 @@ def test_get_enrichment_with_context():
 
 def test_get_nonexistent_enrichment():
     """Test retrieving non-existent enrichment returns None."""
-    root_cy = Cyvest({"test": "data"}, root_type="artifact")
+    root_cy = Cyvest({"test": "data"}, root_type=Cyvest.OBS.ARTIFACT)
     shared = SharedInvestigationContext(root_cy)
 
     result = shared.enrichment_get("nonexistent")
@@ -783,7 +785,7 @@ def test_get_nonexistent_enrichment():
 
 def test_list_enrichments():
     """Test listing all enrichment keys."""
-    root_cy = Cyvest({"test": "data"}, root_type="artifact")
+    root_cy = Cyvest({"test": "data"}, root_type=Cyvest.OBS.ARTIFACT)
     shared = SharedInvestigationContext(root_cy)
 
     # Initially empty
@@ -804,7 +806,7 @@ def test_list_enrichments():
 
 def test_enrichment_reconcile_updates_registry():
     """Test that reconciling updates enrichment registry."""
-    root_cy = Cyvest({"test": "data"}, root_type="artifact")
+    root_cy = Cyvest({"test": "data"}, root_type=Cyvest.OBS.ARTIFACT)
     shared = SharedInvestigationContext(root_cy)
 
     # Create first enrichment
@@ -824,7 +826,7 @@ def test_enrichment_reconcile_updates_registry():
 
 def test_enrichment_deep_copy_independence():
     """Test that retrieved enrichment is a deep copy."""
-    root_cy = Cyvest({"test": "data"}, root_type="artifact")
+    root_cy = Cyvest({"test": "data"}, root_type=Cyvest.OBS.ARTIFACT)
     shared = SharedInvestigationContext(root_cy)
 
     with shared.create_cyvest() as cy:
@@ -845,7 +847,7 @@ def test_enrichment_deep_copy_independence():
 
 def test_enrichment_merge_in_reconcile():
     """Test that enrichments are properly merged during reconciliation."""
-    root_cy = Cyvest({"test": "data"}, root_type="artifact")
+    root_cy = Cyvest({"test": "data"}, root_type=Cyvest.OBS.ARTIFACT)
     shared = SharedInvestigationContext(root_cy)
     inv = root_cy._investigation
 
@@ -872,7 +874,7 @@ def test_enrichment_merge_in_reconcile():
 
 def test_get_enrichment_invalid_arguments():
     """Argument validation is handled by Python signatures."""
-    root_cy = Cyvest({"test": "data"}, root_type="artifact")
+    root_cy = Cyvest({"test": "data"}, root_type=Cyvest.OBS.ARTIFACT)
     shared = SharedInvestigationContext(root_cy)
 
     with pytest.raises(TypeError):
@@ -884,7 +886,7 @@ def test_get_enrichment_invalid_arguments():
 
 def test_enrichment_with_parallel_tasks():
     """Test enrichment sharing across parallel tasks."""
-    root_cy = Cyvest({"test": "data"}, root_type="artifact")
+    root_cy = Cyvest({"test": "data"}, root_type=Cyvest.OBS.ARTIFACT)
     shared = SharedInvestigationContext(root_cy)
 
     def task1():
@@ -921,7 +923,7 @@ def test_enrichment_with_parallel_tasks():
 
 def test_enrichment_reconcile_count_in_log():
     """Test that reconcile debug log includes enrichment count."""
-    root_cy = Cyvest({"test": "data"}, root_type="artifact")
+    root_cy = Cyvest({"test": "data"}, root_type=Cyvest.OBS.ARTIFACT)
     shared = SharedInvestigationContext(root_cy)
 
     with shared.create_cyvest() as cy:
@@ -937,7 +939,7 @@ def test_get_global_score():
     """Test retrieving global score from shared context."""
     from cyvest.model import ThreatIntel
 
-    root_cy = Cyvest({"test": "data"}, root_type="artifact")
+    root_cy = Cyvest({"test": "data"}, root_type=Cyvest.OBS.ARTIFACT)
     shared = SharedInvestigationContext(root_cy)
     inv = root_cy._investigation
 
@@ -962,7 +964,7 @@ def test_get_global_score():
 
 def test_is_whitelisted_reflects_main_investigation():
     """Shared context exposes whitelisted status of underlying investigation."""
-    root_cy = Cyvest({"test": "data"}, root_type="artifact")
+    root_cy = Cyvest({"test": "data"}, root_type=Cyvest.OBS.ARTIFACT)
     shared = SharedInvestigationContext(root_cy)
     inv = root_cy._investigation
 
@@ -974,7 +976,7 @@ def test_is_whitelisted_reflects_main_investigation():
 
 def test_get_global_level_reflects_main_investigation():
     """Shared context exposes global level of underlying investigation."""
-    root_cy = Cyvest({"test": "data"}, root_type="artifact")
+    root_cy = Cyvest({"test": "data"}, root_type=Cyvest.OBS.ARTIFACT)
     shared = SharedInvestigationContext(root_cy)
 
     assert shared.get_global_level() == Cyvest.LVL.INFO
@@ -987,7 +989,7 @@ def test_get_global_level_reflects_main_investigation():
 
 def test_get_global_score_thread_safe():
     """Test that get_global_score is thread-safe."""
-    root_cy = Cyvest({"test": "data"}, root_type="artifact")
+    root_cy = Cyvest({"test": "data"}, root_type=Cyvest.OBS.ARTIFACT)
     shared = SharedInvestigationContext(root_cy)
 
     # Multiple threads reading score concurrently should work safely
@@ -1010,12 +1012,12 @@ def test_get_global_score_thread_safe():
 
 def test_io_to_markdown_basic(tmp_path):
     """Test basic markdown generation from shared context."""
-    root_cy = Cyvest({"test": "data"}, root_type="artifact")
+    root_cy = Cyvest({"test": "data"}, root_type=Cyvest.OBS.ARTIFACT)
     shared = SharedInvestigationContext(root_cy)
 
     with shared.create_cyvest() as cy:
         obs = cy.observable(Cyvest.OBS.EMAIL_ADDR, "malicious@evil.com")
-        obs.add_ti("VT", Decimal("8.5"))
+        obs.with_ti("VT", Decimal("8.5"))
         cy.check("email_reputation", "header", "Check sender reputation").link_observable(obs).with_score(
             Decimal("7.0")
         )
@@ -1032,11 +1034,11 @@ def test_io_to_markdown_basic(tmp_path):
 
 def test_io_save_markdown_creates_file(tmp_path):
     """Test that io_save_markdown creates a markdown file."""
-    root_cy = Cyvest({"test": "data"}, root_type="artifact")
+    root_cy = Cyvest({"test": "data"}, root_type=Cyvest.OBS.ARTIFACT)
     shared = SharedInvestigationContext(root_cy)
 
     with shared.create_cyvest() as cy:
-        cy.observable(Cyvest.OBS.DOMAIN_NAME, "malicious.com").add_ti("VT", Decimal("9.0"))
+        cy.observable(Cyvest.OBS.DOMAIN_NAME, "malicious.com").with_ti("VT", Decimal("9.0"))
 
     filepath = tmp_path / "shared_report.md"
     result_path = shared.io_save_markdown(filepath)
@@ -1051,7 +1053,7 @@ def test_io_save_markdown_creates_file(tmp_path):
 
 def test_io_save_markdown_relative_path(tmp_path, monkeypatch):
     """Test io_save_markdown with relative path."""
-    root_cy = Cyvest({"test": "data"}, root_type="artifact")
+    root_cy = Cyvest({"test": "data"}, root_type=Cyvest.OBS.ARTIFACT)
     shared = SharedInvestigationContext(root_cy)
 
     with shared.create_cyvest() as cy:
@@ -1069,11 +1071,11 @@ def test_io_save_markdown_relative_path(tmp_path, monkeypatch):
 
 def test_io_to_invest_basic():
     """Test basic InvestigationSchema serialization from shared context."""
-    root_cy = Cyvest({"test": "data"}, root_type="artifact")
+    root_cy = Cyvest({"test": "data"}, root_type=Cyvest.OBS.ARTIFACT)
     shared = SharedInvestigationContext(root_cy)
 
     with shared.create_cyvest() as cy:
-        cy.observable(Cyvest.OBS.IPV4_ADDR, "192.168.1.1").add_ti("SEKOIA", Decimal("6.0"))
+        cy.observable(Cyvest.OBS.IPV4_ADDR, "192.168.1.1").with_ti("SEKOIA", Decimal("6.0"))
         cy.check("ip_reputation", "network", "Check IP reputation").with_score(Decimal("5.0"))
 
     schema = shared.io_to_invest()
@@ -1091,11 +1093,11 @@ def test_io_to_invest_basic():
 
 def test_io_save_json_creates_file(tmp_path):
     """Test that io_save_json creates a JSON file."""
-    root_cy = Cyvest({"email": "test@example.com"}, root_type="artifact")
+    root_cy = Cyvest({"email": "test@example.com"}, root_type=Cyvest.OBS.ARTIFACT)
     shared = SharedInvestigationContext(root_cy)
 
     with shared.create_cyvest() as cy:
-        cy.observable(Cyvest.OBS.URL, "https://malicious.com/payload").add_ti("VT", Decimal("10.0"))
+        cy.observable(Cyvest.OBS.URL, "https://malicious.com/payload").with_ti("VT", Decimal("10.0"))
         cy.check("url_check", "body", "Analyze URL")
 
     filepath = tmp_path / "shared_investigation.json"
@@ -1118,7 +1120,7 @@ def test_io_save_json_creates_file(tmp_path):
 
 def test_io_save_json_relative_path(tmp_path, monkeypatch):
     """Test io_save_json with relative path."""
-    root_cy = Cyvest({"test": "data"}, root_type="artifact")
+    root_cy = Cyvest({"test": "data"}, root_type=Cyvest.OBS.ARTIFACT)
     shared = SharedInvestigationContext(root_cy)
 
     with shared.create_cyvest() as cy:
@@ -1135,7 +1137,7 @@ def test_io_save_json_relative_path(tmp_path, monkeypatch):
 
 def test_export_methods_thread_safe():
     """Test that export methods are thread-safe."""
-    root_cy = Cyvest({"test": "data"}, root_type="artifact")
+    root_cy = Cyvest({"test": "data"}, root_type=Cyvest.OBS.ARTIFACT)
     shared = SharedInvestigationContext(root_cy)
 
     with shared.create_cyvest() as cy:
@@ -1166,7 +1168,7 @@ def test_export_methods_thread_safe():
 
 def test_export_methods_capture_latest_state(tmp_path):
     """Test that export methods capture the latest investigation state."""
-    root_cy = Cyvest({"test": "data"}, root_type="artifact")
+    root_cy = Cyvest({"test": "data"}, root_type=Cyvest.OBS.ARTIFACT)
     shared = SharedInvestigationContext(root_cy)
 
     # Initial state
@@ -1197,7 +1199,7 @@ def test_export_methods_capture_latest_state(tmp_path):
 
 def test_export_with_enrichments(tmp_path):
     """Test that export methods include enrichments."""
-    root_cy = Cyvest({"test": "data"}, root_type="artifact")
+    root_cy = Cyvest({"test": "data"}, root_type=Cyvest.OBS.ARTIFACT)
     shared = SharedInvestigationContext(root_cy)
 
     with shared.create_cyvest() as cy:
@@ -1230,7 +1232,7 @@ def test_export_with_enrichments(tmp_path):
 
 def test_export_with_whitelists(tmp_path):
     """Test that export methods include whitelist information."""
-    root_cy = Cyvest({"test": "data"}, root_type="artifact")
+    root_cy = Cyvest({"test": "data"}, root_type=Cyvest.OBS.ARTIFACT)
     inv = root_cy._investigation
     inv.add_whitelist("wl-001", "Known safe domain", "Verified by security team")
     shared = SharedInvestigationContext(root_cy)
@@ -1263,20 +1265,22 @@ def test_export_with_whitelists(tmp_path):
 
 def test_export_comprehensive_investigation(tmp_path):
     """Test export of a comprehensive investigation with all features."""
-    root_cy = Cyvest({"email_subject": "Phishing attempt", "sender": "attacker@evil.com"}, root_type="artifact")
+    root_cy = Cyvest(
+        {"email_subject": "Phishing attempt", "sender": "attacker@evil.com"}, root_type=Cyvest.OBS.ARTIFACT
+    )
     shared = SharedInvestigationContext(root_cy)
 
     # Build comprehensive investigation
     with shared.create_cyvest() as cy:
         # Observables
         email_obs = cy.observable(Cyvest.OBS.EMAIL_ADDR, "attacker@evil.com")
-        email_obs.add_ti("EmailRep", Decimal("9.5"))
+        email_obs.with_ti("EmailRep", Decimal("9.5"))
 
         domain_obs = cy.observable(Cyvest.OBS.DOMAIN_NAME, "evil.com")
-        domain_obs.add_ti("VT", Decimal("8.0"))
+        domain_obs.with_ti("VT", Decimal("8.0"))
 
         url_obs = cy.observable(Cyvest.OBS.URL, "https://evil.com/phishing")
-        url_obs.add_ti("URLhaus", Decimal("10.0"))
+        url_obs.with_ti("URLhaus", Decimal("10.0"))
 
         # Relationships
         email_obs.relate_to(domain_obs, Cyvest.REL.RELATED_TO)
@@ -1332,7 +1336,7 @@ def test_export_comprehensive_investigation(tmp_path):
 
 def test_export_empty_investigation(tmp_path):
     """Test exporting an investigation with only root observable."""
-    root_cy = Cyvest({"test": "empty"}, root_type="artifact")
+    root_cy = Cyvest({"test": "empty"}, root_type=Cyvest.OBS.ARTIFACT)
     shared = SharedInvestigationContext(root_cy)
 
     # No tasks run, only root observable exists
@@ -1357,7 +1361,7 @@ def test_export_empty_investigation(tmp_path):
 
 def test_export_parallel_updates(tmp_path):
     """Test that exports are consistent even with parallel task execution."""
-    root_cy = Cyvest({"test": "data"}, root_type="artifact")
+    root_cy = Cyvest({"test": "data"}, root_type=Cyvest.OBS.ARTIFACT)
     shared = SharedInvestigationContext(root_cy)
 
     # Multiple tasks updating investigation in parallel

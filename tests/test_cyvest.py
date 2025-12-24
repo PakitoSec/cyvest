@@ -13,18 +13,10 @@ from cyvest import Cyvest
 
 def test_cyvest_initialization() -> None:
     """Test Cyvest initialization."""
-    cv = Cyvest(data={"test": "data"})
+    cv = Cyvest(root_data={"test": "data"})
     root = cv.observable_get_root()
     assert root is not None
     assert root.obs_type == "file"
-
-
-def test_context_manager() -> None:
-    """Test Cyvest as context manager."""
-    with Cyvest() as cv:
-        assert cv is not None
-        obs = cv.observable_create(Cyvest.OBS.IPV4_ADDR, "192.168.1.1")
-        assert obs is not None
 
 
 def test_observable_creation() -> None:
@@ -98,7 +90,7 @@ def test_string_levels_are_accepted_by_api() -> None:
     assert ti.level == Cyvest.LVL.MALICIOUS
 
     cv.observable_set_level(obs.key, "trusted")
-    assert cv.get_all_observables()[obs.key].level == Cyvest.LVL.TRUSTED
+    assert cv.observable_get_all()[obs.key].level == Cyvest.LVL.TRUSTED
 
 
 def test_check_creation() -> None:
@@ -203,9 +195,9 @@ def test_investigation_merge() -> None:
     cv1.merge_investigation(cv2)
 
     # Should have observables from both (plus roots)
-    all_obs = cv1.get_all_observables()
+    all_obs = cv1.observable_get_all()
     assert len(all_obs) >= 3
-    all_checks = cv1.get_all_checks()
+    all_checks = cv1.check_get_all()
     assert len(all_checks) == 2
     assert cv1.get_global_score() == Decimal("5.0")
 
@@ -563,24 +555,24 @@ def test_io_save_load_json_roundtrip() -> None:
         loaded_cv = Cyvest.io_load_json(temp_path)
 
         # Verify observables
-        assert len(loaded_cv.get_all_observables()) == len(cv.get_all_observables())
+        assert len(loaded_cv.observable_get_all()) == len(cv.observable_get_all())
         loaded_obs1 = loaded_cv.observable_get(obs1.key)
         assert loaded_obs1 is not None
         assert loaded_obs1.value == "192.168.1.1"
         assert loaded_obs1.score == Decimal("7.5")
 
         # Verify threat intel
-        assert len(loaded_cv.get_all_threat_intels()) == len(cv.get_all_threat_intels())
+        assert len(loaded_cv.threat_intel_get_all()) == len(cv.threat_intel_get_all())
 
         # Verify checks
-        assert len(loaded_cv.get_all_checks()) == len(cv.get_all_checks())
+        assert len(loaded_cv.check_get_all()) == len(cv.check_get_all())
         loaded_check = loaded_cv.check_get(check.key)
         assert loaded_check is not None
         assert loaded_check.scope == "network"
         assert any(link.observable_key == obs1.key for link in loaded_check.observable_links)
 
         # Verify enrichments
-        assert len(loaded_cv.get_all_enrichments()) == len(cv.get_all_enrichments())
+        assert len(loaded_cv.enrichment_get_all()) == len(cv.enrichment_get_all())
 
         # Verify scores match
         assert loaded_cv.get_global_score() == cv.get_global_score()

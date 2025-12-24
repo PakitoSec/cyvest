@@ -55,35 +55,26 @@ class Cyvest:
 
     def __init__(
         self,
-        data: Any = None,
-        root_type: Literal["file", "artifact"] = "file",
-        score_mode: ScoreMode = ScoreMode.MAX,
+        root_data: Any = None,
+        root_type: ObservableType | Literal["file", "artifact"] = ObservableType.FILE,
+        score_mode_obs: ScoreMode = ScoreMode.MAX,
         investigation_name: str | None = None,
     ) -> None:
         """
         Initialize a new investigation.
 
         Args:
-            data: The data being investigated (optional)
-            root_type: Type of root observable ("file" or "artifact")
-            score_mode: Score calculation mode (MAX or SUM)
+            root_data: The data being investigated (optional)
+            root_type: Root observable type (ObservableType.FILE or ObservableType.ARTIFACT)
+            score_mode_obs: Observable score calculation mode (MAX or SUM)
             investigation_name: Optional human-readable investigation name
         """
-        normalized_score_mode = score_mode
         self._investigation = Investigation(
-            data,
+            root_data,
             root_type=root_type,
-            score_mode=normalized_score_mode,
+            score_mode_obs=score_mode_obs,
             investigation_name=investigation_name,
         )
-
-    def __enter__(self) -> Cyvest:
-        """Context manager entry."""
-        return self
-
-    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
-        """Context manager exit."""
-        pass
 
     @staticmethod
     def io_load_json(filepath: str | Path) -> Cyvest:
@@ -328,6 +319,12 @@ class Cyvest:
         """
         return self._observable_proxy(self._investigation.get_root())
 
+    def observable_get_all(self) -> dict[str, ObservableProxy]:
+        """Get read-only proxies for all observables."""
+        return {
+            key: ObservableProxy(self._investigation, key) for key in self._investigation.get_all_observables().keys()
+        }
+
     def observable_add_relationship(
         self,
         source: Observable | ObservableProxy | str,
@@ -423,6 +420,15 @@ class Cyvest:
         )
         return self._observable_proxy(model_observable)
 
+    # Threat intel methods
+
+    def threat_intel_get_all(self) -> dict[str, ThreatIntelProxy]:
+        """Get read-only proxies for all threat intel entries."""
+        return {
+            key: ThreatIntelProxy(self._investigation, key)
+            for key in self._investigation.get_all_threat_intels().keys()
+        }
+
     # Check methods
 
     def check_create(
@@ -516,6 +522,10 @@ class Cyvest:
             raise ValueError("check_get() accepts either (key: str) or (check_id: str, scope: str)")
         return self._check_proxy(self._investigation.get_check(key))
 
+    def check_get_all(self) -> dict[str, CheckProxy]:
+        """Get read-only proxies for all checks."""
+        return {key: CheckProxy(self._investigation, key) for key in self._investigation.get_all_checks().keys()}
+
     def check_link_observable(
         self,
         check_key: str,
@@ -608,6 +618,12 @@ class Cyvest:
         else:
             raise ValueError("container_get() accepts either (key: str) or (path: str)")
         return self._container_proxy(self._investigation.get_container(key))
+
+    def container_get_all(self) -> dict[str, ContainerProxy]:
+        """Get read-only proxies for all containers."""
+        return {
+            key: ContainerProxy(self._investigation, key) for key in self._investigation.get_all_containers().keys()
+        }
 
     def container_add_check(self, container_key: str, check_key: str) -> ContainerProxy | None:
         """
@@ -726,6 +742,12 @@ class Cyvest:
         else:
             raise ValueError('enrichment_get() accepts either (key: str) or (name: str, context: str = "")')
         return self._enrichment_proxy(self._investigation.get_enrichment(key))
+
+    def enrichment_get_all(self) -> dict[str, EnrichmentProxy]:
+        """Get read-only proxies for all enrichments."""
+        return {
+            key: EnrichmentProxy(self._investigation, key) for key in self._investigation.get_all_enrichments().keys()
+        }
 
     # Score and statistics methods
 
@@ -880,35 +902,6 @@ class Cyvest:
         """
         self._investigation.finalize_relationships()
 
-    def get_all_observables(self) -> dict[str, ObservableProxy]:
-        """Get read-only proxies for all observables."""
-        return {
-            key: ObservableProxy(self._investigation, key) for key in self._investigation.get_all_observables().keys()
-        }
-
-    def get_all_checks(self) -> dict[str, CheckProxy]:
-        """Get read-only proxies for all checks."""
-        return {key: CheckProxy(self._investigation, key) for key in self._investigation.get_all_checks().keys()}
-
-    def get_all_threat_intels(self) -> dict[str, ThreatIntelProxy]:
-        """Get read-only proxies for all threat intel entries."""
-        return {
-            key: ThreatIntelProxy(self._investigation, key)
-            for key in self._investigation.get_all_threat_intels().keys()
-        }
-
-    def get_all_enrichments(self) -> dict[str, EnrichmentProxy]:
-        """Get read-only proxies for all enrichments."""
-        return {
-            key: EnrichmentProxy(self._investigation, key) for key in self._investigation.get_all_enrichments().keys()
-        }
-
-    def get_all_containers(self) -> dict[str, ContainerProxy]:
-        """Get read-only proxies for all containers."""
-        return {
-            key: ContainerProxy(self._investigation, key) for key in self._investigation.get_all_containers().keys()
-        }
-
     def display_summary(
         self,
         show_graph: bool = True,
@@ -958,9 +951,9 @@ class Cyvest:
             Path to the generated HTML file
 
         Examples:
-            >>> with Cyvest() as cv:
-            ...     # Create investigation with observables
-            ...     cv.display_network()
+            >>> cv = Cyvest()
+            >>> # Create investigation with observables
+            >>> cv.display_network()
             '/tmp/cyvest_12345/cyvest_network.html'
         """
         from cyvest.io_visualization import generate_network_graph

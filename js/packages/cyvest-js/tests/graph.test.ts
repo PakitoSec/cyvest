@@ -145,8 +145,8 @@ function createGraphTestInvestigation(): CyvestInvestigation {
       total_containers: 0,
     },
     data_extraction: {
-      root_type: "email-message",
-      score_mode: "max",
+      root_type: "file",
+      score_mode_obs: "max",
     },
   };
 }

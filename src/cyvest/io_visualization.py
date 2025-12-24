@@ -169,9 +169,9 @@ def generate_network_graph(
     Examples:
         >>> from cyvest import Cyvest
         >>> from cyvest.io_visualization import generate_network_graph
-        >>> with Cyvest() as cv:
-        ...     # Create investigation with observables
-        ...     generate_network_graph(cv)
+        >>> cv = Cyvest()
+        >>> # Create investigation with observables
+        >>> generate_network_graph(cv)
         '/tmp/cyvest_network_12345.html'
     """
     if not PYVIS_AVAILABLE or Network is None:  # pragma: no branch - both change together
@@ -236,7 +236,7 @@ def generate_network_graph(
     )
 
     # Get all observables
-    observables = cv.get_all_observables()
+    observables = cv.observable_get_all()
 
     # Filter observables based on criteria
     filtered_observables = {}

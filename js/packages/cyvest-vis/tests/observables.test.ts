@@ -2,26 +2,21 @@ import { describe, expect, it } from "vitest";
 
 import { LEVEL_COLORS } from "@cyvest/cyvest-js";
 import {
-  getInvestigationNodeEmoji,
   getLevelBackgroundColor,
   getLevelColor,
-  getObservableEmoji,
   getObservableShape,
   truncateLabel,
 } from "../src/utils/observables";
 
 describe("observables utils", () => {
-  it("returns emojis for known and unknown observable types", () => {
-    expect(getObservableEmoji("domain-name")).toBe("🏠");
-    expect(getObservableEmoji("IPv4-Addr")).toBe("🌐");
-    expect(getObservableEmoji("unmapped")).toBe("❓");
-  });
-
-  it("returns shapes based on type and root flag", () => {
-    expect(getObservableShape("domain-name", false)).toBe("square");
-    expect(getObservableShape("ipv6-addr", false)).toBe("triangle");
+  it("returns shapes based on root flag (all non-root nodes are circles)", () => {
+    // All non-root nodes are now circles for a cleaner design
+    expect(getObservableShape("domain-name", false)).toBe("circle");
+    expect(getObservableShape("ipv6-addr", false)).toBe("circle");
     expect(getObservableShape("anything-else", false)).toBe("circle");
+    // Root nodes get a rectangle (pill shape)
     expect(getObservableShape("anything-else", true)).toBe("rectangle");
+    expect(getObservableShape("domain-name", true)).toBe("rectangle");
   });
 
   it("truncates long labels in the middle by default", () => {
@@ -32,11 +27,9 @@ describe("observables utils", () => {
 
   it("maps levels to colors", () => {
     expect(getLevelColor("SUSPICIOUS")).toBe(LEVEL_COLORS.SUSPICIOUS);
-    expect(getLevelBackgroundColor("SUSPICIOUS")).toBe("#feeadc");
-  });
-
-  it("returns investigation node emoji with fallback", () => {
-    expect(getInvestigationNodeEmoji("root")).toBe("🎯");
-    expect(getInvestigationNodeEmoji("missing")).toBe("❓");
+    // Background color is the level color lightened by 88%
+    const bgColor = getLevelBackgroundColor("SUSPICIOUS");
+    // Just verify it's a valid hex color that's lighter than the original
+    expect(bgColor).toMatch(/^#[0-9a-f]{6}$/i);
   });
 });

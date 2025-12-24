@@ -9,8 +9,43 @@ schema-required fields such as `investigation_id`, `investigation_name`, `starte
 ## Packages
 
 - **@cyvest/cyvest-js** — Generated types, schema validation, graph builders, and helper functions for Cyvest investigation JSON. Ships ESM/CJS builds and `.d.ts` files.
-- **@cyvest/cyvest-vis** — React 18+ components (powered by XYFlow + D3) to visualize investigations with level-aware styling. Depends on `@cyvest/cyvest-js`.
+- **@cyvest/cyvest-vis** — React 19+ visualization components (powered by React Flow + D3) to visualize investigations with level-aware styling. Depends on `@cyvest/cyvest-js`.
 - **@cyvest/cyvest-app** — Private Vite demo that bundles sample investigations and renders them via `CyvestGraph`. Useful for tweaking visuals and testing UI flows.
+
+## @cyvest/cyvest-vis
+
+Interactive graph visualization for Cyvest investigations.
+
+### Features
+
+- **Observables Graph**: Force-directed layout showing all observables and relationships
+- **Investigation Graph**: Hierarchical Dagre layout showing root → containers → checks
+- **Professional icons**: SVG icons for all observable types (IPs, domains, emails, files, etc.)
+- **Interactive controls**: Drag nodes, adjust force parameters, zoom/pan
+- **Level-aware colors**: Nodes styled by security level (SAFE → MALICIOUS)
+
+### Quick Start
+
+```tsx
+import { CyvestGraph } from "@cyvest/cyvest-vis";
+
+<CyvestGraph
+  investigation={investigation}
+  height={600}
+  showViewToggle
+  onNodeClick={(id) => console.log(id)}
+/>
+```
+
+### Available Components
+
+| Component | Description |
+|-----------|-------------|
+| `CyvestGraph` | Combined view with toggle between Observables and Investigation |
+| `ObservablesGraph` | Force-directed graph of observables and relationships |
+| `InvestigationGraph` | Hierarchical graph of root, checks, and containers |
+
+See the [cyvest-vis README](../js/packages/cyvest-vis/README.md) for detailed API documentation.
 
 ## Workspace commands
 
@@ -19,6 +54,12 @@ pnpm install                         # from repo root
 pnpm --filter @cyvest/cyvest-js build
 pnpm --filter @cyvest/cyvest-vis build
 pnpm --filter @cyvest/cyvest-app dev # run the demo app
+```
+
+Run tests:
+
+```bash
+pnpm --filter @cyvest/cyvest-vis test
 ```
 
 Regenerate TypeScript types from the Python schema when model changes land:

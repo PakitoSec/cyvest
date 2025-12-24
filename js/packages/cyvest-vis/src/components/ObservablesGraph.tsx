@@ -3,7 +3,7 @@
  * Uses iterative d3-force simulation for smooth, interactive layout.
  */
 
-import React, { useMemo, useCallback, useState } from "react";
+import React, { useMemo, useCallback, useState, useRef } from "react";
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -17,6 +17,8 @@ import {
   type NodeTypes,
   type EdgeTypes,
   ConnectionMode,
+  BackgroundVariant,
+  Panel,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
@@ -32,12 +34,7 @@ import type {
 import { DEFAULT_FORCE_CONFIG } from "../types";
 import { ObservableNode } from "./ObservableNode";
 import { FloatingEdge } from "./FloatingEdge";
-import {
-  getObservableEmoji,
-  getObservableShape,
-  truncateLabel,
-  getLevelColor,
-} from "../utils/observables";
+import { truncateLabel, getLevelColor } from "../utils/observables";
 import { useForceLayout } from "../hooks/useForceLayout";
 
 /**
@@ -55,6 +52,14 @@ const edgeTypes: EdgeTypes = {
 };
 
 /**
+ * Default edge style options
+ */
+const defaultEdgeOptions = {
+  type: "floating",
+  style: { stroke: "#94a3b8", strokeWidth: 1.5 },
+};
+
+/**
  * Convert investigation observables to React Flow nodes.
  */
 function createObservableNodes(
@@ -65,16 +70,14 @@ function createObservableNodes(
 
   return graph.nodes.map((graphNode, index) => {
     const isRoot = rootObservableIds.has(graphNode.id);
-    const shape = getObservableShape(graphNode.type, isRoot);
 
     const nodeData: ObservableNodeData = {
-      label: truncateLabel(graphNode.value, 18),
+      label: truncateLabel(graphNode.value, 16),
       fullValue: graphNode.value,
       observableType: graphNode.type,
       level: graphNode.level,
       score: graphNode.score,
-      emoji: getObservableEmoji(graphNode.type),
-      shape,
+      shape: "circle",
       isRoot,
       whitelisted: graphNode.whitelisted,
       internal: graphNode.internal,
@@ -82,7 +85,7 @@ function createObservableNodes(
 
     // Spread initial positions in a circle for better starting layout
     const angle = (index / graph.nodes.length) * 2 * Math.PI;
-    const radius = isRoot ? 0 : 150;
+    const radius = isRoot ? 0 : 180;
 
     return {
       id: graphNode.id,
@@ -92,6 +95,9 @@ function createObservableNodes(
         y: Math.sin(angle) * radius,
       },
       data: nodeData,
+      // Enable selection for better UX
+      selectable: true,
+      draggable: true,
     };
   });
 }
@@ -116,100 +122,181 @@ function createObservableEdges(
       target: graphEdge.target,
       type: "floating",
       data: edgeData,
+      // Animated edges for a modern feel
+      animated: false,
       style: { stroke: "#94a3b8", strokeWidth: 1.5 },
     };
   });
 }
 
 /**
- * Force controls panel component.
+ * Force controls panel component with modern styling.
  */
 const ForceControls: React.FC<{
   config: ForceLayoutConfig;
   onChange: (updates: Partial<ForceLayoutConfig>) => void;
   onRestart: () => void;
 }> = ({ config, onChange, onRestart }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  const panelStyle: React.CSSProperties = {
+    background: "rgba(255, 255, 255, 0.95)",
+    backdropFilter: "blur(8px)",
+    padding: isExpanded ? 14 : 10,
+    borderRadius: 12,
+    boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
+    fontSize: 12,
+    fontFamily:
+      "'SF Pro Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+    minWidth: isExpanded ? 180 : "auto",
+    transition: "all 0.2s ease",
+    border: "1px solid rgba(0,0,0,0.06)",
+  };
+
+  const headerStyle: React.CSSProperties = {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+    cursor: "pointer",
+  };
+
+  const titleStyle: React.CSSProperties = {
+    fontWeight: 600,
+    color: "#1f2937",
+    fontSize: 12,
+    letterSpacing: "-0.01em",
+  };
+
+  const toggleStyle: React.CSSProperties = {
+    background: "none",
+    border: "none",
+    cursor: "pointer",
+    padding: 4,
+    borderRadius: 4,
+    color: "#6b7280",
+    display: "flex",
+    alignItems: "center",
+    transition: "transform 0.2s ease",
+    transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)",
+  };
+
+  const sliderContainerStyle: React.CSSProperties = {
+    marginTop: 12,
+    display: isExpanded ? "block" : "none",
+  };
+
+  const sliderLabelStyle: React.CSSProperties = {
+    display: "flex",
+    justifyContent: "space-between",
+    marginBottom: 4,
+    color: "#4b5563",
+    fontSize: 11,
+  };
+
+  const sliderStyle: React.CSSProperties = {
+    width: "100%",
+    height: 4,
+    appearance: "none",
+    background: "#e5e7eb",
+    borderRadius: 2,
+    outline: "none",
+    cursor: "pointer",
+  };
+
+  const buttonStyle: React.CSSProperties = {
+    width: "100%",
+    padding: "8px 12px",
+    border: "none",
+    borderRadius: 8,
+    background: "linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)",
+    color: "white",
+    cursor: "pointer",
+    fontSize: 12,
+    fontWeight: 500,
+    marginTop: 12,
+    transition: "transform 0.1s ease, box-shadow 0.1s ease",
+    boxShadow: "0 2px 4px rgba(59, 130, 246, 0.3)",
+  };
+
   return (
-    <div
-      style={{
-        position: "absolute",
-        top: 10,
-        right: 10,
-        background: "white",
-        padding: 12,
-        borderRadius: 8,
-        boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-        fontSize: 12,
-        fontFamily: "system-ui, sans-serif",
-        zIndex: 10,
-        minWidth: 160,
-      }}
-    >
-      <div style={{ fontWeight: 600, marginBottom: 8 }}>Force Layout</div>
-
-      <div style={{ marginBottom: 8 }}>
-        <label style={{ display: "block", marginBottom: 2 }}>
-          Repulsion: {config.chargeStrength}
-        </label>
-        <input
-          type="range"
-          min="-500"
-          max="-50"
-          value={config.chargeStrength}
-          onChange={(e) =>
-            onChange({ chargeStrength: Number(e.target.value) })
-          }
-          style={{ width: "100%" }}
-        />
+    <div style={panelStyle}>
+      <div style={headerStyle} onClick={() => setIsExpanded(!isExpanded)}>
+        <span style={titleStyle}>⚡ Force Layout</span>
+        <button style={toggleStyle}>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
       </div>
 
-      <div style={{ marginBottom: 8 }}>
-        <label style={{ display: "block", marginBottom: 2 }}>
-          Link Distance: {config.linkDistance}
-        </label>
-        <input
-          type="range"
-          min="30"
-          max="200"
-          value={config.linkDistance}
-          onChange={(e) =>
-            onChange({ linkDistance: Number(e.target.value) })
-          }
-          style={{ width: "100%" }}
-        />
-      </div>
+      <div style={sliderContainerStyle}>
+        <div style={{ marginBottom: 10 }}>
+          <div style={sliderLabelStyle}>
+            <span>Repulsion</span>
+            <span>{config.chargeStrength}</span>
+          </div>
+          <input
+            type="range"
+            min="-500"
+            max="-50"
+            value={config.chargeStrength}
+            onChange={(e) =>
+              onChange({ chargeStrength: Number(e.target.value) })
+            }
+            style={sliderStyle}
+          />
+        </div>
 
-      <div style={{ marginBottom: 8 }}>
-        <label style={{ display: "block", marginBottom: 2 }}>
-          Collision: {config.collisionRadius}
-        </label>
-        <input
-          type="range"
-          min="10"
-          max="80"
-          value={config.collisionRadius}
-          onChange={(e) =>
-            onChange({ collisionRadius: Number(e.target.value) })
-          }
-          style={{ width: "100%" }}
-        />
-      </div>
+        <div style={{ marginBottom: 10 }}>
+          <div style={sliderLabelStyle}>
+            <span>Link Distance</span>
+            <span>{config.linkDistance}</span>
+          </div>
+          <input
+            type="range"
+            min="30"
+            max="200"
+            value={config.linkDistance}
+            onChange={(e) =>
+              onChange({ linkDistance: Number(e.target.value) })
+            }
+            style={sliderStyle}
+          />
+        </div>
 
-      <button
-        onClick={onRestart}
-        style={{
-          width: "100%",
-          padding: "6px 12px",
-          border: "none",
-          borderRadius: 4,
-          background: "#3b82f6",
-          color: "white",
-          cursor: "pointer",
-          fontSize: 12,
-        }}
-      >
-        Restart Simulation
-      </button>
+        <div style={{ marginBottom: 6 }}>
+          <div style={sliderLabelStyle}>
+            <span>Collision</span>
+            <span>{config.collisionRadius}</span>
+          </div>
+          <input
+            type="range"
+            min="10"
+            max="80"
+            value={config.collisionRadius}
+            onChange={(e) =>
+              onChange({ collisionRadius: Number(e.target.value) })
+            }
+            style={sliderStyle}
+          />
+        </div>
+
+        <button
+          onClick={onRestart}
+          style={buttonStyle}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = "translateY(-1px)";
+            e.currentTarget.style.boxShadow = "0 4px 8px rgba(59, 130, 246, 0.4)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = "translateY(0)";
+            e.currentTarget.style.boxShadow = "0 2px 4px rgba(59, 130, 246, 0.3)";
+          }}
+        >
+          Restart Simulation
+        </button>
+      </div>
     </div>
   );
 };
@@ -242,6 +329,9 @@ const ObservablesGraphInner: React.FC<
     ...initialForceConfig,
   });
 
+  // Track if this is the first render for fitView
+  const initialFitDone = useRef(false);
+
   // React Flow state - initialized with initial nodes/edges
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
@@ -250,6 +340,7 @@ const ObservablesGraphInner: React.FC<
   React.useEffect(() => {
     setNodes(initialNodes);
     setEdges(initialEdges);
+    initialFitDone.current = false;
   }, [initialNodes, initialEdges, setNodes, setEdges]);
 
   // Use the iterative force layout hook
@@ -292,15 +383,19 @@ const ObservablesGraphInner: React.FC<
     return getLevelColor(data.level);
   }, []);
 
+  // Container styles
+  const containerStyle = useMemo(
+    () => ({
+      width,
+      height,
+      position: "relative" as const,
+      background: "linear-gradient(180deg, #fafbfc 0%, #f0f4f8 100%)",
+    }),
+    [width, height]
+  );
+
   return (
-    <div
-      className={className}
-      style={{
-        width,
-        height,
-        position: "relative",
-      }}
-    >
+    <div className={className} style={containerStyle}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -313,25 +408,60 @@ const ObservablesGraphInner: React.FC<
         onNodeDragStop={onNodeDragStop}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
+        defaultEdgeOptions={defaultEdgeOptions}
         connectionMode={ConnectionMode.Loose}
         fitView
-        fitViewOptions={{ padding: 0.3 }}
+        fitViewOptions={{ padding: 0.4, maxZoom: 1.5 }}
         minZoom={0.1}
-        maxZoom={2}
+        maxZoom={2.5}
         proOptions={{ hideAttribution: true }}
+        // Better defaults for UX
+        nodesDraggable={true}
+        nodesConnectable={false}
+        elementsSelectable={true}
+        selectNodesOnDrag={false}
+        panOnDrag={true}
+        zoomOnScroll={true}
+        zoomOnPinch={true}
+        panOnScroll={false}
       >
-        <Background />
-        <Controls />
-        <MiniMap nodeColor={miniMapNodeColor} zoomable pannable />
-      </ReactFlow>
-
-      {showControls && (
-        <ForceControls
-          config={forceConfig}
-          onChange={handleConfigChange}
-          onRestart={restartSimulation}
+        <Background
+          variant={BackgroundVariant.Dots}
+          gap={24}
+          size={1}
+          color="#d1d5db"
         />
-      )}
+        <Controls
+          showInteractive={false}
+          style={{
+            borderRadius: 10,
+            boxShadow: "0 2px 12px rgba(0,0,0,0.1)",
+            border: "1px solid rgba(0,0,0,0.06)",
+          }}
+        />
+        <MiniMap
+          nodeColor={miniMapNodeColor}
+          zoomable
+          pannable
+          style={{
+            borderRadius: 10,
+            boxShadow: "0 2px 12px rgba(0,0,0,0.1)",
+            border: "1px solid rgba(0,0,0,0.06)",
+            background: "rgba(255,255,255,0.9)",
+          }}
+          maskColor="rgba(0,0,0,0.08)"
+        />
+
+        {showControls && (
+          <Panel position="top-right">
+            <ForceControls
+              config={forceConfig}
+              onChange={handleConfigChange}
+              onRestart={restartSimulation}
+            />
+          </Panel>
+        )}
+      </ReactFlow>
     </div>
   );
 };

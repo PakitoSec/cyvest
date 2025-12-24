@@ -45,7 +45,7 @@ import { CyvestGraph } from "@cyvest/cyvest-vis";
 | `ObservablesGraph` | Force-directed graph of observables and relationships |
 | `InvestigationGraph` | Hierarchical graph of root, checks, and containers |
 
-See the [cyvest-vis README](../js/packages/cyvest-vis/README.md) for detailed API documentation.
+See `js/packages/cyvest-vis/src/components` for advanced hooks and utilities.
 
 ## Workspace commands
 

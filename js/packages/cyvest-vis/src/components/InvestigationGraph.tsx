@@ -14,6 +14,8 @@ import {
   type Node,
   type Edge,
   type NodeTypes,
+  BackgroundVariant,
+  MarkerType,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
@@ -25,11 +27,7 @@ import type {
   InvestigationNodeType,
 } from "../types";
 import { InvestigationNode } from "./InvestigationNode";
-import {
-  getInvestigationNodeEmoji,
-  getLevelColor,
-  truncateLabel,
-} from "../utils/observables";
+import { getLevelColor, truncateLabel } from "../utils/observables";
 import { computeDagreLayout } from "../hooks/useDagreLayout";
 
 /**
@@ -37,6 +35,23 @@ import { computeDagreLayout } from "../hooks/useDagreLayout";
  */
 const nodeTypes: NodeTypes = {
   investigation: InvestigationNode,
+};
+
+/**
+ * Default edge style
+ */
+const defaultEdgeOptions = {
+  type: "smoothstep",
+  style: {
+    stroke: "#94a3b8",
+    strokeWidth: 1.5,
+  },
+  markerEnd: {
+    type: MarkerType.ArrowClosed,
+    width: 16,
+    height: 16,
+    color: "#94a3b8",
+  },
 };
 
 /**
@@ -89,7 +104,6 @@ function createInvestigationGraph(
     nodeType: "root",
     level: rootLevel,
     score: primaryRoot?.score ?? investigation.score,
-    emoji: getInvestigationNodeEmoji("root"),
   };
 
   nodes.push({
@@ -97,7 +111,19 @@ function createInvestigationGraph(
     type: "investigation",
     position: { x: 0, y: 0 },
     data: rootNodeData,
+    selectable: true,
+    draggable: true,
   });
+
+  // Collect all check keys that belong to containers
+  // These checks should NOT have a direct link to the root node
+  const allContainers = flattenContainers(investigation.containers);
+  const checksInContainers = new Set<string>();
+  for (const container of allContainers) {
+    for (const checkKey of container.checks) {
+      checksInContainers.add(checkKey);
+    }
+  }
 
   // Add check nodes
   // Group checks by scope for better organization
@@ -118,7 +144,6 @@ function createInvestigationGraph(
       level: check.level,
       score: check.score,
       description: truncateLabel(check.description, 30),
-      emoji: getInvestigationNodeEmoji("check"),
     };
 
     nodes.push({
@@ -126,28 +151,34 @@ function createInvestigationGraph(
       type: "investigation",
       position: { x: 0, y: 0 },
       data: checkNodeData,
+      selectable: true,
+      draggable: true,
     });
 
-    // Edge from root to check
-    edges.push({
-      id: `edge-root-${check.key}`,
-      source: rootKey,
-      target: `check-${check.key}`,
-      type: "default",
-    });
+    // Only create edge from root to check if check is NOT in a container
+    // Checks in containers will be linked through their container instead
+    if (!checksInContainers.has(check.key)) {
+      edges.push({
+        id: `edge-root-${check.key}`,
+        source: rootKey,
+        target: `check-${check.key}`,
+        type: "smoothstep",
+        animated: false,
+      });
+    }
   }
 
   // Add container nodes
-  const allContainers = flattenContainers(investigation.containers);
-
   for (const container of allContainers) {
     const containerNodeData: InvestigationNodeData = {
-      label: truncateLabel(container.path.split("/").pop() ?? container.path, 20),
+      label: truncateLabel(
+        container.path.split("/").pop() ?? container.path,
+        20
+      ),
       nodeType: "container",
       level: container.aggregated_level,
       score: container.aggregated_score,
       path: container.path,
-      emoji: getInvestigationNodeEmoji("container"),
     };
 
     nodes.push({
@@ -155,6 +186,8 @@ function createInvestigationGraph(
       type: "investigation",
       position: { x: 0, y: 0 },
       data: containerNodeData,
+      selectable: true,
+      draggable: true,
     });
 
     // Edge from root to container
@@ -162,7 +195,8 @@ function createInvestigationGraph(
       id: `edge-root-container-${container.key}`,
       source: rootKey,
       target: `container-${container.key}`,
-      type: "default",
+      type: "smoothstep",
+      animated: false,
     });
 
     // Edges from container to its checks
@@ -172,8 +206,8 @@ function createInvestigationGraph(
           id: `edge-container-check-${container.key}-${checkKey}`,
           source: `container-${container.key}`,
           target: `check-${checkKey}`,
-          type: "default",
-          style: { strokeDasharray: "5,5" },
+          type: "smoothstep",
+          animated: false,
         });
       }
     }
@@ -203,8 +237,8 @@ export const InvestigationGraph: React.FC<InvestigationGraphProps> = ({
   const { nodes: layoutNodes, edges: layoutEdges } = useMemo(() => {
     return computeDagreLayout(initialNodes, initialEdges, {
       direction: "LR",
-      nodeSpacing: 30,
-      rankSpacing: 120,
+      nodeSpacing: 40,
+      rankSpacing: 140,
     });
   }, [initialNodes, initialEdges]);
 
@@ -233,15 +267,19 @@ export const InvestigationGraph: React.FC<InvestigationGraphProps> = ({
     return getLevelColor(data.level);
   }, []);
 
+  // Container styles
+  const containerStyle = useMemo(
+    () => ({
+      width,
+      height,
+      position: "relative" as const,
+      background: "linear-gradient(180deg, #fafbfc 0%, #f0f4f8 100%)",
+    }),
+    [width, height]
+  );
+
   return (
-    <div
-      className={className}
-      style={{
-        width,
-        height,
-        position: "relative",
-      }}
-    >
+    <div className={className} style={containerStyle}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -249,15 +287,48 @@ export const InvestigationGraph: React.FC<InvestigationGraphProps> = ({
         onEdgesChange={onEdgesChange}
         onNodeClick={handleNodeClick}
         nodeTypes={nodeTypes}
+        defaultEdgeOptions={defaultEdgeOptions}
         fitView
-        fitViewOptions={{ padding: 0.2 }}
+        fitViewOptions={{ padding: 0.3, maxZoom: 1.5 }}
         minZoom={0.1}
-        maxZoom={2}
+        maxZoom={2.5}
         proOptions={{ hideAttribution: true }}
+        // UX settings
+        nodesDraggable={true}
+        nodesConnectable={false}
+        elementsSelectable={true}
+        selectNodesOnDrag={false}
+        panOnDrag={true}
+        zoomOnScroll={true}
+        zoomOnPinch={true}
+        panOnScroll={false}
       >
-        <Background />
-        <Controls />
-        <MiniMap nodeColor={miniMapNodeColor} zoomable pannable />
+        <Background
+          variant={BackgroundVariant.Dots}
+          gap={24}
+          size={1}
+          color="#d1d5db"
+        />
+        <Controls
+          showInteractive={false}
+          style={{
+            borderRadius: 10,
+            boxShadow: "0 2px 12px rgba(0,0,0,0.1)",
+            border: "1px solid rgba(0,0,0,0.06)",
+          }}
+        />
+        <MiniMap
+          nodeColor={miniMapNodeColor}
+          zoomable
+          pannable
+          style={{
+            borderRadius: 10,
+            boxShadow: "0 2px 12px rgba(0,0,0,0.1)",
+            border: "1px solid rgba(0,0,0,0.06)",
+            background: "rgba(255,255,255,0.9)",
+          }}
+          maskColor="rgba(0,0,0,0.08)"
+        />
       </ReactFlow>
     </div>
   );

@@ -11,8 +11,9 @@ import type { Level } from "@cyvest/cyvest-js";
 
 /**
  * Shape types for observable nodes.
+ * In the current design, all non-root nodes are circles.
  */
-export type ObservableShape = "square" | "circle" | "rectangle" | "triangle";
+export type ObservableShape = "circle" | "rectangle";
 
 /**
  * Data attached to observable graph nodes.
@@ -28,8 +29,6 @@ export interface ObservableNodeData extends Record<string, unknown> {
   level: Level;
   /** Numeric score */
   score: number;
-  /** Emoji representing the observable type */
-  emoji: string;
   /** Shape for this node type */
   shape: ObservableShape;
   /** Whether this is the root observable */
@@ -85,8 +84,6 @@ export interface InvestigationNodeData extends Record<string, unknown> {
   description?: string;
   /** Path (for containers) */
   path?: string;
-  /** Emoji for the node */
-  emoji: string;
 }
 
 /**
@@ -107,26 +104,27 @@ export type InvestigationEdge = Edge;
  * Configuration options for d3-force layout.
  */
 export interface ForceLayoutConfig {
-  /** Strength of the charge force (repulsion). Default: -300 */
+  /** Strength of the charge force (repulsion). Default: -200 */
   chargeStrength: number;
-  /** Target distance between linked nodes. Default: 100 */
+  /** Target distance between linked nodes. Default: 80 */
   linkDistance: number;
-  /** Strength of the centering force. Default: 0.1 */
+  /** Strength of the centering force. Default: 0.05 */
   centerStrength: number;
-  /** Strength of the collision force. Default: 30 */
+  /** Radius for collision detection. Default: 40 */
   collisionRadius: number;
-  /** Number of simulation iterations. Default: 300 */
+  /** Number of simulation iterations (for static layout). Default: 300 */
   iterations: number;
 }
 
 /**
  * Default force layout configuration.
+ * Tuned for good visual separation and smooth animations.
  */
 export const DEFAULT_FORCE_CONFIG: ForceLayoutConfig = {
   chargeStrength: -200,
   linkDistance: 80,
   centerStrength: 0.05,
-  collisionRadius: 40,
+  collisionRadius: 45,
   iterations: 300,
 };
 

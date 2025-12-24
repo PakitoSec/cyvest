@@ -1,143 +1,160 @@
 /**
  * Custom node component for the Investigation Graph (Dagre layout).
- * Renders root, check, and container nodes.
+ * Professional design with SVG icons for root, check, and container nodes.
  */
 
-import React, { memo } from "react";
+import React, { memo, useMemo } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import type { InvestigationNodeData } from "../types";
 import { getLevelColor, getLevelBackgroundColor } from "../utils/observables";
+import { getInvestigationIcon } from "./Icons";
 
 /**
- * Investigation node component.
+ * Node style configuration by type
  */
-function InvestigationNodeComponent({
-  data,
-  selected,
-}: NodeProps) {
+const NODE_CONFIG = {
+  root: {
+    minWidth: 140,
+    padding: "10px 18px",
+    borderRadius: 20,
+    fontWeight: 600 as const,
+    fontSize: 13,
+    iconSize: 18,
+    showIcon: true,
+    alignCenter: true,
+  },
+  check: {
+    minWidth: 140,
+    padding: "8px 14px",
+    borderRadius: 8,
+    fontWeight: 500 as const,
+    fontSize: 12,
+    iconSize: 14,
+    showIcon: false, // No icon for checks
+    alignCenter: false, // Left-aligned
+  },
+  container: {
+    minWidth: 120,
+    padding: "8px 14px",
+    borderRadius: 16,
+    fontWeight: 500 as const,
+    fontSize: 12,
+    iconSize: 16,
+    showIcon: true,
+    alignCenter: true,
+  },
+} as const;
+
+/**
+ * Investigation node component with professional design.
+ */
+function InvestigationNodeComponent({ data, selected }: NodeProps) {
   const nodeData = data as unknown as InvestigationNodeData;
-  const {
-    label,
-    emoji,
-    nodeType,
-    level,
-    description,
-  } = nodeData;
+  const { label, nodeType, level, description } = nodeData;
 
   const borderColor = getLevelColor(level);
   const backgroundColor = getLevelBackgroundColor(level);
+  const config = NODE_CONFIG[nodeType] || NODE_CONFIG.check;
 
-  // Different styles based on node type
-  const getNodeStyle = () => {
-    switch (nodeType) {
-      case "root":
-        return {
-          minWidth: 120,
-          padding: "8px 16px",
-          borderRadius: 8,
-          fontWeight: 600 as const,
-        };
-      case "check":
-        return {
-          minWidth: 100,
-          padding: "6px 12px",
-          borderRadius: 4,
-          fontWeight: 400 as const,
-        };
-      case "container":
-        return {
-          minWidth: 100,
-          padding: "6px 12px",
-          borderRadius: 12,
-          fontWeight: 400 as const,
-        };
-      default:
-        return {
-          minWidth: 80,
-          padding: "6px 12px",
-          borderRadius: 4,
-          fontWeight: 400 as const,
-        };
-    }
+  // Get the appropriate icon component
+  const IconComponent = useMemo(
+    () => getInvestigationIcon(nodeType),
+    [nodeType]
+  );
+
+  // Memoize node style
+  const nodeStyle = useMemo(
+    () => ({
+      minWidth: config.minWidth,
+      padding: config.padding,
+      borderRadius: config.borderRadius,
+      display: "flex",
+      flexDirection: "column" as const,
+      alignItems: config.alignCenter ? "center" : "flex-start",
+      backgroundColor,
+      border: `2px solid ${borderColor}`,
+      boxShadow: selected
+        ? `0 0 0 3px ${borderColor}40, 0 4px 12px rgba(0,0,0,0.15)`
+        : "0 2px 8px rgba(0,0,0,0.08)",
+      cursor: "pointer",
+      fontFamily:
+        "'SF Pro Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+      transition: "box-shadow 0.15s ease-out, transform 0.1s ease-out",
+    }),
+    [config, backgroundColor, borderColor, selected]
+  );
+
+  const headerStyle = useMemo(
+    () => ({
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      width: config.alignCenter ? "auto" : "100%",
+    }),
+    [config.alignCenter]
+  );
+
+  const labelStyle = useMemo(
+    () => ({
+      fontSize: config.fontSize,
+      fontWeight: config.fontWeight,
+      maxWidth: 180,
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      whiteSpace: "nowrap" as const,
+      color: "#1f2937",
+      letterSpacing: "-0.01em",
+    }),
+    [config]
+  );
+
+  const descriptionStyle = useMemo(
+    () => ({
+      marginTop: 4,
+      fontSize: 10,
+      color: "#6b7280",
+      maxWidth: 170,
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      whiteSpace: "nowrap" as const,
+      lineHeight: 1.3,
+      width: "100%",
+      textAlign: config.alignCenter ? ("center" as const) : ("left" as const),
+    }),
+    [config.alignCenter]
+  );
+
+  // Hidden handle style - edges connect but no visible dots
+  const handleStyle: React.CSSProperties = {
+    width: 1,
+    height: 1,
+    background: "transparent",
+    border: "none",
+    opacity: 0,
   };
 
-  const style = getNodeStyle();
-
   return (
-    <div
-      className="investigation-node"
-      style={{
-        ...style,
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        backgroundColor,
-        border: `${selected ? 3 : 2}px solid ${borderColor}`,
-        cursor: "pointer",
-        fontFamily: "system-ui, sans-serif",
-      }}
-    >
-      {/* Header with emoji and label */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 6,
-        }}
-      >
-        <span style={{ fontSize: 14 }}>{emoji}</span>
-        <span
-          style={{
-            fontSize: 12,
-            fontWeight: style.fontWeight,
-            maxWidth: 150,
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-          }}
-          title={label}
-        >
+    <div className="investigation-node" style={nodeStyle}>
+      {/* Header with optional icon and label */}
+      <div style={headerStyle}>
+        {config.showIcon && (
+          <IconComponent size={config.iconSize} color={borderColor} />
+        )}
+        <span style={labelStyle} title={label}>
           {label}
         </span>
       </div>
 
       {/* Description for checks */}
       {description && (
-        <div
-          style={{
-            marginTop: 4,
-            fontSize: 10,
-            color: "#6b7280",
-            maxWidth: 140,
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-          }}
-          title={description}
-        >
+        <div style={descriptionStyle} title={description}>
           {description}
         </div>
       )}
 
-      {/* Handles for edges */}
-      <Handle
-        type="target"
-        position={Position.Left}
-        style={{
-          width: 8,
-          height: 8,
-          background: borderColor,
-        }}
-      />
-      <Handle
-        type="source"
-        position={Position.Right}
-        style={{
-          width: 8,
-          height: 8,
-          background: borderColor,
-        }}
-      />
+      {/* Hidden handles for edges - edges still connect but no visible dots */}
+      <Handle type="target" position={Position.Left} style={handleStyle} />
+      <Handle type="source" position={Position.Right} style={handleStyle} />
     </div>
   );
 }

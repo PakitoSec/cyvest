@@ -1,6 +1,6 @@
 /**
  * Hook for computing force-directed layout using d3-force.
- * Uses an iterative simulation that updates on each tick.
+ * Uses a stable simulation that persists across renders.
  */
 
 import { useEffect, useRef, useCallback, useMemo } from "react";
@@ -46,10 +46,12 @@ interface SimLink extends SimulationLinkDatum<SimNode> {
 }
 
 /**
- * Selector to check if nodes are initialized
+ * Selector to get node IDs for change detection
  */
-const nodeCountSelector = (state: { nodeLookup: Map<string, Node> }) =>
-  state.nodeLookup.size;
+const nodeIdsSelector = (state: { nodeLookup: Map<string, Node> }) => {
+  const ids = Array.from(state.nodeLookup.keys()).sort();
+  return ids.join(",");
+};
 
 /**
  * Hook that applies iterative force-directed layout to React Flow nodes.
@@ -61,7 +63,7 @@ export function useForceLayout(
 ) {
   const { getNodes, getEdges, setNodes } = useReactFlow();
   const nodesInitialized = useNodesInitialized();
-  const nodeCount = useStore(nodeCountSelector);
+  const nodeIds = useStore(nodeIdsSelector);
 
   // Merge config with defaults
   const forceConfig = useMemo(
@@ -72,29 +74,57 @@ export function useForceLayout(
   // Store the simulation reference
   const simulationRef = useRef<Simulation<SimNode, SimLink> | null>(null);
 
-  // Store dragging state
-  const draggingNodeRef = useRef<string | null>(null);
+  // Track dragging state with ref for immediate access
+  const draggingRef = useRef<{
+    nodeId: string | null;
+    active: boolean;
+  }>({ nodeId: null, active: false });
+
+  // Store node positions in a ref to avoid React state conflicts during drag
+  const nodePositionsRef = useRef<Map<string, { x: number; y: number }>>(
+    new Map()
+  );
+
+  // Animation frame ref for smooth updates
+  const rafRef = useRef<number | null>(null);
 
   // Initialize and run the simulation
   useEffect(() => {
-    if (!nodesInitialized || nodeCount === 0) {
+    if (!nodesInitialized || !nodeIds) {
       return;
     }
 
     const nodes = getNodes();
     const edges = getEdges();
 
+    if (nodes.length === 0) {
+      return;
+    }
+
     // Create simulation nodes from React Flow nodes
     const simNodes: SimNode[] = nodes.map((node) => {
       // Check if this node already exists in the simulation
-      const existingNode = simulationRef.current?.nodes().find((n) => n.id === node.id);
+      const existingNode = simulationRef.current
+        ?.nodes()
+        .find((n) => n.id === node.id);
+
+      // Use existing position if available, otherwise use node position
+      const x =
+        existingNode?.x ??
+        nodePositionsRef.current.get(node.id)?.x ??
+        node.position.x ??
+        Math.random() * 500 - 250;
+      const y =
+        existingNode?.y ??
+        nodePositionsRef.current.get(node.id)?.y ??
+        node.position.y ??
+        Math.random() * 500 - 250;
 
       return {
         id: node.id,
-        // Use existing simulation position or node position
-        x: existingNode?.x ?? node.position.x ?? Math.random() * 500 - 250,
-        y: existingNode?.y ?? node.position.y ?? Math.random() * 500 - 250,
-        // Preserve fixed positions for dragged nodes
+        x,
+        y,
+        // Preserve fixed positions for dragged nodes or root
         fx: existingNode?.fx ?? null,
         fy: existingNode?.fy ?? null,
       };
@@ -122,6 +152,12 @@ export function useForceLayout(
       simulationRef.current.stop();
     }
 
+    // Cancel any pending animation frame
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
+
     // Create the force simulation
     const simulation = forceSimulation<SimNode>(simNodes)
       .force(
@@ -129,37 +165,44 @@ export function useForceLayout(
         forceLink<SimNode, SimLink>(simLinks)
           .id((d) => d.id)
           .distance(forceConfig.linkDistance)
-          .strength(0.5)
+          .strength(0.4)
       )
       .force(
         "charge",
         forceManyBody<SimNode>().strength(forceConfig.chargeStrength)
       )
-      .force(
-        "center",
-        forceCenter(0, 0).strength(forceConfig.centerStrength)
-      )
-      .force(
-        "collision",
-        forceCollide<SimNode>(forceConfig.collisionRadius)
-      )
-      .force(
-        "x",
-        forceX<SimNode>(0).strength(0.01)
-      )
-      .force(
-        "y",
-        forceY<SimNode>(0).strength(0.01)
-      )
+      .force("center", forceCenter(0, 0).strength(forceConfig.centerStrength))
+      .force("collision", forceCollide<SimNode>(forceConfig.collisionRadius))
+      .force("x", forceX<SimNode>(0).strength(0.008))
+      .force("y", forceY<SimNode>(0).strength(0.008))
       .alphaDecay(0.02)
-      .velocityDecay(0.4);
+      .velocityDecay(0.35);
 
-    // Update React Flow nodes on each tick
-    simulation.on("tick", () => {
+    // Batch updates using requestAnimationFrame for smoother rendering
+    const updateNodes = () => {
+      if (draggingRef.current.active) {
+        // Don't update node positions while actively dragging
+        rafRef.current = requestAnimationFrame(updateNodes);
+        return;
+      }
+
+      const simNodes = simulation.nodes();
+
+      // Update position cache
+      for (const simNode of simNodes) {
+        nodePositionsRef.current.set(simNode.id, { x: simNode.x, y: simNode.y });
+      }
+
+      // Batch update React Flow nodes
       setNodes((currentNodes) =>
         currentNodes.map((node) => {
-          const simNode = simulation.nodes().find((n) => n.id === node.id);
+          const simNode = simNodes.find((n) => n.id === node.id);
           if (!simNode) return node;
+
+          // Skip update if position hasn't changed significantly
+          const dx = Math.abs(node.position.x - simNode.x);
+          const dy = Math.abs(node.position.y - simNode.y);
+          if (dx < 0.1 && dy < 0.1) return node;
 
           return {
             ...node,
@@ -170,6 +213,16 @@ export function useForceLayout(
           };
         })
       );
+
+      if (simulation.alpha() > 0.001) {
+        rafRef.current = requestAnimationFrame(updateNodes);
+      }
+    };
+
+    simulation.on("tick", () => {
+      if (rafRef.current === null && simulation.alpha() > 0.001) {
+        rafRef.current = requestAnimationFrame(updateNodes);
+      }
     });
 
     simulationRef.current = simulation;
@@ -177,10 +230,14 @@ export function useForceLayout(
     // Cleanup: stop simulation when unmounting or dependencies change
     return () => {
       simulation.stop();
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
     };
   }, [
     nodesInitialized,
-    nodeCount,
+    nodeIds,
     getNodes,
     getEdges,
     setNodes,
@@ -189,44 +246,47 @@ export function useForceLayout(
   ]);
 
   /**
-   * Handle drag start - fix the node position and reheat simulation
+   * Handle drag start - fix the node position
    */
   const onNodeDragStart = useCallback(
     (_: React.MouseEvent, node: Node) => {
       const simulation = simulationRef.current;
       if (!simulation) return;
 
-      draggingNodeRef.current = node.id;
+      // Mark as dragging immediately
+      draggingRef.current = { nodeId: node.id, active: true };
 
-      // Reheat the simulation
-      simulation.alphaTarget(0.3).restart();
-
-      // Fix the node position
-      const simNode = simulation.nodes().find((n) => n.id === node.id);
-      if (simNode) {
-        simNode.fx = simNode.x;
-        simNode.fy = simNode.y;
-      }
-    },
-    []
-  );
-
-  /**
-   * Handle drag - update the fixed position
-   */
-  const onNodeDrag = useCallback(
-    (_: React.MouseEvent, node: Node) => {
-      const simulation = simulationRef.current;
-      if (!simulation) return;
-
+      // Find and fix the simulation node
       const simNode = simulation.nodes().find((n) => n.id === node.id);
       if (simNode) {
         simNode.fx = node.position.x;
         simNode.fy = node.position.y;
       }
+
+      // Gently reheat the simulation
+      simulation.alphaTarget(0.1).restart();
     },
     []
   );
+
+  /**
+   * Handle drag - update the fixed position without triggering React updates
+   */
+  const onNodeDrag = useCallback((_: React.MouseEvent, node: Node) => {
+    const simulation = simulationRef.current;
+    if (!simulation) return;
+
+    const simNode = simulation.nodes().find((n) => n.id === node.id);
+    if (simNode) {
+      simNode.fx = node.position.x;
+      simNode.fy = node.position.y;
+      // Update cache
+      nodePositionsRef.current.set(node.id, {
+        x: node.position.x,
+        y: node.position.y,
+      });
+    }
+  }, []);
 
   /**
    * Handle drag end - unfix the node and let simulation cool down
@@ -234,11 +294,13 @@ export function useForceLayout(
   const onNodeDragStop = useCallback(
     (_: React.MouseEvent, node: Node) => {
       const simulation = simulationRef.current;
+
+      // Clear dragging state first
+      draggingRef.current = { nodeId: null, active: false };
+
       if (!simulation) return;
 
-      draggingNodeRef.current = null;
-
-      // Let simulation cool down
+      // Let simulation cool down gradually
       simulation.alphaTarget(0);
 
       // Unfix the node (unless it's the root)
@@ -249,6 +311,13 @@ export function useForceLayout(
           simNode.fy = null;
         }
       }
+
+      // Schedule a gentle restart to let the graph settle
+      setTimeout(() => {
+        if (simulationRef.current && !draggingRef.current.active) {
+          simulationRef.current.alpha(0.1).restart();
+        }
+      }, 50);
     },
     [rootNodeId]
   );
@@ -269,7 +338,9 @@ export function useForceLayout(
       }
 
       if (updates.linkDistance !== undefined) {
-        const linkForce = simulation.force("link") as ReturnType<typeof forceLink<SimNode, SimLink>> | undefined;
+        const linkForce = simulation.force("link") as
+          | ReturnType<typeof forceLink<SimNode, SimLink>>
+          | undefined;
         if (linkForce) {
           linkForce.distance(updates.linkDistance);
         }
@@ -283,7 +354,7 @@ export function useForceLayout(
       }
 
       // Reheat simulation to apply changes
-      simulation.alpha(0.5).restart();
+      simulation.alpha(0.3).restart();
     },
     []
   );
@@ -358,7 +429,10 @@ export function computeForceLayout(
         .distance(config.linkDistance)
     )
     .force("charge", forceManyBody().strength(config.chargeStrength))
-    .force("center", forceCenter(centerX, centerY).strength(config.centerStrength))
+    .force(
+      "center",
+      forceCenter(centerX, centerY).strength(config.centerStrength)
+    )
     .force("collision", forceCollide(config.collisionRadius))
     .stop();
 

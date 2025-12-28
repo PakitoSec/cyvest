@@ -8,23 +8,14 @@ from cyvest.model import Observable, ObservableType, Relationship, RelationshipT
 def test_observable_type_enum_values() -> None:
     """Test that ObservableType enum has expected values."""
     # Network types
-    assert ObservableType.IPV4_ADDR.value == "ipv4-addr"
-    assert ObservableType.IPV6_ADDR.value == "ipv6-addr"
-    assert ObservableType.DOMAIN_NAME.value == "domain-name"
+    assert ObservableType.IPV4.value == "ipv4"
+    assert ObservableType.IPV6.value == "ipv6"
+    assert ObservableType.DOMAIN.value == "domain"
     assert ObservableType.URL.value == "url"
-    assert ObservableType.MAC_ADDR.value == "mac-addr"
-
-    # Email types
-    assert ObservableType.EMAIL_ADDR.value == "email-addr"
-    assert ObservableType.EMAIL_MESSAGE.value == "email-message"
-
-    # File types
+    assert ObservableType.HASH.value == "hash"
+    assert ObservableType.EMAIL.value == "email"
     assert ObservableType.FILE.value == "file"
-    assert ObservableType.DIRECTORY.value == "directory"
-
-    # System types
-    assert ObservableType.PROCESS.value == "process"
-    assert ObservableType.SOFTWARE.value == "software"
+    assert ObservableType.ARTIFACT.value == "artifact"
 
 
 def test_relationship_type_enum_values() -> None:
@@ -49,14 +40,14 @@ def test_observable_with_enum_type() -> None:
 def test_observable_with_string_type() -> None:
     """Test creating observable with string type (backward compatibility)."""
     obs = Observable(
-        obs_type="ipv4-addr",
+        obs_type="ipv4",
         value="192.0.2.1",
         score=Decimal("5.0"),
     )
 
     # String should be normalized to enum if it's a known type
     assert isinstance(obs.obs_type, ObservableType)
-    assert obs.obs_type == ObservableType.IPV4_ADDR
+    assert obs.obs_type == ObservableType.IPV4
 
 
 def test_observable_with_custom_type() -> None:
@@ -75,19 +66,19 @@ def test_observable_with_custom_type() -> None:
 def test_observable_key_generation_with_enum() -> None:
     """Test that key generation works correctly with enum types."""
     obs = Observable(
-        obs_type=ObservableType.DOMAIN_NAME,
+        obs_type=ObservableType.DOMAIN,
         value="example.com",
     )
 
     # Key should use the enum's string value
-    assert "domain-name" in obs.key
+    assert "domain" in obs.key
     assert "example.com" in obs.key
 
 
 def test_relationship_with_enum_type() -> None:
     """Test creating relationship with RelationshipType enum."""
     rel = Relationship(
-        target_key="obs:ipv4-addr:192.0.2.1",
+        target_key="obs:ipv4:192.0.2.1",
         relationship_type=RelationshipType.RELATED_TO,
     )
 
@@ -100,7 +91,7 @@ def test_relationship_with_enum_type() -> None:
 def test_relationship_with_string_type() -> None:
     """Test creating relationship with string type (backward compatibility)."""
     rel = Relationship(
-        target_key="obs:ipv4-addr:192.0.2.1",
+        target_key="obs:ipv4:192.0.2.1",
         relationship_type="related-to",
     )
 
@@ -131,7 +122,7 @@ def test_observable_add_relationship_with_enum() -> None:
         value="https://example.com",
     )
 
-    target = Observable(obs_type=ObservableType.IPV4_ADDR, value="192.0.2.1")
+    target = Observable(obs_type=ObservableType.IPV4, value="192.0.2.1")
     inv.add_observable(obs)
     inv.add_observable(target)
     inv.add_relationship(obs, target, RelationshipType.RELATED_TO)

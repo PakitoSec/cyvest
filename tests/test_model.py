@@ -4,6 +4,8 @@ Tests for the core model classes.
 
 from decimal import Decimal
 
+import pytest
+
 from cyvest.investigation import Investigation
 from cyvest.levels import Level
 from cyvest.model import (
@@ -51,7 +53,7 @@ def test_observable_creation_with_score() -> None:
 def test_observable_score_update() -> None:
     """Test updating observable score."""
     inv = Investigation(root_data={})
-    obs = Observable(obs_type="ip", value="192.168.1.1")
+    obs = Observable(obs_type="ipv4", value="192.168.1.1")
     inv.add_observable(obs)
     initial_score = obs.score
     inv.apply_score_change(obs, Decimal("5.0"), reason="Test update")
@@ -64,7 +66,7 @@ def test_observable_relationships() -> None:
     """Test observable relationships."""
     inv = Investigation(root_data={})
     obs1 = Observable(obs_type="url", value="https://example.com")
-    obs2 = Observable(obs_type="ip", value="192.168.1.1")
+    obs2 = Observable(obs_type="ipv4", value="192.168.1.1")
     inv.add_observable(obs1)
     inv.add_observable(obs2)
     inv.add_relationship(obs1, obs2, "related-to")
@@ -176,6 +178,28 @@ def test_threat_intel_creation() -> None:
     assert ti.key.startswith("ti:")
 
 
+def test_threat_intel_unbound_creation() -> None:
+    """ThreatIntel can be created in an unbound/draft state."""
+    ti = ThreatIntel(source="virustotal", score=Decimal("8.0"))
+    assert ti.observable_key == ""
+    assert ti.key == ""
+    assert ti.level == Level.MALICIOUS  # Auto-calculated from score
+
+
+def test_threat_intel_taxonomy_names_unique() -> None:
+    """ThreatIntel should reject duplicate taxonomy names."""
+    with pytest.raises(ValueError):
+        ThreatIntel(
+            source="virustotal",
+            observable_key="obs:url:example.com",
+            score=Decimal("8.0"),
+            taxonomies=[
+                {"level": Level.INFO, "name": "malware-type", "value": "trojan"},
+                {"level": Level.INFO, "name": "malware-type", "value": "worm"},
+            ],
+        )
+
+
 def test_enrichment_creation() -> None:
     """Test creating enrichment."""
     enr = Enrichment(name="email_headers", data={"from": "test@example.com"})
@@ -263,7 +287,7 @@ def test_explicit_level_setting() -> None:
 def test_string_level_inputs_are_normalized() -> None:
     """String level values should be accepted and normalized."""
     inv = Investigation(root_data={})
-    obs = Observable(obs_type="domain-name", value="example.com", level="suspicious")
+    obs = Observable(obs_type="domain", value="example.com", level="suspicious")
     assert obs.level == Level.SUSPICIOUS
     inv.add_observable(obs)
     inv.apply_level_change(obs, "malicious")
@@ -291,7 +315,7 @@ def test_relationship_direction_default() -> None:
     """Test relationship direction defaults follow semantic mapping."""
     inv = Investigation(root_data={})
     obs1 = Observable(obs_type="url", value="https://example.com")
-    obs2 = Observable(obs_type="ip", value="192.168.1.1")
+    obs2 = Observable(obs_type="ipv4", value="192.168.1.1")
     inv.add_observable(obs1)
     inv.add_observable(obs2)
     inv.add_relationship(obs1, obs2, "indicates")
@@ -303,7 +327,7 @@ def test_relationship_direction_explicit() -> None:
     """Test setting explicit relationship direction."""
     inv = Investigation(root_data={})
     obs1 = Observable(obs_type="url", value="https://example.com")
-    obs2 = Observable(obs_type="ip", value="192.168.1.1")
+    obs2 = Observable(obs_type="ipv4", value="192.168.1.1")
     inv.add_observable(obs1)
     inv.add_observable(obs2)
 
@@ -324,7 +348,7 @@ def test_relationship_direction_string() -> None:
     """Test relationship direction with string values."""
     inv = Investigation(root_data={})
     obs1 = Observable(obs_type="url", value="https://example.com")
-    obs2 = Observable(obs_type="ip", value="192.168.1.1")
+    obs2 = Observable(obs_type="ipv4", value="192.168.1.1")
     inv.add_observable(obs1)
     inv.add_observable(obs2)
 
@@ -348,7 +372,7 @@ def test_relationship_auto_direction() -> None:
 
     inv = Investigation(root_data={})
     obs1 = Observable(obs_type="url", value="https://example.com")
-    obs2 = Observable(obs_type="ip", value="192.168.1.1")
+    obs2 = Observable(obs_type="ipv4", value="192.168.1.1")
     inv.add_observable(obs1)
     inv.add_observable(obs2)
 
@@ -363,7 +387,7 @@ def test_relationship_override_default() -> None:
 
     inv = Investigation(root_data={})
     obs1 = Observable(obs_type="url", value="https://example.com")
-    obs2 = Observable(obs_type="ip", value="192.168.1.1")
+    obs2 = Observable(obs_type="ipv4", value="192.168.1.1")
     inv.add_observable(obs1)
     inv.add_observable(obs2)
 

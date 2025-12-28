@@ -190,7 +190,7 @@ function createTestInvestigation(): CyvestInvestigation {
         score: 5,
         score_display: "5.00",
         level: "MALICIOUS",
-        taxonomies: [{ verdict: "malicious" }],
+        taxonomies: [{ level: "MALICIOUS", name: "verdict", value: "malicious" }],
       },
     },
     enrichments: {

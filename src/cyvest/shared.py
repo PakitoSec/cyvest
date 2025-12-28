@@ -199,7 +199,7 @@ class SharedInvestigationContext:
         return source
 
     def _reconcile_unlocked(self, task_investigation: Investigation) -> None:
-        logger.info("Reconciling task investigation into shared context")
+        logger.debug("Reconciling task investigation into shared context")
         self._main_investigation.merge_investigation(task_investigation)
         self._refresh_registries_unlocked()
         logger.debug(

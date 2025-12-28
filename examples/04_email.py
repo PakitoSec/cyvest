@@ -120,7 +120,7 @@ class EmailFrom(BaseRule):
     """
     Analyzes email headers (FROM, SENDER, TO, CC, BCC).
 
-    Builds observable chain: EMAIL_ADDR -> DOMAIN_NAME -> IPV4_ADDR
+    Builds observable chain: EMAIL -> DOMAIN -> IPV4
     """
 
     _scope = "header"
@@ -140,13 +140,13 @@ class EmailFrom(BaseRule):
 
         # Build observable chain with threat intel
         obs = (
-            cy.observable(cy.OBS.EMAIL_ADDR, from_addr)
+            cy.observable(cy.OBS.EMAIL, from_addr)
             .relate_to(cy.root(), relationship_type=cy.REL.RELATED_TO, direction=cy.DIR.INBOUND)
             .relate_to(
-                cy.observable(cy.OBS.DOMAIN_NAME, from_domain)
+                cy.observable(cy.OBS.DOMAIN, from_domain)
                 .with_ti("VT", from_domain_score)
                 .relate_to(
-                    cy.observable(cy.OBS.IPV4_ADDR, from_ip).with_ti("ABUSEIPDB", from_ip_score),
+                    cy.observable(cy.OBS.IPV4, from_ip).with_ti("ABUSEIPDB", from_ip_score),
                     cy.REL.RELATED_TO,
                     direction=cy.DIR.OUTBOUND,
                 ),
@@ -170,7 +170,7 @@ class EmailFromBIS(BaseRule):
     """
     Analyzes email headers (FROM, SENDER, TO, CC, BCC).
 
-    Builds observable chain: EMAIL_ADDR -> DOMAIN_NAME -> IPV4_ADDR
+    Builds observable chain: EMAIL -> DOMAIN -> IPV4
     """
 
     _scope = "header"
@@ -184,7 +184,7 @@ class EmailFromBIS(BaseRule):
         logger.info(f"Analyzing email header FROM: {from_addr}")
 
         # Build observable chain with threat intel
-        obs = cy.observable(cy.OBS.EMAIL_ADDR, from_addr).with_ti("PROOFPOINT", 5, "> test")
+        obs = cy.observable(cy.OBS.EMAIL, from_addr).with_ti("PROOFPOINT", 5, "> test")
 
         # Create check for header analysis
         (
@@ -212,7 +212,7 @@ class EmailReciever(BaseRule):
 
         cy.enrichment_create("receiver", {"receiver": ["ok"]}, context="from splunk")
         cy.check("receiver", "header", "description", "> receiver").with_score(0.1).link_observable(
-            cy.observable(cy.OBS.EMAIL_ADDR, "user@company.com").relate_to(
+            cy.observable(cy.OBS.EMAIL, "user@company.com").relate_to(
                 cy.root(), cy.REL.RELATED_TO, direction=cy.DIR.INBOUND
             )
         ).in_container(cy.container("emails"))
@@ -262,7 +262,7 @@ class BodiesUrlTask(BaseRule):
             url_obs = cy.observable(cy.OBS.URL, url).with_ti("VT", score)
             if matching_domain:
                 url_obs.relate_to(
-                    cy.observable(cy.OBS.DOMAIN_NAME, matching_domain),
+                    cy.observable(cy.OBS.DOMAIN, matching_domain),
                     cy.REL.RELATED_TO,
                     direction=cy.DIR.INBOUND,
                 )
@@ -311,7 +311,7 @@ class BodiesDomainTask(BaseRule):
 
             # Build Domain observable with relationships
             domain_obs = (
-                cy.observable(cy.OBS.DOMAIN_NAME, domain)
+                cy.observable(cy.OBS.DOMAIN, domain)
                 .with_ti("VT", score)
                 .relate_to(
                     cy.observable(cy.OBS.FILE, "BODY/HTML").relate_to(
@@ -370,7 +370,7 @@ class AttachmentTask(BaseRule):
                 cy.observable(cy.OBS.FILE, filename)
                 .relate_to(cy.root(), cy.REL.RELATED_TO, direction=cy.DIR.INBOUND)
                 .relate_to(
-                    cy.observable(cy.OBS.FILE, f"MD5:{md5_hash}").with_ti("VT", score, "MD5 hash analysis"),
+                    cy.observable(cy.OBS.HASH, f"MD5:{md5_hash}").with_ti("VT", score, "MD5 hash analysis"),
                     cy.REL.RELATED_TO,
                 )
             )
@@ -423,8 +423,8 @@ class AggregatedRiskTask(BaseRule):
         receiver_check = self.shared_context.check_get("receiver", "header")
 
         # Access observables from other tasks using parameter-based API
-        sender_email = self.shared_context.observable_get(Cyvest.OBS.EMAIL_ADDR, "noreply@domainmalicious.com")
-        malicious_domain = self.shared_context.observable_get(Cyvest.OBS.DOMAIN_NAME, "domainmalicious.com")
+        sender_email = self.shared_context.observable_get(Cyvest.OBS.EMAIL, "noreply@domainmalicious.com")
+        malicious_domain = self.shared_context.observable_get(Cyvest.OBS.DOMAIN, "domainmalicious.com")
 
         url_checks = self.shared_context.observables_list_by_type(Cyvest.OBS.URL)
         attachment_checks = self.shared_context.observables_list_by_type(Cyvest.OBS.FILE)

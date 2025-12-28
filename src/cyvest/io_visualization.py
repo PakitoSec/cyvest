@@ -54,17 +54,14 @@ PYVIS_COLOR_MAP = {
 
 # Observable type to shape mapping for visual distinction
 OBSERVABLE_SHAPES = {
-    ObservableType.IPV4_ADDR: "dot",
-    ObservableType.IPV6_ADDR: "dot",
-    ObservableType.DOMAIN_NAME: "diamond",
+    ObservableType.IPV4: "dot",
+    ObservableType.IPV6: "dot",
+    ObservableType.DOMAIN: "diamond",
     ObservableType.URL: "diamond",
-    ObservableType.EMAIL_ADDR: "diamond",
-    ObservableType.EMAIL_MESSAGE: "diamond",
+    ObservableType.EMAIL: "diamond",
+    ObservableType.HASH: "square",
     ObservableType.FILE: "square",
     ObservableType.ARTIFACT: "square",
-    ObservableType.NETWORK_TRAFFIC: "triangle",
-    ObservableType.PROCESS: "triangleDown",
-    ObservableType.USER_ACCOUNT: "star",
 }
 
 

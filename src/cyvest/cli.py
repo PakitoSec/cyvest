@@ -265,7 +265,7 @@ def schema_cmd(output: Path | None) -> None:
 )
 @click.option(
     "--types",
-    help="Comma-separated list of observable types to include (e.g., 'ipv4-addr,domain-name').",
+    help="Comma-separated list of observable types to include (e.g., 'ipv4,domain,url').",
 )
 @click.option(
     "--title",

@@ -14,42 +14,14 @@ from enum import Enum
 class ObservableType(str, Enum):
     """Cyber observable types."""
 
-    # Network observables
-    IPV4_ADDR = "ipv4-addr"
-    IPV6_ADDR = "ipv6-addr"
-    DOMAIN_NAME = "domain-name"
+    IPV4 = "ipv4"
+    IPV6 = "ipv6"
+    DOMAIN = "domain"
     URL = "url"
-    NETWORK_TRAFFIC = "network-traffic"
-    MAC_ADDR = "mac-addr"
-
-    # File observables
+    HASH = "hash"
+    EMAIL = "email"
     FILE = "file"
-    DIRECTORY = "directory"
-
-    # Email observables
-    EMAIL_ADDR = "email-addr"
-    EMAIL_MESSAGE = "email-message"
-    EMAIL_MIME_PART = "email-mime-part"
-
-    # Identity and account
-    USER_ACCOUNT = "user-account"
-
-    # System observables
-    PROCESS = "process"
-    SOFTWARE = "software"
-    WINDOWS_REGISTRY_KEY = "windows-registry-key"
-
-    # Artifact observables
     ARTIFACT = "artifact"
-
-    # Autonomous System
-    AUTONOMOUS_SYSTEM = "autonomous-system"
-
-    # Mutex
-    MUTEX = "mutex"
-
-    # X509 Certificate
-    X509_CERTIFICATE = "x509-certificate"
 
     @classmethod
     def normalize_root_type(cls, root_type: ObservableType | str | None) -> ObservableType:

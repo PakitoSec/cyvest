@@ -727,4 +727,3 @@ export function getInvestigationIcon(
 ): React.FC<IconProps> {
   return INVESTIGATION_ICON_MAP[nodeType] ?? QuestionIcon;
 }
-

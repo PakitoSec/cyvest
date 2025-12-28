@@ -21,7 +21,7 @@ def main() -> None:
     cv = Cyvest(root_data={"type": "email", "subject": "Urgent: Verify Your Account"})
 
     # Create email-related observables using the fluent proxy interface
-    sender_email = cv.observable(cv.OBS.EMAIL_ADDR, "suspicious@phishing-domain.com", internal=False).with_ti(
+    sender_email = cv.observable(cv.OBS.EMAIL, "suspicious@phishing-domain.com", internal=False).with_ti(
         "internal_db", score=Decimal("0"), comment="Unknown sender"
     )
 
@@ -34,7 +34,7 @@ def main() -> None:
     )
 
     # Create domain observable
-    domain = cv.observable(cv.OBS.DOMAIN_NAME, "fake-bank-login.com", internal=False).with_ti(
+    domain = cv.observable(cv.OBS.DOMAIN, "fake-bank-login.com", internal=False).with_ti(
         "dns_lookup", score=Decimal("0"), comment="Recently registered domain (2 days old)"
     )
 

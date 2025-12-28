@@ -9,6 +9,7 @@ from cyvest.keys import (
     generate_observable_key,
     generate_threat_intel_key,
     parse_key_type,
+    parse_observable_key,
     validate_key,
 )
 
@@ -71,6 +72,15 @@ def test_parse_key_type() -> None:
     assert parse_key_type("invalid") is None
 
 
+def test_parse_observable_key() -> None:
+    """Test observable key parsing."""
+    assert parse_observable_key("obs:url:example.com") == ("url", "example.com")
+    assert parse_observable_key("obs:url:https://example.com/path") == ("url", "https://example.com/path")
+    assert parse_observable_key("obs:url:") is None
+    assert parse_observable_key("chk:test:scope") is None
+    assert parse_observable_key("invalid") is None
+
+
 def test_validate_key() -> None:
     """Test key validation."""
     assert validate_key("obs:url:example.com") is True
@@ -85,5 +95,5 @@ def test_key_determinism() -> None:
     """Test that keys are deterministic."""
     # Same inputs should always produce same keys
     for _ in range(10):
-        assert generate_observable_key("ip", "192.168.1.1") == "obs:ip:192.168.1.1"
+        assert generate_observable_key("ipv4", "192.168.1.1") == "obs:ipv4:192.168.1.1"
         assert generate_check_key("test", "scope") == "chk:test:scope"

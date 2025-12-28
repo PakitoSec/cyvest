@@ -39,7 +39,7 @@ def test_markdown_excludes_containers_by_default() -> None:
     cv = Cyvest()
 
     # Add an observable
-    obs = Observable(obs_type=ObservableType.DOMAIN_NAME, value="example.com", level=Level.INFO)
+    obs = Observable(obs_type=ObservableType.DOMAIN, value="example.com", level=Level.INFO)
     cv._investigation.add_observable(obs)
 
     # Add a container
@@ -59,7 +59,7 @@ def test_markdown_includes_containers_when_enabled() -> None:
     cv = Cyvest()
 
     # Add an observable
-    obs = Observable(obs_type=ObservableType.DOMAIN_NAME, value="example.com", level=Level.INFO)
+    obs = Observable(obs_type=ObservableType.DOMAIN, value="example.com", level=Level.INFO)
     cv._investigation.add_observable(obs)
 
     # Add a container
@@ -80,7 +80,7 @@ def test_markdown_excludes_enrichments_by_default() -> None:
     cv = Cyvest()
 
     # Add an observable
-    obs = Observable(obs_type=ObservableType.DOMAIN_NAME, value="example.com", level=Level.INFO)
+    obs = Observable(obs_type=ObservableType.DOMAIN, value="example.com", level=Level.INFO)
     cv._investigation.add_observable(obs)
 
     # Add an enrichment
@@ -100,7 +100,7 @@ def test_markdown_includes_enrichments_when_enabled() -> None:
     cv = Cyvest()
 
     # Add an observable
-    obs = Observable(obs_type=ObservableType.DOMAIN_NAME, value="example.com", level=Level.INFO)
+    obs = Observable(obs_type=ObservableType.DOMAIN, value="example.com", level=Level.INFO)
     cv._investigation.add_observable(obs)
 
     # Add an enrichment
@@ -120,7 +120,7 @@ def test_markdown_includes_observables_by_default() -> None:
     """Test that observables section is included by default in markdown report."""
     cv = Cyvest()
 
-    obs = Observable(obs_type=ObservableType.DOMAIN_NAME, value="example.com", level=Level.INFO)
+    obs = Observable(obs_type=ObservableType.DOMAIN, value="example.com", level=Level.INFO)
     cv._investigation.add_observable(obs)
 
     markdown = cv.io_to_markdown()
@@ -133,7 +133,7 @@ def test_markdown_excludes_observables_when_disabled() -> None:
     """Test that observables section is excluded when include_observables=False."""
     cv = Cyvest()
 
-    obs = Observable(obs_type=ObservableType.DOMAIN_NAME, value="example.com", level=Level.INFO)
+    obs = Observable(obs_type=ObservableType.DOMAIN, value="example.com", level=Level.INFO)
     cv._investigation.add_observable(obs)
 
     markdown = cv.io_to_markdown(include_observables=False)
@@ -147,8 +147,8 @@ def test_markdown_removes_observables_by_type_and_level_section() -> None:
     cv = Cyvest()
 
     # Add observables with different types and levels
-    obs1 = Observable(obs_type=ObservableType.DOMAIN_NAME, value="example.com", level=Level.INFO)
-    obs2 = Observable(obs_type=ObservableType.IPV4_ADDR, value="192.168.1.1", level=Level.SUSPICIOUS)
+    obs1 = Observable(obs_type=ObservableType.DOMAIN, value="example.com", level=Level.INFO)
+    obs2 = Observable(obs_type=ObservableType.IPV4, value="192.168.1.1", level=Level.SUSPICIOUS)
     cv._investigation.add_observable(obs1)
     cv._investigation.add_observable(obs2)
 
@@ -165,7 +165,7 @@ def test_markdown_wrapper_methods_support_optional_parameters() -> None:
     cv = Cyvest()
 
     # Add observable, container, and enrichment
-    obs = Observable(obs_type=ObservableType.DOMAIN_NAME, value="example.com", level=Level.INFO)
+    obs = Observable(obs_type=ObservableType.DOMAIN, value="example.com", level=Level.INFO)
     cv._investigation.add_observable(obs)
 
     container = Container(path="/test", description="Test")

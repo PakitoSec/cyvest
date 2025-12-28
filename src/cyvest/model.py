@@ -16,6 +16,7 @@ from pydantic import (
     ConfigDict,
     Field,
     PrivateAttr,
+    StrictStr,
     computed_field,
     field_serializer,
     field_validator,
@@ -148,7 +149,23 @@ class Relationship(BaseModel):
         )
 
 
-# Forward references for type hints
+class Taxonomy(BaseModel):
+    """Represents a structured taxonomy entry for threat intelligence."""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
+
+    level: Level = Field(...)
+    name: StrictStr = Field(...)
+    value: StrictStr = Field(...)
+
+    @field_validator("level", mode="before")
+    @classmethod
+    def require_level_enum(cls, v: Any) -> Level:
+        if isinstance(v, Level):
+            return v
+        raise TypeError("Taxonomy level must be a Level enum value.")
+
+
 class ThreatIntel(BaseModel):
     """
     Represents threat intelligence from an external source.
@@ -159,13 +176,13 @@ class ThreatIntel(BaseModel):
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    source: str
-    observable_key: str
+    source: str = Field(...)
+    observable_key: str = Field(...)
     comment: str = Field(...)
     extra: dict[str, Any] = Field(...)
     score: Decimal = Field(...)
     level: Level = Field(...)
-    taxonomies: list[dict[str, Any]] = Field(...)
+    taxonomies: list[Taxonomy] = Field(...)
     key: str = Field(...)
 
     @field_validator("extra", mode="before")
@@ -187,6 +204,20 @@ class ThreatIntel(BaseModel):
     def coerce_level(cls, v: Any) -> Level:
         return normalize_level(v)
 
+    @field_validator("taxonomies")
+    @classmethod
+    def ensure_unique_taxonomy_names(cls, v: list[Taxonomy]) -> list[Taxonomy]:
+        seen: set[str] = set()
+        duplicates: set[str] = set()
+        for taxonomy in v:
+            if taxonomy.name in seen:
+                duplicates.add(taxonomy.name)
+            seen.add(taxonomy.name)
+        if duplicates:
+            dupes = ", ".join(sorted(duplicates))
+            raise ValueError(f"Duplicate taxonomy name(s): {dupes}")
+        return v
+
     @model_validator(mode="before")
     @classmethod
     def ensure_defaults(cls, values: Any) -> Any:
@@ -198,10 +229,14 @@ class ThreatIntel(BaseModel):
         if not isinstance(values, dict):
             return values
 
+        if values.get("observable_key") is None:
+            values["observable_key"] = ""
         if "extra" not in values:
             values["extra"] = {}
         if "comment" not in values:
             values["comment"] = ""
+        if values.get("taxonomies") is None:
+            values["taxonomies"] = []
         if "taxonomies" not in values:
             values["taxonomies"] = []
         if "key" not in values:
@@ -211,7 +246,7 @@ class ThreatIntel(BaseModel):
     @model_validator(mode="after")
     def generate_key(self) -> Self:
         """Generate key."""
-        if not self.key:
+        if not self.key and self.observable_key:
             self.key = keys.generate_threat_intel_key(self.source, self.observable_key)
 
         return self
@@ -237,7 +272,7 @@ class Observable(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True, populate_by_name=True)
 
     obs_type: ObservableType | str = Field(..., alias="type")
-    value: str
+    value: str = Field(...)
     internal: bool = Field(...)
     whitelisted: bool = Field(...)
     comment: str = Field(...)
@@ -346,7 +381,7 @@ class ObservableLink(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    observable_key: str
+    observable_key: str = Field(...)
     propagation_mode: PropagationMode = PropagationMode.LOCAL_ONLY
 
 
@@ -360,9 +395,9 @@ class Check(BaseModel):
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    check_id: str
-    scope: str
-    description: str
+    check_id: str = Field(...)
+    scope: str = Field(...)
+    description: str = Field(...)
     comment: str = Field(...)
     extra: dict[str, Any] = Field(...)
     score: Decimal = Field(...)
@@ -434,7 +469,7 @@ class Enrichment(BaseModel):
 
     model_config = ConfigDict()
 
-    name: str
+    name: str = Field(...)
     data: Any = Field(...)
     context: str = Field(...)
     key: str = Field(...)

@@ -10,19 +10,19 @@ from cyvest import Cyvest
 def test_merge_local_check() -> None:
     cv_child = Cyvest()
     cv_child.check("C1", "full", "test").link_observable(
-        cv_child.observable(cv_child.OBS.DOMAIN_NAME, "example.com").with_ti("VT", score=2)
+        cv_child.observable(cv_child.OBS.DOMAIN, "example.com").with_ti("VT", score=2)
     )
 
     main_inv = Cyvest()
     main_inv.check("C2", "full", "test").link_observable(
-        main_inv.observable(main_inv.OBS.DOMAIN_NAME, "example.com").with_ti("OTX", score=4)
+        main_inv.observable(main_inv.OBS.DOMAIN, "example.com").with_ti("OTX", score=4)
     )
 
     main_inv.merge_investigation(cv_child)
 
     c1 = main_inv.check_get("C1", "full")
     c2 = main_inv.check_get("C2", "full")
-    o = main_inv.observable_get(Cyvest.OBS.DOMAIN_NAME, "example.com")
+    o = main_inv.observable_get(Cyvest.OBS.DOMAIN, "example.com")
     global_score = main_inv.get_global_score()
 
     assert c1.score == 2
@@ -34,20 +34,20 @@ def test_merge_local_check() -> None:
 def test_merge_global_check() -> None:
     cv_child = Cyvest()
     cv_child.check("C1", "full", "test").link_observable(
-        cv_child.observable(cv_child.OBS.DOMAIN_NAME, "example.com").with_ti("VT", score=2),
+        cv_child.observable(cv_child.OBS.DOMAIN, "example.com").with_ti("VT", score=2),
         propagation_mode=cv_child.PROP.GLOBAL,
     )
 
     main_inv = Cyvest()
     main_inv.check("C2", "full", "test").link_observable(
-        main_inv.observable(main_inv.OBS.DOMAIN_NAME, "example.com").with_ti("OTX", score=4)
+        main_inv.observable(main_inv.OBS.DOMAIN, "example.com").with_ti("OTX", score=4)
     )
 
     main_inv.merge_investigation(cv_child)
 
     c1 = main_inv.check_get("C1", "full")
     c2 = main_inv.check_get("C2", "full")
-    o = main_inv.observable_get(Cyvest.OBS.DOMAIN_NAME, "example.com")
+    o = main_inv.observable_get(Cyvest.OBS.DOMAIN, "example.com")
     global_score = main_inv.get_global_score()
 
     assert c1.score == 4
@@ -59,12 +59,12 @@ def test_merge_global_check() -> None:
 def test_merge_local_check_multiple_child() -> None:
     cv_child = Cyvest()
     cv_child.check("C1", "full", "test").link_observable(
-        cv_child.observable(Cyvest.OBS.DOMAIN_NAME, "example.com").with_ti("VT", score=2)
+        cv_child.observable(Cyvest.OBS.DOMAIN, "example.com").with_ti("VT", score=2)
     )
 
     cv_child2 = Cyvest()
     cv_child2.check("C1", "full", "test").link_observable(
-        cv_child2.observable(Cyvest.OBS.DOMAIN_NAME, "example.com").with_ti("VT", score=5)
+        cv_child2.observable(Cyvest.OBS.DOMAIN, "example.com").with_ti("VT", score=5)
     )
 
     main_inv = Cyvest()
@@ -72,7 +72,7 @@ def test_merge_local_check_multiple_child() -> None:
     main_inv.merge_investigation(cv_child2)
 
     c1 = main_inv.check_get("C1", "full")
-    o = main_inv.observable_get(Cyvest.OBS.DOMAIN_NAME, "example.com")
+    o = main_inv.observable_get(Cyvest.OBS.DOMAIN, "example.com")
     global_score = main_inv.get_global_score()
 
     assert c1.score == 5
@@ -88,7 +88,7 @@ def test_local_only_link_does_not_affect_foreign_check() -> None:
 
     cv_main.merge_investigation(cv_other)
 
-    obs = cv_main.observable_create(Cyvest.OBS.IPV4_ADDR, "10.0.0.50")
+    obs = cv_main.observable_create(Cyvest.OBS.IPV4, "10.0.0.50")
     cv_main.observable_add_threat_intel(obs.key, source="source1", score=Decimal("9.0"))
 
     cv_main.check_link_observable(foreign_check.key, obs.key)
@@ -106,7 +106,7 @@ def test_global_link_can_affect_foreign_check() -> None:
     foreign_check = cv_other.check_create("foreign", "scope", "Created in other investigation")
     cv_main.merge_investigation(cv_other)
 
-    obs = cv_main.observable_create(Cyvest.OBS.IPV4_ADDR, "10.0.0.52")
+    obs = cv_main.observable_create(Cyvest.OBS.IPV4, "10.0.0.52")
     cv_main.observable_add_threat_intel(obs.key, source="source1", score=Decimal("9.0"))
 
     cv_main.check_link_observable(foreign_check.key, obs.key, propagation_mode="GLOBAL")
@@ -124,12 +124,12 @@ def test_check_reconciliation_preserves_origin_and_links() -> None:
 
     cv1_id = cv1._investigation.investigation_id
 
-    obs1 = cv1.observable_create(Cyvest.OBS.IPV4_ADDR, "10.0.0.60")
+    obs1 = cv1.observable_create(Cyvest.OBS.IPV4, "10.0.0.60")
     cv1.observable_add_threat_intel(obs1.key, source="s1", score=Decimal("4.0"))
     check1 = cv1.check_create("recon", "scope", "Same semantic check")
     cv1.check_link_observable(check1.key, obs1.key)
 
-    obs2 = cv2.observable_create(Cyvest.OBS.IPV4_ADDR, "10.0.0.61")
+    obs2 = cv2.observable_create(Cyvest.OBS.IPV4, "10.0.0.61")
     cv2.observable_add_threat_intel(obs2.key, source="s2", score=Decimal("9.0"))
     check2 = cv2.check_create("recon", "scope", "Same semantic check")
     cv2.check_link_observable(check2.key, obs2.key)
@@ -156,11 +156,11 @@ def test_foreign_check_global_updates_local_only_freezes_after_merge() -> None:
     foreign_check = cv_other.check_create("foreign", "scope", "Created in other investigation")
     cv_main.merge_investigation(cv_other)
 
-    obs_local = cv_main.observable_create(Cyvest.OBS.IPV4_ADDR, "10.0.0.51")
+    obs_local = cv_main.observable_create(Cyvest.OBS.IPV4, "10.0.0.51")
     cv_main.observable_add_threat_intel(obs_local.key, source="source1", score=Decimal("2.0"))
     cv_main.check_link_observable(foreign_check.key, obs_local.key)
 
-    obs_global = cv_main.observable_create(Cyvest.OBS.IPV4_ADDR, "10.0.0.52")
+    obs_global = cv_main.observable_create(Cyvest.OBS.IPV4, "10.0.0.52")
     cv_main.observable_add_threat_intel(obs_global.key, source="source1", score=Decimal("4.0"))
     cv_main.check_link_observable(foreign_check.key, obs_global.key, propagation_mode="GLOBAL")
 
@@ -170,9 +170,9 @@ def test_foreign_check_global_updates_local_only_freezes_after_merge() -> None:
     assert merged_check.level == Cyvest.LVL.SUSPICIOUS
 
     cv_later = Cyvest()
-    obs_local_later = cv_later.observable_create(Cyvest.OBS.IPV4_ADDR, "10.0.0.51")
+    obs_local_later = cv_later.observable_create(Cyvest.OBS.IPV4, "10.0.0.51")
     cv_later.observable_add_threat_intel(obs_local_later.key, source="source2", score=Decimal("8.0"))
-    obs_global_later = cv_later.observable_create(Cyvest.OBS.IPV4_ADDR, "10.0.0.52")
+    obs_global_later = cv_later.observable_create(Cyvest.OBS.IPV4, "10.0.0.52")
     cv_later.observable_add_threat_intel(obs_global_later.key, source="source2", score=Decimal("6.0"))
     cv_main.merge_investigation(cv_later)
 

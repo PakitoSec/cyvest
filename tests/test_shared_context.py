@@ -72,11 +72,11 @@ def test_auto_reconcile_on_context_exit():
     shared = SharedInvestigationContext(root_cy)
 
     with shared.create_cyvest() as cy:
-        cy.observable(Cyvest.OBS.EMAIL_ADDR, "user@domain.com")
+        cy.observable(Cyvest.OBS.EMAIL, "user@domain.com")
         cy.check("email_check", "header", "Test check")
 
     # After exiting context, observable should be in registry
-    assert "obs:email-addr:user@domain.com" in shared._observable_registry
+    assert "obs:email:user@domain.com" in shared._observable_registry
     assert "chk:email_check:header" in shared._check_registry
 
 
@@ -87,14 +87,14 @@ def test_manual_reconcile():
 
     # Create Cyvest without auto-reconcile
     cy = Cyvest({"test": "data"}, root_type=Cyvest.OBS.ARTIFACT)
-    cy.observable(Cyvest.OBS.DOMAIN_NAME, "example.com")
+    cy.observable(Cyvest.OBS.DOMAIN, "example.com")
     cy.check("domain_check", "network", "Test")
 
     # Manually reconcile
     shared.reconcile(cy)
 
     # Should be in registry
-    assert "obs:domain-name:example.com" in shared._observable_registry
+    assert "obs:domain:example.com" in shared._observable_registry
     assert "chk:domain_check:network" in shared._check_registry
 
 
@@ -104,14 +104,14 @@ def test_get_observable():
     shared = SharedInvestigationContext(root_cy)
 
     with shared.create_cyvest() as cy:
-        original = cy.observable(Cyvest.OBS.IPV4_ADDR, "192.168.1.1")
+        original = cy.observable(Cyvest.OBS.IPV4, "192.168.1.1")
         original_model = cy._investigation.get_observable(original.key)
 
     # Retrieve observable
-    retrieved = shared.observable_get(Cyvest.OBS.IPV4_ADDR, "192.168.1.1")
+    retrieved = shared.observable_get(Cyvest.OBS.IPV4, "192.168.1.1")
 
     assert retrieved is not None
-    assert retrieved.obs_type == Cyvest.OBS.IPV4_ADDR
+    assert retrieved.obs_type == Cyvest.OBS.IPV4
     assert retrieved.value == "192.168.1.1"
     # Should be a deep copy, not the same object
     assert retrieved is not original_model
@@ -122,7 +122,7 @@ def test_get_nonexistent_observable():
     root_cy = Cyvest({"test": "data"}, root_type=Cyvest.OBS.ARTIFACT)
     shared = SharedInvestigationContext(root_cy)
 
-    result = shared.observable_get(Cyvest.OBS.IPV4_ADDR, "10.0.0.1")
+    result = shared.observable_get(Cyvest.OBS.IPV4, "10.0.0.1")
     assert result is None
 
 
@@ -175,14 +175,14 @@ def test_list_observables():
     shared = SharedInvestigationContext(root_cy)
 
     with shared.create_cyvest() as cy:
-        cy.observable(Cyvest.OBS.EMAIL_ADDR, "user1@example.com")
-        cy.observable(Cyvest.OBS.EMAIL_ADDR, "user2@example.com")
-        cy.observable(Cyvest.OBS.DOMAIN_NAME, "example.com")
+        cy.observable(Cyvest.OBS.EMAIL, "user1@example.com")
+        cy.observable(Cyvest.OBS.EMAIL, "user2@example.com")
+        cy.observable(Cyvest.OBS.DOMAIN, "example.com")
 
     assert len(shared._observable_registry) == 4  # 3 created + 1 root
-    assert shared.observable_get(Cyvest.OBS.EMAIL_ADDR, "user1@example.com") is not None
-    assert shared.observable_get(Cyvest.OBS.EMAIL_ADDR, "user2@example.com") is not None
-    assert shared.observable_get(Cyvest.OBS.DOMAIN_NAME, "example.com") is not None
+    assert shared.observable_get(Cyvest.OBS.EMAIL, "user1@example.com") is not None
+    assert shared.observable_get(Cyvest.OBS.EMAIL, "user2@example.com") is not None
+    assert shared.observable_get(Cyvest.OBS.DOMAIN, "example.com") is not None
 
 
 def test_list_checks():
@@ -204,10 +204,10 @@ def test_observable_get_and_list_observables():
     shared = SharedInvestigationContext(root_cy)
 
     with shared.create_cyvest() as cy:
-        cy.observable(Cyvest.OBS.DOMAIN_NAME, "example.com")
+        cy.observable(Cyvest.OBS.DOMAIN, "example.com")
 
-    assert shared.observable_get(Cyvest.OBS.DOMAIN_NAME, "example.com") is not None
-    assert "obs:domain-name:example.com" in shared._observable_registry
+    assert shared.observable_get(Cyvest.OBS.DOMAIN, "example.com") is not None
+    assert "obs:domain:example.com" in shared._observable_registry
 
 
 def test_observables_list_by_type_sync_and_async():
@@ -215,16 +215,16 @@ def test_observables_list_by_type_sync_and_async():
     shared = SharedInvestigationContext(root_cy)
 
     with shared.create_cyvest() as cy:
-        cy.observable(Cyvest.OBS.EMAIL_ADDR, "user1@example.com")
-        cy.observable(Cyvest.OBS.EMAIL_ADDR, "user2@example.com")
-        cy.observable(Cyvest.OBS.DOMAIN_NAME, "example.com")
+        cy.observable(Cyvest.OBS.EMAIL, "user1@example.com")
+        cy.observable(Cyvest.OBS.EMAIL, "user2@example.com")
+        cy.observable(Cyvest.OBS.DOMAIN, "example.com")
 
-    sync_results = shared.observables_list_by_type(Cyvest.OBS.EMAIL_ADDR)
+    sync_results = shared.observables_list_by_type(Cyvest.OBS.EMAIL)
     assert len(sync_results) == 2
     assert {o.value for o in sync_results} == {"user1@example.com", "user2@example.com"}
 
     async def run():
-        results = await shared.observables_alist_by_type(Cyvest.OBS.EMAIL_ADDR)
+        results = await shared.observables_alist_by_type(Cyvest.OBS.EMAIL)
         assert len(results) == 2
         assert {o.value for o in results} == {"user1@example.com", "user2@example.com"}
 
@@ -240,23 +240,23 @@ def test_cross_task_observable_sharing():
     # Task 1: Create domain observable
     with shared.create_cyvest() as cy1:
         data = cy1.root().extra
-        domain = cy1.observable(Cyvest.OBS.DOMAIN_NAME, data["domain"])
+        domain = cy1.observable(Cyvest.OBS.DOMAIN, data["domain"])
         domain.with_ti("VT", Decimal("8.0"))
 
     # Task 2: Reference domain from Task 1
     with shared.create_cyvest() as cy2:
         data = cy2.root().extra
         # Inspect shared domain (read-only)
-        domain_info = shared.observable_get(Cyvest.OBS.DOMAIN_NAME, "malicious.com")
+        domain_info = shared.observable_get(Cyvest.OBS.DOMAIN, "malicious.com")
         assert domain_info is not None
         assert domain_info.value == "malicious.com"
 
         # Create URL and link to domain (correct pattern: use cy.observable())
         url = cy2.observable(Cyvest.OBS.URL, data["url"])
-        url.relate_to(cy2.observable(Cyvest.OBS.DOMAIN_NAME, "malicious.com"), Cyvest.REL.RELATED_TO)
+        url.relate_to(cy2.observable(Cyvest.OBS.DOMAIN, "malicious.com"), Cyvest.REL.RELATED_TO)
 
     # Verify final investigation has both observables
-    assert "obs:domain-name:malicious.com" in inv._observables
+    assert "obs:domain:malicious.com" in inv._observables
     assert "obs:url:https://malicious.com/payload" in inv._observables
 
 
@@ -272,12 +272,12 @@ def test_thread_safety_parallel_tasks():
     def create_domain_observable(domain: str):
         """Task that creates a domain observable."""
         with shared.create_cyvest() as cy:
-            cy.observable(Cyvest.OBS.DOMAIN_NAME, domain).with_ti("VT", Decimal("5.0"))
+            cy.observable(Cyvest.OBS.DOMAIN, domain).with_ti("VT", Decimal("5.0"))
 
     def create_ip_observable(ip: str):
         """Task that creates an IP observable."""
         with shared.create_cyvest() as cy:
-            cy.observable(Cyvest.OBS.IPV4_ADDR, ip).with_ti("SEKOIA", Decimal("3.0"))
+            cy.observable(Cyvest.OBS.IPV4, ip).with_ti("SEKOIA", Decimal("3.0"))
 
     # Execute tasks in parallel
     with ThreadPoolExecutor(max_workers=6) as executor:
@@ -298,12 +298,12 @@ def test_thread_safety_parallel_tasks():
 
     # Verify all observables were registered (6 created + 1 root)
     assert len(shared._observable_registry) == 7
-    assert shared.observable_get(Cyvest.OBS.DOMAIN_NAME, "domain1.com") is not None
-    assert shared.observable_get(Cyvest.OBS.DOMAIN_NAME, "domain2.com") is not None
-    assert shared.observable_get(Cyvest.OBS.DOMAIN_NAME, "domain3.com") is not None
-    assert shared.observable_get(Cyvest.OBS.IPV4_ADDR, "1.1.1.1") is not None
-    assert shared.observable_get(Cyvest.OBS.IPV4_ADDR, "2.2.2.2") is not None
-    assert shared.observable_get(Cyvest.OBS.IPV4_ADDR, "3.3.3.3") is not None
+    assert shared.observable_get(Cyvest.OBS.DOMAIN, "domain1.com") is not None
+    assert shared.observable_get(Cyvest.OBS.DOMAIN, "domain2.com") is not None
+    assert shared.observable_get(Cyvest.OBS.DOMAIN, "domain3.com") is not None
+    assert shared.observable_get(Cyvest.OBS.IPV4, "1.1.1.1") is not None
+    assert shared.observable_get(Cyvest.OBS.IPV4, "2.2.2.2") is not None
+    assert shared.observable_get(Cyvest.OBS.IPV4, "3.3.3.3") is not None
 
 
 def test_concurrent_reconciliation():
@@ -357,13 +357,13 @@ def test_auto_reconcile_on_exception_skipped():
 
     try:
         with shared.create_cyvest() as cy:
-            cy.observable(Cyvest.OBS.EMAIL_ADDR, "fail@example.com")
+            cy.observable(Cyvest.OBS.EMAIL, "fail@example.com")
             raise ValueError("Simulated error")
     except ValueError:
         pass
 
     # Observable should NOT be in registry due to exception
-    assert shared.observable_get(Cyvest.OBS.EMAIL_ADDR, "fail@example.com") is None
+    assert shared.observable_get(Cyvest.OBS.EMAIL, "fail@example.com") is None
 
 
 def test_override_data_in_create_cyvest():
@@ -385,7 +385,7 @@ def test_shared_context_with_checks_and_observables():
     # Task 1: Analyze email
     with shared.create_cyvest() as cy:
         data = cy.root().extra
-        email_obs = cy.observable(Cyvest.OBS.EMAIL_ADDR, data["email"])
+        email_obs = cy.observable(Cyvest.OBS.EMAIL, data["email"])
         email_obs.with_ti("EmailRep", Decimal("7.0"))
 
         check = cy.check("email_analysis", "header", "Analyze sender")
@@ -408,7 +408,7 @@ def test_shared_context_with_checks_and_observables():
     # Verify final state
     assert len(shared._observable_registry) == 3  # 2 created + 1 root
     assert len(shared._check_registry) == 2
-    assert shared.observable_get(Cyvest.OBS.EMAIL_ADDR, "phishing@malicious.com") is not None
+    assert shared.observable_get(Cyvest.OBS.EMAIL, "phishing@malicious.com") is not None
     assert shared.observable_get(Cyvest.OBS.URL, "https://malicious.com/payload") is not None
     assert shared.check_get("email_analysis", "header") is not None
     assert shared.check_get("url_analysis", "body") is not None
@@ -420,15 +420,15 @@ def test_deep_copy_prevents_modification():
     shared = SharedInvestigationContext(root_cy)
 
     with shared.create_cyvest() as cy:
-        obs = cy.observable(Cyvest.OBS.DOMAIN_NAME, "example.com")
+        obs = cy.observable(Cyvest.OBS.DOMAIN, "example.com")
         obs.with_ti("VT", Decimal("5.0"))
 
     # Get observable and modify it
-    retrieved1 = shared.observable_get(Cyvest.OBS.DOMAIN_NAME, "example.com")
+    retrieved1 = shared.observable_get(Cyvest.OBS.DOMAIN, "example.com")
     retrieved1.value = "modified.com"  # Modify the copy
 
     # Get observable again - should be unchanged
-    retrieved2 = shared.observable_get(Cyvest.OBS.DOMAIN_NAME, "example.com")
+    retrieved2 = shared.observable_get(Cyvest.OBS.DOMAIN, "example.com")
     assert retrieved2.value == "example.com"  # Original value preserved
     assert retrieved1 is not retrieved2  # Different objects
 
@@ -444,11 +444,11 @@ def test_observable_get_with_parameters():
     shared = SharedInvestigationContext(root_cy)
 
     with shared.create_cyvest() as cy:
-        cy.observable(Cyvest.OBS.EMAIL_ADDR, "user@example.com")
+        cy.observable(Cyvest.OBS.EMAIL, "user@example.com")
 
-    obs = shared.observable_get(Cyvest.OBS.EMAIL_ADDR, "user@example.com")
+    obs = shared.observable_get(Cyvest.OBS.EMAIL, "user@example.com")
     assert obs is not None
-    assert obs.obs_type == Cyvest.OBS.EMAIL_ADDR
+    assert obs.obs_type == Cyvest.OBS.EMAIL
     assert obs.value == "user@example.com"
 
 
@@ -475,11 +475,11 @@ def test_existence_checks_via_getters():
     shared = SharedInvestigationContext(root_cy)
 
     with shared.create_cyvest() as cy:
-        cy.observable(Cyvest.OBS.DOMAIN_NAME, "malicious.com")
+        cy.observable(Cyvest.OBS.DOMAIN, "malicious.com")
         cy.check("url_reputation", "body", "Check URL reputation")
 
-    assert shared.observable_get(Cyvest.OBS.DOMAIN_NAME, "malicious.com") is not None
-    assert shared.observable_get(Cyvest.OBS.DOMAIN_NAME, "safe.com") is None
+    assert shared.observable_get(Cyvest.OBS.DOMAIN, "malicious.com") is not None
+    assert shared.observable_get(Cyvest.OBS.DOMAIN, "safe.com") is None
     assert shared.check_get("url_reputation", "body") is not None
     assert shared.check_get("email_reputation", "header") is None
 
@@ -487,9 +487,9 @@ def test_existence_checks_via_getters():
 def test_cyvest_get_observable_with_parameters():
     """Test Cyvest.observable_get using parameters for API consistency."""
     cy = Cyvest({"test": "data"}, root_type=Cyvest.OBS.ARTIFACT)
-    obs_proxy = cy.observable(Cyvest.OBS.IPV4_ADDR, "10.0.0.1")
+    obs_proxy = cy.observable(Cyvest.OBS.IPV4, "10.0.0.1")
 
-    obs = cy.observable_get(Cyvest.OBS.IPV4_ADDR, "10.0.0.1")
+    obs = cy.observable_get(Cyvest.OBS.IPV4, "10.0.0.1")
     assert obs is not None
     assert obs.value == "10.0.0.1"
 
@@ -522,12 +522,12 @@ def test_observable_type_enum_conversion():
         # Create observables of different types
         cy.observable(Cyvest.OBS.URL, "https://example.com")
         cy.observable(Cyvest.OBS.FILE, "malware.exe")
-        cy.observable(Cyvest.OBS.NETWORK_TRAFFIC, "http-traffic")
+        cy.observable(Cyvest.OBS.ARTIFACT, "http-traffic")
 
     # Test that enum values work correctly
     assert shared.observable_get(Cyvest.OBS.URL, "https://example.com") is not None
     assert shared.observable_get(Cyvest.OBS.FILE, "malware.exe") is not None
-    assert shared.observable_get(Cyvest.OBS.NETWORK_TRAFFIC, "http-traffic") is not None
+    assert shared.observable_get(Cyvest.OBS.ARTIFACT, "http-traffic") is not None
 
     url_obs = shared.observable_get(Cyvest.OBS.URL, "https://example.com")
     assert url_obs is not None
@@ -555,13 +555,13 @@ def test_parameter_based_api_in_parallel_tasks():
 
     def task1(shared_ctx):
         with shared_ctx.create_cyvest() as cy:
-            cy.observable(Cyvest.OBS.EMAIL_ADDR, "sender@malicious.com").with_ti("EmailRep", Decimal("8.0"))
+            cy.observable(Cyvest.OBS.EMAIL, "sender@malicious.com").with_ti("EmailRep", Decimal("8.0"))
             cy.check("sender_check", "header", "Analyze sender")
 
     def task2(shared_ctx):
         with shared_ctx.create_cyvest() as cy:
             # Use parameter-based lookup to get observable from task1
-            sender = shared_ctx.observable_get(Cyvest.OBS.EMAIL_ADDR, "sender@malicious.com")
+            sender = shared_ctx.observable_get(Cyvest.OBS.EMAIL, "sender@malicious.com")
             if sender and sender.score > 5:
                 cy.check("high_risk_sender", "risk", "High risk detected").with_score(Decimal("9.0"))
 
@@ -573,11 +573,11 @@ def test_parameter_based_api_in_parallel_tasks():
         f2.result()
 
     # Verify both tasks completed and parameter-based lookups worked
-    assert shared.observable_get(Cyvest.OBS.EMAIL_ADDR, "sender@malicious.com") is not None
+    assert shared.observable_get(Cyvest.OBS.EMAIL, "sender@malicious.com") is not None
     assert shared.check_get("sender_check", "header") is not None
     assert shared.check_get("high_risk_sender", "risk") is not None
 
-    sender_obs = shared.observable_get(Cyvest.OBS.EMAIL_ADDR, "sender@malicious.com")
+    sender_obs = shared.observable_get(Cyvest.OBS.EMAIL, "sender@malicious.com")
     assert sender_obs.score >= Decimal("8.0")
 
 
@@ -588,12 +588,12 @@ def test_normalization_consistency():
 
     with shared.create_cyvest() as cy:
         # Create with mixed case
-        cy.observable(Cyvest.OBS.EMAIL_ADDR, "User@Example.COM")
+        cy.observable(Cyvest.OBS.EMAIL, "User@Example.COM")
 
     # Lookup should work with different casing (normalization)
-    obs1 = shared.observable_get(Cyvest.OBS.EMAIL_ADDR, "user@example.com")
-    obs2 = shared.observable_get(Cyvest.OBS.EMAIL_ADDR, "USER@EXAMPLE.COM")
-    obs3 = shared.observable_get(Cyvest.OBS.EMAIL_ADDR, "  User@Example.COM  ")
+    obs1 = shared.observable_get(Cyvest.OBS.EMAIL, "user@example.com")
+    obs2 = shared.observable_get(Cyvest.OBS.EMAIL, "USER@EXAMPLE.COM")
+    obs3 = shared.observable_get(Cyvest.OBS.EMAIL, "  User@Example.COM  ")
 
     assert obs1 is not None
     assert obs2 is not None
@@ -612,14 +612,14 @@ def test_prevent_relationship_with_shared_copy():
 
     # Task 1: Create domain observable
     with shared.create_cyvest() as cy1:
-        cy1.observable(Cyvest.OBS.DOMAIN_NAME, "malicious.com").with_ti("VT", 8)
+        cy1.observable(Cyvest.OBS.DOMAIN, "malicious.com").with_ti("VT", 8)
 
     # Task 2: Try to use the copy (should fail with clear error)
     with shared.create_cyvest() as cy2:
         url_obs = cy2.observable(Cyvest.OBS.URL, "https://evil.com/payload")
 
         # Get copy from shared context (anti-pattern)
-        domain_copy = shared.observable_get(Cyvest.OBS.DOMAIN_NAME, "malicious.com")
+        domain_copy = shared.observable_get(Cyvest.OBS.DOMAIN, "malicious.com")
         assert domain_copy is not None
         assert domain_copy._from_shared_context is True
 
@@ -639,7 +639,7 @@ def test_prevent_relationship_with_shared_copy():
     with shared.create_cyvest() as cy3:
         url_obs = cy3.observable(Cyvest.OBS.URL, "https://evil.com/payload")
         url_obs.relate_to(
-            cy3.observable(Cyvest.OBS.DOMAIN_NAME, "malicious.com"),
+            cy3.observable(Cyvest.OBS.DOMAIN, "malicious.com"),
             Cyvest.REL.RELATED_TO,
         )
         # Should succeed without error
@@ -659,19 +659,19 @@ def test_copied_observable_has_marker():
     inv = root_cy._investigation
 
     with shared.create_cyvest() as cy:
-        original = cy.observable(Cyvest.OBS.DOMAIN_NAME, "example.com")
+        original = cy.observable(Cyvest.OBS.DOMAIN, "example.com")
         original_model = cy._investigation.get_observable(original.key)
         assert original_model is not None
         # Original should not be marked
         assert original_model._from_shared_context is False
 
     # Copy from shared context should be marked
-    copy = shared.observable_get(Cyvest.OBS.DOMAIN_NAME, "example.com")
+    copy = shared.observable_get(Cyvest.OBS.DOMAIN, "example.com")
     assert copy is not None
     assert copy._from_shared_context is True
 
     # Get from investigation directly should not be marked
-    direct_key = keys.generate_observable_key(Cyvest.OBS.DOMAIN_NAME.value, "example.com")
+    direct_key = keys.generate_observable_key(Cyvest.OBS.DOMAIN.value, "example.com")
     direct = inv.get_observable(direct_key)
     assert direct is not None
     assert direct._from_shared_context is False
@@ -688,12 +688,12 @@ def test_async_context_manager_auto_reconcile():
 
     async def run():
         async with shared.create_cyvest() as cy:
-            cy.observable(Cyvest.OBS.EMAIL_ADDR, "async@domain.com")
+            cy.observable(Cyvest.OBS.EMAIL, "async@domain.com")
             cy.check("async_check", "scope", "Async check")
 
     asyncio.run(run())
 
-    assert shared.observable_get(Cyvest.OBS.EMAIL_ADDR, "async@domain.com") is not None
+    assert shared.observable_get(Cyvest.OBS.EMAIL, "async@domain.com") is not None
     assert shared.check_get("async_check", "scope") is not None
 
 
@@ -702,11 +702,11 @@ def test_areconcile_and_observable_aget():
     shared = SharedInvestigationContext(root_cy)
 
     cy = Cyvest({"test": "data"}, root_type=Cyvest.OBS.ARTIFACT)
-    cy.observable(Cyvest.OBS.IPV4_ADDR, "8.8.8.8")
+    cy.observable(Cyvest.OBS.IPV4, "8.8.8.8")
 
     async def run():
         await shared.areconcile(cy)
-        obs = await shared.observable_aget(Cyvest.OBS.IPV4_ADDR, "8.8.8.8")
+        obs = await shared.observable_aget(Cyvest.OBS.IPV4, "8.8.8.8")
         assert obs is not None
         assert obs.value == "8.8.8.8"
 
@@ -1016,7 +1016,7 @@ def test_io_to_markdown_basic(tmp_path):
     shared = SharedInvestigationContext(root_cy)
 
     with shared.create_cyvest() as cy:
-        obs = cy.observable(Cyvest.OBS.EMAIL_ADDR, "malicious@evil.com")
+        obs = cy.observable(Cyvest.OBS.EMAIL, "malicious@evil.com")
         obs.with_ti("VT", Decimal("8.5"))
         cy.check("email_reputation", "header", "Check sender reputation").link_observable(obs).with_score(
             Decimal("7.0")
@@ -1038,7 +1038,7 @@ def test_io_save_markdown_creates_file(tmp_path):
     shared = SharedInvestigationContext(root_cy)
 
     with shared.create_cyvest() as cy:
-        cy.observable(Cyvest.OBS.DOMAIN_NAME, "malicious.com").with_ti("VT", Decimal("9.0"))
+        cy.observable(Cyvest.OBS.DOMAIN, "malicious.com").with_ti("VT", Decimal("9.0"))
 
     filepath = tmp_path / "shared_report.md"
     result_path = shared.io_save_markdown(filepath)
@@ -1075,7 +1075,7 @@ def test_io_to_invest_basic():
     shared = SharedInvestigationContext(root_cy)
 
     with shared.create_cyvest() as cy:
-        cy.observable(Cyvest.OBS.IPV4_ADDR, "192.168.1.1").with_ti("SEKOIA", Decimal("6.0"))
+        cy.observable(Cyvest.OBS.IPV4, "192.168.1.1").with_ti("SEKOIA", Decimal("6.0"))
         cy.check("ip_reputation", "network", "Check IP reputation").with_score(Decimal("5.0"))
 
     schema = shared.io_to_invest()
@@ -1087,7 +1087,7 @@ def test_io_to_invest_basic():
     assert hasattr(schema, "observables")
     assert hasattr(schema, "checks")
     assert hasattr(schema, "stats")
-    assert "obs:ipv4-addr:192.168.1.1" in schema.observables
+    assert "obs:ipv4:192.168.1.1" in schema.observables
     assert "network" in schema.checks  # checks are grouped by scope
 
 
@@ -1141,7 +1141,7 @@ def test_export_methods_thread_safe():
     shared = SharedInvestigationContext(root_cy)
 
     with shared.create_cyvest() as cy:
-        cy.observable(Cyvest.OBS.DOMAIN_NAME, "test.com")
+        cy.observable(Cyvest.OBS.DOMAIN, "test.com")
         cy.check("test", "scope", "desc")
 
     # Multiple threads calling export methods concurrently
@@ -1173,7 +1173,7 @@ def test_export_methods_capture_latest_state(tmp_path):
 
     # Initial state
     with shared.create_cyvest() as cy:
-        cy.observable(Cyvest.OBS.EMAIL_ADDR, "first@example.com")
+        cy.observable(Cyvest.OBS.EMAIL, "first@example.com")
 
     markdown1 = shared.io_to_markdown()
     assert "first@example.com" in markdown1
@@ -1181,7 +1181,7 @@ def test_export_methods_capture_latest_state(tmp_path):
 
     # Update state
     with shared.create_cyvest() as cy:
-        cy.observable(Cyvest.OBS.EMAIL_ADDR, "second@example.com")
+        cy.observable(Cyvest.OBS.EMAIL, "second@example.com")
 
     markdown2 = shared.io_to_markdown()
     assert "first@example.com" in markdown2
@@ -1238,7 +1238,7 @@ def test_export_with_whitelists(tmp_path):
     shared = SharedInvestigationContext(root_cy)
 
     with shared.create_cyvest() as cy:
-        cy.observable(Cyvest.OBS.DOMAIN_NAME, "safe.com")
+        cy.observable(Cyvest.OBS.DOMAIN, "safe.com")
 
     # Test markdown export
     markdown = shared.io_to_markdown()
@@ -1273,10 +1273,10 @@ def test_export_comprehensive_investigation(tmp_path):
     # Build comprehensive investigation
     with shared.create_cyvest() as cy:
         # Observables
-        email_obs = cy.observable(Cyvest.OBS.EMAIL_ADDR, "attacker@evil.com")
+        email_obs = cy.observable(Cyvest.OBS.EMAIL, "attacker@evil.com")
         email_obs.with_ti("EmailRep", Decimal("9.5"))
 
-        domain_obs = cy.observable(Cyvest.OBS.DOMAIN_NAME, "evil.com")
+        domain_obs = cy.observable(Cyvest.OBS.DOMAIN, "evil.com")
         domain_obs.with_ti("VT", Decimal("8.0"))
 
         url_obs = cy.observable(Cyvest.OBS.URL, "https://evil.com/phishing")
@@ -1314,7 +1314,7 @@ def test_export_comprehensive_investigation(tmp_path):
     assert "whois" in markdown
 
     # Verify schema content
-    assert "obs:email-addr:attacker@evil.com" in schema.observables
+    assert "obs:email:attacker@evil.com" in schema.observables
 
     # Verify schema structure
     assert len(schema.observables) >= 4  # 3 created + 1 root
@@ -1367,7 +1367,7 @@ def test_export_parallel_updates(tmp_path):
     # Multiple tasks updating investigation in parallel
     def create_observable(index: int):
         with shared.create_cyvest() as cy:
-            cy.observable(Cyvest.OBS.IPV4_ADDR, f"10.0.0.{index}")
+            cy.observable(Cyvest.OBS.IPV4, f"10.0.0.{index}")
             cy.check(f"check_{index}", "scope", f"Check {index}")
 
     with ThreadPoolExecutor(max_workers=5) as executor:

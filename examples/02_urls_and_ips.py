@@ -30,7 +30,7 @@ def main() -> None:
         )
 
         # IP address for URL1
-        ip1 = cv.observable(cv.OBS.IPV4_ADDR, "192.0.2.100", internal=False).with_ti(
+        ip1 = cv.observable(cv.OBS.IPV4, "192.0.2.100", internal=False).with_ti(
             "abuseipdb", score=Decimal("7.5"), level=cv.LVL.MALICIOUS, comment="High abuse score"
         )
 
@@ -44,7 +44,7 @@ def main() -> None:
 
         # IP address for URL2
         ip2 = (
-            cv.observable(cv.OBS.IPV4_ADDR, "198.51.100.50", internal=False)
+            cv.observable(cv.OBS.IPV4, "198.51.100.50", internal=False)
             .with_ti("shodan", score=Decimal("0"), comment="Open ports: 80, 443, 8080")
             .with_ti("abuseipdb", score=Decimal("6.0"), level=cv.LVL.SUSPICIOUS, comment="Moderate abuse score")
         )
@@ -54,7 +54,7 @@ def main() -> None:
 
         # Internal host that connected
         internal_host = cv.observable(
-            cv.OBS.DOMAIN_NAME,
+            cv.OBS.DOMAIN,
             "workstation-042.company.local",
             internal=True,
         ).with_ti("edr", score=Decimal("0"), comment="Detected outbound connection to suspicious IP")

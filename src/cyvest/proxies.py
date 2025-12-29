@@ -215,22 +215,22 @@ class ObservableProxy(_ReadOnlyProxy[Observable]):
         self._get_investigation().add_threat_intel(ti, observable)
         return self
 
-    def bind_threat_intel(self, ti: ThreatIntel) -> ThreatIntelProxy:
+    def with_ti_draft(self, draft: ThreatIntel) -> ThreatIntelProxy:
         """
-        Bind an existing threat intel entry to this observable.
+        Attach a threat intel draft to this observable.
         """
-        if not isinstance(ti, ThreatIntel):
-            raise TypeError("Threat intel must be a ThreatIntel instance.")
-        if ti.observable_key and ti.observable_key != self.key:
+        if not isinstance(draft, ThreatIntel):
+            raise TypeError("Threat intel draft must be a ThreatIntel instance.")
+        if draft.observable_key and draft.observable_key != self.key:
             raise ValueError("Threat intel is already bound to a different observable.")
 
         observable = self._resolve()
-        ti.observable_key = self.key
-        expected_key = keys.generate_threat_intel_key(ti.source, self.key)
-        if not ti.key or ti.key != expected_key:
-            ti.key = expected_key
+        draft.observable_key = self.key
+        expected_key = keys.generate_threat_intel_key(draft.source, self.key)
+        if not draft.key or draft.key != expected_key:
+            draft.key = expected_key
 
-        result = self._get_investigation().add_threat_intel(ti, observable)
+        result = self._get_investigation().add_threat_intel(draft, observable)
         return ThreatIntelProxy(self._get_investigation(), result.key)
 
     def relate_to(

@@ -98,6 +98,18 @@ check.update_metadata(description="New scope", extra={"playbook": "url-analysis"
 
 Dictionary fields merge by default; pass `merge_extra=False` (or `merge_data=False` for enrichments) to overwrite them.
 
+### Threat Intel Drafts
+
+When the observable is unknown yet, create a draft and attach it later:
+
+```python
+draft = cv.threat_intel_draft("vt", score=Decimal("4.2"), comment="Initial lookup")
+obs = cv.observable(cv.OBS.DOMAIN, "example.com")
+obs.with_ti_draft(draft)
+```
+
+Drafts are plain `ThreatIntel` objects with no `observable_key` yet; attaching generates the key.
+
 ## Core Concepts
 
 ### Observables

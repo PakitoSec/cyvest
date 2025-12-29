@@ -80,9 +80,9 @@ def test_threat_intel_binding() -> None:
     """Test binding unbound threat intel to observable."""
     cv = Cyvest()
     obs = cv.observable_create(Cyvest.OBS.DOMAIN, "example.com")
-    draft = cv.threat_intel(source="vt", score=Decimal("4.2"))
+    draft = cv.threat_intel_draft(source="vt", score=Decimal("4.2"))
 
-    bound = cv.observable_bind_threat_intel(obs.key, draft)
+    bound = cv.observable_with_ti_draft(obs.key, draft)
     assert bound is not None
     assert draft.observable_key == obs.key
     assert bound.key == draft.key

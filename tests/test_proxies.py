@@ -91,13 +91,13 @@ def test_threat_intel_proxy_taxonomy_mutators() -> None:
     assert {taxonomy.name for taxonomy in ti.taxonomies} == {"malware-type"}
 
 
-def test_observable_proxy_bind_threat_intel() -> None:
-    """ObservableProxy.bind_threat_intel should bind draft threat intel entries."""
+def test_observable_proxy_with_ti_draft() -> None:
+    """ObservableProxy.with_ti_draft should attach draft threat intel entries."""
     cv = Cyvest()
     obs = cv.observable_create(Cyvest.OBS.DOMAIN, "example.com")
-    draft = cv.threat_intel(source="vt", score=Decimal("4.2"))
+    draft = cv.threat_intel_draft(source="vt", score=Decimal("4.2"))
 
-    bound = obs.bind_threat_intel(draft)
+    bound = obs.with_ti_draft(draft)
     assert draft.observable_key == obs.key
     assert draft.key.startswith("ti:")
     assert bound.key == draft.key

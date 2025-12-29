@@ -417,17 +417,17 @@ class Cyvest:
         result = self._investigation.add_threat_intel(ti, observable)
         return self._threat_intel_proxy(result)
 
-    def observable_bind_threat_intel(
+    def observable_with_ti_draft(
         self,
         observable: Observable | ObservableProxy | str,
         threat_intel: ThreatIntel,
     ) -> ThreatIntelProxy:
         """
-        Bind an existing threat intel entry to an observable.
+        Attach a threat intel draft to an observable.
 
         Args:
             observable: Observable, ObservableProxy, or its key
-            threat_intel: Threat intel entry (unbound or matching observable)
+            threat_intel: Threat intel draft entry (unbound or matching observable)
 
         Returns:
             The created/merged threat intel
@@ -436,7 +436,7 @@ class Cyvest:
             KeyError: If the observable does not exist
         """
         if not isinstance(threat_intel, ThreatIntel):
-            raise TypeError("Threat intel must be a ThreatIntel instance.")
+            raise TypeError("Threat intel draft must be a ThreatIntel instance.")
 
         observable_key = self._resolve_key(observable)
         model_observable = self._require_observable(observable_key)
@@ -482,7 +482,7 @@ class Cyvest:
 
     # Threat intel methods
 
-    def threat_intel_create(
+    def threat_intel_draft_create(
         self,
         source: str,
         score: Decimal | float,
@@ -492,7 +492,7 @@ class Cyvest:
         taxonomies: list[Taxonomy | dict[str, Any]] | None = None,
     ) -> ThreatIntel:
         """
-        Create an unbound threat intel entry.
+        Create an unbound threat intel draft entry.
 
         Args:
             source: Threat intel source name
@@ -1143,7 +1143,7 @@ class Cyvest:
         """
         return Taxonomy(level=level, name=name, value=value)
 
-    def threat_intel(
+    def threat_intel_draft(
         self,
         source: str,
         score: Decimal | float,
@@ -1153,7 +1153,7 @@ class Cyvest:
         taxonomies: list[Taxonomy | dict[str, Any]] | None = None,
     ) -> ThreatIntel:
         """
-        Create an unbound threat intel entry with fluent helper methods.
+        Create an unbound threat intel draft entry with fluent helper methods.
 
         Args:
             source: Threat intel source name
@@ -1166,7 +1166,7 @@ class Cyvest:
         Returns:
             Unbound ThreatIntel instance
         """
-        return self.threat_intel_create(source, score, comment, extra, level, taxonomies)
+        return self.threat_intel_draft_create(source, score, comment, extra, level, taxonomies)
 
     def observable(
         self,

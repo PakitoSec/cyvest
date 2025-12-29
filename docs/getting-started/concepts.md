@@ -137,6 +137,15 @@ taxonomies=[
 ]
 ```
 
+If you don't know the observable yet, create a draft and attach it later:
+
+```python
+draft = cv.threat_intel_draft("virustotal", score=Decimal("4.2"))
+obs.with_ti_draft(draft)
+```
+
+Drafts are plain `ThreatIntel` objects without an `observable_key`; the key is generated on attach.
+
 ### Containers
 
 **Containers** organize checks hierarchically:

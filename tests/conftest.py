@@ -1,7 +1,7 @@
 import sys
 
 import pytest
-from logurich import set_console
+from logurich import rich_set_console
 from rich.console import Console
 
 
@@ -12,4 +12,4 @@ def configure_loguru_rich_for_pytest():
     console = Console(file=sys.stderr, markup=True, force_terminal=True)
 
     # Inject it into your app's console module
-    set_console(console)
+    rich_set_console(console)

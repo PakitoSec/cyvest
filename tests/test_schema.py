@@ -15,7 +15,7 @@ from cyvest.model_schema import InvestigationSchema
 def _sample_investigation() -> Cyvest:
     """Create a minimal investigation for schema validation."""
     cv = Cyvest()
-    obs = cv.observable(Cyvest.OBS.DOMAIN_NAME, "example.com", internal=False)
+    obs = cv.observable(Cyvest.OBS.DOMAIN, "example.com", internal=False)
     cv.check("domain_check", "network", "Validate domain").link_observable(obs)
     return cv
 

@@ -26,6 +26,7 @@ from cyvest.model import (
     ObservableLink,
     ObservableType,
     Relationship,
+    Taxonomy,
     ThreatIntel,
 )
 from cyvest.model_enums import PropagationMode, RelationshipDirection, RelationshipType
@@ -55,7 +56,7 @@ class Investigation:
             "dict_fields": {"extra"},
         },
         "threat_intel": {
-            "fields": {"comment", "extra", "level"},
+            "fields": {"comment", "extra", "level", "taxonomies"},
             "dict_fields": {"extra"},
         },
         "enrichment": {
@@ -497,10 +498,15 @@ class Investigation:
             else:
                 existing.comment = incoming.comment
 
-        # Merge taxonomies (avoid duplicates)
+        # Merge taxonomies (ensure unique names)
+        existing_by_name: dict[str, int] = {taxonomy.name: idx for idx, taxonomy in enumerate(existing.taxonomies)}
         for taxonomy in incoming.taxonomies:
-            if taxonomy not in existing.taxonomies:
+            existing_idx = existing_by_name.get(taxonomy.name)
+            if existing_idx is None:
                 existing.taxonomies.append(taxonomy)
+                existing_by_name[taxonomy.name] = len(existing.taxonomies) - 1
+            else:
+                existing.taxonomies[existing_idx] = taxonomy
 
         return existing
 
@@ -695,6 +701,55 @@ class Investigation:
         )
         return ti
 
+    def add_threat_intel_taxonomy(self, threat_intel_key: str, taxonomy: Taxonomy) -> ThreatIntel:
+        """
+        Add or replace a taxonomy entry on a threat intel by name.
+
+        Args:
+            threat_intel_key: Threat intel key
+            taxonomy: Taxonomy entry to add or replace
+
+        Returns:
+            The updated threat intel
+        """
+        ti = self._threat_intels.get(threat_intel_key)
+        if ti is None:
+            raise KeyError(f"threat_intel '{threat_intel_key}' not found in investigation.")
+
+        updated_taxonomies = list(ti.taxonomies)
+        replaced = False
+        for idx, existing in enumerate(updated_taxonomies):
+            if existing.name == taxonomy.name:
+                updated_taxonomies[idx] = taxonomy
+                replaced = True
+                break
+
+        if not replaced:
+            updated_taxonomies.append(taxonomy)
+
+        return self.update_model_metadata("threat_intel", threat_intel_key, {"taxonomies": updated_taxonomies})
+
+    def remove_threat_intel_taxonomy(self, threat_intel_key: str, name: str) -> ThreatIntel:
+        """
+        Remove a taxonomy entry from a threat intel by name.
+
+        Args:
+            threat_intel_key: Threat intel key
+            name: Taxonomy name to remove
+
+        Returns:
+            The updated threat intel
+        """
+        ti = self._threat_intels.get(threat_intel_key)
+        if ti is None:
+            raise KeyError(f"threat_intel '{threat_intel_key}' not found in investigation.")
+
+        updated_taxonomies = [taxonomy for taxonomy in ti.taxonomies if taxonomy.name != name]
+        if len(updated_taxonomies) == len(ti.taxonomies):
+            return ti
+
+        return self.update_model_metadata("threat_intel", threat_intel_key, {"taxonomies": updated_taxonomies})
+
     def add_enrichment(self, enrichment: Enrichment) -> Enrichment:
         """
         Add or merge enrichment.
@@ -750,7 +805,7 @@ class Investigation:
         target: Observable | str,
         relationship_type: RelationshipType | str,
         direction: RelationshipDirection | str | None = None,
-    ) -> Observable | None:
+    ) -> Observable:
         """
         Add a relationship between observables.
 
@@ -761,7 +816,10 @@ class Investigation:
             direction: Direction of the relationship (None = use semantic default)
 
         Returns:
-            The source observable if both source and target exist, None otherwise
+            The source observable
+
+        Raises:
+            KeyError: If the source or target observable does not exist
         """
 
         # Extract keys from Observable objects if needed
@@ -789,15 +847,10 @@ class Investigation:
         target_obs = self._observables.get(target_key)
 
         if not source_obs:
-            logger.critical(f"Cannot add relationship: source observable '{source_key}' does not exist")
-            return None
+            raise KeyError(f"observable '{source_key}' not found in investigation.")
 
         if not target_obs:
-            logger.critical(
-                f"Cannot add relationship: target observable '{target_key}' does not exist. "
-                f"Relationship from '{source_key}' to '{target_key}' was not created."
-            )
-            return None
+            raise KeyError(f"observable '{target_key}' not found in investigation.")
 
         # Add relationship using internal method
         self._add_relationship_internal(source_obs, target_key, relationship_type, direction)
@@ -823,7 +876,7 @@ class Investigation:
         check_key: str,
         observable_key: str,
         propagation_mode: PropagationMode | str = PropagationMode.LOCAL_ONLY,
-    ) -> Check | None:
+    ) -> Check:
         """
         Link an observable to a check.
 
@@ -833,10 +886,18 @@ class Investigation:
             propagation_mode: Propagation behavior for this link
 
         Returns:
-            The check if found, None otherwise
+            The check
+
+        Raises:
+            KeyError: If the check or observable does not exist
         """
         check = self._checks.get(check_key)
         observable = self._observables.get(observable_key)
+
+        if check is None:
+            raise KeyError(f"check '{check_key}' not found in investigation.")
+        if observable is None:
+            raise KeyError(f"observable '{observable_key}' not found in investigation.")
 
         if check and observable:
             propagation_mode = PropagationMode(propagation_mode)
@@ -867,7 +928,7 @@ class Investigation:
 
         return check
 
-    def add_check_to_container(self, container_key: str, check_key: str) -> Container | None:
+    def add_check_to_container(self, container_key: str, check_key: str) -> Container:
         """
         Add a check to a container.
 
@@ -876,10 +937,18 @@ class Investigation:
             check_key: Key of the check
 
         Returns:
-            The container if found, None otherwise
+            The container
+
+        Raises:
+            KeyError: If the container or check does not exist
         """
         container = self._containers.get(container_key)
         check = self._checks.get(check_key)
+
+        if container is None:
+            raise KeyError(f"container '{container_key}' not found in investigation.")
+        if check is None:
+            raise KeyError(f"check '{check_key}' not found in investigation.")
 
         if container and check:
             self._container_add_check(container, check)
@@ -892,7 +961,7 @@ class Investigation:
 
         return container
 
-    def add_sub_container(self, parent_key: str, child_key: str) -> Container | None:
+    def add_sub_container(self, parent_key: str, child_key: str) -> Container:
         """
         Add a sub-container to a container.
 
@@ -901,10 +970,18 @@ class Investigation:
             child_key: Key of the child container
 
         Returns:
-            The parent container if found, None otherwise
+            The parent container
+
+        Raises:
+            KeyError: If the parent or child container does not exist
         """
         parent = self._containers.get(parent_key)
         child = self._containers.get(child_key)
+
+        if parent is None:
+            raise KeyError(f"container '{parent_key}' not found in investigation.")
+        if child is None:
+            raise KeyError(f"container '{child_key}' not found in investigation.")
 
         if parent and child:
             self._container_add_sub_container(parent, child)
@@ -938,6 +1015,24 @@ class Investigation:
     def get_threat_intel(self, key: str) -> ThreatIntel | None:
         """Get a threat intel by key."""
         return self._threat_intels.get(key)
+
+    @staticmethod
+    def _normalize_taxonomies(value: Any) -> list[Taxonomy]:
+        if value is None:
+            return []
+        if not isinstance(value, list):
+            raise TypeError("taxonomies must be a list of taxonomy objects.")
+        taxonomies = [Taxonomy.model_validate(item) for item in value]
+        seen: set[str] = set()
+        duplicates: set[str] = set()
+        for taxonomy in taxonomies:
+            if taxonomy.name in seen:
+                duplicates.add(taxonomy.name)
+            seen.add(taxonomy.name)
+        if duplicates:
+            dupes = ", ".join(sorted(duplicates))
+            raise ValueError(f"Duplicate taxonomy name(s): {dupes}")
+        return taxonomies
 
     def get_root(self) -> Observable:
         """Get the root observable."""
@@ -997,6 +1092,8 @@ class Investigation:
             old_value = deepcopy(getattr(target, field, None))
             if field == "level":
                 value = normalize_level(value)
+            if model_type == "threat_intel" and field == "taxonomies":
+                value = self._normalize_taxonomies(value)
             if field in dict_fields:
                 if not isinstance(value, dict):
                     raise TypeError(f"Field '{field}' on {model_type} expects a dict value.")

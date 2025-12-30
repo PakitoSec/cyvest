@@ -14,6 +14,7 @@ from copy import deepcopy
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
+from cyvest import keys
 from cyvest.levels import Level
 from cyvest.model import (
     Check,
@@ -23,6 +24,7 @@ from cyvest.model import (
     ObservableLink,
     ObservableType,
     Relationship,
+    Taxonomy,
     ThreatIntel,
 )
 from cyvest.model_enums import PropagationMode, RelationshipDirection, RelationshipType
@@ -193,7 +195,7 @@ class ObservableProxy(_ReadOnlyProxy[Observable]):
         comment: str = "",
         extra: dict[str, Any] | None = None,
         level: Level | None = None,
-        taxonomies: list[dict[str, Any]] | None = None,
+        taxonomies: list[Taxonomy | dict[str, Any]] | None = None,
     ) -> ObservableProxy:
         """
         Attach threat intelligence to this observable.
@@ -212,6 +214,24 @@ class ObservableProxy(_ReadOnlyProxy[Observable]):
         ti = ThreatIntel(**ti_kwargs)
         self._get_investigation().add_threat_intel(ti, observable)
         return self
+
+    def with_ti_draft(self, draft: ThreatIntel) -> ThreatIntelProxy:
+        """
+        Attach a threat intel draft to this observable.
+        """
+        if not isinstance(draft, ThreatIntel):
+            raise TypeError("Threat intel draft must be a ThreatIntel instance.")
+        if draft.observable_key and draft.observable_key != self.key:
+            raise ValueError("Threat intel is already bound to a different observable.")
+
+        observable = self._resolve()
+        draft.observable_key = self.key
+        expected_key = keys.generate_threat_intel_key(draft.source, self.key)
+        if not draft.key or draft.key != expected_key:
+            draft.key = expected_key
+
+        result = self._get_investigation().add_threat_intel(draft, observable)
+        return ThreatIntelProxy(self._get_investigation(), result.key)
 
     def relate_to(
         self,
@@ -480,8 +500,19 @@ class ThreatIntelProxy(_ReadOnlyProxy[ThreatIntel]):
         return self._read_attr("level")
 
     @property
-    def taxonomies(self) -> list[dict[str, Any]]:
+    def taxonomies(self) -> list[Taxonomy]:
         return self._read_attr("taxonomies")
+
+    def add_taxonomy(self, *, level: Level, name: str, value: str) -> ThreatIntelProxy:
+        """Add or replace a taxonomy by name."""
+        taxonomy = Taxonomy(level=level, name=name, value=value)
+        self._get_investigation().add_threat_intel_taxonomy(self.key, taxonomy)
+        return self
+
+    def remove_taxonomy(self, name: str) -> ThreatIntelProxy:
+        """Remove a taxonomy by name."""
+        self._get_investigation().remove_threat_intel_taxonomy(self.key, name)
+        return self
 
     def update_metadata(
         self,

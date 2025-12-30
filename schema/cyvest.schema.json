@@ -592,6 +592,30 @@
       "title": "StatisticsSchema",
       "type": "object"
     },
+    "Taxonomy": {
+      "additionalProperties": false,
+      "description": "Represents a structured taxonomy entry for threat intelligence.",
+      "properties": {
+        "level": {
+          "$ref": "#/$defs/Level"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "value": {
+          "title": "Value",
+          "type": "string"
+        }
+      },
+      "required": [
+        "level",
+        "name",
+        "value"
+      ],
+      "title": "Taxonomy",
+      "type": "object"
+    },
     "ThreatIntel": {
       "description": "Represents threat intelligence from an external source.\n\nThreat intelligence provides verdicts about observables from sources\nlike VirusTotal, URLScan.io, etc.",
       "properties": {
@@ -621,8 +645,7 @@
         },
         "taxonomies": {
           "items": {
-            "additionalProperties": true,
-            "type": "object"
+            "$ref": "#/$defs/Taxonomy"
           },
           "title": "Taxonomies",
           "type": "array"

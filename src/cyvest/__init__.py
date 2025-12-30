@@ -9,7 +9,7 @@ from logurich import logger
 
 from cyvest.cyvest import Cyvest
 from cyvest.levels import Level
-from cyvest.model import InvestigationWhitelist
+from cyvest.model import Check, Container, Enrichment, InvestigationWhitelist, Observable, Taxonomy, ThreatIntel
 from cyvest.model_enums import ObservableType, RelationshipDirection, RelationshipType
 from cyvest.proxies import CheckProxy, ContainerProxy, EnrichmentProxy, ObservableProxy, ThreatIntelProxy
 
@@ -20,13 +20,19 @@ logger.disable("cyvest")
 __all__ = [
     "Cyvest",
     "Level",
-    "InvestigationWhitelist",
-    "CheckProxy",
-    "ObservableProxy",
     "ObservableType",
     "RelationshipDirection",
     "RelationshipType",
+    "CheckProxy",
+    "ObservableProxy",
     "ThreatIntelProxy",
     "EnrichmentProxy",
     "ContainerProxy",
+    "Container",
+    "Enrichment",
+    "InvestigationWhitelist",
+    "Check",
+    "Observable",
+    "ThreatIntel",
+    "Taxonomy",
 ]

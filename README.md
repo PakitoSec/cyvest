@@ -85,6 +85,9 @@ All mutations are routed through the Investigation layer, so use the facade help
 `cv.check_update_score`, `cv.observable_add_threat_intel`) or the built-in fluent methods on the proxies themselves
 (`with_ti`, `relate_to`, `link_observable`, `with_score`, …) so the score engine and audit log stay consistent.
 
+Mutation helpers that reference existing objects (for example, `cv.observable_add_relationship`,
+`cv.check_link_observable`, `cv.container_add_check`) raise `KeyError` when a key is missing.
+
 Safe metadata fields like `comment`, `extra`, or `internal` can be updated through the proxies without breaking score
 consistency:
 
@@ -94,6 +97,18 @@ check.update_metadata(description="New scope", extra={"playbook": "url-analysis"
 ```
 
 Dictionary fields merge by default; pass `merge_extra=False` (or `merge_data=False` for enrichments) to overwrite them.
+
+### Threat Intel Drafts
+
+When the observable is unknown yet, create a draft and attach it later:
+
+```python
+draft = cv.threat_intel_draft("vt", score=Decimal("4.2"), comment="Initial lookup")
+obs = cv.observable(cv.OBS.DOMAIN, "example.com")
+obs.with_ti_draft(draft)
+```
+
+Drafts are plain `ThreatIntel` objects with no `observable_key` yet; attaching generates the key.
 
 ## Core Concepts
 
@@ -149,8 +164,16 @@ cv.observable_add_threat_intel(
     score=Decimal("7.5"),
     level=cv.LVL.SUSPICIOUS,
     comment="15/70 vendors flagged as malicious",
-    taxonomies=[{"malware-type": "trojan"}]
+    taxonomies=[cv.taxonomy(level=cv.LVL.MALICIOUS, name="scan", value="trojan")]
 )
+```
+
+Taxonomies are unique by name per threat intel entry. Use the fluent helpers to add or remove them:
+
+```python
+ti = cv.observable_add_threat_intel(observable.key, source="vt", score=Decimal("7.5"))
+ti.add_taxonomy(level=cv.LVL.SUSPICIOUS, name="confidence", value="medium")
+ti.remove_taxonomy("confidence")
 ```
 
 ### Containers

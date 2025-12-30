@@ -29,7 +29,7 @@ from cyvest.io_serialization import (
     serialize_investigation,
 )
 from cyvest.levels import Level
-from cyvest.model import Check, Container, Enrichment, Observable, ThreatIntel
+from cyvest.model import Check, Container, Enrichment, Observable, Taxonomy, ThreatIntel
 from cyvest.model_enums import ObservableType, PropagationMode, RelationshipDirection, RelationshipType
 from cyvest.model_schema import InvestigationSchema, StatisticsSchema
 from cyvest.proxies import CheckProxy, ContainerProxy, EnrichmentProxy, ObservableProxy, ThreatIntelProxy
@@ -149,6 +149,26 @@ class Cyvest:
         if isinstance(value, (Observable, ObservableProxy)):
             return value.key
         raise TypeError("Expected an observable key, ObservableProxy, or Observable instance.")
+
+    @staticmethod
+    def _resolve_threat_intel_key(value: ThreatIntel | ThreatIntelProxy | str) -> str:
+        if isinstance(value, str):
+            return value
+        if isinstance(value, (ThreatIntel, ThreatIntelProxy)):
+            return value.key
+        raise TypeError("Expected a threat intel key, ThreatIntelProxy, or ThreatIntel instance.")
+
+    def _require_observable(self, key: str) -> Observable:
+        observable = self._investigation.get_observable(key)
+        if observable is None:
+            raise KeyError(f"observable '{key}' not found in investigation.")
+        return observable
+
+    def _require_check(self, key: str) -> Check:
+        check = self._investigation.get_check(key)
+        if check is None:
+            raise KeyError(f"check '{key}' not found in investigation.")
+        return check
 
     # Investigation-level helpers
 
@@ -331,7 +351,7 @@ class Cyvest:
         target: Observable | ObservableProxy | str,
         relationship_type: RelationshipType,
         direction: RelationshipDirection | None = None,
-    ) -> ObservableProxy | None:
+    ) -> ObservableProxy:
         """
         Add a relationship between observables.
 
@@ -342,7 +362,10 @@ class Cyvest:
             direction: Direction of the relationship (None = use semantic default for relationship type)
 
         Returns:
-            The source observable if both source and target exist, None otherwise
+            The source observable
+
+        Raises:
+            KeyError: If the source or target observable does not exist
         """
         source_key = self._resolve_key(source)
         target_key = self._resolve_key(target)
@@ -357,8 +380,8 @@ class Cyvest:
         comment: str = "",
         extra: dict[str, Any] | None = None,
         level: Level | None = None,
-        taxonomies: list[dict[str, Any]] | None = None,
-    ) -> ThreatIntelProxy | None:
+        taxonomies: list[Taxonomy | dict[str, Any]] | None = None,
+    ) -> ThreatIntelProxy:
         """
         Add threat intelligence to an observable.
 
@@ -372,12 +395,13 @@ class Cyvest:
             taxonomies: Optional taxonomies
 
         Returns:
-            The created threat intel if observable found, None otherwise
+            The created threat intel
+
+        Raises:
+            KeyError: If the observable does not exist
         """
         observable_key = self._resolve_key(observable)
-        observable = self._investigation.get_observable(observable_key)
-        if not observable:
-            return None
+        observable = self._require_observable(observable_key)
 
         ti_kwargs: dict[str, Any] = {
             "source": source,
@@ -393,12 +417,47 @@ class Cyvest:
         result = self._investigation.add_threat_intel(ti, observable)
         return self._threat_intel_proxy(result)
 
+    def observable_with_ti_draft(
+        self,
+        observable: Observable | ObservableProxy | str,
+        threat_intel: ThreatIntel,
+    ) -> ThreatIntelProxy:
+        """
+        Attach a threat intel draft to an observable.
+
+        Args:
+            observable: Observable, ObservableProxy, or its key
+            threat_intel: Threat intel draft entry (unbound or matching observable)
+
+        Returns:
+            The created/merged threat intel
+
+        Raises:
+            KeyError: If the observable does not exist
+        """
+        if not isinstance(threat_intel, ThreatIntel):
+            raise TypeError("Threat intel draft must be a ThreatIntel instance.")
+
+        observable_key = self._resolve_key(observable)
+        model_observable = self._require_observable(observable_key)
+
+        if threat_intel.observable_key and threat_intel.observable_key != observable_key:
+            raise ValueError("Threat intel is already bound to a different observable.")
+
+        threat_intel.observable_key = observable_key
+        expected_key = keys.generate_threat_intel_key(threat_intel.source, observable_key)
+        if not threat_intel.key or threat_intel.key != expected_key:
+            threat_intel.key = expected_key
+
+        result = self._investigation.add_threat_intel(threat_intel, model_observable)
+        return self._threat_intel_proxy(result)
+
     def observable_set_level(
         self,
         observable: Observable | ObservableProxy | str,
         level: Level,
         reason: str | None = None,
-    ) -> ObservableProxy | None:
+    ) -> ObservableProxy:
         """
         Explicitly set an observable's level via the service layer.
 
@@ -407,12 +466,13 @@ class Cyvest:
             level: Level to apply
 
         Returns:
-            Updated observable proxy if found, None otherwise
+            Updated observable proxy
+
+        Raises:
+            KeyError: If the observable does not exist
         """
         observable_key = self._resolve_key(observable)
-        model_observable = self._investigation.get_observable(observable_key)
-        if not model_observable:
-            return None
+        model_observable = self._require_observable(observable_key)
         self._investigation.apply_level_change(
             model_observable,
             level,
@@ -421,6 +481,91 @@ class Cyvest:
         return self._observable_proxy(model_observable)
 
     # Threat intel methods
+
+    def threat_intel_draft_create(
+        self,
+        source: str,
+        score: Decimal | float,
+        comment: str = "",
+        extra: dict[str, Any] | None = None,
+        level: Level | None = None,
+        taxonomies: list[Taxonomy | dict[str, Any]] | None = None,
+    ) -> ThreatIntel:
+        """
+        Create an unbound threat intel draft entry.
+
+        Args:
+            source: Threat intel source name
+            score: Score from threat intel
+            comment: Optional comment
+            extra: Optional extra data
+            level: Optional explicit level
+            taxonomies: Optional taxonomies
+
+        Returns:
+            Unbound ThreatIntel instance
+        """
+        ti_kwargs: dict[str, Any] = {
+            "source": source,
+            "observable_key": "",
+            "comment": comment,
+            "extra": extra or {},
+            "score": Decimal(str(score)),
+            "taxonomies": taxonomies or [],
+        }
+        if level is not None:
+            ti_kwargs["level"] = level
+        return ThreatIntel(**ti_kwargs)
+
+    def threat_intel_add_taxonomy(
+        self,
+        threat_intel: ThreatIntel | ThreatIntelProxy | str,
+        *,
+        level: Level,
+        name: str,
+        value: str,
+    ) -> ThreatIntelProxy:
+        """
+        Add or replace a taxonomy entry by name on a threat intel.
+
+        Args:
+            threat_intel: ThreatIntel, ThreatIntelProxy, or its key
+            level: Taxonomy level
+            name: Taxonomy name (unique per threat intel)
+            value: Taxonomy value
+
+        Returns:
+            Updated threat intel proxy
+
+        Raises:
+            KeyError: If the threat intel does not exist
+        """
+        ti_key = self._resolve_threat_intel_key(threat_intel)
+        taxonomy = Taxonomy(level=level, name=name, value=value)
+        updated = self._investigation.add_threat_intel_taxonomy(ti_key, taxonomy)
+        return self._threat_intel_proxy(updated)
+
+    def threat_intel_remove_taxonomy(
+        self,
+        threat_intel: ThreatIntel | ThreatIntelProxy | str,
+        name: str,
+    ) -> ThreatIntelProxy:
+        """
+        Remove a taxonomy entry by name from a threat intel.
+
+        Args:
+            threat_intel: ThreatIntel, ThreatIntelProxy, or its key
+            name: Taxonomy name to remove
+
+        Returns:
+            Updated threat intel proxy
+
+        Raises:
+            KeyError: If the threat intel does not exist
+        """
+        ti_key = self._resolve_threat_intel_key(threat_intel)
+        updated = self._investigation.remove_threat_intel_taxonomy(ti_key, name)
+        return self._threat_intel_proxy(updated)
 
     def threat_intel_get_all(self) -> dict[str, ThreatIntelProxy]:
         """Get read-only proxies for all threat intel entries."""
@@ -531,7 +676,7 @@ class Cyvest:
         check_key: str,
         observable: Observable | ObservableProxy | str,
         propagation_mode: PropagationMode = PropagationMode.LOCAL_ONLY,
-    ) -> CheckProxy | None:
+    ) -> CheckProxy:
         """
         Link an observable to a check.
 
@@ -541,14 +686,16 @@ class Cyvest:
             propagation_mode: Propagation behavior for this link
 
         Returns:
-            The check if found, None otherwise
+            The check
+
+        Raises:
+            KeyError: If the check or observable does not exist
         """
         observable_key = self._resolve_key(observable)
-        return self._check_proxy(
-            self._investigation.link_check_observable(check_key, observable_key, propagation_mode=propagation_mode)
-        )
+        result = self._investigation.link_check_observable(check_key, observable_key, propagation_mode=propagation_mode)
+        return self._check_proxy(result)
 
-    def check_update_score(self, check_key: str, score: Decimal | float, reason: str = "") -> CheckProxy | None:
+    def check_update_score(self, check_key: str, score: Decimal | float, reason: str = "") -> CheckProxy:
         """
         Update a check's score.
 
@@ -558,11 +705,13 @@ class Cyvest:
             reason: Reason for update
 
         Returns:
-            The check if found, None otherwise
+            The check
+
+        Raises:
+            KeyError: If the check does not exist
         """
-        check = self._investigation.get_check(check_key)
-        if check:
-            self._investigation.apply_score_change(check, Decimal(str(score)), reason=reason)
+        check = self._require_check(check_key)
+        self._investigation.apply_score_change(check, Decimal(str(score)), reason=reason)
         return self._check_proxy(check)
 
     # Container methods
@@ -625,7 +774,7 @@ class Cyvest:
             key: ContainerProxy(self._investigation, key) for key in self._investigation.get_all_containers().keys()
         }
 
-    def container_add_check(self, container_key: str, check_key: str) -> ContainerProxy | None:
+    def container_add_check(self, container_key: str, check_key: str) -> ContainerProxy:
         """
         Add a check to a container.
 
@@ -634,11 +783,15 @@ class Cyvest:
             check_key: Key of the check
 
         Returns:
-            The container if found, None otherwise
-        """
-        return self._container_proxy(self._investigation.add_check_to_container(container_key, check_key))
+            The container
 
-    def container_add_sub_container(self, parent_key: str, child_key: str) -> ContainerProxy | None:
+        Raises:
+            KeyError: If the container or check does not exist
+        """
+        container = self._investigation.add_check_to_container(container_key, check_key)
+        return self._container_proxy(container)
+
+    def container_add_sub_container(self, parent_key: str, child_key: str) -> ContainerProxy:
         """
         Add a sub-container to a container.
 
@@ -647,9 +800,13 @@ class Cyvest:
             child_key: Key of the child container
 
         Returns:
-            The parent container if found, None otherwise
+            The parent container
+
+        Raises:
+            KeyError: If the parent or child container does not exist
         """
-        return self._container_proxy(self._investigation.add_sub_container(parent_key, child_key))
+        parent = self._investigation.add_sub_container(parent_key, child_key)
+        return self._container_proxy(parent)
 
     # Enrichment methods
 
@@ -971,6 +1128,45 @@ class Cyvest:
         )
 
     # Fluent helper entrypoints
+
+    def taxonomy(self, *, level: Level, name: str, value: str) -> Taxonomy:
+        """
+        Create a taxonomy object for threat intelligence entries.
+
+        Args:
+            level: Taxonomy level (Level enum)
+            name: Taxonomy name (unique per threat intel)
+            value: Taxonomy value
+
+        Returns:
+            Taxonomy instance
+        """
+        return Taxonomy(level=level, name=name, value=value)
+
+    def threat_intel_draft(
+        self,
+        source: str,
+        score: Decimal | float,
+        comment: str = "",
+        extra: dict[str, Any] | None = None,
+        level: Level | None = None,
+        taxonomies: list[Taxonomy | dict[str, Any]] | None = None,
+    ) -> ThreatIntel:
+        """
+        Create an unbound threat intel draft entry with fluent helper methods.
+
+        Args:
+            source: Threat intel source name
+            score: Score from threat intel
+            comment: Optional comment
+            extra: Optional extra data
+            level: Optional explicit level
+            taxonomies: Optional taxonomies
+
+        Returns:
+            Unbound ThreatIntel instance
+        """
+        return self.threat_intel_draft_create(source, score, comment, extra, level, taxonomies)
 
     def observable(
         self,

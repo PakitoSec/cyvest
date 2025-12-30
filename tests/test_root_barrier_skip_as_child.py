@@ -23,7 +23,7 @@ def test_root_not_included_as_child_in_max_mode() -> None:
     cv.observable_add_threat_intel(root.key, source="root_source", score=Decimal("9.0"))
 
     # Create an observable that has root as a child
-    parent_obs = cv.observable_create(Cyvest.OBS.DOMAIN_NAME, "parent.com")
+    parent_obs = cv.observable_create(Cyvest.OBS.DOMAIN, "parent.com")
     cv.observable_add_threat_intel(parent_obs.key, source="parent_source", score=Decimal("2.0"))
 
     # Link parent -> root (root is child of parent via OUTBOUND)
@@ -56,13 +56,13 @@ def test_root_not_included_as_child_in_sum_mode() -> None:
     cv.observable_add_threat_intel(root.key, source="root_source", score=Decimal("5.0"))
 
     # Create an observable that has root as a child via INBOUND relationship
-    child_obs = cv.observable_create(Cyvest.OBS.IPV4_ADDR, "10.0.0.1")
+    child_obs = cv.observable_create(Cyvest.OBS.IPV4, "10.0.0.1")
     cv.observable_add_threat_intel(child_obs.key, source="child_source", score=Decimal("3.0"))
 
     # child -> root (INBOUND), meaning root is parent, but from Method 2 perspective,
     # child has INBOUND to root, so root could be seen as aggregating child
     # Let's test the opposite: parent with OUTBOUND to root
-    parent_obs = cv.observable_create(Cyvest.OBS.DOMAIN_NAME, "parent.com")
+    parent_obs = cv.observable_create(Cyvest.OBS.DOMAIN, "parent.com")
     cv.observable_add_threat_intel(parent_obs.key, source="parent_source", score=Decimal("1.0"))
 
     cv.observable_add_relationship(parent_obs.key, root.key, "related-to", direction="outbound")
@@ -89,10 +89,10 @@ def test_root_aggregates_its_own_children_normally() -> None:
     root = cv.root()
 
     # Create children of root
-    child1 = cv.observable_create(Cyvest.OBS.IPV4_ADDR, "10.0.0.1")
+    child1 = cv.observable_create(Cyvest.OBS.IPV4, "10.0.0.1")
     cv.observable_add_threat_intel(child1.key, source="source1", score=Decimal("6.0"))
 
-    child2 = cv.observable_create(Cyvest.OBS.DOMAIN_NAME, "example.com")
+    child2 = cv.observable_create(Cyvest.OBS.DOMAIN, "example.com")
     cv.observable_add_threat_intel(child2.key, source="source2", score=Decimal("8.0"))
 
     # Link root -> children
@@ -112,10 +112,10 @@ def test_root_barrier_prevents_cross_contamination() -> None:
     root = cv.root()
 
     # Create two branches connected through root
-    branch1 = cv.observable_create(Cyvest.OBS.DOMAIN_NAME, "branch1.com")
+    branch1 = cv.observable_create(Cyvest.OBS.DOMAIN, "branch1.com")
     cv.observable_add_threat_intel(branch1.key, source="source1", score=Decimal("9.0"))
 
-    branch2 = cv.observable_create(Cyvest.OBS.DOMAIN_NAME, "branch2.com")
+    branch2 = cv.observable_create(Cyvest.OBS.DOMAIN, "branch2.com")
     cv.observable_add_threat_intel(branch2.key, source="source2", score=Decimal("1.0"))
 
     # Root has both branches as children: root -> branch1, root -> branch2
@@ -133,7 +133,7 @@ def test_root_barrier_prevents_cross_contamination() -> None:
 
     # This is the key test: if other observables try to use root as a child, they shouldn't
     # receive contamination from root's aggregated score
-    parent_of_root = cv.observable_create(Cyvest.OBS.DOMAIN_NAME, "parent.com")
+    parent_of_root = cv.observable_create(Cyvest.OBS.DOMAIN, "parent.com")
     cv.observable_add_threat_intel(parent_of_root.key, source="source3", score=Decimal("0.5"))
 
     # Parent has root as child: parent -> root
@@ -151,13 +151,13 @@ def test_multi_level_hierarchy_with_root_as_child() -> None:
     cv.observable_add_threat_intel(root.key, source="root_source", score=Decimal("5.0"))
 
     # Create hierarchy: grandparent -> parent -> root -> child
-    grandparent = cv.observable_create(Cyvest.OBS.DOMAIN_NAME, "grandparent.com")
+    grandparent = cv.observable_create(Cyvest.OBS.DOMAIN, "grandparent.com")
     cv.observable_add_threat_intel(grandparent.key, source="gp_source", score=Decimal("1.0"))
 
-    parent = cv.observable_create(Cyvest.OBS.DOMAIN_NAME, "parent.com")
+    parent = cv.observable_create(Cyvest.OBS.DOMAIN, "parent.com")
     cv.observable_add_threat_intel(parent.key, source="p_source", score=Decimal("2.0"))
 
-    child = cv.observable_create(Cyvest.OBS.IPV4_ADDR, "10.0.0.1")
+    child = cv.observable_create(Cyvest.OBS.IPV4, "10.0.0.1")
     cv.observable_add_threat_intel(child.key, source="c_source", score=Decimal("8.0"))
 
     # Build hierarchy

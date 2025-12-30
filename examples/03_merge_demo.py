@@ -22,12 +22,12 @@ def analyze_network_traffic() -> Cyvest:
     cv = Cyvest(root_data={"type": "pcap_analysis", "source": "network_sensor_01"})
 
     # Create network-related observables
-    malicious_ip = cv.observable_create(cv.OBS.IPV4_ADDR, "203.0.113.50", internal=False)
+    malicious_ip = cv.observable_create(cv.OBS.IPV4, "203.0.113.50", internal=False)
     cv.observable_add_threat_intel(
         malicious_ip.key, "abuseipdb", score=Decimal("8.0"), level=cv.LVL.MALICIOUS, comment="Known botnet C2"
     )
 
-    internal_host = cv.observable_create(cv.OBS.IPV4_ADDR, "10.0.1.25", internal=True)
+    internal_host = cv.observable_create(cv.OBS.IPV4, "10.0.1.25", internal=True)
     cv.observable_add_relationship(internal_host.key, malicious_ip.key, cv.REL.RELATED_TO)
 
     # Create check
@@ -44,19 +44,19 @@ def analyze_endpoint_logs() -> Cyvest:
     """Analyze endpoint logs (simulating a separate process)."""
     cv = Cyvest(root_data={"type": "edr_logs", "source": "endpoint_agent"})
 
-    # Create file hash observable
-    suspicious_file = cv.observable_create(cv.OBS.ARTIFACT, "e99a18c428cb38d5f260853678922e03", internal=False)
+    # Create hash observable
+    suspicious_hash = cv.observable_create(cv.OBS.HASH, "e99a18c428cb38d5f260853678922e03", internal=False)
     cv.observable_add_threat_intel(
-        suspicious_file.key,
+        suspicious_hash.key,
         "virustotal",
         score=Decimal("9.5"),
         level=cv.LVL.MALICIOUS,
         comment="Ransomware detected: 45/70 vendors",
     )
 
-    # Create process observable
-    malicious_process = cv.observable_create(cv.OBS.PROCESS, "update.exe", internal=False)
-    cv.observable_add_relationship(malicious_process.key, suspicious_file.key, cv.REL.RELATED_TO)
+    # Create executable file observable
+    malicious_executable = cv.observable_create(cv.OBS.FILE, "update.exe", internal=False)
+    cv.observable_add_relationship(malicious_executable.key, suspicious_hash.key, cv.REL.RELATED_TO)
 
     # Create check
     endpoint_check = cv.check_create(
@@ -67,8 +67,8 @@ def analyze_endpoint_logs() -> Cyvest:
         score=Decimal("9.5"),
         level=cv.LVL.MALICIOUS,
     )
-    cv.check_link_observable(endpoint_check.key, suspicious_file.key)
-    cv.check_link_observable(endpoint_check.key, malicious_process.key)
+    cv.check_link_observable(endpoint_check.key, suspicious_hash.key)
+    cv.check_link_observable(endpoint_check.key, malicious_executable.key)
 
     return cv
 
@@ -78,7 +78,7 @@ def analyze_email_gateway() -> Cyvest:
     cv = Cyvest(root_data={"type": "email_gateway", "source": "mail_filter"})
 
     # Create email observable
-    phishing_email = cv.observable_create(cv.OBS.EMAIL_ADDR, "attacker@evil.com", internal=False)
+    phishing_email = cv.observable_create(cv.OBS.EMAIL, "attacker@evil.com", internal=False)
     cv.observable_add_threat_intel(
         phishing_email.key,
         "email_reputation",

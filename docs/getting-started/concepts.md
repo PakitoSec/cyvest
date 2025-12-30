@@ -126,7 +126,25 @@ Each threat intel entry has:
 - **Score**: Severity assessment
 - **Level**: Classification
 - **Comment**: Details about the verdict
-- **Taxonomies**: Structured metadata
+- **Taxonomies**: Structured metadata (unique by name)
+
+Taxonomies are objects with a strict shape and unique names:
+
+```python
+taxonomies=[
+    {"level": cv.LVL.INFO, "name": "malware-type", "value": "trojan"},
+    {"level": cv.LVL.SUSPICIOUS, "name": "confidence", "value": "medium"},
+]
+```
+
+If you don't know the observable yet, create a draft and attach it later:
+
+```python
+draft = cv.threat_intel_draft("virustotal", score=Decimal("4.2"))
+obs.with_ti_draft(draft)
+```
+
+Drafts are plain `ThreatIntel` objects without an `observable_key`; the key is generated on attach.
 
 ### Containers
 
@@ -598,7 +616,7 @@ This propagation ensures that checks analyzing whitelisted/trusted assets are pr
 
 ## Relationships
 
-Relationships let you link observables together. Use the Cyvest facade or proxy helpers (e.g., `cv.observable_add_relationship()` or `ObservableProxy.relate_to()`) so validation and score propagation stay consistent.
+Relationships let you link observables together. Use the Cyvest facade or proxy helpers (e.g., `cv.observable_add_relationship()` or `ObservableProxy.relate_to()`) so validation and score propagation stay consistent. These helpers raise `KeyError` if either observable key is missing.
 
 ```python
 # Using observable proxies (recommended)
@@ -791,7 +809,7 @@ inv1.merge_investigation(inv2)
 **Merge strategies:**
 - **Observables**: Higher score/level wins, comments concatenate, relationships and threat intel merge
 - **Checks**: Higher score/level wins, observables merge by key (not identity)
-- **Threat Intel**: Higher score/level wins, taxonomies merge
+- **Threat Intel**: Higher score/level wins, taxonomies merge by name (incoming replaces same name)
 - **Enrichments**: Deep merge of data dictionaries
 - **Containers**: Recursive merge of checks and sub-containers
 

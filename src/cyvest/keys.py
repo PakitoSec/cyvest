@@ -45,7 +45,7 @@ def generate_observable_key(obs_type: str, value: str) -> str:
     Format: obs:{type}:{normalized_value}
 
     Args:
-        obs_type: Type of observable (ip, url, domain, hash, etc.)
+        obs_type: Type of observable (ipv4, ipv6, url, domain, hash, email, etc.)
         value: Value of the observable
 
     Returns:
@@ -142,6 +142,32 @@ def parse_key_type(key: str) -> str | None:
     if ":" in key:
         return key.split(":", 1)[0]
     return None
+
+
+def parse_observable_key(key: str) -> tuple[str, str] | None:
+    """
+    Parse an observable key into its type and value.
+
+    Format: obs:{type}:{normalized_value}
+
+    Args:
+        key: Observable key to parse
+
+    Returns:
+        Tuple of (observable type, value) or None if invalid
+    """
+    if parse_key_type(key) != "obs":
+        return None
+
+    parts = key.split(":", 2)
+    if len(parts) != 3:
+        return None
+
+    _, obs_type, value = parts
+    if not obs_type or not value:
+        return None
+
+    return obs_type, value
 
 
 def validate_key(key: str, expected_type: str | None = None) -> bool:

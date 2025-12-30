@@ -52,7 +52,7 @@ def test_check_proxy_update_metadata() -> None:
 def test_threat_intel_proxy_update_metadata() -> None:
     """ThreatIntelProxy.update_metadata should allow comment/level/extra."""
     cv = Cyvest()
-    obs = cv.observable_create(Cyvest.OBS.DOMAIN_NAME, "example.com")
+    obs = cv.observable_create(Cyvest.OBS.DOMAIN, "example.com")
     ti = cv.observable_add_threat_intel(
         obs.key,
         source="vt",
@@ -66,6 +66,42 @@ def test_threat_intel_proxy_update_metadata() -> None:
     assert ti.comment == "Escalated"
     assert ti.level == Cyvest.LVL.MALICIOUS
     assert ti.extra["confidence"] == "high"
+
+
+def test_threat_intel_proxy_taxonomy_mutators() -> None:
+    """ThreatIntelProxy should add/replace/remove taxonomies by name."""
+    cv = Cyvest()
+    obs = cv.observable_create(Cyvest.OBS.DOMAIN, "example.com")
+    ti = cv.observable_add_threat_intel(
+        obs.key,
+        source="vt",
+        score=Decimal("4.2"),
+        taxonomies=[{"level": Cyvest.LVL.INFO, "name": "malware-type", "value": "trojan"}],
+    )
+    assert ti is not None
+
+    ti.add_taxonomy(level=Cyvest.LVL.SUSPICIOUS, name="confidence", value="low")
+    assert {taxonomy.name for taxonomy in ti.taxonomies} == {"malware-type", "confidence"}
+
+    ti.add_taxonomy(level=Cyvest.LVL.SUSPICIOUS, name="confidence", value="high")
+    confidence = [taxonomy for taxonomy in ti.taxonomies if taxonomy.name == "confidence"][0]
+    assert confidence.value == "high"
+
+    ti.remove_taxonomy("confidence")
+    assert {taxonomy.name for taxonomy in ti.taxonomies} == {"malware-type"}
+
+
+def test_observable_proxy_with_ti_draft() -> None:
+    """ObservableProxy.with_ti_draft should attach draft threat intel entries."""
+    cv = Cyvest()
+    obs = cv.observable_create(Cyvest.OBS.DOMAIN, "example.com")
+    draft = cv.threat_intel_draft(source="vt", score=Decimal("4.2"))
+
+    bound = obs.with_ti_draft(draft)
+    assert draft.observable_key == obs.key
+    assert draft.key.startswith("ti:")
+    assert bound.key == draft.key
+    assert {ti.key for ti in obs.threat_intels} == {draft.key}
 
 
 def test_enrichment_proxy_update_metadata() -> None:
@@ -158,7 +194,7 @@ def test_proxy_dir_exposes_public_fields() -> None:
 def test_proxy_public_fields_are_deep_copied() -> None:
     """Mutable model data exposed through proxies should be defensive copies."""
     cv = Cyvest()
-    obs = cv.observable_create(Cyvest.OBS.DOMAIN_NAME, "example.com")
+    obs = cv.observable_create(Cyvest.OBS.DOMAIN, "example.com")
     check = cv.check_create("check-id", "scope", "desc")
     linked_check = cv.check_link_observable(check.key, obs.key)
     assert linked_check is not None
@@ -166,7 +202,12 @@ def test_proxy_public_fields_are_deep_copied() -> None:
     container = cv.container_create("root")
     container.add_check(check)
 
-    ti = cv.observable_add_threat_intel(obs.key, source="vt", score=Decimal("2.5"), taxonomies=[{"k": "v"}])
+    ti = cv.observable_add_threat_intel(
+        obs.key,
+        source="vt",
+        score=Decimal("2.5"),
+        taxonomies=[{"level": Cyvest.LVL.INFO, "name": "malware-type", "value": "trojan"}],
+    )
     assert ti is not None
 
     enrichment = cv.enrichment_create("metadata", {"host": {"ip": "10.0.0.1"}}, context="ctx")
@@ -185,8 +226,9 @@ def test_proxy_public_fields_are_deep_copied() -> None:
     assert len(container.checks) == 1
 
     taxonomies_copy = ti.taxonomies
-    taxonomies_copy.append({"new": "value"})
-    assert ti.taxonomies == [{"k": "v"}]
+    taxonomies_copy.append({"level": Cyvest.LVL.SUSPICIOUS, "name": "confidence", "value": "low"})
+    assert len(ti.taxonomies) == 1
+    assert ti.taxonomies[0].name == "malware-type"
 
     data_copy = enrichment.data
     data_copy["host"]["ip"] = "10.0.0.2"

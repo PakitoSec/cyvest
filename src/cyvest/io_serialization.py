@@ -12,7 +12,7 @@ from decimal import Decimal
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from cyvest.levels import Level
+from cyvest.levels import Level, normalize_level
 from cyvest.model import AuditEvent, Check, Container, Enrichment, Observable, Relationship, ThreatIntel
 from cyvest.model_enums import ObservableType
 from cyvest.model_schema import InvestigationSchema
@@ -386,6 +386,14 @@ def load_investigation_json(filepath: str | Path) -> Cyvest:
 
     # Threat intel - leverage Pydantic model_validate
     for ti_info in data.get("threat_intels", {}).values():
+        raw_taxonomies = ti_info.get("taxonomies", []) or []
+        normalized_taxonomies: list[Any] = []
+        for taxonomy in raw_taxonomies:
+            if isinstance(taxonomy, dict) and "level" in taxonomy:
+                taxonomy = dict(taxonomy)
+                taxonomy["level"] = normalize_level(taxonomy["level"])
+            normalized_taxonomies.append(taxonomy)
+
         ti_data = {
             "source": ti_info.get("source", ""),
             "observable_key": ti_info.get("observable_key", ""),
@@ -393,7 +401,7 @@ def load_investigation_json(filepath: str | Path) -> Cyvest:
             "extra": ti_info.get("extra", {}),
             "score": Decimal(str(ti_info.get("score", 0))),
             "level": ti_info.get("level", "INFO"),
-            "taxonomies": ti_info.get("taxonomies", []),
+            "taxonomies": normalized_taxonomies,
             "key": ti_info.get("key", ""),
         }
         ti = ThreatIntel.model_validate(ti_data)
@@ -477,7 +485,5 @@ def load_investigation_json(filepath: str | Path) -> Cyvest:
             continue
     cv._investigation._event_log = event_log
     cv._investigation._audit_enabled = True
-
-    # Note: Root observable is managed by Investigation, no need to set it here
 
     return cv

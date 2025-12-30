@@ -39,9 +39,7 @@ export type CheckLinks = string[];
  */
 export type PropagationMode = "LOCAL_ONLY" | "GLOBAL";
 export type ObservableLinks = ObservableLink[];
-export type Taxonomies = {
-  [k: string]: unknown;
-}[];
+export type Taxonomies = Taxonomy[];
 export type Checks1 = string[];
 /**
  * Root observable type used during data extraction.
@@ -231,6 +229,14 @@ export interface ThreatIntel {
 }
 export interface Extra2 {
   [k: string]: unknown;
+}
+/**
+ * Represents a structured taxonomy entry for threat intelligence.
+ */
+export interface Taxonomy {
+  level: Level;
+  name: string;
+  value: string;
 }
 /**
  * Enrichment entries keyed by their unique key.

@@ -323,7 +323,7 @@ docs = [
 [package.metadata]
 requires-dist = [
     { name = "click", specifier = ">=8" },
-    { name = "logurich", extras = ["click"], specifier = ">=0.5.1" },
+    { name = "logurich", extras = ["click"], specifier = ">=0.6.0" },
     { name = "pydantic", specifier = ">=2.12.5" },
     { name = "pyvis", marker = "extra == 'visualization'", specifier = ">=0.3.2" },
     { name = "rich", specifier = ">=13" },
@@ -586,15 +586,15 @@ wheels = [
 
 [[package]]
 name = "logurich"
-version = "0.5.1"
+version = "0.6.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "loguru" },
     { name = "rich" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/2b/13/aa3d1b79a2456a4cc72d2612684f48b7b5c56a938eadac0571815d86d286/logurich-0.5.1.tar.gz", hash = "sha256:8299175e7c5c05207447d79cb5f1467925488693958f14c1ae77dded2ae70b64", size = 12861, upload-time = "2025-12-30T11:25:19.367Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ce/87/a776b3e2ad0dd9ef0d9104b767f029145e58621f4b4ef0ba84e6255cfc2a/logurich-0.6.0.tar.gz", hash = "sha256:688d4850ecc4eb59ae370171c356f6d1287cad872951aec6f924958444999503", size = 12958, upload-time = "2025-12-31T16:09:12.263Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/b1/55/eae8dbaa6cef60562b2e612140e4d965908f5f65cfbcf91265a8412caa53/logurich-0.5.1-py3-none-any.whl", hash = "sha256:039203afbbadfabd2fd28485daba2dba3f2cd62b8be5a799a802c1bf5f5bc2a1", size = 16616, upload-time = "2025-12-30T11:25:17.949Z" },
+    { url = "https://files.pythonhosted.org/packages/6f/c5/e5a173009787983a000769225770250395663e01c6342da5d217b2f41dbb/logurich-0.6.0-py3-none-any.whl", hash = "sha256:8c0b42092ea20ed2985d55017ec95766fa5dbe4ede35fe22c69e628fcd015ae5", size = 16700, upload-time = "2025-12-31T16:09:10.861Z" },
 ]
 
 [package.optional-dependencies]

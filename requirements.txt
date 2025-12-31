@@ -6,7 +6,7 @@ click==8.3.0
     # via
     #   cyvest (pyproject.toml)
     #   logurich
-logurich==0.5.1
+logurich==0.6.0
     # via cyvest (pyproject.toml)
 loguru==0.7.3
     # via logurich

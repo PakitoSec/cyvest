@@ -1378,7 +1378,7 @@ def test_export_parallel_updates(tmp_path):
     # Export should capture all observables and checks
     schema = shared.io_to_invest()
     assert len(schema.observables) == 11  # 10 created + 1 root
-    assert schema.stats.checks_by_scope["scope"] == 10
+    assert len(schema.stats.checks_by_scope["scope"]) == 10
 
     # Save and verify
     json_path = tmp_path / "parallel.json"

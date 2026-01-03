@@ -538,16 +538,20 @@
         },
         "checks_by_scope": {
           "additionalProperties": {
-            "minimum": 0,
-            "type": "integer"
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
           },
           "title": "Checks By Scope",
           "type": "object"
         },
         "checks_by_level": {
           "additionalProperties": {
-            "minimum": 0,
-            "type": "integer"
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
           },
           "title": "Checks By Level",
           "type": "object"
@@ -753,17 +757,6 @@
       "title": "Checks",
       "type": "object"
     },
-    "checks_by_level": {
-      "additionalProperties": {
-        "items": {
-          "type": "string"
-        },
-        "type": "array"
-      },
-      "description": "Check keys organized by level name.",
-      "title": "Checks By Level",
-      "type": "object"
-    },
     "threat_intels": {
       "additionalProperties": {
         "$ref": "#/$defs/ThreatIntel"
@@ -812,7 +805,6 @@
     "whitelists",
     "observables",
     "checks",
-    "checks_by_level",
     "threat_intels",
     "enrichments",
     "containers",

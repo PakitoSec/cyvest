@@ -160,10 +160,8 @@ class Taxonomy(BaseModel):
 
     @field_validator("level", mode="before")
     @classmethod
-    def require_level_enum(cls, v: Any) -> Level:
-        if isinstance(v, Level):
-            return v
-        raise TypeError("Taxonomy level must be a Level enum value.")
+    def coerce_level(cls, v: Any) -> Level:
+        return normalize_level(v)
 
 
 class ThreatIntel(BaseModel):
@@ -236,8 +234,6 @@ class ThreatIntel(BaseModel):
         if "comment" not in values:
             values["comment"] = ""
         if values.get("taxonomies") is None:
-            values["taxonomies"] = []
-        if "taxonomies" not in values:
             values["taxonomies"] = []
         if "key" not in values:
             values["key"] = ""

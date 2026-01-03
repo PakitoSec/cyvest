@@ -49,13 +49,6 @@ def serialize_investigation(inv: Investigation) -> InvestigationSchema:
             checks_by_scope[check.scope] = []
         checks_by_scope[check.scope].append(check)
 
-    # Build checks organized by level
-    checks_by_level: dict[str, list[str]] = {}
-    for check in inv.get_all_checks().values():
-        if check.level.name not in checks_by_level:
-            checks_by_level[check.level.name] = []
-        checks_by_level[check.level.name].append(check.key)
-
     # Get root type
     root = inv.get_root()
     root_type_value = root.obs_type.value
@@ -80,7 +73,6 @@ def serialize_investigation(inv: Investigation) -> InvestigationSchema:
         event_log=inv.get_event_log(),
         observables=observables,
         checks=checks_by_scope,
-        checks_by_level=checks_by_level,
         threat_intels=threat_intels,
         enrichments=enrichments,
         containers=containers,

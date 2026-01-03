@@ -154,6 +154,18 @@ class InvestigationStats:
             counts[check.scope] += 1
         return dict(counts)
 
+    def get_check_keys_by_scope(self) -> dict[str, list[str]]:
+        """
+        Get check keys grouped by scope.
+
+        Returns:
+            Dictionary mapping scope to list of check keys
+        """
+        keys: dict[str, list[str]] = defaultdict(list)
+        for check in self._checks.values():
+            keys[check.scope].append(check.key)
+        return dict(keys)
+
     def get_check_count_by_level(self) -> dict[Level, int]:
         """
         Get count of checks by level.
@@ -165,6 +177,18 @@ class InvestigationStats:
         for check in self._checks.values():
             counts[check.level] += 1
         return dict(counts)
+
+    def get_check_keys_by_level(self) -> dict[Level, list[str]]:
+        """
+        Get check keys grouped by level.
+
+        Returns:
+            Dictionary mapping level to list of check keys
+        """
+        keys: dict[Level, list[str]] = defaultdict(list)
+        for check in self._checks.values():
+            keys[check.level].append(check.key)
+        return dict(keys)
 
     def get_applied_check_count(self) -> int:
         """
@@ -283,8 +307,8 @@ class InvestigationStats:
             },
             total_checks=self.get_total_check_count(),
             applied_checks=self.get_applied_check_count(),
-            checks_by_scope=self.get_check_count_by_scope(),
-            checks_by_level={str(k): v for k, v in self.get_check_count_by_level().items()},
+            checks_by_scope=self.get_check_keys_by_scope(),
+            checks_by_level={str(k): v for k, v in self.get_check_keys_by_level().items()},
             total_threat_intel=self.get_threat_intel_count(),
             threat_intel_by_source=self.get_threat_intel_count_by_source(),
             threat_intel_by_level={str(k): v for k, v in self.get_threat_intel_count_by_level().items()},

@@ -176,10 +176,6 @@ function createTestInvestigation(): CyvestInvestigation {
         },
       ],
     },
-    checks_by_level: {
-      INFO: ["chk:ip_check:network", "chk:dns_lookup:dns"],
-      MALICIOUS: ["chk:domain_check:dns"],
-    },
     threat_intels: {
       "ti:virustotal:obs:domain-name:example.com": {
         key: "ti:virustotal:obs:domain-name:example.com",
@@ -232,8 +228,8 @@ function createTestInvestigation(): CyvestInvestigation {
       observables_by_type_and_level: {},
       total_checks: 3,
       applied_checks: 2,
-      checks_by_scope: { network: 1, dns: 2 },
-      checks_by_level: { INFO: 2, MALICIOUS: 1 },
+      checks_by_scope: { network: ["chk:ip_check:network"], dns: ["chk:domain_check:dns", "chk:dns_lookup:dns"] },
+      checks_by_level: { INFO: ["chk:ip_check:network", "chk:dns_lookup:dns"], MALICIOUS: ["chk:domain_check:dns"] },
       total_threat_intel: 1,
       threat_intel_by_source: { virustotal: 1 },
       threat_intel_by_level: { MALICIOUS: 1 },

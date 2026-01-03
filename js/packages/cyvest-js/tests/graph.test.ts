@@ -123,7 +123,6 @@ function createGraphTestInvestigation(): CyvestInvestigation {
       },
     },
     checks: {},
-    checks_by_level: {},
     threat_intels: {},
     enrichments: {},
     containers: {},

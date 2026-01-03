@@ -83,7 +83,6 @@ export interface CyvestInvestigation {
   event_log?: EventLog;
   observables: Observables;
   checks: Checks;
-  checks_by_level: ChecksByLevel;
   threat_intels: ThreatIntels1;
   enrichments: Enrichments;
   containers: Containers;
@@ -198,12 +197,6 @@ export interface ObservableLink {
   propagation_mode?: PropagationMode;
 }
 /**
- * Check keys organized by level name.
- */
-export interface ChecksByLevel {
-  [k: string]: string[];
-}
-/**
  * Threat intelligence entries keyed by their unique key.
  */
 export interface ThreatIntels1 {
@@ -300,7 +293,7 @@ export interface StatisticsSchema {
   total_checks: number;
   applied_checks: number;
   checks_by_scope?: ChecksByScope;
-  checks_by_level?: ChecksByLevel1;
+  checks_by_level?: ChecksByLevel;
   total_threat_intel: number;
   threat_intel_by_source?: ThreatIntelBySource;
   threat_intel_by_level?: ThreatIntelByLevel;
@@ -318,10 +311,10 @@ export interface ObservablesByTypeAndLevel {
   };
 }
 export interface ChecksByScope {
-  [k: string]: number;
+  [k: string]: string[];
 }
-export interface ChecksByLevel1 {
-  [k: string]: number;
+export interface ChecksByLevel {
+  [k: string]: string[];
 }
 export interface ThreatIntelBySource {
   [k: string]: number;

@@ -94,7 +94,6 @@ def test_investigation_schema_level_required_and_defaults() -> None:
         "whitelists",
         "observables",
         "checks",
-        "checks_by_level",
         "threat_intels",
         "enrichments",
         "containers",
@@ -130,7 +129,6 @@ def test_investigation_schema_level_required_and_defaults() -> None:
     assert inst.whitelists == []
     assert inst.observables == {}
     assert inst.checks == {}
-    assert inst.checks_by_level == {}
     assert inst.threat_intels == {}
     assert inst.enrichments == {}
     assert inst.containers == {}

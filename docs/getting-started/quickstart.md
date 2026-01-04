@@ -39,6 +39,13 @@ print(cv.get_global_score(), cv.get_global_level())
 !!! tip "Context-first mindset"
     Pass incident metadata through `Cyvest(root_data={...})`. Every container, check, and export inherits it so you never lose analyst intent.
 
+!!! tip "Deterministic investigation IDs"
+    For reproducible reports that enable diffing between runs, pass a custom `investigation_id`:
+    ```python
+    cv = Cyvest(root_data={"type": "email"}, investigation_id="email-analysis-v1")
+    ```
+    Without this parameter, a unique ULID is auto-generated for each run.
+
 !!! note "Immutable proxies"
     `observable_create`, `check_create`, and the fluent helpers return read-only proxies (`ObservableProxy`, `CheckProxy`, …). Inspect their attributes freely, but use the Cyvest facade or the proxy helper methods for any updates so the score engine runs automatically.
 
@@ -156,6 +163,9 @@ cv.io_save_json("investigation.json")
 cv.io_save_markdown("report.md")
 # Hide observables while keeping aggregate stats/whitelists
 cv.io_save_markdown("redacted_report.md", include_observables=False)
+
+# For compact, deterministic JSON (useful for testing/diffing):
+cv.io_save_json("deterministic.json", include_audit_log=False)
 ```
 
 !!! tip "Filtering checks by severity"
@@ -168,7 +178,7 @@ cv.io_save_markdown("redacted_report.md", include_observables=False)
     The docs assume you write to the project root, but automation pipelines typically point to `dist/` (JSON) and `reports/` (Markdown/PDF). Adjust paths to match your workflow.
 
 !!! note "Provenance fields in JSON"
-    Exports include `investigation_id`, optional `investigation_name`, and the investigation-level `event_log`, plus check origins (`origin_investigation_id`) and link fields (`observable_links`, `check_links`) needed for scoring after merges.
+    Exports include `investigation_id`, optional `investigation_name`, and the investigation-level `audit_log`, plus check origins (`origin_investigation_id`) and link fields (`observable_links`, `check_links`) needed for scoring after merges.
 
 ---
 

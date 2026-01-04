@@ -56,6 +56,9 @@ from cyvest import Cyvest
 # Create an investigation (root_data becomes the root observable extra)
 cv = Cyvest(root_data={"type": "email"})
 
+# For deterministic reports (enables diffing between runs), pass a custom investigation_id:
+# cv = Cyvest(root_data={"type": "email"}, investigation_id="email-analysis-v1")
+
 # Create observables
 url = (
     cv.observable(cv.OBS.URL, "https://phishing-site.com", internal=False)
@@ -273,6 +276,11 @@ cv = Cyvest(score_mode_obs=ScoreMode.SUM)  # accumulative children
 
 - All meaningful changes (including score/level changes) are recorded in the investigation-level audit log.
 - Per-object histories are not stored; use `cv.investigation_get_audit_log()` to review changes.
+- For compact, deterministic JSON output (useful for testing/diffing), exclude the audit log:
+  ```python
+  cv.io_save_json("output.json", include_audit_log=False)  # audit_log: null
+  cv.io_to_invest(include_audit_log=False)  # schema.audit_log is None
+  ```
 
 To force cross-investigation propagation for a specific link, use a GLOBAL link:
 
@@ -455,8 +463,9 @@ The repo includes a PNPM workspace under `js/` with three packages:
 - `@cyvest/cyvest-app`: Vite demo that bundles the JS packages with sample investigations.
 
 The JS packages track the generated schema; serialized investigations should include fields like
-`investigation_id`, `investigation_name`, `started_at`, `score_display`, `check_links`, and
-`observable_links`.
+`investigation_id`, `investigation_name`, `audit_log`, `score_display`, `check_links`, and
+`observable_links`. The investigation start time is recorded as an `INVESTIGATION_STARTED` event
+in the `audit_log`.
 
 See `docs/js-packages.md` for workspace commands and usage snippets.
 
@@ -489,6 +498,7 @@ Cyvest is designed for:
 
 - **Concurrency**: Advanced `SharedInvestigationContext` (via `cyvest.shared`) enables safe parallel task execution
 - **Deterministic Keys**: Same objects always generate same keys for merging
+- **Deterministic IDs**: Optional `investigation_id` parameter for reproducible reports and diffing
 - **Score Propagation**: Automatic hierarchical score calculation
 - **Flexible Export**: JSON for storage, Markdown for LLM analysis
 - **Audit Trail**: Score change history for debugging

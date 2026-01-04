@@ -125,58 +125,117 @@ class SharedInvestigationContext:
     # Task creation (local fragment builder)
     # ---------------------------------------------------------------------
 
-    def create_cyvest(self, root_data: Any | None = None):
+    def create_cyvest(
+        self,
+        root_data: Any | None = None,
+        investigation_id: str | None = None,
+        investigation_name: str | None = None,
+    ):
         """
         Return a context manager for a task-local Cyvest instance.
 
         - `with shared.create_cyvest() as cy:` auto-reconciles on successful exit.
         - `async with shared.create_cyvest() as cy:` also works (reconciles via `areconcile()`).
 
+        Args:
+            root_data: Task data (if None, uses a deep copy of the canonical root observable extra).
+            investigation_id: Optional deterministic investigation ID for the fragment.
+            investigation_name: Optional human-readable name for the fragment.
+
         If `root_data` is None, task data is a deep copy of the canonical root observable extra.
         """
-        return self._CyvestContextManager(shared_context=self, root_data=root_data)
+        return self._CyvestContextManager(
+            shared_context=self,
+            root_data=root_data,
+            investigation_id=investigation_id,
+            investigation_name=investigation_name,
+        )
 
-    def acreate_cyvest(self, root_data: Any | None = None):
+    def acreate_cyvest(
+        self,
+        root_data: Any | None = None,
+        investigation_id: str | None = None,
+        investigation_name: str | None = None,
+    ):
         """Async-friendly alias for `create_cyvest` (supports `async with`)."""
-        return self.create_cyvest(root_data=root_data)
+        return self.create_cyvest(
+            root_data=root_data,
+            investigation_id=investigation_id,
+            investigation_name=investigation_name,
+        )
 
     class _CyvestContextManager:
-        def __init__(self, *, shared_context: SharedInvestigationContext, root_data: Any | None) -> None:
+        def __init__(
+            self,
+            *,
+            shared_context: SharedInvestigationContext,
+            root_data: Any | None,
+            investigation_id: str | None = None,
+            investigation_name: str | None = None,
+        ) -> None:
             self._shared_context = shared_context
             self._root_data = root_data
+            self._investigation_id = investigation_id
+            self._investigation_name = investigation_name
             self._cyvest: Cyvest | None = None
 
         def __enter__(self):
-            self._cyvest = self._shared_context._create_task_cyvest_sync(self._root_data)
+            self._cyvest = self._shared_context._create_task_cyvest_sync(
+                self._root_data, self._investigation_id, self._investigation_name
+            )
             return self._cyvest
 
-        def __exit__(self, exc_type, exc_val, exc_tb) -> Literal[False]:
+        def __exit__(self, exc_type, _exc_val, _exc_tb) -> Literal[False]:
             if exc_type is None and self._cyvest is not None:
                 self._shared_context.reconcile(self._cyvest)
             return False
 
         async def __aenter__(self):
-            self._cyvest = await self._shared_context._create_task_cyvest_async(self._root_data)
+            self._cyvest = await self._shared_context._create_task_cyvest_async(
+                self._root_data, self._investigation_id, self._investigation_name
+            )
             return self._cyvest
 
-        async def __aexit__(self, exc_type, exc_val, exc_tb) -> Literal[False]:
+        async def __aexit__(self, exc_type, _exc_val, _exc_tb) -> Literal[False]:
             if exc_type is None and self._cyvest is not None:
                 await self._shared_context.areconcile(self._cyvest)
             return False
 
-    def _create_task_cyvest_sync(self, root_data: Any | None):
+    def _create_task_cyvest_sync(
+        self,
+        root_data: Any | None,
+        investigation_id: str | None = None,
+        investigation_name: str | None = None,
+    ):
         if root_data is None:
             root_data = self._lock.run(self._get_root_data_copy_unlocked)
         else:
             root_data = deepcopy(root_data)
-        return Cyvest(root_data, root_type=self._root_type, score_mode_obs=self._score_mode_obs)
+        return Cyvest(
+            root_data,
+            root_type=self._root_type,
+            score_mode_obs=self._score_mode_obs,
+            investigation_id=investigation_id,
+            investigation_name=investigation_name,
+        )
 
-    async def _create_task_cyvest_async(self, root_data: Any | None):
+    async def _create_task_cyvest_async(
+        self,
+        root_data: Any | None,
+        investigation_id: str | None = None,
+        investigation_name: str | None = None,
+    ):
         if root_data is None:
             root_data = await self._lock.arun(self._get_root_data_copy_unlocked)
         else:
             root_data = deepcopy(root_data)
-        return Cyvest(root_data, root_type=self._root_type, score_mode_obs=self._score_mode_obs)
+        return Cyvest(
+            root_data,
+            root_type=self._root_type,
+            score_mode_obs=self._score_mode_obs,
+            investigation_id=investigation_id,
+            investigation_name=investigation_name,
+        )
 
     def _get_root_data_copy_unlocked(self) -> Any:
         return deepcopy(self._main_investigation._root_observable.extra)
@@ -417,21 +476,21 @@ class SharedInvestigationContext:
         )
         return str(Path(filepath).resolve())
 
-    def io_to_invest(self) -> InvestigationSchema:
-        return self._lock.run(self._io_to_invest_unlocked)
+    def io_to_invest(self, *, include_audit_log: bool = True) -> InvestigationSchema:
+        return self._lock.run(self._io_to_invest_unlocked, include_audit_log)
 
-    async def aio_to_invest(self) -> InvestigationSchema:
-        return await self._lock.arun(self._io_to_invest_unlocked)
+    async def aio_to_invest(self, *, include_audit_log: bool = True) -> InvestigationSchema:
+        return await self._lock.arun(self._io_to_invest_unlocked, include_audit_log)
 
-    def _io_to_invest_unlocked(self) -> InvestigationSchema:
-        return serialize_investigation(self._main_investigation)
+    def _io_to_invest_unlocked(self, include_audit_log: bool = True) -> InvestigationSchema:
+        return serialize_investigation(self._main_investigation, include_audit_log=include_audit_log)
 
-    def io_save_json(self, filepath: str | Path) -> str:
-        return self._lock.run(self._io_save_json_unlocked, filepath)
+    def io_save_json(self, filepath: str | Path, *, include_audit_log: bool = True) -> str:
+        return self._lock.run(self._io_save_json_unlocked, filepath, include_audit_log)
 
-    async def aio_save_json(self, filepath: str | Path) -> str:
-        return await self._lock.arun(self._io_save_json_unlocked, filepath)
+    async def aio_save_json(self, filepath: str | Path, *, include_audit_log: bool = True) -> str:
+        return await self._lock.arun(self._io_save_json_unlocked, filepath, include_audit_log)
 
-    def _io_save_json_unlocked(self, filepath: str | Path) -> str:
-        save_investigation_json(self._main_investigation, filepath)
+    def _io_save_json_unlocked(self, filepath: str | Path, include_audit_log: bool = True) -> str:
+        save_investigation_json(self._main_investigation, filepath, include_audit_log=include_audit_log)
         return str(Path(filepath).resolve())

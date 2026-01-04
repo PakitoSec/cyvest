@@ -7,7 +7,6 @@ Provides JSON export/import and Markdown generation for LLM consumption.
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -23,7 +22,7 @@ if TYPE_CHECKING:
     from cyvest.investigation import Investigation
 
 
-def serialize_investigation(inv: Investigation) -> InvestigationSchema:
+def serialize_investigation(inv: Investigation, *, include_audit_log: bool = True) -> InvestigationSchema:
     """
     Serialize a complete investigation to an InvestigationSchema.
 
@@ -32,6 +31,8 @@ def serialize_investigation(inv: Investigation) -> InvestigationSchema:
 
     Args:
         inv: Investigation to serialize
+        include_audit_log: Include audit log in serialization (default: True).
+            When False, audit_log is set to None for compact, deterministic output.
 
     Returns:
         InvestigationSchema instance (use .model_dump() for dict)
@@ -54,23 +55,14 @@ def serialize_investigation(inv: Investigation) -> InvestigationSchema:
     root_type_value = root.obs_type.value
 
     # Build and validate using Pydantic model
-    started_at = getattr(inv, "_started_at", None)
-    if not isinstance(started_at, datetime):
-        started_at = datetime.now(timezone.utc)
-    elif started_at.tzinfo is None:
-        started_at = started_at.replace(tzinfo=timezone.utc)
-    else:
-        started_at = started_at.astimezone(timezone.utc)
-
     investigation = InvestigationSchema(
         investigation_id=inv.investigation_id,
         investigation_name=inv.investigation_name,
-        started_at=started_at,
         score=inv.get_global_score(),
         level=inv.get_global_level(),
         whitelisted=inv.is_whitelisted(),
         whitelists=list(inv.get_whitelists()),
-        event_log=inv.get_event_log(),
+        audit_log=inv.get_audit_log() if include_audit_log else None,
         observables=observables,
         checks=checks_by_scope,
         threat_intels=threat_intels,
@@ -86,15 +78,17 @@ def serialize_investigation(inv: Investigation) -> InvestigationSchema:
     return investigation
 
 
-def save_investigation_json(inv: Investigation, filepath: str | Path) -> None:
+def save_investigation_json(inv: Investigation, filepath: str | Path, *, include_audit_log: bool = True) -> None:
     """
     Save an investigation to a JSON file.
 
     Args:
         inv: Investigation to save
         filepath: Path to save the JSON file
+        include_audit_log: Include audit log in output (default: True).
+            When False, audit_log is set to null for compact, deterministic output.
     """
-    data = serialize_investigation(inv)
+    data = serialize_investigation(inv, include_audit_log=include_audit_log)
     with open(filepath, "w", encoding="utf-8") as f:
         f.write(data.model_dump_json(indent=2, by_alias=True))
 
@@ -294,27 +288,11 @@ def load_investigation_json(filepath: str | Path) -> Cyvest:
         investigation_id=investigation_id,
     )
     cv._investigation._audit_enabled = False
-    cv._investigation._event_log = []
+    cv._investigation._audit_log = []
 
     investigation_name = data.get("investigation_name")
     if isinstance(investigation_name, str):
         cv._investigation.investigation_name = investigation_name
-
-    started_at_raw = data.get("started_at")
-    if isinstance(started_at_raw, str) and started_at_raw.strip():
-        started_at_candidate = started_at_raw.strip()
-        if started_at_candidate.endswith("Z"):
-            started_at_candidate = started_at_candidate[:-1] + "+00:00"
-        try:
-            started_at = datetime.fromisoformat(started_at_candidate)
-        except ValueError:
-            started_at = None
-        if isinstance(started_at, datetime):
-            if started_at.tzinfo is None:
-                started_at = started_at.replace(tzinfo=timezone.utc)
-            else:
-                started_at = started_at.astimezone(timezone.utc)
-            cv._investigation._started_at = started_at
 
     # Load whitelists using Pydantic validation
     whitelists = data.get("whitelists") or []
@@ -469,13 +447,13 @@ def load_investigation_json(filepath: str | Path) -> Cyvest:
 
     cv._investigation._refresh_check_links()
 
-    event_log = []
-    for event_info in data.get("event_log", []) or []:
+    audit_log = []
+    for event_info in data.get("audit_log", []) or []:
         try:
-            event_log.append(AuditEvent.model_validate(event_info))
+            audit_log.append(AuditEvent.model_validate(event_info))
         except Exception:
             continue
-    cv._investigation._event_log = event_log
+    cv._investigation._audit_log = audit_log
     cv._investigation._audit_enabled = True
 
     return cv

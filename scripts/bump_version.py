@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -69,6 +70,11 @@ def main() -> None:
     update_pyproject(version)
     update_init(version)
     update_js_packages(version)
+
+    print("Running uv lock && uv sync...")
+    subprocess.run(["uv", "lock"], cwd=ROOT, check=True)
+    subprocess.run(["uv", "sync"], cwd=ROOT, check=True)
+
     print("Done.")
 
 

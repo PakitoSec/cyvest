@@ -59,6 +59,7 @@ class Cyvest:
         root_type: ObservableType | Literal["file", "artifact"] = ObservableType.FILE,
         score_mode_obs: ScoreMode = ScoreMode.MAX,
         investigation_name: str | None = None,
+        investigation_id: str | None = None,
     ) -> None:
         """
         Initialize a new investigation.
@@ -68,12 +69,14 @@ class Cyvest:
             root_type: Root observable type (ObservableType.FILE or ObservableType.ARTIFACT)
             score_mode_obs: Observable score calculation mode (MAX or SUM)
             investigation_name: Optional human-readable investigation name
+            investigation_id: Optional deterministic investigation ID (auto-generated ULID if not provided)
         """
         self._investigation = Investigation(
             root_data,
             root_type=root_type,
             score_mode_obs=score_mode_obs,
             investigation_name=investigation_name,
+            investigation_id=investigation_id,
         )
 
     @staticmethod
@@ -194,7 +197,7 @@ class Cyvest:
 
     def investigation_get_audit_log(self) -> tuple:
         """Return the investigation-level audit log."""
-        return tuple(self._investigation.get_event_log())
+        return tuple(self._investigation.get_audit_log())
 
     def investigation_add_whitelist(
         self, identifier: str, name: str, justification: str | None = None
@@ -937,7 +940,7 @@ class Cyvest:
 
     # Serialization and I/O methods
 
-    def io_save_json(self, filepath: str | Path) -> str:
+    def io_save_json(self, filepath: str | Path, *, include_audit_log: bool = True) -> str:
         """
         Save the investigation to a JSON file.
 
@@ -945,6 +948,8 @@ class Cyvest:
 
         Args:
             filepath: Path to save the JSON file (relative or absolute)
+            include_audit_log: Include audit log in output (default: True).
+                When False, audit_log is set to null for compact, deterministic output.
 
         Returns:
             Absolute path to the saved file as a string
@@ -957,8 +962,10 @@ class Cyvest:
             >>> cv = Cyvest()
             >>> path = cv.io_save_json("investigation.json")
             >>> print(path)  # /absolute/path/to/investigation.json
+            >>> # For compact, deterministic output:
+            >>> path = cv.io_save_json("output.json", include_audit_log=False)
         """
-        save_investigation_json(self._investigation, filepath)
+        save_investigation_json(self._investigation, filepath, include_audit_log=include_audit_log)
         return str(Path(filepath).resolve())
 
     def io_save_markdown(
@@ -1024,9 +1031,13 @@ class Cyvest:
             self._investigation, include_containers, include_enrichments, include_observables
         )
 
-    def io_to_invest(self) -> InvestigationSchema:
+    def io_to_invest(self, *, include_audit_log: bool = True) -> InvestigationSchema:
         """
         Serialize the investigation to an InvestigationSchema.
+
+        Args:
+            include_audit_log: Include audit log in serialization (default: True).
+                When False, audit_log is set to None for compact, deterministic output.
 
         Returns:
             InvestigationSchema instance (use .model_dump() for dict)
@@ -1036,8 +1047,11 @@ class Cyvest:
             >>> schema = cv.io_to_invest()
             >>> print(schema.score, schema.level)
             >>> dict_data = schema.model_dump(by_alias=True)
+            >>> # For compact, deterministic output:
+            >>> schema = cv.io_to_invest(include_audit_log=False)
+            >>> assert schema.audit_log is None
         """
-        return serialize_investigation(self._investigation)
+        return serialize_investigation(self._investigation, include_audit_log=include_audit_log)
 
     # Merge methods
 

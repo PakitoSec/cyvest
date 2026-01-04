@@ -19,6 +19,33 @@ def test_cyvest_initialization() -> None:
     assert root.obs_type == "file"
 
 
+def test_cyvest_deterministic_investigation_id() -> None:
+    """Test that investigation_id parameter sets deterministic ID."""
+    # Without investigation_id, a ULID is auto-generated
+    cv_auto = Cyvest()
+    assert cv_auto._investigation.investigation_id is not None
+    assert len(cv_auto._investigation.investigation_id) == 26  # ULID length
+
+    # With investigation_id, the provided ID is used
+    cv_custom = Cyvest(investigation_id="my-custom-id")
+    assert cv_custom._investigation.investigation_id == "my-custom-id"
+
+    # Verify it persists through JSON serialization
+    schema = cv_custom.io_to_invest()
+    assert schema.investigation_id == "my-custom-id"
+
+    # Verify roundtrip through JSON save/load
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+        temp_path = f.name
+
+    try:
+        cv_custom.io_save_json(temp_path)
+        cv_loaded = Cyvest.io_load_json(temp_path)
+        assert cv_loaded._investigation.investigation_id == "my-custom-id"
+    finally:
+        Path(temp_path).unlink(missing_ok=True)
+
+
 def test_observable_creation() -> None:
     """Test creating observables via facade."""
     cv = Cyvest()
@@ -678,6 +705,74 @@ def test_io_to_invest_serialization() -> None:
     # Verify content
     assert obs.key in data["observables"]
     assert data["observables"][obs.key]["value"] == "https://malicious.com"
+
+
+def test_io_to_invest_include_audit_log_default() -> None:
+    """Test that io_to_invest includes audit_log by default."""
+    cv = Cyvest()
+    cv.observable_create(Cyvest.OBS.URL, "https://example.com")
+
+    schema = cv.io_to_invest()
+
+    # By default, audit_log should be a list with events
+    assert schema.audit_log is not None
+    assert isinstance(schema.audit_log, list)
+    assert len(schema.audit_log) > 0  # At least INVESTIGATION_STARTED event
+
+
+def test_io_to_invest_exclude_audit_log() -> None:
+    """Test that io_to_invest can exclude audit_log."""
+    cv = Cyvest()
+    cv.observable_create(Cyvest.OBS.URL, "https://example.com")
+
+    schema = cv.io_to_invest(include_audit_log=False)
+
+    # audit_log should be None when disabled
+    assert schema.audit_log is None
+
+    # Verify JSON output has null
+    data = schema.model_dump(mode="json", by_alias=True)
+    assert data["audit_log"] is None
+
+
+def test_io_save_json_exclude_audit_log(tmp_path) -> None:
+    """Test that io_save_json can exclude audit_log from output."""
+    import json
+
+    cv = Cyvest()
+    cv.observable_create(Cyvest.OBS.DOMAIN, "test.com")
+
+    filepath = tmp_path / "investigation.json"
+
+    # Save without audit_log
+    cv.io_save_json(str(filepath), include_audit_log=False)
+
+    # Verify JSON content
+    with open(filepath) as f:
+        data = json.load(f)
+
+    assert data["audit_log"] is None
+
+
+def test_io_save_json_include_audit_log_default(tmp_path) -> None:
+    """Test that io_save_json includes audit_log by default."""
+    import json
+
+    cv = Cyvest()
+    cv.observable_create(Cyvest.OBS.DOMAIN, "test.com")
+
+    filepath = tmp_path / "investigation.json"
+
+    # Save with default (include audit_log)
+    cv.io_save_json(str(filepath))
+
+    # Verify JSON content
+    with open(filepath) as f:
+        data = json.load(f)
+
+    assert data["audit_log"] is not None
+    assert isinstance(data["audit_log"], list)
+    assert len(data["audit_log"]) > 0
 
 
 def test_io_to_markdown_generates_report() -> None:

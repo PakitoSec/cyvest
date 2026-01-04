@@ -511,9 +511,9 @@ def display_summary(
 
     if show_audit_log:
         investigation = getattr(cv, "_investigation", None)
-        events = investigation.get_event_log() if investigation else []
+        events = investigation.get_audit_log() if investigation else []
         if events:
-            started_at = getattr(investigation, "_started_at", None) if investigation else None
+            started_at = investigation.started_at if investigation else None
             _render_audit_log_table(
                 rich_print=rich_print,
                 title="Audit Log",

@@ -12,7 +12,6 @@ and produces schemas matching the actual model_dump() output.
 
 from __future__ import annotations
 
-from datetime import datetime
 from decimal import Decimal
 from typing import Annotated, Any, Literal
 
@@ -100,7 +99,6 @@ class InvestigationSchema(BaseModel):
         default=None,
         description="Optional human-readable investigation name.",
     )
-    started_at: datetime = Field(..., description="Investigation start time (UTC).")
     score: Decimal = Field(..., description="Global investigation score.")
     level: Level = Field(
         ...,
@@ -111,9 +109,9 @@ class InvestigationSchema(BaseModel):
         ...,
         description="List of whitelist entries applied to this investigation.",
     )
-    event_log: list[AuditEvent] = Field(
+    audit_log: list[AuditEvent] | None = Field(
         default_factory=list,
-        description="Append-only investigation audit log.",
+        description="Append-only investigation audit log. Null when serialization disabled audit.",
     )
     observables: dict[str, Observable] = Field(
         ...,
@@ -156,7 +154,7 @@ class InvestigationSchema(BaseModel):
 
         v.setdefault("level", Level.NONE)
         v.setdefault("whitelists", [])
-        v.setdefault("event_log", [])
+        v.setdefault("audit_log", [])
         v.setdefault("observables", {})
         v.setdefault("checks", {})
         v.setdefault("threat_intels", {})

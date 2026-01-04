@@ -15,15 +15,15 @@ export type Justification = string | null;
  * List of whitelist entries applied to this investigation.
  */
 export type Whitelists = InvestigationWhitelist[];
+/**
+ * Append-only investigation audit log. Null when serialization disabled audit.
+ */
+export type AuditLog = AuditEvent[] | null;
 export type Actor = string | null;
 export type Reason = string | null;
 export type Tool = string | null;
 export type ObjectType = string | null;
 export type ObjectKey = string | null;
-/**
- * Append-only investigation audit log.
- */
-export type EventLog = AuditEvent[];
 export type ThreatIntels = string[];
 /**
  * Direction of a relationship between observables.
@@ -67,10 +67,6 @@ export interface CyvestInvestigation {
   investigation_id: string;
   investigation_name?: InvestigationName;
   /**
-   * Investigation start time (UTC).
-   */
-  started_at: string;
-  /**
    * Global investigation score.
    */
   score: number;
@@ -80,7 +76,7 @@ export interface CyvestInvestigation {
    */
   whitelisted: boolean;
   whitelists: Whitelists;
-  event_log?: EventLog;
+  audit_log?: AuditLog;
   observables: Observables;
   checks: Checks;
   threat_intels: ThreatIntels1;

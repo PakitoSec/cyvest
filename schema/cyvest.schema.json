@@ -702,12 +702,6 @@
       "description": "Optional human-readable investigation name.",
       "title": "Investigation Name"
     },
-    "started_at": {
-      "description": "Investigation start time (UTC).",
-      "format": "date-time",
-      "title": "Started At",
-      "type": "string"
-    },
     "score": {
       "description": "Global investigation score.",
       "title": "Score",
@@ -730,13 +724,20 @@
       "title": "Whitelists",
       "type": "array"
     },
-    "event_log": {
-      "description": "Append-only investigation audit log.",
-      "items": {
-        "$ref": "#/$defs/AuditEvent"
-      },
-      "title": "Event Log",
-      "type": "array"
+    "audit_log": {
+      "anyOf": [
+        {
+          "items": {
+            "$ref": "#/$defs/AuditEvent"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Append-only investigation audit log. Null when serialization disabled audit.",
+      "title": "Audit Log"
     },
     "observables": {
       "additionalProperties": {
@@ -798,7 +799,6 @@
   },
   "required": [
     "investigation_id",
-    "started_at",
     "score",
     "level",
     "whitelisted",

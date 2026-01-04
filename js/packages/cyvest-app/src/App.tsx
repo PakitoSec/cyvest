@@ -1,4 +1,5 @@
 import type { CyvestInvestigation } from "@cyvest/cyvest-js";
+import { getStartedAt } from "@cyvest/cyvest-js";
 import { CyvestGraph } from "@cyvest/cyvest-vis";
 import React, { useEffect, useState } from "react";
 import { loadInvestigation, INVESTIGATIONS, type InvestigationKey } from "./api";
@@ -66,7 +67,7 @@ export const App: React.FC = () => {
             <div style={{ color: "#6b7280", fontSize: 13, marginTop: 4 }}>
               <span>Score {investigation.score_display}</span>
               <span> | Level {investigation.level}</span>
-              <span> | Started {investigation.started_at}</span>
+              <span> | Started {getStartedAt(investigation) ?? "N/A"}</span>
             </div>
           </div>
 

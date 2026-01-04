@@ -37,9 +37,20 @@ class BaseRule(ABC):
     _scope: str = "general"  # Task scope (email, network, file, etc.)
     order: int = 100  # Execution order priority
 
+    def _get_investigation_id(self) -> str:
+        """Generate a deterministic investigation ID based on class name."""
+        return f"fragment-{self.__class__.__name__.lower()}"
+
+    def _get_investigation_name(self) -> str:
+        """Generate a human-readable investigation name based on class name."""
+        return self.__class__.__name__
+
     def _run(self, shared_context: SharedInvestigationContext) -> None:
         self.shared_context = shared_context
-        with shared_context.create_cyvest() as cy:
+        with shared_context.create_cyvest(
+            investigation_id=self._get_investigation_id(),
+            investigation_name=self._get_investigation_name(),
+        ) as cy:
             self.run(cy)
 
     @abstractmethod
@@ -88,7 +99,12 @@ class RuleExecutor:
         sorted_tasks = sorted(tasks, key=lambda t: t.order)
 
         # Create main investigation and shared context
-        main_cy = Cyvest(root_data=data, root_type=Cyvest.OBS.ARTIFACT, investigation_name="Email Investigation")
+        main_cy = Cyvest(
+            root_data=data,
+            root_type=Cyvest.OBS.ARTIFACT,
+            investigation_name="Email Investigation",
+            investigation_id="cyvest-email-example",
+        )
         shared = main_cy.shared_context()
 
         logger.info(f"Running {len(sorted_tasks)} tasks in parallel with {self.max_workers} workers")
@@ -499,8 +515,15 @@ class AI(BaseRule):
 @click.option("--browser", "browser", is_flag=True, default=False)
 @click.option("--stats", "stats", is_flag=True, default=False)
 @click.option("--audit", "audit", is_flag=True, default=False)
+@click.option(
+    "--no-audit-log",
+    "no_audit_log",
+    is_flag=True,
+    default=False,
+    help="Exclude audit log from JSON output for deterministic output",
+)
 @click.option("-o", "--output", type=click.Path(dir_okay=False, path_type=Path), default=None)
-def main(workers, browser, stats, audit, output):
+def main(workers, browser, stats, audit, no_audit_log, output):
     """Main execution demonstrating multi-threaded investigation."""
 
     # Prepare input data
@@ -562,7 +585,7 @@ def main(workers, browser, stats, audit, output):
 
     if output is not None:
         logger.info("[bold cyan]Generating json...[/bold cyan]")
-        json_path = cy.io_save_json(output)
+        json_path = cy.io_save_json(output, include_audit_log=not no_audit_log)
         size_kb = Path(json_path).stat().st_size / 1024
         logger.info("[green]✓ Full json saved to: {} ({:.2f} KB)[/green]", json_path, size_kb)
 

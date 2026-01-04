@@ -87,11 +87,17 @@ class Investigation:
             score_mode_obs: Observable score calculation mode (MAX or SUM)
             investigation_name: Optional human-readable investigation name
         """
-        self._started_at = datetime.now(timezone.utc)
         self.investigation_id = investigation_id or generate_ulid()
         self.investigation_name = investigation_name
-        self._event_log: list[AuditEvent] = []
+        self._audit_log: list[AuditEvent] = []
         self._audit_enabled = True
+
+        # Record investigation start as the first event
+        self._record_event(
+            event_type="INVESTIGATION_STARTED",
+            object_type="investigation",
+            object_key=self.investigation_id,
+        )
 
         # Object collections
         self._observables: dict[str, Observable] = {}
@@ -154,8 +160,17 @@ class Investigation:
             object_key=object_key,
             details=deepcopy(details) if details else {},
         )
-        self._event_log.append(event)
+        self._audit_log.append(event)
         return event
+
+    @property
+    def started_at(self) -> datetime:
+        """Return the investigation start time from the first event in the audit log."""
+        for event in self._audit_log:
+            if event.event_type == "INVESTIGATION_STARTED":
+                return event.timestamp
+        # Fallback if no INVESTIGATION_STARTED event (shouldn't happen)
+        return datetime.now(timezone.utc)
 
     def _add_threat_intel_to_observable(self, observable: Observable, ti: ThreatIntel) -> None:
         if any(existing.key == ti.key for existing in observable.threat_intels):
@@ -291,9 +306,9 @@ class Investigation:
         for observable_key in self._observables:
             self._sync_check_links_for_observable(observable_key)
 
-    def get_event_log(self) -> list[AuditEvent]:
-        """Return a deep copy of the audit event log."""
-        return [event.model_copy(deep=True) for event in self._event_log]
+    def get_audit_log(self) -> list[AuditEvent]:
+        """Return a deep copy of the audit log."""
+        return [event.model_copy(deep=True) for event in self._audit_log]
 
     def get_audit_events(
         self,
@@ -303,7 +318,7 @@ class Investigation:
         event_type: str | None = None,
     ) -> list[AuditEvent]:
         """Filter audit events by optional object type/key and event type."""
-        events = self._event_log
+        events = self._audit_log
         if object_type is not None:
             events = [event for event in events if event.object_type == object_type]
         if object_key is not None:

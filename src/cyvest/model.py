@@ -281,6 +281,14 @@ class Observable(BaseModel):
     _check_links: list[str] = PrivateAttr(default_factory=list)
     _from_shared_context: bool = PrivateAttr(default=False)
 
+    def model_dump(self, *, by_alias: bool = True, **kwargs) -> dict[str, Any]:
+        """Serialize to dict, defaulting to by_alias=True for JSON compatibility."""
+        return super().model_dump(by_alias=by_alias, **kwargs)
+
+    def model_dump_json(self, *, by_alias: bool = True, **kwargs) -> str:
+        """Serialize to JSON string, defaulting to by_alias=True."""
+        return super().model_dump_json(by_alias=by_alias, **kwargs)
+
     @field_validator("obs_type", mode="before")
     @classmethod
     def coerce_obs_type(cls, v: Any) -> ObservableType | str:

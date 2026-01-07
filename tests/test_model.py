@@ -387,3 +387,24 @@ def test_relationship_override_default() -> None:
     # Override default: RELATED_TO normally BIDIRECTIONAL, force INBOUND
     inv.add_relationship(obs1, obs2, RelationshipType.RELATED_TO, RelationshipDirection.INBOUND)
     assert obs1.relationships[0].direction == RelationshipDirection.INBOUND
+
+
+def test_observable_serializes_with_type_alias() -> None:
+    """Observable.model_dump() should output 'type' not 'obs_type' by default."""
+    obs = Observable(obs_type="url", value="https://example.com")
+
+    # Default model_dump() should use by_alias=True
+    dumped = obs.model_dump()
+    assert "type" in dumped
+    assert "obs_type" not in dumped
+    assert dumped["type"] == "url"
+
+    # model_dump_json() should also use alias
+    json_str = obs.model_dump_json()
+    assert '"type":' in json_str or '"type": ' in json_str
+    assert '"obs_type"' not in json_str
+
+    # Explicit by_alias=False should use field name
+    dumped_no_alias = obs.model_dump(by_alias=False)
+    assert "obs_type" in dumped_no_alias
+    assert "type" not in dumped_no_alias

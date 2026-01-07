@@ -14,7 +14,7 @@ import type {
   Tag,
   Level,
 } from "./types.generated";
-import { generateObservableKey, isTagChildOf } from "./keys";
+import { generateObservableKey, generateCheckKey, generateTagKey, isTagChildOf } from "./keys";
 import { getLevelFromScore } from "./levels";
 
 /**
@@ -132,8 +132,7 @@ export function getCheckByName(
   inv: CyvestInvestigation,
   checkName: string
 ): Check | undefined {
-  const normalizedName = checkName.trim().toLowerCase();
-  const key = `chk:${normalizedName}`;
+  const key = generateCheckKey(checkName);
   return inv.checks[key];
 }
 
@@ -286,8 +285,7 @@ export function getTagByName(
   inv: CyvestInvestigation,
   name: string
 ): Tag | undefined {
-  const normalizedName = name.trim().toLowerCase();
-  const key = `tag:${normalizedName}`;
+  const key = generateTagKey(name);
   return inv.tags[key];
 }
 

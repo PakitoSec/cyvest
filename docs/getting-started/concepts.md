@@ -805,8 +805,8 @@ inv1.merge_investigation(inv2)
 ```
 
 **Merge strategies:**
-- **Observables**: Higher score/level wins, comments concatenate, relationships and threat intel merge
-- **Checks**: Higher score/level wins, observables merge by key (not identity)
+- **Observables**: Higher score/level wins, comments overwrite (if incoming non-empty), relationships and threat intel merge
+- **Checks**: Higher score/level wins, comments overwrite (if incoming non-empty), observables merge by key (not identity)
 - **Threat Intel**: Higher score/level wins, taxonomies merge by name (incoming replaces same name)
 - **Enrichments**: Deep merge of data dictionaries
 - **Tags**: Merge of checks, hierarchy auto-reconstructed from names

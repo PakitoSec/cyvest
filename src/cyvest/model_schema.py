@@ -19,6 +19,7 @@ from pydantic import BaseModel, ConfigDict, Field, computed_field, field_seriali
 
 from cyvest.levels import Level
 from cyvest.model import (
+    AliasDumpModel,
     AuditEvent,
     Check,
     Enrichment,
@@ -71,7 +72,7 @@ class DataExtractionSchema(BaseModel):
     )
 
 
-class InvestigationSchema(BaseModel):
+class InvestigationSchema(AliasDumpModel):
     """
     Schema for a complete serialized investigation.
 

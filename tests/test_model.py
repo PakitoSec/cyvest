@@ -408,3 +408,26 @@ def test_observable_serializes_with_type_alias() -> None:
     dumped_no_alias = obs.model_dump(by_alias=False)
     assert "obs_type" in dumped_no_alias
     assert "type" not in dumped_no_alias
+
+
+def test_investigation_schema_serializes_observables_with_type_alias() -> None:
+    """InvestigationSchema.model_dump() should output 'type' for nested observables."""
+    from cyvest.io_serialization import serialize_investigation
+
+    inv = Investigation(root_data={})
+    obs = Observable(obs_type="url", value="https://example.com")
+    inv.add_observable(obs)
+
+    schema = serialize_investigation(inv)
+
+    # Default model_dump() should use by_alias=True for nested observables
+    dumped = schema.model_dump()
+    obs_data = dumped["observables"][obs.key]
+    assert "type" in obs_data
+    assert "obs_type" not in obs_data
+    assert obs_data["type"] == "url"
+
+    # model_dump_json() should also use alias
+    json_str = schema.model_dump_json()
+    assert '"type":' in json_str or '"type": ' in json_str
+    assert '"obs_type"' not in json_str

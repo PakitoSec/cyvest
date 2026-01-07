@@ -1003,7 +1003,7 @@ class Cyvest:
             >>> cv = Cyvest()
             >>> schema = cv.io_to_invest()
             >>> print(schema.score, schema.level)
-            >>> dict_data = schema.model_dump(by_alias=True)
+            >>> dict_data = schema.model_dump()  # defaults to by_alias=True
             >>> # For compact, deterministic output:
             >>> schema = cv.io_to_invest(include_audit_log=False)
             >>> assert schema.audit_log is None

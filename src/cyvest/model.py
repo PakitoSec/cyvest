@@ -37,6 +37,18 @@ from cyvest.model_enums import (
 _DEFAULT_SCORE_PLACES = 2
 
 
+class AliasDumpModel(BaseModel):
+    """Base model that defaults to by_alias=True for JSON-compatible serialization."""
+
+    def model_dump(self, *, by_alias: bool = True, **kwargs: Any) -> dict[str, Any]:
+        """Serialize to dict, defaulting to by_alias=True for JSON compatibility."""
+        return super().model_dump(by_alias=by_alias, **kwargs)
+
+    def model_dump_json(self, *, by_alias: bool = True, **kwargs: Any) -> str:
+        """Serialize to JSON string, defaulting to by_alias=True."""
+        return super().model_dump_json(by_alias=by_alias, **kwargs)
+
+
 def _format_score_decimal(value: Decimal | None, *, places: int = _DEFAULT_SCORE_PLACES) -> str:
     if value is None:
         return "-"
@@ -257,7 +269,7 @@ class ThreatIntel(BaseModel):
         return _format_score_decimal(self.score)
 
 
-class Observable(BaseModel):
+class Observable(AliasDumpModel):
     """
     Represents a cyber observable (IP, URL, domain, hash, etc.).
 
@@ -280,14 +292,6 @@ class Observable(BaseModel):
     key: str = Field(...)
     _check_links: list[str] = PrivateAttr(default_factory=list)
     _from_shared_context: bool = PrivateAttr(default=False)
-
-    def model_dump(self, *, by_alias: bool = True, **kwargs) -> dict[str, Any]:
-        """Serialize to dict, defaulting to by_alias=True for JSON compatibility."""
-        return super().model_dump(by_alias=by_alias, **kwargs)
-
-    def model_dump_json(self, *, by_alias: bool = True, **kwargs) -> str:
-        """Serialize to JSON string, defaulting to by_alias=True."""
-        return super().model_dump_json(by_alias=by_alias, **kwargs)
 
     @field_validator("obs_type", mode="before")
     @classmethod

@@ -122,7 +122,7 @@ def main(no_audit_log: bool = False, output: Path | None = None) -> None:
         .link_observable(attacker_email)
         .link_observable(victim_email)
         .with_score(8.0)
-        .in_tag(cv.tag("phishing:investigation:email"))
+        .tagged("phishing:investigation:email")
     )
 
     _ = (
@@ -130,7 +130,7 @@ def main(no_audit_log: bool = False, output: Path | None = None) -> None:
         .link_observable(phishing_url1)
         .link_observable(phishing_url2)
         .with_score(9.0)
-        .in_tag(cv.tag("phishing:investigation:network"))
+        .tagged("phishing:investigation:network")
     )
 
     _ = (
@@ -138,14 +138,14 @@ def main(no_audit_log: bool = False, output: Path | None = None) -> None:
         .link_observable(malicious_domain)
         .link_observable(malicious_ip)
         .with_score(9.5)
-        .in_tag(cv.tag("phishing:investigation:network"))
+        .tagged("phishing:investigation:network")
     )
 
     _ = (
         cv.check("malware_detection", "Malware file analysis")
         .link_observable(malware_file)
         .with_score(10.0)
-        .in_tag(cv.tag("phishing:investigation:malware"))
+        .tagged("phishing:investigation:malware")
     )
 
     # Finalize relationships

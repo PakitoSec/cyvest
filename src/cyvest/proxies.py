@@ -346,18 +346,23 @@ class CheckProxy(_ReadOnlyProxy[Check]):
         self._get_investigation().update_model_metadata("check", self.key, updates, dict_merge=dict_merge)
         return self
 
-    def in_tag(self, tag: Tag | TagProxy | str) -> CheckProxy:
-        """Add this check to a tag."""
-        if isinstance(tag, TagProxy):
-            tag_key = tag.key
-        elif isinstance(tag, Tag):
-            tag_key = tag.key
-        elif isinstance(tag, str):
-            tag_key = tag
-        else:
-            raise TypeError("Tag must provide a key.")
+    def tagged(self, *tags: Tag | TagProxy | str) -> CheckProxy:
+        """Add this check to one or more tags (auto-creates tags from strings)."""
+        investigation = self._get_investigation()
+        for tag in tags:
+            if isinstance(tag, TagProxy):
+                tag_key = tag.key
+            elif isinstance(tag, Tag):
+                tag_key = tag.key
+            elif isinstance(tag, str):
+                # Auto-create tag if it doesn't exist
+                tag_key = keys.generate_tag_key(tag)
+                if investigation.get_tag(tag_key) is None:
+                    investigation.add_tag(Tag(name=tag, checks=[], key=tag_key))
+            else:
+                raise TypeError("Tag must provide a key.")
 
-        self._get_investigation().add_check_to_tag(tag_key, self.key)
+            investigation.add_check_to_tag(tag_key, self.key)
         return self
 
     def link_observable(

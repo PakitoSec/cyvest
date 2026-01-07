@@ -118,19 +118,17 @@ cv.observable_add_relationship(
 ```python
 cv = Cyvest()
 
-# Tags use ":" delimiter for automatic hierarchy
-# Creating "network:east_dc" auto-creates "network" tag
-network_tag = cv.tag("network:analysis", "Network telemetry")
+# Simple: pass tag names directly (auto-creates tags)
 (
     cv.check("c2_detection", "Detect C2 communication")
-    .in_tag(network_tag)
+    .tagged("network", "suspicious")  # multiple tags at once
 )
 
-# Nested tags for larger stories
-east_tag = cv.tag("network:analysis:east_dc", "East datacenter")
+# With description: create tag first
+network_tag = cv.tag("network:analysis", "Network telemetry")
 (
     cv.check("ids_east", "IDS signals from east DC")
-    .in_tag(east_tag)
+    .tagged(network_tag, "network:analysis:east_dc")  # mix TagProxy and strings
 )
 
 # Query hierarchy

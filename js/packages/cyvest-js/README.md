@@ -32,17 +32,17 @@ pnpm --filter @cyvest/cyvest-js test
 ```ts
 import {
   parseCyvest,
-  findRootObservables,
+  findSourceObservables,
   getObservableGraph,
   type CyvestInvestigation,
 } from "@cyvest/cyvest-js";
 import raw from "./investigation.json";
 
 const investigation: CyvestInvestigation = parseCyvest(raw);
-const roots = findRootObservables(investigation);
+const sources = findSourceObservables(investigation);
 const graph = getObservableGraph(investigation);
 
-console.log(`Roots: ${roots.length} • Nodes: ${graph.nodes.length}`);
+console.log(`Sources: ${sources.length} • Nodes: ${graph.nodes.length}`);
 ```
 
 ## Publishing / consumers

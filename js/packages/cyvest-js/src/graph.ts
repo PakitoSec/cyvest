@@ -12,6 +12,7 @@ import type {
   Level,
   RelationshipDirection,
 } from "./types.generated";
+import { generateObservableKey } from "./keys";
 
 /**
  * Edge representation for graph operations.
@@ -325,15 +326,15 @@ export function getObservableGraph(inv: CyvestInvestigation): InvestigationGraph
 // ============================================================================
 
 /**
- * Find the root observable(s) of the investigation.
+ * Find source observables in the investigation graph.
  *
- * Root observables are those that have no incoming relationships
+ * Source observables are those that have no incoming relationships
  * (nothing points to them as a target).
  *
  * @param inv - The investigation
- * @returns Array of root observables
+ * @returns Array of source observables
  */
-export function findRootObservables(inv: CyvestInvestigation): Observable[] {
+export function findSourceObservables(inv: CyvestInvestigation): Observable[] {
   const targetKeys = new Set<string>();
 
   // Collect all target keys from relationships
@@ -349,6 +350,24 @@ export function findRootObservables(inv: CyvestInvestigation): Observable[] {
   return Object.values(inv.observables).filter(
     (obs) => !targetKeys.has(obs.key)
   );
+}
+
+/**
+ * Get the root observable of the investigation.
+ *
+ * The root observable is identified using the `root_type` from data extraction
+ * metadata combined with value="root".
+ *
+ * @param inv - The investigation
+ * @returns The root observable, or undefined if not found
+ */
+export function getRootObservable(inv: CyvestInvestigation): Observable | undefined {
+  const rootType = inv.data_extraction.root_type;
+  if (!rootType) {
+    return undefined;
+  }
+  const rootKey = generateObservableKey(rootType, "root");
+  return inv.observables[rootKey];
 }
 
 /**

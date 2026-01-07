@@ -197,7 +197,7 @@ Serialize the shared investigation to an `InvestigationSchema`.
 
 Thread-safe: Uses lock to ensure consistent read of investigation state.
 
-**Returns:** `InvestigationSchema` instance (use `.model_dump(mode="json", by_alias=True)` for JSON-ready dict)
+**Returns:** `InvestigationSchema` instance (use `.model_dump()` for JSON-ready dict — defaults to `by_alias=True`)
 
 **Examples:**
 ```python

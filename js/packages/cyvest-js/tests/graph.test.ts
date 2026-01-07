@@ -6,7 +6,7 @@ import {
   getObservableParents,
   getRelatedObservablesByType,
   getObservableGraph,
-  findRootObservables,
+  findSourceObservables,
   findOrphanObservables,
   findLeafObservables,
   areConnected,
@@ -259,12 +259,12 @@ describe("Graph Traversal", () => {
     });
   });
 
-  describe("findRootObservables", () => {
+  describe("findSourceObservables", () => {
     it("finds observables with no incoming relationships", () => {
-      const roots = findRootObservables(inv);
-      // email-message and file-hash are roots
-      expect(roots.length).toBeGreaterThanOrEqual(2);
-      const values = roots.map((o) => o.value);
+      const sources = findSourceObservables(inv);
+      // email-message and file-hash are sources
+      expect(sources.length).toBeGreaterThanOrEqual(2);
+      const values = sources.map((o) => o.value);
       expect(values).toContain("msg1");
       expect(values).toContain("abc123");
     });

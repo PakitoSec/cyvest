@@ -393,39 +393,39 @@ class SharedInvestigationContext:
 
     def io_to_markdown(
         self,
-        include_containers: bool = False,
+        include_tags: bool = False,
         include_enrichments: bool = False,
         include_observables: bool = True,
     ) -> str:
         return self._lock.run(
             self._io_to_markdown_unlocked,
-            include_containers,
+            include_tags,
             include_enrichments,
             include_observables,
         )
 
     async def aio_to_markdown(
         self,
-        include_containers: bool = False,
+        include_tags: bool = False,
         include_enrichments: bool = False,
         include_observables: bool = True,
     ) -> str:
         return await self._lock.arun(
             self._io_to_markdown_unlocked,
-            include_containers,
+            include_tags,
             include_enrichments,
             include_observables,
         )
 
     def _io_to_markdown_unlocked(
         self,
-        include_containers: bool,
+        include_tags: bool,
         include_enrichments: bool,
         include_observables: bool,
     ) -> str:
         return generate_markdown_report(
             self._main_investigation,
-            include_containers,
+            include_tags,
             include_enrichments,
             include_observables,
         )
@@ -433,14 +433,14 @@ class SharedInvestigationContext:
     def io_save_markdown(
         self,
         filepath: str | Path,
-        include_containers: bool = False,
+        include_tags: bool = False,
         include_enrichments: bool = False,
         include_observables: bool = True,
     ) -> str:
         return self._lock.run(
             self._io_save_markdown_unlocked,
             filepath,
-            include_containers,
+            include_tags,
             include_enrichments,
             include_observables,
         )
@@ -448,14 +448,14 @@ class SharedInvestigationContext:
     async def aio_save_markdown(
         self,
         filepath: str | Path,
-        include_containers: bool = False,
+        include_tags: bool = False,
         include_enrichments: bool = False,
         include_observables: bool = True,
     ) -> str:
         return await self._lock.arun(
             self._io_save_markdown_unlocked,
             filepath,
-            include_containers,
+            include_tags,
             include_enrichments,
             include_observables,
         )
@@ -463,14 +463,14 @@ class SharedInvestigationContext:
     def _io_save_markdown_unlocked(
         self,
         filepath: str | Path,
-        include_containers: bool,
+        include_tags: bool,
         include_enrichments: bool,
         include_observables: bool,
     ) -> str:
         save_investigation_markdown(
             self._main_investigation,
             filepath,
-            include_containers,
+            include_tags,
             include_enrichments,
             include_observables,
         )

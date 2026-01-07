@@ -387,19 +387,19 @@ def display_summary(
         level = f"[{color_level}]{check.level.name}[/{color_level}]"
         table.add_row(name, score, level)
 
-    # Containers section (if any)
-    if cv.container_get_all():
+    # Tags section (if any)
+    if cv.tag_get_all():
         table.add_section()
-        rule = Rule("[bold magenta]CONTAINERS[/bold magenta]")
+        rule = Rule("[bold magenta]TAGS[/bold magenta]")
         table.add_row(rule, "-", "-")
 
-        for container in cv.container_get_all().values():
-            agg_score = container.get_aggregated_score()
-            agg_level = container.get_aggregated_level()
+        for tag in cv.tag_get_all().values():
+            agg_score = tag.get_aggregated_score()
+            agg_level = tag.get_aggregated_level()
             color_level = get_color_level(agg_level)
             color_score = get_color_score(agg_score)
 
-            name = f"  {container.path}"
+            name = f"  {tag.name}"
             score = f"[{color_score}]{agg_score:.2f}[/{color_score}]"
             level = f"[{color_level}]{agg_level.name}[/{color_level}]"
             table.add_row(name, score, level)

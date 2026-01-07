@@ -145,13 +145,13 @@ obs.with_ti_draft(draft)
 
 Drafts are plain `ThreatIntel` objects without an `observable_key`; the key is generated on attach.
 
-### Containers
+### Tags
 
-**Containers** organize checks hierarchically:
+**Tags** organize checks with automatic hierarchy based on `:` delimiter:
 - Group related checks together
 - Create logical investigation sections
-- Support nesting for complex structures
-- Provide aggregated scores and levels
+- Auto-create ancestor tags (e.g., `header:auth:dkim` creates `header` and `header:auth`)
+- Provide direct and aggregated scores/levels
 
 ### Enrichments
 
@@ -651,7 +651,7 @@ Every object has a unique, deterministic key:
 - **Check**: `chk:{check_name}`
 - **Threat Intel**: `ti:{source}:{observable_key}`
 - **Enrichment**: `enr:{name}[:{context_hash}]`
-- **Container**: `ctr:{path}`
+- **Tag**: `tag:{name}`
 
 Keys enable:
 - Fast object retrieval
@@ -809,7 +809,7 @@ inv1.merge_investigation(inv2)
 - **Checks**: Higher score/level wins, observables merge by key (not identity)
 - **Threat Intel**: Higher score/level wins, taxonomies merge by name (incoming replaces same name)
 - **Enrichments**: Deep merge of data dictionaries
-- **Containers**: Recursive merge of checks and sub-containers
+- **Tags**: Merge of checks, hierarchy auto-reconstructed from names
 
 ## Next Steps
 

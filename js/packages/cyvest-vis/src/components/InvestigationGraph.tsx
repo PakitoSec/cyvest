@@ -1,6 +1,6 @@
 /**
  * InvestigationGraph component - displays investigation structure with Dagre layout.
- * Shows root observable, checks, and containers in a hierarchical view.
+ * Shows root observable, checks, and tags in a hierarchical view.
  */
 
 import React, { useMemo, useCallback } from "react";
@@ -19,7 +19,8 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
-import type { CyvestInvestigation, Check, Container } from "@cyvest/cyvest-js";
+import type { CyvestInvestigation, Check, Tag } from "@cyvest/cyvest-js";
+import { getTagAncestors } from "@cyvest/cyvest-js";
 
 import type {
   InvestigationGraphProps,
@@ -55,21 +56,10 @@ const defaultEdgeOptions = {
 };
 
 /**
- * Flatten containers recursively to get all container keys.
+ * Get all tags as an array.
  */
-function flattenContainers(
-  containers: Record<string, Container>
-): Container[] {
-  const result: Container[] = [];
-
-  for (const container of Object.values(containers)) {
-    result.push(container);
-    if (container.sub_containers) {
-      result.push(...flattenContainers(container.sub_containers));
-    }
-  }
-
-  return result;
+function getAllTags(tags: Record<string, Tag>): Tag[] {
+  return Object.values(tags);
 }
 
 /**
@@ -115,13 +105,13 @@ function createInvestigationGraph(
     draggable: true,
   });
 
-  // Collect all check keys that belong to containers
+  // Collect all check keys that belong to tags
   // These checks should NOT have a direct link to the root node
-  const allContainers = flattenContainers(investigation.containers);
-  const checksInContainers = new Set<string>();
-  for (const container of allContainers) {
-    for (const checkKey of container.checks) {
-      checksInContainers.add(checkKey);
+  const allTags = getAllTags(investigation.tags);
+  const checksInTags = new Set<string>();
+  for (const tag of allTags) {
+    for (const checkKey of tag.checks) {
+      checksInTags.add(checkKey);
     }
   }
 
@@ -151,9 +141,9 @@ function createInvestigationGraph(
       draggable: true,
     });
 
-    // Only create edge from root to check if check is NOT in a container
-    // Checks in containers will be linked through their container instead
-    if (!checksInContainers.has(check.key)) {
+    // Only create edge from root to check if check is NOT in a tag
+    // Checks in tags will be linked through their tag instead
+    if (!checksInTags.has(check.key)) {
       edges.push({
         id: `edge-root-${check.key}`,
         source: rootKey,
@@ -164,43 +154,79 @@ function createInvestigationGraph(
     }
   }
 
-  // Add container nodes
-  for (const container of allContainers) {
-    const containerNodeData: InvestigationNodeData = {
-      label: truncateLabel(
-        container.path.split("/").pop() ?? container.path,
-        20
-      ),
-      nodeType: "container",
-      level: container.aggregated_level,
-      score: container.aggregated_score,
-      path: container.path,
+  // Build hierarchical tag structure
+  // First, collect all tag names and find/create ancestor tags
+  const tagByName = new Map<string, Tag>();
+  for (const tag of allTags) {
+    tagByName.set(tag.name, tag);
+  }
+
+  // Collect all unique tag names including synthetic ancestors
+  const allTagNames = new Set<string>();
+  for (const tag of allTags) {
+    allTagNames.add(tag.name);
+    // Add ancestors (they may not exist as actual tags)
+    for (const ancestor of getTagAncestors(tag.name)) {
+      allTagNames.add(ancestor);
+    }
+  }
+
+  // Create tag nodes (real and synthetic)
+  for (const tagName of allTagNames) {
+    const realTag = tagByName.get(tagName);
+
+    const tagNodeData: InvestigationNodeData = {
+      label: truncateLabel(tagName.split(":").pop() ?? tagName, 20),
+      nodeType: "tag",
+      level: realTag?.direct_level ?? "INFO",
+      score: realTag?.direct_score ?? 0,
+      name: tagName,
     };
 
     nodes.push({
-      id: `container-${container.key}`,
+      id: `tag-${tagName}`,
       type: "investigation",
       position: { x: 0, y: 0 },
-      data: containerNodeData,
+      data: tagNodeData,
       selectable: true,
       draggable: true,
     });
+  }
 
-    // Edge from root to container
-    edges.push({
-      id: `edge-root-container-${container.key}`,
-      source: rootKey,
-      target: `container-${container.key}`,
-      type: "smoothstep",
-      animated: false,
-    });
+  // Create edges based on tag hierarchy
+  for (const tagName of allTagNames) {
+    const nodeId = `tag-${tagName}`;
+    const parts = tagName.split(":");
 
-    // Edges from container to its checks
-    for (const checkKey of container.checks) {
+    if (parts.length === 1) {
+      // Top-level tag, connect to root
+      edges.push({
+        id: `edge-root-tag-${tagName}`,
+        source: rootKey,
+        target: nodeId,
+        type: "smoothstep",
+        animated: false,
+      });
+    } else {
+      // Has a parent tag, connect to parent
+      const parentName = parts.slice(0, -1).join(":");
+      edges.push({
+        id: `edge-tag-${parentName}-${tagName}`,
+        source: `tag-${parentName}`,
+        target: nodeId,
+        type: "smoothstep",
+        animated: false,
+      });
+    }
+  }
+
+  // Create edges from tags to their checks (only for real tags with checks)
+  for (const tag of allTags) {
+    for (const checkKey of tag.checks) {
       if (seenCheckIds.has(checkKey)) {
         edges.push({
-          id: `edge-container-check-${container.key}-${checkKey}`,
-          source: `container-${container.key}`,
+          id: `edge-tag-check-${tag.name}-${checkKey}`,
+          source: `tag-${tag.name}`,
           target: `check-${checkKey}`,
           type: "smoothstep",
           animated: false,

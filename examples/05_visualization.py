@@ -122,7 +122,7 @@ def main(no_audit_log: bool = False, output: Path | None = None) -> None:
         .link_observable(attacker_email)
         .link_observable(victim_email)
         .with_score(8.0)
-        .in_container(cv.container("phishing_investigation/email"))
+        .in_tag(cv.tag("phishing:investigation:email"))
     )
 
     _ = (
@@ -130,7 +130,7 @@ def main(no_audit_log: bool = False, output: Path | None = None) -> None:
         .link_observable(phishing_url1)
         .link_observable(phishing_url2)
         .with_score(9.0)
-        .in_container(cv.container("phishing_investigation/network"))
+        .in_tag(cv.tag("phishing:investigation:network"))
     )
 
     _ = (
@@ -138,14 +138,14 @@ def main(no_audit_log: bool = False, output: Path | None = None) -> None:
         .link_observable(malicious_domain)
         .link_observable(malicious_ip)
         .with_score(9.5)
-        .in_container(cv.container("phishing_investigation/network"))
+        .in_tag(cv.tag("phishing:investigation:network"))
     )
 
     _ = (
         cv.check("malware_detection", "Malware file analysis")
         .link_observable(malware_file)
         .with_score(10.0)
-        .in_container(cv.container("phishing_investigation/malware"))
+        .in_tag(cv.tag("phishing:investigation:malware"))
     )
 
     # Finalize relationships
@@ -169,9 +169,9 @@ def main(no_audit_log: bool = False, output: Path | None = None) -> None:
 
     # Example: Export to markdown (with optional sections)
     logger.info("[bold cyan]Exporting to Markdown...[/bold cyan]")
-    # Export with containers and enrichments included
+    # Export with tags and enrichments included
     tmp_path = Path(tempfile.gettempdir()) / "investigation_report_full.md"
-    markdown_full_path = cv.io_save_markdown(tmp_path, include_containers=True, include_enrichments=True)
+    markdown_full_path = cv.io_save_markdown(tmp_path, include_tags=True, include_enrichments=True)
     logger.info(f"[green]✓ Full markdown report saved to: {markdown_full_path}[/green]")
 
 

@@ -13,12 +13,16 @@ import {
   getEnrichment,
   getEnrichmentByName,
   getAllEnrichments,
-  getContainer,
-  getContainerByPath,
-  getAllContainers,
+  getTag,
+  getTagByName,
+  getAllTags,
   getAllObservables,
   getCounts,
   getStartedAt,
+  getTagChildren,
+  getTagDescendants,
+  getTagAggregatedScore,
+  getTagAggregatedLevel,
   // Finders
   findObservablesByType,
   findObservablesByLevel,
@@ -29,11 +33,11 @@ import {
   findChecksByLevel,
   findChecksAtLeast,
   findThreatIntelBySource,
-  getChecksForObservable,
-  getThreatIntelsForObservable,
-  getObservablesForCheck,
-  getHighestScoringObservables,
-  getMaliciousObservables,
+  findChecksForObservable,
+  findThreatIntelsForObservable,
+  findObservablesForCheck,
+  findHighestScoringObservables,
+  findMaliciousObservables,
   getAllCheckKeys,
   getAllObservableTypes,
 } from "../src";
@@ -198,25 +202,38 @@ function createTestInvestigation(): CyvestInvestigation {
         context: "example.com",
       },
     },
-    containers: {
-      "ctr:email": {
-        key: "ctr:email",
-        path: "email",
-        description: "Email container",
+    tags: {
+      "tag:email": {
+        key: "tag:email",
+        name: "email",
+        description: "Email tag",
         checks: [],
-        sub_containers: {
-          "ctr:email/headers": {
-            key: "ctr:email/headers",
-            path: "email/headers",
-            description: "Email headers",
-            checks: ["chk:ip_check"],
-            sub_containers: {},
-            aggregated_score: 0,
-            aggregated_level: "INFO",
-          },
-        },
-        aggregated_score: 0,
-        aggregated_level: "INFO",
+        direct_score: 1.5,
+        direct_level: "NOTABLE",
+      },
+      "tag:email:headers": {
+        key: "tag:email:headers",
+        name: "email:headers",
+        description: "Email headers",
+        checks: ["chk:ip_check"],
+        direct_score: 2.0,
+        direct_level: "NOTABLE",
+      },
+      "tag:email:headers:auth": {
+        key: "tag:email:headers:auth",
+        name: "email:headers:auth",
+        description: "Auth headers",
+        checks: [],
+        direct_score: 3.5,
+        direct_level: "SUSPICIOUS",
+      },
+      "tag:email:body": {
+        key: "tag:email:body",
+        name: "email:body",
+        description: "Email body",
+        checks: [],
+        direct_score: 1.0,
+        direct_level: "NOTABLE",
       },
     },
     stats: {
@@ -233,7 +250,7 @@ function createTestInvestigation(): CyvestInvestigation {
       total_threat_intel: 1,
       threat_intel_by_source: { virustotal: 1 },
       threat_intel_by_level: { MALICIOUS: 1 },
-      total_containers: 2,
+      total_tags: 4,
     },
     data_extraction: {
       root_type: "file",
@@ -308,24 +325,24 @@ describe("Getters", () => {
     });
   });
 
-  describe("getContainer", () => {
-    it("returns top-level container", () => {
-      const container = getContainer(inv, "ctr:email");
-      expect(container).toBeDefined();
-      expect(container?.path).toBe("email");
+  describe("getTag", () => {
+    it("returns tag by key", () => {
+      const tag = getTag(inv, "tag:email");
+      expect(tag).toBeDefined();
+      expect(tag?.name).toBe("email");
     });
 
-    it("returns nested container", () => {
-      const container = getContainer(inv, "ctr:email/headers");
-      expect(container).toBeDefined();
-      expect(container?.path).toBe("email/headers");
+    it("returns nested tag", () => {
+      const tag = getTag(inv, "tag:email:headers");
+      expect(tag).toBeDefined();
+      expect(tag?.name).toBe("email:headers");
     });
   });
 
-  describe("getAllContainers", () => {
-    it("returns all containers including nested", () => {
-      const containers = getAllContainers(inv);
-      expect(containers).toHaveLength(2);
+  describe("getAllTags", () => {
+    it("returns all tags", () => {
+      const tags = getAllTags(inv);
+      expect(tags).toHaveLength(4);
     });
   });
 
@@ -336,7 +353,7 @@ describe("Getters", () => {
       expect(counts.checks).toBe(3);
       expect(counts.threatIntels).toBe(1);
       expect(counts.enrichments).toBe(1);
-      expect(counts.containers).toBe(2);
+      expect(counts.tags).toBe(4);
       expect(counts.whitelists).toBe(1);
     });
   });
@@ -424,17 +441,17 @@ describe("Finders", () => {
     });
   });
 
-  describe("getChecksForObservable", () => {
+  describe("findChecksForObservable", () => {
     it("finds checks that reference observable", () => {
-      const checks = getChecksForObservable(inv, "obs:ipv4-addr:192.168.1.1");
+      const checks = findChecksForObservable(inv, "obs:ipv4-addr:192.168.1.1");
       expect(checks).toHaveLength(1);
       expect(checks[0].check_name).toBe("ip_check");
     });
   });
 
-  describe("getThreatIntelsForObservable", () => {
+  describe("findThreatIntelsForObservable", () => {
     it("finds threat intel for observable", () => {
-      const tis = getThreatIntelsForObservable(
+      const tis = findThreatIntelsForObservable(
         inv,
         "obs:domain-name:example.com"
       );
@@ -443,25 +460,25 @@ describe("Finders", () => {
     });
   });
 
-  describe("getObservablesForCheck", () => {
+  describe("findObservablesForCheck", () => {
     it("finds observables referenced by check", () => {
-      const obs = getObservablesForCheck(inv, "chk:ip_check");
+      const obs = findObservablesForCheck(inv, "chk:ip_check");
       expect(obs).toHaveLength(1);
       expect(obs[0].value).toBe("192.168.1.1");
     });
   });
 
-  describe("getHighestScoringObservables", () => {
+  describe("findHighestScoringObservables", () => {
     it("returns top scoring observables", () => {
-      const top = getHighestScoringObservables(inv, 2);
+      const top = findHighestScoringObservables(inv, 2);
       expect(top).toHaveLength(2);
       expect(top[0].score).toBeGreaterThanOrEqual(top[1].score);
     });
   });
 
-  describe("getMaliciousObservables", () => {
+  describe("findMaliciousObservables", () => {
     it("returns malicious observables", () => {
-      const mal = getMaliciousObservables(inv);
+      const mal = findMaliciousObservables(inv);
       expect(mal).toHaveLength(2);
     });
   });
@@ -480,6 +497,104 @@ describe("Finders", () => {
       expect(types).toContain("ipv4-addr");
       expect(types).toContain("domain-name");
       expect(types).toContain("url");
+    });
+  });
+
+  // Tag Aggregation Tests
+  describe("getTagChildren", () => {
+    it("returns direct children of a tag", () => {
+      const children = getTagChildren(inv, "email");
+      expect(children).toHaveLength(2);
+      const names = children.map((t) => t.name);
+      expect(names).toContain("email:headers");
+      expect(names).toContain("email:body");
+    });
+
+    it("does not return grandchildren", () => {
+      const children = getTagChildren(inv, "email");
+      const names = children.map((t) => t.name);
+      expect(names).not.toContain("email:headers:auth");
+    });
+
+    it("returns empty array for leaf tag", () => {
+      const children = getTagChildren(inv, "email:headers:auth");
+      expect(children).toHaveLength(0);
+    });
+
+    it("returns empty array for non-existent tag", () => {
+      const children = getTagChildren(inv, "nonexistent");
+      expect(children).toHaveLength(0);
+    });
+  });
+
+  describe("getTagDescendants", () => {
+    it("returns all descendants of a tag", () => {
+      const descendants = getTagDescendants(inv, "email");
+      expect(descendants).toHaveLength(3);
+      const names = descendants.map((t) => t.name);
+      expect(names).toContain("email:headers");
+      expect(names).toContain("email:headers:auth");
+      expect(names).toContain("email:body");
+    });
+
+    it("returns children and grandchildren", () => {
+      const descendants = getTagDescendants(inv, "email:headers");
+      expect(descendants).toHaveLength(1);
+      expect(descendants[0].name).toBe("email:headers:auth");
+    });
+
+    it("returns empty array for leaf tag", () => {
+      const descendants = getTagDescendants(inv, "email:headers:auth");
+      expect(descendants).toHaveLength(0);
+    });
+  });
+
+  describe("getTagAggregatedScore", () => {
+    it("returns aggregated score including all descendants", () => {
+      // email (1.5) + email:headers (2.0) + email:headers:auth (3.5) + email:body (1.0) = 8.0
+      const score = getTagAggregatedScore(inv, "email");
+      expect(score).toBe(8.0);
+    });
+
+    it("returns aggregated score for intermediate tag", () => {
+      // email:headers (2.0) + email:headers:auth (3.5) = 5.5
+      const score = getTagAggregatedScore(inv, "email:headers");
+      expect(score).toBe(5.5);
+    });
+
+    it("returns direct score for leaf tag", () => {
+      const score = getTagAggregatedScore(inv, "email:headers:auth");
+      expect(score).toBe(3.5);
+    });
+
+    it("returns 0 for non-existent tag", () => {
+      const score = getTagAggregatedScore(inv, "nonexistent");
+      expect(score).toBe(0);
+    });
+  });
+
+  describe("getTagAggregatedLevel", () => {
+    it("returns level based on aggregated score", () => {
+      // email aggregated score = 8.0 -> MALICIOUS (>= 5)
+      const level = getTagAggregatedLevel(inv, "email");
+      expect(level).toBe("MALICIOUS");
+    });
+
+    it("returns level for intermediate tag", () => {
+      // email:headers aggregated score = 5.5 -> MALICIOUS (>= 5)
+      const level = getTagAggregatedLevel(inv, "email:headers");
+      expect(level).toBe("MALICIOUS");
+    });
+
+    it("returns level for leaf tag", () => {
+      // email:headers:auth direct score = 3.5 -> SUSPICIOUS (3 <= x < 5)
+      const level = getTagAggregatedLevel(inv, "email:headers:auth");
+      expect(level).toBe("SUSPICIOUS");
+    });
+
+    it("returns INFO for non-existent tag (score 0)", () => {
+      const level = getTagAggregatedLevel(inv, "nonexistent");
+      expect(level).toBe("INFO");
     });
   });
 });

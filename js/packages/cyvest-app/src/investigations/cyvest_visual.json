@@ -559,40 +559,53 @@
     }
   },
   "enrichments": {},
-  "containers": {
-    "ctr:phishing_investigation/email": {
-      "path": "phishing_investigation/email",
+  "tags": {
+    "tag:phishing": {
+      "name": "phishing",
+      "description": "",
+      "checks": [],
+      "key": "tag:phishing",
+      "direct_score": 0.0,
+      "direct_level": "INFO"
+    },
+    "tag:phishing:investigation": {
+      "name": "phishing:investigation",
+      "description": "",
+      "checks": [],
+      "key": "tag:phishing:investigation",
+      "direct_score": 0.0,
+      "direct_level": "INFO"
+    },
+    "tag:phishing:investigation:email": {
+      "name": "phishing:investigation:email",
       "description": "",
       "checks": [
         "chk:email_analysis"
       ],
-      "sub_containers": {},
-      "key": "ctr:phishing_investigation/email",
-      "aggregated_score": 10.0,
-      "aggregated_level": "MALICIOUS"
+      "key": "tag:phishing:investigation:email",
+      "direct_score": 10.0,
+      "direct_level": "MALICIOUS"
     },
-    "ctr:phishing_investigation/network": {
-      "path": "phishing_investigation/network",
+    "tag:phishing:investigation:network": {
+      "name": "phishing:investigation:network",
       "description": "",
       "checks": [
         "chk:url_analysis",
         "chk:infrastructure"
       ],
-      "sub_containers": {},
-      "key": "ctr:phishing_investigation/network",
-      "aggregated_score": 19.5,
-      "aggregated_level": "MALICIOUS"
+      "key": "tag:phishing:investigation:network",
+      "direct_score": 19.5,
+      "direct_level": "MALICIOUS"
     },
-    "ctr:phishing_investigation/malware": {
-      "path": "phishing_investigation/malware",
+    "tag:phishing:investigation:malware": {
+      "name": "phishing:investigation:malware",
       "description": "",
       "checks": [
         "chk:malware_detection"
       ],
-      "sub_containers": {},
-      "key": "ctr:phishing_investigation/malware",
-      "aggregated_score": 10.0,
-      "aggregated_level": "MALICIOUS"
+      "key": "tag:phishing:investigation:malware",
+      "direct_score": 10.0,
+      "direct_level": "MALICIOUS"
     }
   },
   "stats": {
@@ -669,7 +682,7 @@
       "TRUSTED": 2,
       "NOTABLE": 1
     },
-    "total_containers": 3
+    "total_tags": 5
   },
   "data_extraction": {
     "root_type": "file",

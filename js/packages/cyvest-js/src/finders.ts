@@ -10,7 +10,7 @@ import type {
   Observable,
   Check,
   ThreatIntel,
-  Container,
+  Tag,
   Level,
 } from "./types.generated";
 import { isLevelAtLeast, isLevelHigherThan, LEVEL_VALUES } from "./levels";
@@ -286,59 +286,51 @@ export function findThreatIntelAtLeast(
 }
 
 // ============================================================================
-// Container Finders
+// Tag Finders
 // ============================================================================
 
 /**
- * Find containers at a specific aggregated level.
+ * Find tags at a specific direct level.
  *
  * @param inv - The investigation to search
- * @param level - Aggregated level to filter by
- * @returns Array of matching containers
+ * @param level - Direct level to filter by
+ * @returns Array of matching tags
  */
-export function findContainersByLevel(
+export function findTagsByLevel(
   inv: CyvestInvestigation,
   level: Level
-): Container[] {
-  const result: Container[] = [];
-
-  function searchContainers(containers: Record<string, Container>): void {
-    for (const container of Object.values(containers)) {
-      if (container.aggregated_level === level) {
-        result.push(container);
-      }
-      searchContainers(container.sub_containers);
-    }
-  }
-
-  searchContainers(inv.containers);
-  return result;
+): Tag[] {
+  return Object.values(inv.tags).filter((tag) => tag.direct_level === level);
 }
 
 /**
- * Find containers at or above a minimum aggregated level.
+ * Find tags at or above a minimum direct level.
  *
  * @param inv - The investigation to search
- * @param minLevel - Minimum aggregated level
- * @returns Array of matching containers
+ * @param minLevel - Minimum direct level
+ * @returns Array of matching tags
  */
-export function findContainersAtLeast(
+export function findTagsAtLeast(
   inv: CyvestInvestigation,
   minLevel: Level
-): Container[] {
-  const result: Container[] = [];
+): Tag[] {
+  return Object.values(inv.tags).filter((tag) =>
+    isLevelAtLeast(tag.direct_level, minLevel)
+  );
+}
 
-  function searchContainers(containers: Record<string, Container>): void {
-    for (const container of Object.values(containers)) {
-      if (isLevelAtLeast(container.aggregated_level, minLevel)) {
-        result.push(container);
-      }
-      searchContainers(container.sub_containers);
-    }
-  }
-
-  searchContainers(inv.containers);
-  return result;
+/**
+ * Find tags by name pattern.
+ *
+ * @param inv - The investigation to search
+ * @param pattern - Pattern to match against tag names
+ * @returns Array of matching tags
+ */
+export function findTagsByNamePattern(
+  inv: CyvestInvestigation,
+  pattern: RegExp
+): Tag[] {
+  return Object.values(inv.tags).filter((tag) => pattern.test(tag.name));
 }
 
 // ============================================================================
@@ -346,7 +338,7 @@ export function findContainersAtLeast(
 // ============================================================================
 
 /**
- * Get all checks that generated or reference a specific observable.
+ * Find all checks that generated or reference a specific observable.
  *
  * @param inv - The investigation to search
  * @param observableKey - Key of the observable
@@ -354,10 +346,10 @@ export function findContainersAtLeast(
  *
  * @example
  * ```ts
- * const checks = getChecksForObservable(investigation, "obs:ipv4-addr:192.168.1.1");
+ * const checks = findChecksForObservable(investigation, "obs:ipv4-addr:192.168.1.1");
  * ```
  */
-export function getChecksForObservable(
+export function findChecksForObservable(
   inv: CyvestInvestigation,
   observableKey: string
 ): Check[] {
@@ -390,13 +382,13 @@ export function getChecksForObservable(
 }
 
 /**
- * Get all threat intel entries for a specific observable.
+ * Find all threat intel entries for a specific observable.
  *
  * @param inv - The investigation to search
  * @param observableKey - Key of the observable
  * @returns Array of threat intel for this observable
  */
-export function getThreatIntelsForObservable(
+export function findThreatIntelsForObservable(
   inv: CyvestInvestigation,
   observableKey: string
 ): ThreatIntel[] {
@@ -415,13 +407,13 @@ export function getThreatIntelsForObservable(
 }
 
 /**
- * Get all observables referenced by a specific check.
+ * Find all observables referenced by a specific check.
  *
  * @param inv - The investigation to search
  * @param checkKey - Key of the check
  * @returns Array of observables referenced by this check
  */
-export function getObservablesForCheck(
+export function findObservablesForCheck(
   inv: CyvestInvestigation,
   checkKey: string
 ): Observable[] {
@@ -440,51 +432,46 @@ export function getObservablesForCheck(
 }
 
 /**
- * Get all checks for a specific container.
+ * Find all checks for a specific tag.
  *
  * @param inv - The investigation to search
- * @param containerKey - Key of the container
- * @param recursive - Include checks from sub-containers (default: false)
- * @returns Array of checks in the container
+ * @param tagKey - Key of the tag
+ * @param recursive - Include checks from descendant tags (default: false)
+ * @returns Array of checks in the tag
  */
-export function getChecksForContainer(
+export function findChecksForTag(
   inv: CyvestInvestigation,
-  containerKey: string,
+  tagKey: string,
   recursive = false
 ): Check[] {
   const result: Check[] = [];
+  const tag = inv.tags[tagKey];
 
-  function findContainer(
-    containers: Record<string, Container>
-  ): Container | undefined {
-    for (const container of Object.values(containers)) {
-      if (container.key === containerKey) {
-        return container;
-      }
-      const found = findContainer(container.sub_containers);
-      if (found) return found;
-    }
-    return undefined;
+  if (!tag) {
+    return result;
   }
 
-  function collectChecks(container: Container): void {
-    for (const checkKey of container.checks) {
-      const check = inv.checks[checkKey];
-      if (check) {
-        result.push(check);
-      }
-    }
-
-    if (recursive) {
-      for (const subContainer of Object.values(container.sub_containers)) {
-        collectChecks(subContainer);
-      }
+  // Get direct checks
+  for (const checkKey of tag.checks) {
+    const check = inv.checks[checkKey];
+    if (check) {
+      result.push(check);
     }
   }
 
-  const container = findContainer(inv.containers);
-  if (container) {
-    collectChecks(container);
+  // If recursive, get checks from descendant tags
+  if (recursive) {
+    const prefix = tag.name + ":";
+    for (const otherTag of Object.values(inv.tags)) {
+      if (otherTag.name.startsWith(prefix)) {
+        for (const checkKey of otherTag.checks) {
+          const check = inv.checks[checkKey];
+          if (check) {
+            result.push(check);
+          }
+        }
+      }
+    }
   }
 
   return result;
@@ -543,13 +530,13 @@ export function sortChecksByLevel(checks: Check[]): Check[] {
 // ============================================================================
 
 /**
- * Get the highest scoring observables.
+ * Find the highest scoring observables.
  *
  * @param inv - The investigation to search
  * @param n - Number of results to return (default: 10)
  * @returns Array of highest scoring observables
  */
-export function getHighestScoringObservables(
+export function findHighestScoringObservables(
   inv: CyvestInvestigation,
   n = 10
 ): Observable[] {
@@ -557,13 +544,13 @@ export function getHighestScoringObservables(
 }
 
 /**
- * Get the highest scoring checks.
+ * Find the highest scoring checks.
  *
  * @param inv - The investigation to search
  * @param n - Number of results to return (default: 10)
  * @returns Array of highest scoring checks
  */
-export function getHighestScoringChecks(
+export function findHighestScoringChecks(
   inv: CyvestInvestigation,
   n = 10
 ): Check[] {
@@ -571,42 +558,42 @@ export function getHighestScoringChecks(
 }
 
 /**
- * Get all malicious observables (convenience function).
+ * Find all malicious observables (convenience function).
  *
  * @param inv - The investigation to search
  * @returns Array of malicious observables
  */
-export function getMaliciousObservables(inv: CyvestInvestigation): Observable[] {
+export function findMaliciousObservables(inv: CyvestInvestigation): Observable[] {
   return findObservablesByLevel(inv, "MALICIOUS");
 }
 
 /**
- * Get all suspicious observables (convenience function).
+ * Find all suspicious observables (convenience function).
  *
  * @param inv - The investigation to search
  * @returns Array of suspicious observables
  */
-export function getSuspiciousObservables(inv: CyvestInvestigation): Observable[] {
+export function findSuspiciousObservables(inv: CyvestInvestigation): Observable[] {
   return findObservablesByLevel(inv, "SUSPICIOUS");
 }
 
 /**
- * Get all malicious checks (convenience function).
+ * Find all malicious checks (convenience function).
  *
  * @param inv - The investigation to search
  * @returns Array of malicious checks
  */
-export function getMaliciousChecks(inv: CyvestInvestigation): Check[] {
+export function findMaliciousChecks(inv: CyvestInvestigation): Check[] {
   return findChecksByLevel(inv, "MALICIOUS");
 }
 
 /**
- * Get all suspicious checks (convenience function).
+ * Find all suspicious checks (convenience function).
  *
  * @param inv - The investigation to search
  * @returns Array of suspicious checks
  */
-export function getSuspiciousChecks(inv: CyvestInvestigation): Check[] {
+export function findSuspiciousChecks(inv: CyvestInvestigation): Check[] {
   return findChecksByLevel(inv, "SUSPICIOUS");
 }
 

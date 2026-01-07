@@ -21,10 +21,10 @@ from cyvest.levels import Level
 from cyvest.model import (
     AuditEvent,
     Check,
-    Container,
     Enrichment,
     InvestigationWhitelist,
     Observable,
+    Tag,
     ThreatIntel,
     _format_score_decimal,
 )
@@ -54,7 +54,7 @@ class StatisticsSchema(BaseModel):
     total_threat_intel: Annotated[int, Field(ge=0)]
     threat_intel_by_source: dict[str, Annotated[int, Field(ge=0)]] = Field(default_factory=dict)
     threat_intel_by_level: dict[str, Annotated[int, Field(ge=0)]] = Field(default_factory=dict)
-    total_containers: Annotated[int, Field(ge=0)]
+    total_tags: Annotated[int, Field(ge=0)]
 
 
 class DataExtractionSchema(BaseModel):
@@ -128,9 +128,9 @@ class InvestigationSchema(BaseModel):
         ...,
         description="Enrichment entries keyed by their unique key.",
     )
-    containers: dict[str, Container] = Field(
+    tags: dict[str, Tag] = Field(
         ...,
-        description="Containers keyed by their unique key.",
+        description="Tags keyed by their unique key.",
     )
     stats: StatisticsSchema = Field(description="Investigation statistics summary.")
     data_extraction: DataExtractionSchema = Field(description="Data extraction metadata.")
@@ -158,6 +158,6 @@ class InvestigationSchema(BaseModel):
         v.setdefault("checks", {})
         v.setdefault("threat_intels", {})
         v.setdefault("enrichments", {})
-        v.setdefault("containers", {})
+        v.setdefault("tags", {})
 
         return v

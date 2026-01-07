@@ -131,14 +131,12 @@ def main() -> None:
     main_investigation.merge_investigation(endpoint_investigation)
     main_investigation.merge_investigation(email_investigation)
 
-    # Create a container to organize all findings
-    incident_container = main_investigation.container_create(
-        "incident_findings", "Consolidated findings from all data sources"
-    )
+    # Create a tag to organize all findings
+    incident_tag = main_investigation.tag_create("incident:findings", "Consolidated findings from all data sources")
 
-    # Add all checks to the container
+    # Add all checks to the tag
     for check in main_investigation.get_all_checks().values():
-        main_investigation.container_add_check(incident_container.key, check.key)
+        main_investigation.tag_add_check(incident_tag.key, check.key)
 
     # Finalize relationships
     main_investigation.finalize_relationships()

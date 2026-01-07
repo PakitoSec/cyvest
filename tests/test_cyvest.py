@@ -78,9 +78,9 @@ def test_facade_getters_accept_component_parameters() -> None:
     check = cv.check_create("check_id", "desc")
     assert cv.check_get(check.key) is not None
 
-    ctr = cv.container_create("path/to/container")
-    assert cv.container_get("path/to/container") is not None
-    assert cv.container_get(ctr.key) is not None
+    tag = cv.tag_create("path:to:tag")
+    assert cv.tag_get("path:to:tag") is not None
+    assert cv.tag_get(tag.key) is not None
 
     enr = cv.enrichment_create("metadata", {"key": "value"})
     assert cv.enrichment_get("metadata") is not None
@@ -150,21 +150,21 @@ def test_check_observable_linking() -> None:
     assert any(link.observable_key == obs.key for link in check.observable_links)
 
 
-def test_container_creation() -> None:
-    """Test creating containers."""
+def test_tag_creation() -> None:
+    """Test creating tags."""
     cv = Cyvest()
-    ctr = cv.container_create("network_analysis", "Network analysis container")
-    assert ctr.path == "network_analysis"
-    assert cv.container_get(ctr.key) is not None
+    tag = cv.tag_create("network:analysis", "Network analysis tag")
+    assert tag.name == "network:analysis"
+    assert cv.tag_get(tag.key) is not None
 
 
-def test_container_check_addition() -> None:
-    """Test adding checks to containers."""
+def test_tag_check_addition() -> None:
+    """Test adding checks to tags."""
     cv = Cyvest()
     check = cv.check_create("c1", "d1")
-    ctr = cv.container_create("test_container")
-    cv.container_add_check(ctr.key, check.key)
-    assert any(c.key == check.key for c in ctr.checks)
+    tag = cv.tag_create("test_tag")
+    cv.tag_add_check(tag.key, check.key)
+    assert any(c.key == check.key for c in tag.checks)
 
 
 def test_enrichment_creation() -> None:
@@ -680,7 +680,7 @@ def test_io_to_invest_serialization() -> None:
     assert hasattr(schema, "checks")
     assert hasattr(schema, "threat_intels")
     assert hasattr(schema, "enrichments")
-    assert hasattr(schema, "containers")
+    assert hasattr(schema, "tags")
     assert hasattr(schema, "stats")
     assert hasattr(schema, "whitelists")
 

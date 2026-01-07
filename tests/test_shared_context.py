@@ -1283,9 +1283,7 @@ def test_export_comprehensive_investigation(tmp_path):
         url_obs.relate_to(domain_obs, Cyvest.REL.RELATED_TO)
 
         # Checks
-        cy.check("sender_reputation", "High risk sender detected").link_observable(email_obs).with_score(
-            Decimal("8.5")
-        )
+        cy.check("sender_reputation", "High risk sender detected").link_observable(email_obs).with_score(Decimal("8.5"))
         cy.check("url_analysis", "Malicious URL detected").link_observable(url_obs).with_score(Decimal("9.0"))
 
         # Enrichments

@@ -9,7 +9,7 @@ recorded as an `INVESTIGATION_STARTED` event in the `audit_log`.
 
 ## Packages
 
-- **@cyvest/cyvest-js** — Generated types, schema validation, graph builders, and helper functions for Cyvest investigation JSON. Ships ESM/CJS builds and `.d.ts` files.
+- **@cyvest/cyvest-js** — Generated types, schema validation, graph builders, tag hierarchy utilities (including aggregated score/level), and helper functions for Cyvest investigation JSON. Ships ESM/CJS builds and `.d.ts` files.
 - **@cyvest/cyvest-vis** — React 19+ visualization components (powered by React Flow + D3) to visualize investigations with level-aware styling. Depends on `@cyvest/cyvest-js`.
 - **@cyvest/cyvest-app** — Private Vite demo that bundles sample investigations and renders them via `CyvestGraph`. Useful for tweaking visuals and testing UI flows.
 
@@ -20,7 +20,7 @@ Interactive graph visualization for Cyvest investigations.
 ### Features
 
 - **Observables Graph**: Force-directed layout showing all observables and relationships
-- **Investigation Graph**: Hierarchical Dagre layout showing root → containers → checks
+- **Investigation Graph**: Hierarchical Dagre layout showing root → tags → checks
 - **Professional icons**: SVG icons for all observable types (IPs, domains, emails, files, etc.)
 - **Interactive controls**: Drag nodes, adjust force parameters, zoom/pan
 - **Level-aware colors**: Nodes styled by security level (SAFE → MALICIOUS)
@@ -44,7 +44,7 @@ import { CyvestGraph } from "@cyvest/cyvest-vis";
 |-----------|-------------|
 | `CyvestGraph` | Combined view with toggle between Observables and Investigation |
 | `ObservablesGraph` | Force-directed graph of observables and relationships |
-| `InvestigationGraph` | Hierarchical graph of root, checks, and containers |
+| `InvestigationGraph` | Hierarchical graph of root, checks, and tags |
 
 See `js/packages/cyvest-vis/src/components` for advanced hooks and utilities.
 

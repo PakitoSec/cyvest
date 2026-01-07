@@ -594,9 +594,9 @@ export const CheckIcon: React.FC<IconProps> = ({
 );
 
 /**
- * Box icon for containers
+ * Tag icon for tags
  */
-export const BoxIcon: React.FC<IconProps> = ({
+export const TagIcon: React.FC<IconProps> = ({
   size = defaultSize,
   color = defaultColor,
   className,
@@ -706,7 +706,7 @@ export const INVESTIGATION_ICON_MAP: Record<
 > = {
   root: CrosshairIcon,
   check: CheckIcon,
-  container: BoxIcon,
+  tag: TagIcon,
 };
 
 /**

@@ -668,66 +668,79 @@
       "key": "enr:receiver:1528478e"
     }
   },
-  "containers": {
-    "ctr:emails": {
-      "path": "emails",
+  "tags": {
+    "tag:emails": {
+      "name": "emails",
       "description": "",
       "checks": [
         "chk:from",
         "chk:from-proofpoint",
         "chk:receiver"
       ],
-      "sub_containers": {},
-      "key": "ctr:emails",
-      "aggregated_score": 7.1,
-      "aggregated_level": "MALICIOUS"
+      "key": "tag:emails",
+      "direct_score": 7.1,
+      "direct_level": "MALICIOUS"
     },
-    "ctr:bodies-urls": {
-      "path": "bodies-urls",
+    "tag:bodies": {
+      "name": "bodies",
+      "description": "",
+      "checks": [],
+      "key": "tag:bodies",
+      "direct_score": 0.0,
+      "direct_level": "INFO"
+    },
+    "tag:bodies:urls": {
+      "name": "bodies:urls",
       "description": "Bodies URLs Analysis",
       "checks": [
         "chk:body-url-https://virus.com/payload.exe",
         "chk:body-url-https://virus.com/about",
         "chk:body-url-https://domain.com/ok/toto"
       ],
-      "sub_containers": {},
-      "key": "ctr:bodies-urls",
-      "aggregated_score": 8.0,
-      "aggregated_level": "MALICIOUS"
+      "key": "tag:bodies:urls",
+      "direct_score": 8.0,
+      "direct_level": "MALICIOUS"
     },
-    "ctr:bodies-domains": {
-      "path": "bodies-domains",
+    "tag:bodies:domains": {
+      "name": "bodies:domains",
       "description": "Bodies Domains Analysis",
       "checks": [
         "chk:body-domain-virus.com",
         "chk:body-domain-domain.com"
       ],
-      "sub_containers": {},
-      "key": "ctr:bodies-domains",
-      "aggregated_score": 5.0,
-      "aggregated_level": "MALICIOUS"
+      "key": "tag:bodies:domains",
+      "direct_score": 5.0,
+      "direct_level": "MALICIOUS"
     },
-    "ctr:attachments": {
-      "path": "attachments",
+    "tag:attachments": {
+      "name": "attachments",
       "description": "Email Attachments Analysis",
       "checks": [
         "chk:attachment-invoice.pdf"
       ],
-      "sub_containers": {},
-      "key": "ctr:attachments",
-      "aggregated_score": 10.0,
-      "aggregated_level": "MALICIOUS"
+      "key": "tag:attachments",
+      "direct_score": 10.0,
+      "direct_level": "MALICIOUS"
     },
-    "ctr:risk_assessment": {
-      "path": "risk_assessment",
+    "tag:risk_assessment": {
+      "name": "risk_assessment",
       "description": "Aggregated Risk Analysis",
       "checks": [
         "chk:email_risk_aggregated"
       ],
-      "sub_containers": {},
-      "key": "ctr:risk_assessment",
-      "aggregated_score": 6.0,
-      "aggregated_level": "MALICIOUS"
+      "key": "tag:risk_assessment",
+      "direct_score": 6.0,
+      "direct_level": "MALICIOUS"
+    },
+    "tag:risk_assessment:ai": {
+      "name": "risk_assessment:ai",
+      "description": "AI Analysis Tag",
+      "checks": [
+        "chk:ai"
+      ],
+      "key": "tag:risk_assessment:ai",
+      "direct_score": 0.0,
+      "direct_level": "INFO"
     }
   },
   "stats": {
@@ -816,7 +829,7 @@
       "SUSPICIOUS": 2,
       "TRUSTED": 1
     },
-    "total_containers": 5
+    "total_tags": 7
   },
   "data_extraction": {
     "root_type": "artifact",

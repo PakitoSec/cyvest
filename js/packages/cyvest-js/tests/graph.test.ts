@@ -144,7 +144,6 @@ function createGraphTestInvestigation(): CyvestInvestigation {
       observables_by_type_and_level: {},
       total_checks: 0,
       applied_checks: 0,
-      checks_by_scope: {},
       checks_by_level: {},
       total_threat_intel: 0,
       threat_intel_by_source: {},

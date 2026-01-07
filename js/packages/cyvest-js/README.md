@@ -5,7 +5,8 @@ TypeScript utilities and generated types for working with serialized Cyvest inve
 ## What it does
 
 - Validates Cyvest JSON payloads against the schema (AJV) and returns typed investigations.
-- Ships generated TypeScript types plus helpers to query observables, checks, threat intel, and relationships.
+- Ships generated TypeScript types plus helpers to query observables, checks, threat intel, tags, and relationships.
+- Provides tag hierarchy utilities including aggregated score/level calculations.
 - Builds lightweight graph representations for use in visualizers or custom tooling.
 
 ## Install & build

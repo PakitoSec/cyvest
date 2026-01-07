@@ -14,18 +14,19 @@ from typing import TYPE_CHECKING, Any, Literal
 
 from logurich import logger
 
+from cyvest import keys
 from cyvest.level_score_rules import recalculate_level_for_score
 from cyvest.levels import Level, normalize_level
 from cyvest.model import (
     AuditEvent,
     Check,
-    Container,
     Enrichment,
     InvestigationWhitelist,
     Observable,
     ObservableLink,
     ObservableType,
     Relationship,
+    Tag,
     Taxonomy,
     ThreatIntel,
 )
@@ -63,7 +64,7 @@ class Investigation:
             "fields": {"context", "data"},
             "dict_fields": {"data"},
         },
-        "container": {
+        "tag": {
             "fields": {"description"},
             "dict_fields": set(),
         },
@@ -104,7 +105,7 @@ class Investigation:
         self._checks: dict[str, Check] = {}
         self._threat_intels: dict[str, ThreatIntel] = {}
         self._enrichments: dict[str, Enrichment] = {}
-        self._containers: dict[str, Container] = {}
+        self._tags: dict[str, Tag] = {}
 
         # Internal components
         normalized_score_mode_obs = ScoreMode.normalize(score_mode_obs)
@@ -201,13 +202,10 @@ class Investigation:
         check.observable_links.append(link)
         return True
 
-    def _container_add_check(self, container: Container, check: Check) -> None:
-        if any(existing.key == check.key for existing in container.checks):
+    def _tag_add_check(self, tag: Tag, check: Check) -> None:
+        if any(existing.key == check.key for existing in tag.checks):
             return
-        container.checks.append(check)
-
-    def _container_add_sub_container(self, parent: Container, child: Container) -> None:
-        parent.sub_containers[child.key] = child
+        tag.checks.append(check)
 
     def _infer_object_type(self, obj: Any) -> str | None:
         if isinstance(obj, Observable):
@@ -218,8 +216,8 @@ class Investigation:
             return "threat_intel"
         if isinstance(obj, Enrichment):
             return "enrichment"
-        if isinstance(obj, Container):
-            return "container"
+        if isinstance(obj, Tag):
+            return "tag"
         return None
 
     def apply_score_change(
@@ -561,20 +559,19 @@ class Investigation:
 
         return existing
 
-    def _merge_container(self, existing: Container, incoming: Container) -> Container:
+    def _merge_tag(self, existing: Tag, incoming: Tag) -> Tag:
         """
-        Merge an incoming container into an existing container.
+        Merge an incoming tag into an existing tag.
 
         Strategy:
         - Merge checks (dict-based lookup for efficiency)
-        - Merge sub-containers recursively
 
         Args:
-            existing: The existing container
-            incoming: The incoming container to merge
+            existing: The existing tag
+            incoming: The incoming tag to merge
 
         Returns:
-            The merged container (existing is modified in place)
+            The merged tag (existing is modified in place)
         """
         # Update description if incoming has one
         if incoming.description:
@@ -589,16 +586,7 @@ class Investigation:
                 self._merge_check(existing_checks_dict[incoming_check.key], incoming_check)
             else:
                 # Add new check
-                self._container_add_check(existing, incoming_check)
-
-        # Merge sub-containers recursively
-        for sub_key, incoming_sub in incoming.sub_containers.items():
-            if sub_key in existing.sub_containers:
-                # Merge existing sub-container
-                self._merge_container(existing.sub_containers[sub_key], incoming_sub)
-            else:
-                # Add new sub-container
-                self._container_add_sub_container(existing, incoming_sub)
+                self._tag_add_check(existing, incoming_check)
 
         return existing
 
@@ -787,30 +775,51 @@ class Investigation:
         )
         return enrichment
 
-    def add_container(self, container: Container) -> Container:
+    def add_tag(self, tag: Tag) -> Tag:
         """
-        Add or merge container.
+        Add or merge a tag, automatically creating ancestor tags.
+
+        When adding a tag with a hierarchical name (using ":" delimiter),
+        ancestor tags are automatically created if they don't exist.
+        For example, adding "header:auth:dkim" will auto-create
+        "header" and "header:auth" tags.
 
         Args:
-            container: Container to add or merge
+            tag: Tag to add or merge
 
         Returns:
-            The resulting container (either new or merged)
+            The resulting tag (either new or merged)
         """
-        if container.key in self._containers:
-            r = self._merge_container(self._containers[container.key], container)
+        # Auto-create ancestor tags
+        ancestor_names = keys.get_tag_ancestors(tag.name)
+        for ancestor_name in ancestor_names:
+            ancestor_key = keys.generate_tag_key(ancestor_name)
+            if ancestor_key not in self._tags:
+                ancestor_tag = Tag(name=ancestor_name)
+                self._tags[ancestor_key] = ancestor_tag
+                self._stats.register_tag(ancestor_tag)
+                self._record_event(
+                    event_type="TAG_CREATED",
+                    object_type="tag",
+                    object_key=ancestor_key,
+                    details={"auto_created": True, "descendant": tag.name},
+                )
+
+        # Add or merge the tag itself
+        if tag.key in self._tags:
+            r = self._merge_tag(self._tags[tag.key], tag)
             self._score_engine.recalculate_all()
             return r
 
-        # Register new container
-        self._containers[container.key] = container
-        self._stats.register_container(container)
+        # Register new tag
+        self._tags[tag.key] = tag
+        self._stats.register_tag(tag)
         self._record_event(
-            event_type="CONTAINER_CREATED",
-            object_type="container",
-            object_key=container.key,
+            event_type="TAG_CREATED",
+            object_type="tag",
+            object_key=tag.key,
         )
-        return container
+        return tag
 
     # Relationship and linking methods
 
@@ -943,71 +952,38 @@ class Investigation:
 
         return check
 
-    def add_check_to_container(self, container_key: str, check_key: str) -> Container:
+    def add_check_to_tag(self, tag_key: str, check_key: str) -> Tag:
         """
-        Add a check to a container.
+        Add a check to a tag.
 
         Args:
-            container_key: Key of the container
+            tag_key: Key of the tag
             check_key: Key of the check
 
         Returns:
-            The container
+            The tag
 
         Raises:
-            KeyError: If the container or check does not exist
+            KeyError: If the tag or check does not exist
         """
-        container = self._containers.get(container_key)
+        tag = self._tags.get(tag_key)
         check = self._checks.get(check_key)
 
-        if container is None:
-            raise KeyError(f"container '{container_key}' not found in investigation.")
+        if tag is None:
+            raise KeyError(f"tag '{tag_key}' not found in investigation.")
         if check is None:
             raise KeyError(f"check '{check_key}' not found in investigation.")
 
-        if container and check:
-            self._container_add_check(container, check)
+        if tag and check:
+            self._tag_add_check(tag, check)
             self._record_event(
-                event_type="CONTAINER_CHECK_ADDED",
-                object_type="container",
-                object_key=container.key,
+                event_type="TAG_CHECK_ADDED",
+                object_type="tag",
+                object_key=tag.key,
                 details={"check_key": check.key},
             )
 
-        return container
-
-    def add_sub_container(self, parent_key: str, child_key: str) -> Container:
-        """
-        Add a sub-container to a container.
-
-        Args:
-            parent_key: Key of the parent container
-            child_key: Key of the child container
-
-        Returns:
-            The parent container
-
-        Raises:
-            KeyError: If the parent or child container does not exist
-        """
-        parent = self._containers.get(parent_key)
-        child = self._containers.get(child_key)
-
-        if parent is None:
-            raise KeyError(f"container '{parent_key}' not found in investigation.")
-        if child is None:
-            raise KeyError(f"container '{child_key}' not found in investigation.")
-
-        if parent and child:
-            self._container_add_sub_container(parent, child)
-            self._record_event(
-                event_type="CONTAINER_SUBCONTAINER_ADDED",
-                object_type="container",
-                object_key=parent.key,
-                details={"child_container_key": child.key},
-            )
-
-        return parent
+        return tag
 
     # Query methods
 
@@ -1019,9 +995,88 @@ class Investigation:
         """Get check by full key string."""
         return self._checks.get(key)
 
-    def get_container(self, key: str) -> Container | None:
-        """Get a container by key."""
-        return self._containers.get(key)
+    def get_tag(self, key: str) -> Tag | None:
+        """Get a tag by key."""
+        return self._tags.get(key)
+
+    def get_tag_children(self, tag_name: str) -> list[Tag]:
+        """
+        Get direct child tags of a tag.
+
+        Args:
+            tag_name: Name of the parent tag
+
+        Returns:
+            List of direct child Tag objects
+        """
+        return [t for t in self._tags.values() if keys.is_tag_child_of(t.name, tag_name)]
+
+    def get_tag_descendants(self, tag_name: str) -> list[Tag]:
+        """
+        Get all descendant tags of a tag.
+
+        Args:
+            tag_name: Name of the ancestor tag
+
+        Returns:
+            List of all descendant Tag objects
+        """
+        return [t for t in self._tags.values() if keys.is_tag_descendant_of(t.name, tag_name)]
+
+    def get_tag_ancestors(self, tag_name: str) -> list[Tag]:
+        """
+        Get all ancestor tags of a tag.
+
+        Args:
+            tag_name: Name of the descendant tag
+
+        Returns:
+            List of ancestor Tag objects (in order from root to immediate parent)
+        """
+        ancestor_names = keys.get_tag_ancestors(tag_name)
+        result = []
+        for name in ancestor_names:
+            tag_key = keys.generate_tag_key(name)
+            if tag_key in self._tags:
+                result.append(self._tags[tag_key])
+        return result
+
+    def get_tag_aggregated_score(self, tag_name: str) -> Decimal:
+        """
+        Get aggregated score for a tag including all descendants.
+
+        Args:
+            tag_name: Name of the tag
+
+        Returns:
+            Total score from direct checks and all descendant tag checks
+        """
+        tag_key = keys.generate_tag_key(tag_name)
+        tag = self._tags.get(tag_key)
+        if not tag:
+            return Decimal("0")
+
+        total = tag.get_direct_score()
+
+        # Add scores from direct children only (they will recursively add their children)
+        for child in self.get_tag_children(tag_name):
+            total += self.get_tag_aggregated_score(child.name)
+
+        return total
+
+    def get_tag_aggregated_level(self, tag_name: str) -> Level:
+        """
+        Get aggregated level for a tag including all descendants.
+
+        Args:
+            tag_name: Name of the tag
+
+        Returns:
+            Level based on aggregated score
+        """
+        from cyvest.levels import get_level_from_score
+
+        return get_level_from_score(self.get_tag_aggregated_score(tag_name))
 
     def get_enrichment(self, key: str) -> Enrichment | None:
         """Get an enrichment by key."""
@@ -1055,7 +1110,7 @@ class Investigation:
 
     def update_model_metadata(
         self,
-        model_type: Literal["observable", "check", "threat_intel", "enrichment", "container"],
+        model_type: Literal["observable", "check", "threat_intel", "enrichment", "tag"],
         key: str,
         updates: dict[str, Any],
         *,
@@ -1083,7 +1138,7 @@ class Investigation:
             "check": self._checks,
             "threat_intel": self._threat_intels,
             "enrichment": self._enrichments,
-            "container": self._containers,
+            "tag": self._tags,
         }
         store = store_lookup[model_type]
         target = store.get(key)
@@ -1152,9 +1207,9 @@ class Investigation:
         """Get all enrichments."""
         return self._enrichments.copy()
 
-    def get_all_containers(self) -> dict[str, Container]:
-        """Get all containers."""
-        return self._containers.copy()
+    def get_all_tags(self) -> dict[str, Tag]:
+        """Get all tags."""
+        return self._tags.copy()
 
     # Scoring and statistics
 
@@ -1397,11 +1452,10 @@ class Investigation:
                 "data": deepcopy(enrichment.data),
             }
 
-        def _snapshot_container(container: Container) -> dict[str, Any]:
+        def _snapshot_tag(tag: Tag) -> dict[str, Any]:
             return {
-                "description": container.description,
-                "checks": sorted(check.key for check in container.checks),
-                "sub_containers": sorted(container.sub_containers.keys()),
+                "description": tag.description,
+                "checks": sorted(check.key for check in tag.checks),
             }
 
         merge_summary: list[dict[str, Any]] = []
@@ -1411,7 +1465,7 @@ class Investigation:
             incoming_threat_intels,
             incoming_checks,
             incoming_enrichments,
-            incoming_containers,
+            incoming_tags,
         ) = self._clone_for_merge(other)
 
         # PASS 1: Merge observables and collect deferred relationships
@@ -1524,13 +1578,13 @@ class Investigation:
                 }
             )
 
-        # Merge containers
-        for container in incoming_containers.values():
-            existing_container = self._containers.get(container.key)
-            before = _snapshot_container(existing_container) if existing_container else None
-            self.add_container(container)
-            if existing_container:
-                after = _snapshot_container(existing_container)
+        # Merge tags
+        for tag in incoming_tags.values():
+            existing_tag = self._tags.get(tag.key)
+            before = _snapshot_tag(existing_tag) if existing_tag else None
+            self.add_tag(tag)
+            if existing_tag:
+                after = _snapshot_tag(existing_tag)
                 changed_fields = _diff_fields(before, after) if before else []
                 action = "merged" if changed_fields else "skipped"
             else:
@@ -1538,8 +1592,8 @@ class Investigation:
                 action = "created"
             merge_summary.append(
                 {
-                    "object_type": "container",
-                    "object_key": container.key,
+                    "object_type": "tag",
+                    "object_key": tag.key,
                     "action": action,
                     "changed_fields": changed_fields,
                 }
@@ -1576,7 +1630,7 @@ class Investigation:
         dict[str, ThreatIntel],
         dict[str, Check],
         dict[str, Enrichment],
-        dict[str, Container],
+        dict[str, Tag],
     ]:
         """Clone incoming models while preserving shared object references."""
         incoming_threat_intels = {key: ti.model_copy(deep=True) for key, ti in other._threat_intels.items()}
@@ -1614,31 +1668,28 @@ class Investigation:
             orphan_checks[check.key] = copied
             return copied
 
-        incoming_containers: dict[str, Container] = {}
+        incoming_tags: dict[str, Tag] = {}
 
-        def _copy_container(container: Container) -> Container:
-            existing = incoming_containers.get(container.key)
+        def _copy_tag(tag: Tag) -> Tag:
+            existing = incoming_tags.get(tag.key)
             if existing:
                 return existing
-            copied = Container(
-                path=container.path,
-                description=container.description,
-                checks=[_copy_check(check) for check in container.checks],
-                sub_containers={},
-                key=container.key,
+            copied = Tag(
+                name=tag.name,
+                description=tag.description,
+                checks=[_copy_check(check) for check in tag.checks],
+                key=tag.key,
             )
-            incoming_containers[container.key] = copied
-            for sub_key, sub in container.sub_containers.items():
-                copied.sub_containers[sub_key] = _copy_container(sub)
+            incoming_tags[tag.key] = copied
             return copied
 
-        for container in other._containers.values():
-            _copy_container(container)
+        for tag in other._tags.values():
+            _copy_tag(tag)
 
         return (
             incoming_observables,
             incoming_threat_intels,
             incoming_checks,
             incoming_enrichments,
-            incoming_containers,
+            incoming_tags,
         )

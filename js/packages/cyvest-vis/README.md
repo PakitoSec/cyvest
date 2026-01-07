@@ -85,7 +85,7 @@ import { ObservablesGraph } from "@cyvest/cyvest-vis";
 
 #### `InvestigationGraph`
 
-Hierarchical graph showing root → containers → checks structure.
+Hierarchical graph showing root → tags → checks structure.
 
 ```tsx
 import { InvestigationGraph } from "@cyvest/cyvest-vis";
@@ -95,7 +95,7 @@ import { InvestigationGraph } from "@cyvest/cyvest-vis";
   height={600}
   width="100%"
   onNodeClick={(nodeId, nodeType) => {
-    // nodeType: "root" | "check" | "container"
+    // nodeType: "root" | "check" | "tag"
   }}
 />
 ```
@@ -116,7 +116,7 @@ const Icon = getObservableIcon("ipv4-addr"); // Returns GlobeIcon
 <MailIcon size={16} color="#ef4444" />
 ```
 
-Available icons: `GlobeIcon`, `DomainIcon`, `LinkIcon`, `MailIcon`, `EnvelopeIcon`, `FileIcon`, `HashIcon`, `UserIcon`, `IdCardIcon`, `GearIcon`, `AppIcon`, `RegistryIcon`, `ThreatActorIcon`, `BugIcon`, `SwordIcon`, `TargetIcon`, `AlertIcon`, `FlaskIcon`, `CertificateIcon`, `WifiIcon`, `WorldIcon`, `QuestionIcon`, `CheckIcon`, `BoxIcon`, `CrosshairIcon`
+Available icons: `GlobeIcon`, `DomainIcon`, `LinkIcon`, `MailIcon`, `EnvelopeIcon`, `FileIcon`, `HashIcon`, `UserIcon`, `IdCardIcon`, `GearIcon`, `AppIcon`, `RegistryIcon`, `ThreatActorIcon`, `BugIcon`, `SwordIcon`, `TargetIcon`, `AlertIcon`, `FlaskIcon`, `CertificateIcon`, `WifiIcon`, `WorldIcon`, `QuestionIcon`, `CheckIcon`, `TagIcon`, `CrosshairIcon`
 
 ## Types
 

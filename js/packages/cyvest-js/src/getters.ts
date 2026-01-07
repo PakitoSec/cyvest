@@ -2,7 +2,7 @@
  * Getter utilities for retrieving entities from a Cyvest Investigation.
  *
  * These functions provide type-safe access to observables, checks, threat intel,
- * enrichments, and containers by their keys.
+ * enrichments, and tags by their keys.
  */
 
 import type {
@@ -11,8 +11,11 @@ import type {
   Check,
   ThreatIntel,
   Enrichment,
-  Container,
+  Tag,
+  Level,
 } from "./types.generated";
+import { generateObservableKey, isTagChildOf } from "./keys";
+import { getLevelFromScore } from "./levels";
 
 /**
  * Get an observable by its key.
@@ -66,6 +69,32 @@ export function getObservableByTypeValue(
     }
   }
   return undefined;
+}
+
+/**
+ * Get the root observable of the investigation.
+ *
+ * The root observable is identified using the `root_type` from data extraction
+ * metadata combined with value="root".
+ *
+ * @param inv - The investigation
+ * @returns The root observable, or undefined if not found
+ *
+ * @example
+ * ```ts
+ * const root = getRootObservable(investigation);
+ * if (root) {
+ *   console.log(`Root: ${root.type} = ${root.value}`);
+ * }
+ * ```
+ */
+export function getRootObservable(inv: CyvestInvestigation): Observable | undefined {
+  const rootType = inv.data_extraction.root_type;
+  if (!rootType) {
+    return undefined;
+  }
+  const rootKey = generateObservableKey(rootType, "root");
+  return inv.observables[rootKey];
 }
 
 /**
@@ -220,81 +249,62 @@ export function getAllEnrichments(inv: CyvestInvestigation): Enrichment[] {
 }
 
 /**
- * Get a container by its key.
+ * Get a tag by its key.
  *
  * @param inv - The investigation to search
- * @param key - Container key (e.g., "ctr:email/headers")
- * @returns The container or undefined if not found
+ * @param key - Tag key (e.g., "tag:header:auth")
+ * @returns The tag or undefined if not found
+ *
+ * @example
+ * ```ts
+ * const tag = getTag(investigation, "tag:header:auth");
+ * if (tag) {
+ *   console.log(tag.name, tag.direct_level);
+ * }
+ * ```
  */
-export function getContainer(
+export function getTag(
   inv: CyvestInvestigation,
   key: string
-): Container | undefined {
-  // First check top-level containers
-  if (inv.containers[key]) {
-    return inv.containers[key];
-  }
-
-  // Search recursively in sub-containers
-  function searchSubContainers(containers: Record<string, Container>): Container | undefined {
-    for (const container of Object.values(containers)) {
-      if (container.key === key) {
-        return container;
-      }
-      const found = searchSubContainers(container.sub_containers);
-      if (found) return found;
-    }
-    return undefined;
-  }
-
-  return searchSubContainers(inv.containers);
+): Tag | undefined {
+  return inv.tags[key];
 }
 
 /**
- * Get a container by its path.
+ * Get a tag by its name.
  *
  * @param inv - The investigation to search
- * @param path - Container path
- * @returns The container or undefined if not found
+ * @param name - Tag name (e.g., "header:auth:dkim")
+ * @returns The tag or undefined if not found
+ *
+ * @example
+ * ```ts
+ * const tag = getTagByName(investigation, "header:auth:dkim");
+ * ```
  */
-export function getContainerByPath(
+export function getTagByName(
   inv: CyvestInvestigation,
-  path: string
-): Container | undefined {
-  const normalizedPath = path.replace(/\\/g, "/").replace(/^\/+|\/+$/g, "").toLowerCase();
-
-  function searchContainers(containers: Record<string, Container>): Container | undefined {
-    for (const container of Object.values(containers)) {
-      if (container.path.toLowerCase() === normalizedPath) {
-        return container;
-      }
-      const found = searchContainers(container.sub_containers);
-      if (found) return found;
-    }
-    return undefined;
-  }
-
-  return searchContainers(inv.containers);
+  name: string
+): Tag | undefined {
+  const normalizedName = name.trim().toLowerCase();
+  const key = `tag:${normalizedName}`;
+  return inv.tags[key];
 }
 
 /**
- * Get all containers as a flat array (including sub-containers).
+ * Get all tags as an array.
  *
  * @param inv - The investigation
- * @returns Array of all containers
+ * @returns Array of all tags
+ *
+ * @example
+ * ```ts
+ * const allTags = getAllTags(investigation);
+ * console.log(`Total tags: ${allTags.length}`);
+ * ```
  */
-export function getAllContainers(inv: CyvestInvestigation): Container[] {
-  const result: Container[] = [];
-
-  function collectContainers(containers: Record<string, Container>): void {
-    for (const container of Object.values(containers)) {
-      result.push(container);
-      collectContainers(container.sub_containers);
-    }
-  }
-
-  collectContainers(inv.containers);
-  return result;
+export function getAllTags(inv: CyvestInvestigation): Tag[] {
+  return Object.values(inv.tags);
 }
 
 /**
@@ -345,7 +355,7 @@ export interface InvestigationCounts {
   checks: number;
   threatIntels: number;
   enrichments: number;
-  containers: number;
+  tags: number;
   whitelists: number;
 }
 
@@ -361,7 +371,7 @@ export function getCounts(inv: CyvestInvestigation): InvestigationCounts {
     checks: getAllChecks(inv).length,
     threatIntels: Object.keys(inv.threat_intels).length,
     enrichments: Object.keys(inv.enrichments).length,
-    containers: getAllContainers(inv).length,
+    tags: getAllTags(inv).length,
     whitelists: inv.whitelists.length,
   };
 }
@@ -387,4 +397,98 @@ export function getStartedAt(inv: CyvestInvestigation): string | undefined {
     (e) => e.event_type === "INVESTIGATION_STARTED"
   );
   return event?.timestamp;
+}
+
+// ============================================================================
+// Tag Aggregation
+// ============================================================================
+
+/**
+ * Get direct child tags of a given tag.
+ *
+ * @param inv - The investigation
+ * @param tagName - Parent tag name
+ * @returns Array of direct child tags
+ *
+ * @example
+ * ```ts
+ * const children = getTagChildren(investigation, "bodies");
+ * // Returns tags like "bodies:urls", "bodies:domains" (but not "bodies:urls:something")
+ * ```
+ */
+export function getTagChildren(inv: CyvestInvestigation, tagName: string): Tag[] {
+  return Object.values(inv.tags).filter((tag) => isTagChildOf(tag.name, tagName));
+}
+
+/**
+ * Get all descendant tags of a given tag (any depth).
+ *
+ * @param inv - The investigation
+ * @param tagName - Ancestor tag name
+ * @returns Array of all descendant tags
+ *
+ * @example
+ * ```ts
+ * const descendants = getTagDescendants(investigation, "bodies");
+ * // Returns all tags starting with "bodies:"
+ * ```
+ */
+export function getTagDescendants(inv: CyvestInvestigation, tagName: string): Tag[] {
+  const prefix = tagName + ":";
+  return Object.values(inv.tags).filter((tag) => tag.name.startsWith(prefix));
+}
+
+/**
+ * Get the aggregated score for a tag including all descendant tags.
+ *
+ * The aggregated score includes:
+ * - The tag's direct_score (from its direct checks)
+ * - Recursively, the aggregated scores of all child tags
+ *
+ * @param inv - The investigation
+ * @param tagName - Name of the tag
+ * @returns Total aggregated score, or 0 if tag not found
+ *
+ * @example
+ * ```ts
+ * const score = getTagAggregatedScore(investigation, "bodies");
+ * // Includes scores from bodies, bodies:urls, bodies:domains, etc.
+ * ```
+ */
+export function getTagAggregatedScore(inv: CyvestInvestigation, tagName: string): number {
+  const tag = getTagByName(inv, tagName);
+  if (!tag) {
+    return 0;
+  }
+
+  // Start with direct score
+  let total = tag.direct_score;
+
+  // Add scores from direct children (they will recursively add their children)
+  const children = getTagChildren(inv, tagName);
+  for (const child of children) {
+    total += getTagAggregatedScore(inv, child.name);
+  }
+
+  return total;
+}
+
+/**
+ * Get the aggregated level for a tag including all descendant tags.
+ *
+ * The level is calculated from the aggregated score using the standard
+ * score-to-level mapping.
+ *
+ * @param inv - The investigation
+ * @param tagName - Name of the tag
+ * @returns Level based on aggregated score
+ *
+ * @example
+ * ```ts
+ * const level = getTagAggregatedLevel(investigation, "bodies");
+ * // Returns "MALICIOUS" if aggregated score >= 5, etc.
+ * ```
+ */
+export function getTagAggregatedLevel(inv: CyvestInvestigation, tagName: string): Level {
+  return getLevelFromScore(getTagAggregatedScore(inv, tagName));
 }

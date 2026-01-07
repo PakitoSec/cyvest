@@ -154,59 +154,6 @@
       "title": "Check",
       "type": "object"
     },
-    "Container": {
-      "additionalProperties": false,
-      "description": "Groups checks and sub-containers for hierarchical organization.\n\nContainers allow structuring the investigation into logical sections\nwith aggregated scores and levels.",
-      "properties": {
-        "path": {
-          "title": "Path",
-          "type": "string"
-        },
-        "description": {
-          "default": "",
-          "title": "Description",
-          "type": "string"
-        },
-        "checks": {
-          "items": {
-            "type": "string"
-          },
-          "title": "Checks",
-          "type": "array"
-        },
-        "sub_containers": {
-          "additionalProperties": {
-            "$ref": "#/$defs/Container"
-          },
-          "title": "Sub Containers",
-          "type": "object"
-        },
-        "key": {
-          "title": "Key",
-          "type": "string"
-        },
-        "aggregated_score": {
-          "readOnly": true,
-          "title": "Aggregated Score",
-          "type": "number"
-        },
-        "aggregated_level": {
-          "$ref": "#/$defs/Level",
-          "description": "Calculate the aggregated level from the aggregated score.\n\nReturns:\n    Level based on aggregated score",
-          "readOnly": true
-        }
-      },
-      "required": [
-        "path",
-        "checks",
-        "sub_containers",
-        "key",
-        "aggregated_score",
-        "aggregated_level"
-      ],
-      "title": "Container",
-      "type": "object"
-    },
     "DataExtractionSchema": {
       "additionalProperties": false,
       "description": "Schema for data extraction metadata.",
@@ -562,9 +509,9 @@
           "title": "Threat Intel By Level",
           "type": "object"
         },
-        "total_containers": {
+        "total_tags": {
           "minimum": 0,
-          "title": "Total Containers",
+          "title": "Total Tags",
           "type": "integer"
         }
       },
@@ -576,9 +523,55 @@
         "total_checks",
         "applied_checks",
         "total_threat_intel",
-        "total_containers"
+        "total_tags"
       ],
       "title": "StatisticsSchema",
+      "type": "object"
+    },
+    "Tag": {
+      "additionalProperties": false,
+      "description": "Groups checks for categorical organization.\n\nTags allow structuring the investigation into logical sections\nwith aggregated scores and levels. Hierarchy is automatic based on\nthe \":\" delimiter in tag names (e.g., \"header:auth:dkim\").",
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "description": {
+          "default": "",
+          "title": "Description",
+          "type": "string"
+        },
+        "checks": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Checks",
+          "type": "array"
+        },
+        "key": {
+          "title": "Key",
+          "type": "string"
+        },
+        "direct_score": {
+          "description": "Calculate the score from direct checks only (no hierarchy).\n\nFor hierarchical aggregation (including descendant tags), use\nInvestigation.get_tag_aggregated_score() or TagProxy.get_aggregated_score().\n\nReturns:\n    Total score from direct checks",
+          "readOnly": true,
+          "title": "Direct Score",
+          "type": "number"
+        },
+        "direct_level": {
+          "$ref": "#/$defs/Level",
+          "description": "Calculate the level from direct checks only (no hierarchy).\n\nFor hierarchical aggregation (including descendant tags), use\nInvestigation.get_tag_aggregated_level() or TagProxy.get_aggregated_level().\n\nReturns:\n    Level based on direct score",
+          "readOnly": true
+        }
+      },
+      "required": [
+        "name",
+        "checks",
+        "key",
+        "direct_score",
+        "direct_level"
+      ],
+      "title": "Tag",
       "type": "object"
     },
     "Taxonomy": {
@@ -756,12 +749,12 @@
       "title": "Enrichments",
       "type": "object"
     },
-    "containers": {
+    "tags": {
       "additionalProperties": {
-        "$ref": "#/$defs/Container"
+        "$ref": "#/$defs/Tag"
       },
-      "description": "Containers keyed by their unique key.",
-      "title": "Containers",
+      "description": "Tags keyed by their unique key.",
+      "title": "Tags",
       "type": "object"
     },
     "stats": {
@@ -789,7 +782,7 @@
     "checks",
     "threat_intels",
     "enrichments",
-    "containers",
+    "tags",
     "stats",
     "data_extraction",
     "score_display"

@@ -8,7 +8,7 @@
 /**
  * Key type prefixes used in Cyvest.
  */
-export type KeyType = "obs" | "chk" | "ti" | "enr" | "ctr";
+export type KeyType = "obs" | "chk" | "ti" | "enr" | "tag";
 
 /**
  * Normalize a string value for consistent key generation.
@@ -125,31 +125,88 @@ export function generateEnrichmentKey(name: string, context?: string): string {
 }
 
 /**
- * Generate a unique key for a container.
+ * Generate a unique key for a tag.
  *
- * Format: ctr:{normalized_path}
+ * Format: tag:{normalized_name}
  *
- * @param path - Path of the container (can use / or . as separator)
- * @returns Unique container key
+ * @param name - Name of the tag (can use : as hierarchy delimiter)
+ * @returns Unique tag key
  *
  * @example
  * ```ts
- * generateContainerKey("email/headers")
- * // => "ctr:email/headers"
+ * generateTagKey("header:auth:dkim")
+ * // => "tag:header:auth:dkim"
  * ```
  */
-export function generateContainerKey(path: string): string {
-  // Normalize path separators
-  let normalizedPath = path.replace(/\\/g, "/").replace(/^\/+|\/+$/g, "");
-  normalizedPath = normalizeValue(normalizedPath);
-  return `ctr:${normalizedPath}`;
+export function generateTagKey(name: string): string {
+  const normalizedName = normalizeValue(name);
+  return `tag:${normalizedName}`;
+}
+
+/**
+ * Get all ancestor tag names from a hierarchical tag name.
+ *
+ * @param name - Tag name with : delimiter
+ * @returns Array of ancestor tag names
+ *
+ * @example
+ * ```ts
+ * getTagAncestors("header:auth:dkim")
+ * // => ["header", "header:auth"]
+ * ```
+ */
+export function getTagAncestors(name: string): string[] {
+  const parts = name.split(":");
+  const ancestors: string[] = [];
+  for (let i = 0; i < parts.length - 1; i++) {
+    ancestors.push(parts.slice(0, i + 1).join(":"));
+  }
+  return ancestors;
+}
+
+/**
+ * Check if a tag is a direct child of another tag.
+ *
+ * @param childName - Potential child tag name
+ * @param parentName - Potential parent tag name
+ * @returns True if childName is a direct child of parentName
+ *
+ * @example
+ * ```ts
+ * isTagChildOf("header:auth", "header") // => true
+ * isTagChildOf("header:auth:dkim", "header") // => false (grandchild)
+ * ```
+ */
+export function isTagChildOf(childName: string, parentName: string): boolean {
+  if (!childName.startsWith(parentName + ":")) {
+    return false;
+  }
+  const remaining = childName.slice(parentName.length + 1);
+  return !remaining.includes(":");
+}
+
+/**
+ * Check if a tag is a descendant of another tag (any depth).
+ *
+ * @param descendantName - Potential descendant tag name
+ * @param ancestorName - Potential ancestor tag name
+ * @returns True if descendantName is a descendant of ancestorName
+ *
+ * @example
+ * ```ts
+ * isTagDescendantOf("header:auth:dkim", "header") // => true
+ * isTagDescendantOf("header", "header") // => false (same)
+ * ```
+ */
+export function isTagDescendantOf(descendantName: string, ancestorName: string): boolean {
+  return descendantName.startsWith(ancestorName + ":");
 }
 
 /**
  * Extract the type prefix from a key.
  *
  * @param key - The key to parse
- * @returns Type prefix (obs, chk, ti, enr, ctr) or null if invalid
+ * @returns Type prefix (obs, chk, ti, enr, tag) or null if invalid
  *
  * @example
  * ```ts
@@ -160,7 +217,7 @@ export function generateContainerKey(path: string): string {
 export function parseKeyType(key: string): KeyType | null {
   if (key.includes(":")) {
     const prefix = key.split(":", 1)[0] as KeyType;
-    if (["obs", "chk", "ti", "enr", "ctr"].includes(prefix)) {
+    if (["obs", "chk", "ti", "enr", "tag"].includes(prefix)) {
       return prefix;
     }
   }

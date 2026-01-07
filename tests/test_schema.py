@@ -8,7 +8,7 @@ import pytest
 
 from cyvest import Cyvest
 from cyvest.io_schema import get_investigation_schema
-from cyvest.model import Check, Container, Observable, ThreatIntel
+from cyvest.model import Check, Observable, Tag, ThreatIntel
 from cyvest.model_schema import InvestigationSchema
 
 
@@ -51,20 +51,20 @@ def test_level_required_in_serialization_schema() -> None:
             assert {"origin_investigation_id", "observable_links", "score"} <= required
 
 
-def test_container_aggregated_level_schema() -> None:
-    """aggregated_level is exposed as a Level enum in the schema."""
-    schema = Container.model_json_schema(mode="serialization")
+def test_tag_direct_level_schema() -> None:
+    """direct_level is exposed as a Level enum in the schema."""
+    schema = Tag.model_json_schema(mode="serialization")
 
     # If Pydantic emits a root $ref (common for self-recursive models), follow it.
     if "$ref" in schema:
-        ref = schema["$ref"]  # e.g. "#/$defs/Container"
+        ref = schema["$ref"]  # e.g. "#/$defs/Tag"
         name = ref.rsplit("/", 1)[-1]
         schema = schema["$defs"][name]
 
-    agg_level_schema = schema["properties"]["aggregated_level"]
+    direct_level_schema = schema["properties"]["direct_level"]
 
-    assert {"aggregated_level", "sub_containers", "checks", "key"} <= set(schema["properties"])
-    assert {"sub_containers", "checks", "key"} <= set(schema.get("required", []))
+    assert {"direct_level", "checks", "key"} <= set(schema["properties"])
+    assert {"checks", "key"} <= set(schema.get("required", []))
 
     def _has_level(subschema: dict[str, object]) -> bool:
         if "$ref" in subschema:
@@ -73,10 +73,10 @@ def test_container_aggregated_level_schema() -> None:
             return set(subschema["enum"]) >= {level.value for level in Cyvest.LVL}
         return False
 
-    if "allOf" in agg_level_schema:
-        assert any(_has_level(subschema) for subschema in agg_level_schema["allOf"])
+    if "allOf" in direct_level_schema:
+        assert any(_has_level(subschema) for subschema in direct_level_schema["allOf"])
     else:
-        assert _has_level(agg_level_schema)
+        assert _has_level(direct_level_schema)
 
 
 def test_investigation_schema_level_required_and_defaults() -> None:
@@ -95,7 +95,7 @@ def test_investigation_schema_level_required_and_defaults() -> None:
         "checks",
         "threat_intels",
         "enrichments",
-        "containers",
+        "tags",
     } <= required
 
     inst = InvestigationSchema.model_validate(
@@ -117,7 +117,7 @@ def test_investigation_schema_level_required_and_defaults() -> None:
                 "total_threat_intel": 0,
                 "threat_intel_by_source": {},
                 "threat_intel_by_level": {},
-                "total_containers": 0,
+                "total_tags": 0,
             },
             "data_extraction": {"root_type": None, "score_mode_obs": "max"},
         }
@@ -128,4 +128,4 @@ def test_investigation_schema_level_required_and_defaults() -> None:
     assert inst.checks == {}
     assert inst.threat_intels == {}
     assert inst.enrichments == {}
-    assert inst.containers == {}
+    assert inst.tags == {}

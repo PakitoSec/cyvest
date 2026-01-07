@@ -10,10 +10,10 @@ from cyvest.investigation import Investigation
 from cyvest.levels import Level
 from cyvest.model import (
     Check,
-    Container,
     Enrichment,
     Observable,
     RelationshipDirection,
+    Tag,
     ThreatIntel,
     _format_score_decimal,
 )
@@ -203,20 +203,19 @@ def test_enrichment_creation() -> None:
     assert enr.key.startswith("enr:")
 
 
-def test_container_creation() -> None:
-    """Test creating container."""
-    ctr = Container(path="network/analysis", description="Network analysis container")
-    assert ctr.path == "network/analysis"
-    assert ctr.description == "Network analysis container"
-    assert ctr.key.startswith("ctr:")
-    assert len(ctr.checks) == 0
-    assert len(ctr.sub_containers) == 0
+def test_tag_creation() -> None:
+    """Test creating tag."""
+    tag = Tag(name="network:analysis", description="Network analysis tag")
+    assert tag.name == "network:analysis"
+    assert tag.description == "Network analysis tag"
+    assert tag.key.startswith("tag:")
+    assert len(tag.checks) == 0
 
 
-def test_container_aggregated_score() -> None:
-    """Test container score aggregation."""
+def test_tag_direct_score() -> None:
+    """Test tag direct score calculation."""
     inv = Investigation(root_data={})
-    ctr = inv.add_container(Container(path="test"))
+    tag = inv.add_tag(Tag(name="test"))
     check1 = Check(
         check_name="c1",
         description="d1",
@@ -231,17 +230,20 @@ def test_container_aggregated_score() -> None:
     )
     inv.add_check(check1)
     inv.add_check(check2)
-    inv.add_check_to_container(ctr.key, check1.key)
-    inv.add_check_to_container(ctr.key, check2.key)
-    assert ctr.get_aggregated_score() == Decimal("8.0")
-    assert ctr.get_aggregated_level() == Level.MALICIOUS
+    inv.add_check_to_tag(tag.key, check1.key)
+    inv.add_check_to_tag(tag.key, check2.key)
+    assert tag.get_direct_score() == Decimal("8.0")
+    assert tag.get_direct_level() == Level.MALICIOUS
 
 
-def test_container_nested_aggregation() -> None:
-    """Test nested container score aggregation."""
+def test_tag_hierarchical_aggregation() -> None:
+    """Test tag hierarchical score aggregation."""
     inv = Investigation(root_data={})
-    parent = inv.add_container(Container(path="parent"))
-    child = inv.add_container(Container(path="parent/child"))
+    # Creating a child tag auto-creates parent
+    child = inv.add_tag(Tag(name="parent:child"))
+    parent = inv.get_tag("tag:parent")
+    assert parent is not None
+
     check1 = Check(
         check_name="c1",
         description="d",
@@ -256,11 +258,12 @@ def test_container_nested_aggregation() -> None:
     )
     inv.add_check(check1)
     inv.add_check(check2)
-    inv.add_check_to_container(parent.key, check1.key)
-    inv.add_check_to_container(child.key, check2.key)
-    inv.add_sub_container(parent.key, child.key)
-    # Should sum both parent and child checks
-    assert parent.get_aggregated_score() == Decimal("5.0")
+    inv.add_check_to_tag(parent.key, check1.key)
+    inv.add_check_to_tag(child.key, check2.key)
+    # Aggregated should sum parent + child checks
+    assert inv.get_tag_aggregated_score("parent") == Decimal("5.0")
+    # Direct should only be parent's checks
+    assert parent.get_direct_score() == Decimal("2.0")
 
 
 def test_explicit_level_setting() -> None:

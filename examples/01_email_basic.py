@@ -60,10 +60,10 @@ def main() -> None:
     cv.check_link_observable(sender_check.key, sender_email.key)
     cv.check_link_observable(url_check.key, phishing_url.key)
 
-    # Create container for organization
-    email_container = cv.container_create("email_analysis", "Analysis of suspicious email")
-    cv.container_add_check(email_container.key, sender_check.key)
-    cv.container_add_check(email_container.key, url_check.key)
+    # Create tag for organization
+    email_tag = cv.tag_create("email:analysis", "Analysis of suspicious email")
+    cv.tag_add_check(email_tag.key, sender_check.key)
+    cv.tag_add_check(email_tag.key, url_check.key)
 
     # Add enrichment
     cv.enrichment_create(

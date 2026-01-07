@@ -63,7 +63,7 @@ class BaseRule(ABC):
                           (access data via cy.root().extra)
 
         Returns:
-            Cyvest instance containing observables, checks, and containers
+            Cyvest instance containing observables, checks, and tags
         """
         pass
 
@@ -173,11 +173,7 @@ class EmailFrom(BaseRule):
         )
 
         # Create check for header analysis
-        (
-            cy.check("from", "test email vt 10", "> ok boys")
-            .link_observable(obs)
-            .in_container(cy.container("emails"))
-        )
+        (cy.check("from", "test email vt 10", "> ok boys").link_observable(obs).in_tag(cy.tag("emails")))
 
         logger.info(f"Email header analysis complete: {obs.key}")
 
@@ -203,11 +199,7 @@ class EmailFromBIS(BaseRule):
         obs = cy.observable(cy.OBS.EMAIL, from_addr).with_ti("PROOFPOINT", 5, "> test")
 
         # Create check for header analysis
-        (
-            cy.check("from-proofpoint", "test email vt 10", "> ok boys")
-            .link_observable(obs)
-            .in_container(cy.container("emails"))
-        )
+        (cy.check("from-proofpoint", "test email vt 10", "> ok boys").link_observable(obs).in_tag(cy.tag("emails")))
 
         logger.info(f"Email header analysis complete: {obs.key}")
 
@@ -231,7 +223,7 @@ class EmailReciever(BaseRule):
             cy.observable(cy.OBS.EMAIL, "user@company.com").relate_to(
                 cy.root(), cy.REL.RELATED_TO, direction=cy.DIR.INBOUND
             )
-        ).in_container(cy.container("emails"))
+        ).in_tag(cy.tag("emails"))
 
         logger.info("Email receiver analysis complete")
 
@@ -259,8 +251,8 @@ class BodiesUrlTask(BaseRule):
 
         logger.info(f"Checking BODIES URLs: {len(urls_with_scores)}")
 
-        # Create container for URL checks
-        container = cy.container("bodies-urls", "Bodies URLs Analysis")
+        # Create tag for URL checks
+        tag = cy.tag("bodies:urls", "Bodies URLs Analysis")
 
         # Analyze each URL
         for url_data in urls_with_scores:
@@ -283,17 +275,17 @@ class BodiesUrlTask(BaseRule):
                     direction=cy.DIR.INBOUND,
                 )
 
-            # Create check and link to container
+            # Create check and link to tag
             chk = (
                 cy.check(f"body-url-{url}", f"URL analysis {url}", comment=f"> score: {score}")
                 .link_observable(url_obs)
-                .in_container(container)
+                .in_tag(tag)
             )
 
             logger.info("[bold red]Check Score: {}[/bold red]", chk.score)
 
         logger.info(f"Bodies URLs analysis complete: {len(urls_with_scores)} URLs processed")
-        logger.info("[bold red]Container Score: {}[/bold red]", container.get_aggregated_score())
+        logger.info("[bold red]Tag Score: {}[/bold red]", tag.get_aggregated_score())
 
 
 class BodiesDomainTask(BaseRule):
@@ -315,8 +307,8 @@ class BodiesDomainTask(BaseRule):
 
         logger.info(f"Checking BODIES DOMAINS: {len(domains_with_scores)}")
 
-        # Create container for domain checks
-        container = cy.container("bodies-domains", "Bodies Domains Analysis")
+        # Create tag for domain checks
+        tag = cy.tag("bodies:domains", "Bodies Domains Analysis")
 
         # Analyze each domain
         for domain_data in domains_with_scores:
@@ -338,17 +330,17 @@ class BodiesDomainTask(BaseRule):
                 )
             )
 
-            # Create check and link to container
+            # Create check and link to tag
             chk = (
                 cy.check(f"body-domain-{domain}", f"Domain analysis {domain}", comment=f"> score: {score}")
                 .link_observable(domain_obs, propagation_mode=cy.PROP.GLOBAL)
-                .in_container(container)
+                .in_tag(tag)
             )
 
             logger.info("[bold red]Check Score: {}[/bold red]", chk.score)
 
         logger.info(f"Bodies DOMAINS analysis complete: {len(domains_with_scores)} DOMAINS processed")
-        logger.info("[bold red]Container Score: {}[/bold red]", container.get_aggregated_score())
+        logger.info("[bold red]Tag Score: {}[/bold red]", tag.get_aggregated_score())
 
 
 class AttachmentTask(BaseRule):
@@ -368,8 +360,8 @@ class AttachmentTask(BaseRule):
 
         logger.info(f"Checking ATTACHMENTS: {len(attachments)}")
 
-        # Create container for attachment checks
-        container = cy.container("attachments", "Email Attachments Analysis")
+        # Create tag for attachment checks
+        tag = cy.tag("attachments", "Email Attachments Analysis")
 
         # Analyze each attachment
         for attachment in attachments:
@@ -395,13 +387,13 @@ class AttachmentTask(BaseRule):
             if score >= 5:
                 file_obs = file_obs.with_ti("MALWAREBAZAAR", score, f"Known malware: {filename}")
 
-            # Create check and link to container
+            # Create check and link to tag
             check_desc = f"File: {filename} ({size} bytes)"
             cy.check(
                 f"attachment-{filename}",
                 check_desc,
                 comment=f"> MD5: {md5_hash}\n> SHA256: {sha256_hash}\n> Threat score: {score}",
-            ).link_observable(file_obs).in_container(container)
+            ).link_observable(file_obs).in_tag(tag)
 
         logger.info(f"Attachments analysis complete: {len(attachments)} files processed")
 
@@ -487,8 +479,8 @@ class AggregatedRiskTask(BaseRule):
         if malicious_domain:
             aggregated_check.link_observable(malicious_domain)
 
-        # Put in a dedicated container
-        aggregated_check.in_container(cy.container("risk_assessment", "Aggregated Risk Analysis"))
+        # Put in a dedicated tag
+        aggregated_check.in_tag(cy.tag("risk_assessment", "Aggregated Risk Analysis"))
 
         logger.info(f"Aggregated risk assessment complete: score={risk_score}")
         logger.info(f"Risk indicators: {len(risk_indicators)}")
@@ -500,7 +492,9 @@ class AI(BaseRule):
 
     def run(self, cy: Cyvest) -> None:
         """Calculate aggregated risk score based on all previous checks."""
-        cy.check("ai", "AI Analysis", score=0, level=cy.LVL.MALICIOUS)
+        cy.check("ai", "AI Analysis", score=0, level=cy.LVL.MALICIOUS).in_tag(
+            cy.tag("risk_assessment:ai", "AI Analysis Tag")
+        )
 
 
 # ============================================================================

@@ -36,7 +36,7 @@ print(cv.get_global_score(), cv.get_global_level())
 ```
 
 !!! tip "Context-first mindset"
-    Pass incident metadata through `Cyvest(root_data={...})`. Every container, check, and export inherits it so you never lose analyst intent.
+    Pass incident metadata through `Cyvest(root_data={...})`. Every tag, check, and export inherits it so you never lose analyst intent.
 
 !!! tip "Deterministic investigation IDs"
     For reproducible reports that enable diffing between runs, pass a custom `investigation_id`:
@@ -113,25 +113,31 @@ cv.observable_add_relationship(
 
 ---
 
-## 4. Organize workstreams with containers
+## 4. Organize workstreams with tags
 
 ```python
 cv = Cyvest()
-with cv.container("network_analysis", "Network telemetry") as network:
-    (
-        cv.check("c2_detection", "Detect C2 communication")
-        .in_container(network)
-    )
 
-    # Nesting is encouraged for larger stories
-    with network.sub_container("east_dc", "East datacenter") as east:
-        (
-            cv.check("ids_east", "IDS signals from east DC")
-            .in_container(east)
-        )
+# Tags use ":" delimiter for automatic hierarchy
+# Creating "network:east_dc" auto-creates "network" tag
+network_tag = cv.tag("network:analysis", "Network telemetry")
+(
+    cv.check("c2_detection", "Detect C2 communication")
+    .in_tag(network_tag)
+)
+
+# Nested tags for larger stories
+east_tag = cv.tag("network:analysis:east_dc", "East datacenter")
+(
+    cv.check("ids_east", "IDS signals from east DC")
+    .in_tag(east_tag)
+)
+
+# Query hierarchy
+children = cv.tag_get_children("network:analysis")  # Returns east_dc tag
 ```
 
-Containers keep checks, sub-containers, and metrics scoped. They also enable reporting sections inside Markdown exports.
+Tags organize checks with automatic hierarchy. Creating `header:auth:dkim` auto-creates `header` and `header:auth` tags.
 
 ---
 

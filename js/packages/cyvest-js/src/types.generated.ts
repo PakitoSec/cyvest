@@ -81,7 +81,7 @@ export interface CyvestInvestigation {
   checks: Checks;
   threat_intels: ThreatIntels1;
   enrichments: Enrichments;
-  containers: Containers;
+  tags: Tags;
   stats: StatisticsSchema;
   data_extraction: DataExtractionSchema;
   /**
@@ -249,28 +249,34 @@ export interface Data {
   [k: string]: unknown;
 }
 /**
- * Containers keyed by their unique key.
+ * Tags keyed by their unique key.
  */
-export interface Containers {
-  [k: string]: Container;
+export interface Tags {
+  [k: string]: Tag;
 }
 /**
- * Groups checks and sub-containers for hierarchical organization.
+ * Groups checks for categorical organization.
  *
- * Containers allow structuring the investigation into logical sections
- * with aggregated scores and levels.
+ * Tags allow structuring the investigation into logical sections
+ * with aggregated scores and levels. Hierarchy is automatic based on
+ * the ":" delimiter in tag names (e.g., "header:auth:dkim").
  */
-export interface Container {
-  path: string;
+export interface Tag {
+  name: string;
   description?: string;
   checks: Checks1;
-  sub_containers: SubContainers;
   key: string;
-  aggregated_score: number;
-  aggregated_level: Level;
-}
-export interface SubContainers {
-  [k: string]: Container;
+  /**
+   * Calculate the score from direct checks only (no hierarchy).
+   *
+   * For hierarchical aggregation (including descendant tags), use
+   * Investigation.get_tag_aggregated_score() or TagProxy.get_aggregated_score().
+   *
+   * Returns:
+   *     Total score from direct checks
+   */
+  direct_score: number;
+  direct_level: Level;
 }
 /**
  * Schema for investigation statistics.
@@ -291,7 +297,7 @@ export interface StatisticsSchema {
   total_threat_intel: number;
   threat_intel_by_source?: ThreatIntelBySource;
   threat_intel_by_level?: ThreatIntelByLevel;
-  total_containers: number;
+  total_tags: number;
 }
 export interface ObservablesByType {
   [k: string]: number;

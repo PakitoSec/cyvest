@@ -350,7 +350,7 @@ class Investigation:
         - Update score (take maximum)
         - Update level (take maximum)
         - Update extra (merge dicts)
-        - Concatenate comments
+        - Overwrite comment (if incoming is non-empty)
         - Merge threat intels
         - Merge relationships (defer if target missing)
         - Preserve provenance metadata
@@ -381,12 +381,9 @@ class Investigation:
         elif incoming.extra:
             existing.extra = dict(incoming.extra)
 
-        # Concatenate comments
+        # Overwrite comment if incoming is non-empty
         if incoming.comment:
-            if existing.comment:
-                existing.comment += "\n\n" + incoming.comment
-            else:
-                existing.comment = incoming.comment
+            existing.comment = incoming.comment
 
         # Merge whitelisted status (if either is whitelisted, result is whitelisted)
         existing.whitelisted = existing.whitelisted or incoming.whitelisted
@@ -421,7 +418,7 @@ class Investigation:
         - Update score (take maximum)
         - Update level (take maximum)
         - Update extra (merge dicts)
-        - Concatenate comments
+        - Overwrite comment (if incoming is non-empty)
         - Merge observable links (tuple-based deduplication, provenance-preserving)
 
         Args:
@@ -451,12 +448,9 @@ class Investigation:
         # Update extra (merge dictionaries)
         existing.extra.update(incoming.extra)
 
-        # Concatenate comments
+        # Overwrite comment if incoming is non-empty
         if incoming.comment:
-            if existing.comment:
-                existing.comment += "\n\n" + incoming.comment
-            else:
-                existing.comment = incoming.comment
+            existing.comment = incoming.comment
 
         existing_by_tuple: dict[tuple[str, PropagationMode], int] = {}
         for idx, existing_link in enumerate(existing.observable_links):

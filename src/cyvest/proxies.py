@@ -18,12 +18,12 @@ from cyvest import keys
 from cyvest.levels import Level
 from cyvest.model import (
     Check,
-    Container,
     Enrichment,
     Observable,
     ObservableLink,
     ObservableType,
     Relationship,
+    Tag,
     Taxonomy,
     ThreatIntel,
 )
@@ -282,12 +282,8 @@ class CheckProxy(_ReadOnlyProxy[Check]):
         return check
 
     @property
-    def check_id(self) -> str:
-        return self._read_attr("check_id")
-
-    @property
-    def scope(self) -> str:
-        return self._read_attr("scope")
+    def check_name(self) -> str:
+        return self._read_attr("check_name")
 
     @property
     def description(self) -> str:
@@ -350,18 +346,18 @@ class CheckProxy(_ReadOnlyProxy[Check]):
         self._get_investigation().update_model_metadata("check", self.key, updates, dict_merge=dict_merge)
         return self
 
-    def in_container(self, container: Container | ContainerProxy | str) -> CheckProxy:
-        """Add this check to a container."""
-        if isinstance(container, ContainerProxy):
-            container_key = container.key
-        elif isinstance(container, Container):
-            container_key = container.key
-        elif isinstance(container, str):
-            container_key = container
+    def in_tag(self, tag: Tag | TagProxy | str) -> CheckProxy:
+        """Add this check to a tag."""
+        if isinstance(tag, TagProxy):
+            tag_key = tag.key
+        elif isinstance(tag, Tag):
+            tag_key = tag.key
+        elif isinstance(tag, str):
+            tag_key = tag
         else:
-            raise TypeError("Container must provide a key.")
+            raise TypeError("Tag must provide a key.")
 
-        self._get_investigation().add_check_to_container(container_key, self.key)
+        self._get_investigation().add_check_to_tag(tag_key, self.key)
         return self
 
     def link_observable(
@@ -390,18 +386,18 @@ class CheckProxy(_ReadOnlyProxy[Check]):
         return self
 
 
-class ContainerProxy(_ReadOnlyProxy[Container]):
-    """Read-only proxy over a container."""
+class TagProxy(_ReadOnlyProxy[Tag]):
+    """Read-only proxy over a tag."""
 
     def _resolve(self):
-        container = self._get_investigation().get_container(self.key)
-        if container is None:
-            raise ModelNotFoundError(f"Container '{self.key}' no longer exists in this investigation.")
-        return container
+        tag = self._get_investigation().get_tag(self.key)
+        if tag is None:
+            raise ModelNotFoundError(f"Tag '{self.key}' no longer exists in this investigation.")
+        return tag
 
     @property
-    def path(self) -> str:
-        return self._read_attr("path")
+    def name(self) -> str:
+        return self._read_attr("name")
 
     @property
     def description(self) -> str:
@@ -411,20 +407,26 @@ class ContainerProxy(_ReadOnlyProxy[Container]):
     def checks(self) -> list[Check]:
         return self._read_attr("checks")
 
-    @property
-    def sub_containers(self) -> dict[str, Container]:
-        return self._read_attr("sub_containers")
+    def get_direct_score(self):
+        """Return the direct score (checks in this tag only, no hierarchy)."""
+        return self._call_readonly("get_direct_score")
+
+    def get_direct_level(self):
+        """Return the direct level (from direct score only, no hierarchy)."""
+        return self._call_readonly("get_direct_level")
 
     def get_aggregated_score(self):
-        """Return the aggregated score copy."""
-        return self._call_readonly("get_aggregated_score")
+        """Return the aggregated score including all descendant tags."""
+        tag = self._resolve()
+        return self._get_investigation().get_tag_aggregated_score(tag.name)
 
     def get_aggregated_level(self):
-        """Return the aggregated level copy."""
-        return self._call_readonly("get_aggregated_level")
+        """Return the aggregated level including all descendant tags."""
+        tag = self._resolve()
+        return self._get_investigation().get_tag_aggregated_level(tag.name)
 
-    def add_check(self, check: Check | CheckProxy | str) -> ContainerProxy:
-        """Add a check to this container."""
+    def add_check(self, check: Check | CheckProxy | str) -> TagProxy:
+        """Add a check to this tag."""
         if isinstance(check, CheckProxy):
             check_key = check.key
         elif isinstance(check, Check):
@@ -434,19 +436,10 @@ class ContainerProxy(_ReadOnlyProxy[Container]):
         else:
             raise TypeError("Check must provide a key.")
 
-        self._get_investigation().add_check_to_container(self.key, check_key)
+        self._get_investigation().add_check_to_tag(self.key, check_key)
         return self
 
-    def sub_container(self, path: str, description: str = "") -> ContainerProxy:
-        """Create a sub-container nested beneath this container."""
-        parent = self._resolve()
-        full_path = f"{parent.path}/{path}"
-        sub = Container(path=full_path, description=description)
-        sub = self._get_investigation().add_container(sub)
-        self._get_investigation().add_sub_container(self.key, sub.key)
-        return ContainerProxy(self._get_investigation(), sub.key)
-
-    def __enter__(self) -> ContainerProxy:
+    def __enter__(self) -> TagProxy:
         """Context manager entry returning self."""
         return self
 
@@ -454,11 +447,11 @@ class ContainerProxy(_ReadOnlyProxy[Container]):
         """Context manager exit (no-op)."""
         return None
 
-    def update_metadata(self, *, description: str | None = None) -> ContainerProxy:
-        """Update mutable metadata on the container."""
+    def update_metadata(self, *, description: str | None = None) -> TagProxy:
+        """Update mutable metadata on the tag."""
         if description is None:
             return self
-        self._get_investigation().update_model_metadata("container", self.key, {"description": description})
+        self._get_investigation().update_model_metadata("tag", self.key, {"description": description})
         return self
 
 

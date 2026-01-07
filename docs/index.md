@@ -23,7 +23,7 @@ Build, score, and narrate cybersecurity investigations with a single fluent Pyth
 
 | Area | Why it matters | What to look at |
 | --- | --- | --- |
-| **Structured objects** | Model observables, checks, TI, containers, and enrichments with typed helpers | `cyvest.model`, [Concepts](getting-started/concepts.md#observables) |
+| **Structured objects** | Model observables, checks, TI, tags, and enrichments with typed helpers | `cyvest.model`, [Concepts](getting-started/concepts.md#observables) |
 | **Deterministic scoring** | MAX/SUM propagation, centralized audit log, and automatic level classification | `cyvest.score`, [Scoring System](getting-started/concepts.md#scoring-system) |
 | **Fluent helpers** | Builder-style methods with deterministic keys and safe merges | `cyvest.cyvest`, [Quick Start](getting-started/quickstart.md#using-the-fluent-api) |
 | **Shared context** | Thread-safe fragments that can reconcile into a single story | `cyvest.shared.SharedInvestigationContext`, [Guide](shared-investigation-context.md) |
@@ -45,7 +45,7 @@ phishing_url = (
 )
 
 (
-    cv.check("email:url", "body", "Analyze embedded URL")
+    cv.check("email_url_check", "Analyze embedded URL")
     .link_observable(phishing_url)
     .with_score(Decimal("8.5"))
 )
@@ -67,7 +67,7 @@ print(cv.get_global_score(), cv.get_global_level())
 Cyvest (facade + fluent proxies)
 └─ Investigation (core state)
    ├─ Observables & relationships
-   ├─ Checks and containers (workflow context)
+   ├─ Checks and tags (workflow context)
    ├─ Threat intelligence (source, score, taxonomies)
    ├─ ScoreEngine (MAX/SUM propagation, history)
    ├─ InvestigationStats (live metrics)

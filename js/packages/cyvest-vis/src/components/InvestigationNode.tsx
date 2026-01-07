@@ -1,6 +1,6 @@
 /**
  * Custom node component for the Investigation Graph (Dagre layout).
- * Professional design with SVG icons for root, check, and container nodes.
+ * Professional design with SVG icons for root, check, and tag nodes.
  */
 
 import React, { memo, useMemo } from "react";
@@ -33,7 +33,7 @@ const NODE_CONFIG = {
     showIcon: false, // No icon for checks
     alignCenter: false, // Left-aligned
   },
-  container: {
+  tag: {
     minWidth: 120,
     padding: "8px 14px",
     borderRadius: 16,

@@ -118,13 +118,13 @@ def test_enrichment_proxy_update_metadata() -> None:
     assert enrichment.data == {"host": {"ip": "10.0.0.2"}}
 
 
-def test_container_proxy_update_metadata() -> None:
-    """ContainerProxy.update_metadata should update description."""
+def test_tag_proxy_update_metadata() -> None:
+    """TagProxy.update_metadata should update description."""
     cv = Cyvest()
-    container = cv.container_create("path", "old description")
+    tag = cv.tag_create("tagname", "old description")
 
-    container.update_metadata(description="new description")
-    assert container.description == "new description"
+    tag.update_metadata(description="new description")
+    assert tag.description == "new description"
 
 
 def test_proxy_dir_exposes_public_fields() -> None:
@@ -132,7 +132,7 @@ def test_proxy_dir_exposes_public_fields() -> None:
     cv = Cyvest()
     obs = cv.observable_create(Cyvest.OBS.URL, "https://example.com")
     check = cv.check_create("check-id", "scope", "desc")
-    container = cv.container_create("root")
+    tag = cv.tag_create("root")
     ti = cv.observable_add_threat_intel(obs.key, source="vt", score=Decimal("1"), comment="c")
     enrichment = cv.enrichment_create("metadata", {"k": "v"}, context="ctx")
     assert ti is not None
@@ -151,8 +151,7 @@ def test_proxy_dir_exposes_public_fields() -> None:
             "key",
         },
         check: {
-            "check_id",
-            "scope",
+            "check_name",
             "description",
             "comment",
             "extra",
@@ -162,11 +161,10 @@ def test_proxy_dir_exposes_public_fields() -> None:
             "observable_links",
             "key",
         },
-        container: {
-            "path",
+        tag: {
+            "name",
             "description",
             "checks",
-            "sub_containers",
             "key",
         },
         ti: {
@@ -199,8 +197,8 @@ def test_proxy_public_fields_are_deep_copied() -> None:
     linked_check = cv.check_link_observable(check.key, obs.key)
     assert linked_check is not None
 
-    container = cv.container_create("root")
-    container.add_check(check)
+    tag = cv.tag_create("root")
+    tag.add_check(check)
 
     ti = cv.observable_add_threat_intel(
         obs.key,
@@ -221,9 +219,9 @@ def test_proxy_public_fields_are_deep_copied() -> None:
     links_copy.clear()
     assert len(check.observable_links) == 1
 
-    checks_copy = container.checks
+    checks_copy = tag.checks
     checks_copy.clear()
-    assert len(container.checks) == 1
+    assert len(tag.checks) == 1
 
     taxonomies_copy = ti.taxonomies
     taxonomies_copy.append({"level": Cyvest.LVL.SUSPICIOUS, "name": "confidence", "value": "low"})

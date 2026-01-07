@@ -5,7 +5,7 @@ import {
   generateCheckKey,
   generateThreatIntelKey,
   generateEnrichmentKey,
-  generateContainerKey,
+  generateTagKey,
   parseKeyType,
   validateKey,
   parseObservableKey,
@@ -47,8 +47,8 @@ describe("Key Generation", () => {
 
   describe("generateCheckKey", () => {
     it("generates correct check key", () => {
-      expect(generateCheckKey("sender_verification", "email_headers")).toBe(
-        "chk:sender_verification:email_headers"
+      expect(generateCheckKey("sender_verification")).toBe(
+        "chk:sender_verification"
       );
     });
   });
@@ -72,17 +72,17 @@ describe("Key Generation", () => {
     });
   });
 
-  describe("generateContainerKey", () => {
-    it("generates correct container key", () => {
-      expect(generateContainerKey("email/headers")).toBe("ctr:email/headers");
+  describe("generateTagKey", () => {
+    it("generates correct tag key", () => {
+      expect(generateTagKey("header:auth")).toBe("tag:header:auth");
     });
 
-    it("normalizes path separators", () => {
-      expect(generateContainerKey("email\\headers")).toBe("ctr:email/headers");
+    it("normalizes to lowercase", () => {
+      expect(generateTagKey("HEADER:AUTH")).toBe("tag:header:auth");
     });
 
-    it("strips leading/trailing slashes", () => {
-      expect(generateContainerKey("/email/headers/")).toBe("ctr:email/headers");
+    it("trims whitespace", () => {
+      expect(generateTagKey("  header:auth  ")).toBe("tag:header:auth");
     });
   });
 
@@ -103,8 +103,8 @@ describe("Key Generation", () => {
       expect(parseKeyType("enr:whois")).toBe("enr");
     });
 
-    it("parses container key type", () => {
-      expect(parseKeyType("ctr:email/body")).toBe("ctr");
+    it("parses tag key type", () => {
+      expect(parseKeyType("tag:header:auth")).toBe("tag");
     });
 
     it("returns null for invalid key", () => {
@@ -153,9 +153,8 @@ describe("Key Generation", () => {
 
   describe("parseCheckKey", () => {
     it("parses check key components", () => {
-      expect(parseCheckKey("chk:sender_verification:email_headers")).toEqual({
-        checkId: "sender_verification",
-        scope: "email_headers",
+      expect(parseCheckKey("chk:sender_verification")).toEqual({
+        checkName: "sender_verification",
       });
     });
   });

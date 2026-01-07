@@ -66,7 +66,7 @@ export type ObservableEdge = Edge<ObservableEdgeData>;
 /**
  * Node types for the investigation graph view.
  */
-export type InvestigationNodeType = "root" | "check" | "container";
+export type InvestigationNodeType = "root" | "check" | "tag";
 
 /**
  * Data attached to investigation graph nodes.
@@ -74,7 +74,7 @@ export type InvestigationNodeType = "root" | "check" | "container";
 export interface InvestigationNodeData extends Record<string, unknown> {
   /** Display label */
   label: string;
-  /** Node type (root, check, or container) */
+  /** Node type (root, check, or tag) */
   nodeType: InvestigationNodeType;
   /** Security level */
   level: Level;
@@ -82,8 +82,8 @@ export interface InvestigationNodeData extends Record<string, unknown> {
   score: number;
   /** Description (for checks) */
   description?: string;
-  /** Path (for containers) */
-  path?: string;
+  /** Name (for tags) */
+  name?: string;
 }
 
 /**

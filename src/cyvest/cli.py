@@ -172,7 +172,7 @@ def merge(inputs: tuple[Path, ...], output: Path, output_format: str, stats: boo
         logger.info(f"  Total Observables: {investigation_stats.total_observables}")
         logger.info(f"  Total Checks: {investigation_stats.total_checks}")
         logger.info(f"  Total Threat Intel: {investigation_stats.total_threat_intel}")
-        logger.info(f"  Total Containers: {investigation_stats.total_containers}")
+        logger.info(f"  Total Tags: {investigation_stats.total_tags}")
         logger.info(f"  Global Score: {main_investigation.get_global_score():.2f}")
         logger.info(f"  Global Level: {main_investigation.get_global_level()}\n")
 

@@ -9,7 +9,7 @@ import type {
   Observable,
   Check,
   ThreatIntel,
-  Container,
+  Tag,
   Level,
 } from "./types.generated";
 
@@ -254,15 +254,15 @@ export function hasLevel(obj: unknown): obj is { level: Level } {
 }
 
 /**
- * Extract level from an entity (Observable, Check, ThreatIntel, Container).
+ * Extract level from an entity (Observable, Check, ThreatIntel, Tag).
  */
 export function getEntityLevel(
-  entity: Observable | Check | ThreatIntel | Container
+  entity: Observable | Check | ThreatIntel | Tag
 ): Level {
-  if ("aggregated_level" in entity) {
-    const aggregatedLevel = entity.aggregated_level;
-    if (typeof aggregatedLevel === "string" && isValidLevel(aggregatedLevel)) {
-      return aggregatedLevel;
+  if ("direct_level" in entity) {
+    const directLevel = entity.direct_level;
+    if (typeof directLevel === "string" && isValidLevel(directLevel)) {
+      return directLevel;
     }
   }
   if ("level" in entity && isValidLevel(entity.level)) {

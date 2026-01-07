@@ -26,7 +26,7 @@ def get_investigation_schema() -> dict[str, Any]:
     matches the actual `model_dump()` output structure.
 
     The returned schema automatically includes all referenced entity types
-    (Observable, Check, ThreatIntel, Enrichment, Container, InvestigationWhitelist)
+    (Observable, Check, ThreatIntel, Enrichment, Tag, InvestigationWhitelist)
     in the `$defs` section.
 
     Returns:

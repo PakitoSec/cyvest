@@ -1,7 +1,7 @@
 """
 Core data models for Cyvest investigation framework.
 
-Defines the base classes for Check, Observable, ThreatIntel, Enrichment, Container,
+Defines the base classes for Check, Observable, ThreatIntel, Enrichment, Tag,
 and InvestigationWhitelist using Pydantic BaseModel.
 """
 
@@ -391,8 +391,7 @@ class Check(BaseModel):
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    check_id: str = Field(...)
-    scope: str = Field(...)
+    check_name: str = Field(...)
     description: str = Field(...)
     comment: str = Field(...)
     extra: dict[str, Any] = Field(...)
@@ -442,7 +441,7 @@ class Check(BaseModel):
     def generate_key(self) -> Self:
         """Generate key."""
         if not self.key:
-            self.key = keys.generate_check_key(self.check_id, self.scope)
+            self.key = keys.generate_check_key(self.check_name)
         return self
 
     @field_serializer("score")
@@ -491,27 +490,27 @@ class Enrichment(BaseModel):
         return values
 
 
-class Container(BaseModel):
+class Tag(BaseModel):
     """
-    Groups checks and sub-containers for hierarchical organization.
+    Groups checks for categorical organization.
 
-    Containers allow structuring the investigation into logical sections
-    with aggregated scores and levels.
+    Tags allow structuring the investigation into logical sections
+    with aggregated scores and levels. Hierarchy is automatic based on
+    the ":" delimiter in tag names (e.g., "header:auth:dkim").
     """
 
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
 
-    path: str
+    name: str
     description: str = ""
     checks: list[Check] = Field(...)
-    sub_containers: dict[str, Container] = Field(...)
     key: str = Field(...)
 
     @model_validator(mode="after")
     def generate_key(self) -> Self:
         """Generate key."""
         if not self.key:
-            self.key = keys.generate_container_key(self.path)
+            self.key = keys.generate_tag_key(self.name)
         return self
 
     @model_validator(mode="before")
@@ -521,63 +520,64 @@ class Container(BaseModel):
             return values
         if "checks" not in values:
             values["checks"] = []
-        if "sub_containers" not in values:
-            values["sub_containers"] = {}
         if "key" not in values:
             values["key"] = ""
         return values
-
-    @computed_field(return_type=Decimal)
-    @property
-    def aggregated_score(self) -> Decimal:
-        return self.get_aggregated_score()
-
-    @field_serializer("aggregated_score")
-    def serialize_aggregated_score(self, v: Decimal) -> float:
-        return float(v)
-
-    def get_aggregated_score(self) -> Decimal:
-        """
-        Calculate the aggregated score from all checks and sub-containers.
-
-        Returns:
-            Total aggregated score
-        """
-        total = Decimal("0")
-        # Sum scores from direct checks
-        for check in self.checks:
-            total += check.score
-        # Sum scores from sub-containers
-        for sub in self.sub_containers.values():
-            total += sub.get_aggregated_score()
-        return total
-
-    @computed_field(return_type=Level)
-    @property
-    def aggregated_level(self) -> Level:
-        """
-        Calculate the aggregated level from the aggregated score.
-
-        Returns:
-            Level based on aggregated score
-        """
-        return self.get_aggregated_level()
 
     @field_serializer("checks")
     def serialize_checks(self, value: list[Check]) -> list[str]:
         """Serialize checks as keys only."""
         return [check.key for check in value]
 
-    @field_serializer("sub_containers")
-    def serialize_sub_containers(self, value: dict[str, Container]) -> dict[str, Container]:
-        """Serialize sub-containers recursively."""
-        return {key: sub.model_dump() for key, sub in value.items()}
-
-    def get_aggregated_level(self) -> Level:
+    @computed_field(return_type=Decimal)
+    @property
+    def direct_score(self) -> Decimal:
         """
-        Calculate the aggregated level from the aggregated score.
+        Calculate the score from direct checks only (no hierarchy).
+
+        For hierarchical aggregation (including descendant tags), use
+        Investigation.get_tag_aggregated_score() or TagProxy.get_aggregated_score().
 
         Returns:
-            Level based on aggregated score
+            Total score from direct checks
         """
-        return get_level_from_score(self.get_aggregated_score())
+        return self.get_direct_score()
+
+    @field_serializer("direct_score")
+    def serialize_direct_score(self, v: Decimal) -> float:
+        return float(v)
+
+    def get_direct_score(self) -> Decimal:
+        """
+        Calculate the score from direct checks only.
+
+        Returns:
+            Total score from direct checks
+        """
+        total = Decimal("0")
+        for check in self.checks:
+            total += check.score
+        return total
+
+    @computed_field(return_type=Level)
+    @property
+    def direct_level(self) -> Level:
+        """
+        Calculate the level from direct checks only (no hierarchy).
+
+        For hierarchical aggregation (including descendant tags), use
+        Investigation.get_tag_aggregated_level() or TagProxy.get_aggregated_level().
+
+        Returns:
+            Level based on direct score
+        """
+        return self.get_direct_level()
+
+    def get_direct_level(self) -> Level:
+        """
+        Calculate the level from direct score only.
+
+        Returns:
+            Level based on direct score
+        """
+        return get_level_from_score(self.get_direct_score())

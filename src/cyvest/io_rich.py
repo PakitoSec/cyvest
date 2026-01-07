@@ -50,8 +50,8 @@ def _sort_key_by_score(item: Any) -> tuple[Decimal, str]:
     except (TypeError, ValueError, InvalidOperation):
         decimal_score = Decimal(0)
 
-    item_id = getattr(item, "check_id", "")
-    return (-decimal_score, item_id)
+    item_name = getattr(item, "check_name", "")
+    return (-decimal_score, item_name)
 
 
 def _get_direction_symbol(rel: Relationship, reversed_edge: bool) -> str:
@@ -377,40 +377,29 @@ def display_summary(
     rule = Rule("[bold magenta]CHECKS[/bold magenta]")
     table.add_row(rule, "-", "-")
 
-    # Organize checks by scope
-    checks_by_scope: dict[str, list[Any]] = {}
-    for check in cv.check_get_all().values():
-        if check.level in resolved_excluded_levels:
-            continue
-        if check.scope not in checks_by_scope:
-            checks_by_scope[check.scope] = []
-        checks_by_scope[check.scope].append(check)
+    checks = [c for c in cv.check_get_all().values() if c.level not in resolved_excluded_levels]
+    checks = sorted(checks, key=_sort_key_by_score)
+    for check in checks:
+        color_level = get_color_level(check.level)
+        color_score = get_color_score(check.score)
+        name = f"  {check.check_name}"
+        score = f"[{color_score}]{check.score_display}[/{color_score}]"
+        level = f"[{color_level}]{check.level.name}[/{color_level}]"
+        table.add_row(name, score, level)
 
-    for scope_name, checks in checks_by_scope.items():
-        scope_rule = Align(f"[bold magenta]{scope_name}[/bold magenta]", align="left")
-        table.add_row(scope_rule, "-", "-")
-        checks = sorted(checks, key=_sort_key_by_score)
-        for check in checks:
-            color_level = get_color_level(check.level)
-            color_score = get_color_score(check.score)
-            name = f"  {check.check_id}"
-            score = f"[{color_score}]{check.score_display}[/{color_score}]"
-            level = f"[{color_level}]{check.level.name}[/{color_level}]"
-            table.add_row(name, score, level)
-
-    # Containers section (if any)
-    if cv.container_get_all():
+    # Tags section (if any)
+    if cv.tag_get_all():
         table.add_section()
-        rule = Rule("[bold magenta]CONTAINERS[/bold magenta]")
+        rule = Rule("[bold magenta]TAGS[/bold magenta]")
         table.add_row(rule, "-", "-")
 
-        for container in cv.container_get_all().values():
-            agg_score = container.get_aggregated_score()
-            agg_level = container.get_aggregated_level()
+        for tag in cv.tag_get_all().values():
+            agg_score = tag.get_aggregated_score()
+            agg_level = tag.get_aggregated_level()
             color_level = get_color_level(agg_level)
             color_score = get_color_score(agg_score)
 
-            name = f"  {container.path}"
+            name = f"  {tag.name}"
             score = f"[{color_score}]{agg_score:.2f}[/{color_score}]"
             level = f"[{color_level}]{agg_level.name}[/{color_level}]"
             table.add_row(name, score, level)
@@ -437,7 +426,7 @@ def display_summary(
 
             for check in checks:
                 color_score = get_color_score(check.score)
-                name = f"  {check.check_id}"
+                name = f"  {check.check_name}"
                 score = f"[{color_score}]{check.score_display}[/{color_score}]"
                 level = f"[{color_level}]{check.level.name}[/{color_level}]"
                 table.add_row(name, score, level)
@@ -558,11 +547,11 @@ def display_statistics(cv: Cyvest, rich_print: Callable[[Any], None]) -> None:
     # Check statistics table
     rich_print("")
     check_table = Table(title="Check Statistics")
-    check_table.add_column("Scope", style="cyan")
+    check_table.add_column("Level", style="cyan")
     check_table.add_column("Count", justify="right")
 
-    for scope, count in stats.checks_by_scope.items():
-        check_table.add_row(scope, str(count))
+    for level, count in stats.checks_by_level.items():
+        check_table.add_row(level, str(count))
 
     rich_print(check_table)
 

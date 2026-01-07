@@ -9,9 +9,9 @@ from logurich import logger
 
 from cyvest.cyvest import Cyvest
 from cyvest.levels import Level
-from cyvest.model import Check, Container, Enrichment, InvestigationWhitelist, Observable, Taxonomy, ThreatIntel
+from cyvest.model import Check, Enrichment, InvestigationWhitelist, Observable, Tag, Taxonomy, ThreatIntel
 from cyvest.model_enums import ObservableType, RelationshipDirection, RelationshipType
-from cyvest.proxies import CheckProxy, ContainerProxy, EnrichmentProxy, ObservableProxy, ThreatIntelProxy
+from cyvest.proxies import CheckProxy, EnrichmentProxy, ObservableProxy, TagProxy, ThreatIntelProxy
 
 __version__ = "4.4.1"
 
@@ -27,8 +27,8 @@ __all__ = [
     "ObservableProxy",
     "ThreatIntelProxy",
     "EnrichmentProxy",
-    "ContainerProxy",
-    "Container",
+    "TagProxy",
+    "Tag",
     "Enrichment",
     "InvestigationWhitelist",
     "Check",

@@ -56,22 +56,20 @@ def generate_observable_key(obs_type: str, value: str) -> str:
     return f"obs:{normalized_type}:{normalized_value}"
 
 
-def generate_check_key(check_id: str, scope: str) -> str:
+def generate_check_key(check_name: str) -> str:
     """
     Generate a unique key for a check.
 
-    Format: chk:{check_id}:{scope}
+    Format: chk:{check_name}
 
     Args:
-        check_id: Identifier of the check
-        scope: Scope of the check
+        check_name: Name of the check
 
     Returns:
         Unique check key
     """
-    normalized_id = _normalize_value(check_id)
-    normalized_scope = _normalize_value(scope)
-    return f"chk:{normalized_id}:{normalized_scope}"
+    normalized_name = _normalize_value(check_name)
+    return f"chk:{normalized_name}"
 
 
 def generate_threat_intel_key(source: str, observable_key: str) -> str:
@@ -111,22 +109,67 @@ def generate_enrichment_key(name: str, context: str = "") -> str:
     return f"enr:{normalized_name}"
 
 
-def generate_container_key(path: str) -> str:
+def generate_tag_key(name: str) -> str:
     """
-    Generate a unique key for a container.
+    Generate a unique key for a tag.
 
-    Format: ctr:{normalized_path}
+    Format: tag:{normalized_name}
 
     Args:
-        path: Path of the container (can use / or . as separator)
+        name: Name of the tag (uses : as hierarchy delimiter)
 
     Returns:
-        Unique container key
+        Unique tag key
     """
-    # Normalize path separators
-    normalized_path = path.replace("\\", "/").strip("/")
-    normalized_path = _normalize_value(normalized_path)
-    return f"ctr:{normalized_path}"
+    normalized_name = _normalize_value(name)
+    return f"tag:{normalized_name}"
+
+
+def get_tag_ancestors(name: str) -> list[str]:
+    """
+    Get all ancestor tag names from a hierarchical tag name.
+
+    Uses ":" as the hierarchy delimiter.
+
+    Args:
+        name: Tag name (e.g., "header:auth:dkim")
+
+    Returns:
+        List of ancestor names (e.g., ["header", "header:auth"])
+    """
+    parts = name.split(":")
+    return [":".join(parts[: i + 1]) for i in range(len(parts) - 1)]
+
+
+def is_tag_child_of(child_name: str, parent_name: str) -> bool:
+    """
+    Check if a tag is a direct child of another tag.
+
+    Args:
+        child_name: Potential child tag name
+        parent_name: Potential parent tag name
+
+    Returns:
+        True if child_name is a direct child of parent_name
+    """
+    if not child_name.startswith(parent_name + ":"):
+        return False
+    remaining = child_name[len(parent_name) + 1 :]
+    return ":" not in remaining
+
+
+def is_tag_descendant_of(descendant_name: str, ancestor_name: str) -> bool:
+    """
+    Check if a tag is a descendant (child, grandchild, etc.) of another tag.
+
+    Args:
+        descendant_name: Potential descendant tag name
+        ancestor_name: Potential ancestor tag name
+
+    Returns:
+        True if descendant_name is a descendant of ancestor_name
+    """
+    return descendant_name.startswith(ancestor_name + ":")
 
 
 def parse_key_type(key: str) -> str | None:
@@ -137,7 +180,7 @@ def parse_key_type(key: str) -> str | None:
         key: The key to parse
 
     Returns:
-        Type prefix (obs, chk, ti, enr, ctr) or None if invalid
+        Type prefix (obs, chk, ti, enr, tag) or None if invalid
     """
     if ":" in key:
         return key.split(":", 1)[0]
@@ -185,7 +228,7 @@ def validate_key(key: str, expected_type: str | None = None) -> bool:
         return False
 
     key_type = parse_key_type(key)
-    if key_type not in ("obs", "chk", "ti", "enr", "ctr"):
+    if key_type not in ("obs", "chk", "ti", "enr", "tag"):
         return False
 
     if expected_type and key_type != expected_type:

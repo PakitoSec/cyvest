@@ -44,7 +44,6 @@ def main() -> None:
     # Create checks
     sender_check = cv.check_create(
         "sender_verification",
-        "email_headers",
         "Verify sender authenticity",
         comment="Sender domain not in known contacts. SPF check failed.",
         score=Decimal("3.5"),
@@ -52,7 +51,6 @@ def main() -> None:
 
     url_check = cv.check_create(
         "url_analysis",
-        "email_body",
         "Analyze URLs in email body",
         comment="Found phishing URL attempting to steal credentials",
         score=Decimal("8.5"),
@@ -62,10 +60,10 @@ def main() -> None:
     cv.check_link_observable(sender_check.key, sender_email.key)
     cv.check_link_observable(url_check.key, phishing_url.key)
 
-    # Create container for organization
-    email_container = cv.container_create("email_analysis", "Analysis of suspicious email")
-    cv.container_add_check(email_container.key, sender_check.key)
-    cv.container_add_check(email_container.key, url_check.key)
+    # Create tag for organization
+    email_tag = cv.tag_create("email:analysis", "Analysis of suspicious email")
+    cv.tag_add_check(email_tag.key, sender_check.key)
+    cv.tag_add_check(email_tag.key, url_check.key)
 
     # Add enrichment
     cv.enrichment_create(

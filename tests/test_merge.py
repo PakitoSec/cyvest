@@ -9,19 +9,19 @@ from cyvest import Cyvest
 
 def test_merge_local_check() -> None:
     cv_child = Cyvest()
-    cv_child.check("C1", "full", "test").link_observable(
+    cv_child.check("C1", "test").link_observable(
         cv_child.observable(cv_child.OBS.DOMAIN, "example.com").with_ti("VT", score=2)
     )
 
     main_inv = Cyvest()
-    main_inv.check("C2", "full", "test").link_observable(
+    main_inv.check("C2", "test").link_observable(
         main_inv.observable(main_inv.OBS.DOMAIN, "example.com").with_ti("OTX", score=4)
     )
 
     main_inv.merge_investigation(cv_child)
 
-    c1 = main_inv.check_get("C1", "full")
-    c2 = main_inv.check_get("C2", "full")
+    c1 = main_inv.check_get("chk:c1")
+    c2 = main_inv.check_get("chk:c2")
     o = main_inv.observable_get(Cyvest.OBS.DOMAIN, "example.com")
     global_score = main_inv.get_global_score()
 
@@ -33,20 +33,20 @@ def test_merge_local_check() -> None:
 
 def test_merge_global_check() -> None:
     cv_child = Cyvest()
-    cv_child.check("C1", "full", "test").link_observable(
+    cv_child.check("C1", "test").link_observable(
         cv_child.observable(cv_child.OBS.DOMAIN, "example.com").with_ti("VT", score=2),
         propagation_mode=cv_child.PROP.GLOBAL,
     )
 
     main_inv = Cyvest()
-    main_inv.check("C2", "full", "test").link_observable(
+    main_inv.check("C2", "test").link_observable(
         main_inv.observable(main_inv.OBS.DOMAIN, "example.com").with_ti("OTX", score=4)
     )
 
     main_inv.merge_investigation(cv_child)
 
-    c1 = main_inv.check_get("C1", "full")
-    c2 = main_inv.check_get("C2", "full")
+    c1 = main_inv.check_get("chk:c1")
+    c2 = main_inv.check_get("chk:c2")
     o = main_inv.observable_get(Cyvest.OBS.DOMAIN, "example.com")
     global_score = main_inv.get_global_score()
 
@@ -58,12 +58,12 @@ def test_merge_global_check() -> None:
 
 def test_merge_local_check_multiple_child() -> None:
     cv_child = Cyvest()
-    cv_child.check("C1", "full", "test").link_observable(
+    cv_child.check("C1", "test").link_observable(
         cv_child.observable(Cyvest.OBS.DOMAIN, "example.com").with_ti("VT", score=2)
     )
 
     cv_child2 = Cyvest()
-    cv_child2.check("C1", "full", "test").link_observable(
+    cv_child2.check("C1", "test").link_observable(
         cv_child2.observable(Cyvest.OBS.DOMAIN, "example.com").with_ti("VT", score=5)
     )
 
@@ -71,7 +71,7 @@ def test_merge_local_check_multiple_child() -> None:
     main_inv.merge_investigation(cv_child)
     main_inv.merge_investigation(cv_child2)
 
-    c1 = main_inv.check_get("C1", "full")
+    c1 = main_inv.check_get("chk:c1")
     o = main_inv.observable_get(Cyvest.OBS.DOMAIN, "example.com")
     global_score = main_inv.get_global_score()
 
@@ -84,7 +84,7 @@ def test_local_only_link_does_not_affect_foreign_check() -> None:
     cv_main = Cyvest()
     cv_other = Cyvest()
 
-    foreign_check = cv_other.check_create("foreign", "scope", "Created in other investigation")
+    foreign_check = cv_other.check_create("foreign", "Created in other investigation")
 
     cv_main.merge_investigation(cv_other)
 
@@ -103,7 +103,7 @@ def test_global_link_can_affect_foreign_check() -> None:
     cv_main = Cyvest()
     cv_other = Cyvest()
 
-    foreign_check = cv_other.check_create("foreign", "scope", "Created in other investigation")
+    foreign_check = cv_other.check_create("foreign", "Created in other investigation")
     cv_main.merge_investigation(cv_other)
 
     obs = cv_main.observable_create(Cyvest.OBS.IPV4, "10.0.0.52")
@@ -126,12 +126,12 @@ def test_check_reconciliation_preserves_origin_and_links() -> None:
 
     obs1 = cv1.observable_create(Cyvest.OBS.IPV4, "10.0.0.60")
     cv1.observable_add_threat_intel(obs1.key, source="s1", score=Decimal("4.0"))
-    check1 = cv1.check_create("recon", "scope", "Same semantic check")
+    check1 = cv1.check_create("recon", "Same semantic check")
     cv1.check_link_observable(check1.key, obs1.key)
 
     obs2 = cv2.observable_create(Cyvest.OBS.IPV4, "10.0.0.61")
     cv2.observable_add_threat_intel(obs2.key, source="s2", score=Decimal("9.0"))
-    check2 = cv2.check_create("recon", "scope", "Same semantic check")
+    check2 = cv2.check_create("recon", "Same semantic check")
     cv2.check_link_observable(check2.key, obs2.key)
 
     cv1.merge_investigation(cv2)
@@ -153,7 +153,7 @@ def test_foreign_check_global_updates_local_only_freezes_after_merge() -> None:
     cv_main = Cyvest()
     cv_other = Cyvest()
 
-    foreign_check = cv_other.check_create("foreign", "scope", "Created in other investigation")
+    foreign_check = cv_other.check_create("foreign", "Created in other investigation")
     cv_main.merge_investigation(cv_other)
 
     obs_local = cv_main.observable_create(Cyvest.OBS.IPV4, "10.0.0.51")

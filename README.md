@@ -82,14 +82,14 @@ cv.io_save_json("investigation.json")
 ### Model Proxies
 
 Cyvest only exposes immutable model proxies. Helpers like `observable_create`, `check_create`, and the
-fluent `cv.observable()`/`cv.check()` convenience methods return `ObservableProxy`, `CheckProxy`, `ContainerProxy`, etc.
+fluent `cv.observable()`/`cv.check()` convenience methods return `ObservableProxy`, `CheckProxy`, `TagProxy`, etc.
 These proxies reflect the live investigation state but raise `AttributeError` if you try to assign to their attributes.
 All mutations are routed through the Investigation layer, so use the facade helpers (`cv.observable_set_level`,
 `cv.check_update_score`, `cv.observable_add_threat_intel`) or the built-in fluent methods on the proxies themselves
 (`with_ti`, `relate_to`, `link_observable`, `with_score`, …) so the score engine and audit log stay consistent.
 
 Mutation helpers that reference existing objects (for example, `cv.observable_add_relationship`,
-`cv.check_link_observable`, `cv.container_add_check`) raise `KeyError` when a key is missing.
+`cv.check_link_observable`, `cv.tag_add_check`) raise `KeyError` when a key is missing.
 
 Safe metadata fields like `comment`, `extra`, or `internal` can be updated through the proxies without breaking score
 consistency:
@@ -179,15 +179,19 @@ ti.add_taxonomy(level=cv.LVL.SUSPICIOUS, name="confidence", value="medium")
 ti.remove_taxonomy("confidence")
 ```
 
-### Containers
+### Tags
 
-Containers organize checks hierarchically:
+Tags organize checks with automatic hierarchy based on `:` delimiter:
 
 ```python
-with cv.container("network_analysis") as network:
-    with network.sub_container("c2_detection") as c2:
-        check = cv.check("beacon_detection", "network", "Detect C2 beacons")
-        c2.add_check(check)
+# Creating "network:c2:detection" auto-creates "network" and "network:c2" tags
+tag = cv.tag("network:c2:detection", "C2 Detection Checks")
+check = cv.check("beacon_detection", "Detect C2 beacons")
+check.in_tag(tag)
+
+# Query hierarchy
+children = cv.tag_get_children("network")  # ["network:c2"]
+descendants = cv.tag_get_descendants("network")  # ["network:c2", "network:c2:detection"]
 ```
 
 ### Lookup Helpers
@@ -203,9 +207,9 @@ check = cv.check_create("malware_detection", "endpoint", "Verify file hash")
 same_check = cv.check_get("malware_detection", "endpoint")
 same_check_by_key = cv.check_get(check.key)
 
-container = cv.container_create("network_analysis")
-same_container = cv.container_get("network_analysis")
-same_container_by_key = cv.container_get(container.key)
+tag = cv.tag_create("network:analysis")
+same_tag = cv.tag_get("network:analysis")
+same_tag_by_key = cv.tag_get(tag.key)
 
 enrichment = cv.enrichment_create("whois", {"registrar": "Example Inc"})
 same_enrichment = cv.enrichment_get("whois")

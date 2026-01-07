@@ -51,9 +51,9 @@ pytest --cov=cyvest --cov-report=term-missing --cov-report=html
 
 | Layer | Role | Files |
 | --- | --- | --- |
-| **Investigation** | Authoritative state: observables, checks, TI, containers, score engine | `src/cyvest/investigation.py` |
+| **Investigation** | Authoritative state: observables, checks, TI, tags, score engine | `src/cyvest/investigation.py` |
 | **Cyvest facade** | Public API + CLI entry, manages deterministic keys, exposes fluent helpers | `src/cyvest/cyvest.py`, `src/cyvest/cli.py` |
-| **Proxy helpers** | Fluent builders for observables/checks/containers with merge-on-create semantics | `src/cyvest/proxies.py` |
+| **Proxy helpers** | Fluent builders for observables/checks/tags with merge-on-create semantics | `src/cyvest/proxies.py` |
 | **Models** | Dataclasses for Observables, Checks, ThreatIntel, etc. | `src/cyvest/model.py` |
 | **Scoring** | Score modes, propagation, and level determination | `src/cyvest/score.py` |
 

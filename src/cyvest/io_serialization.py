@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from cyvest.levels import Level, normalize_level
-from cyvest.model import AuditEvent, Check, Container, Enrichment, Observable, Relationship, ThreatIntel
+from cyvest.model import AuditEvent, Check, Enrichment, Observable, Relationship, Tag, ThreatIntel
 from cyvest.model_enums import ObservableType
 from cyvest.model_schema import InvestigationSchema
 from cyvest.score import ScoreMode
@@ -41,14 +41,10 @@ def serialize_investigation(inv: Investigation, *, include_audit_log: bool = Tru
     observables = dict(inv.get_all_observables())
     threat_intels = dict(inv.get_all_threat_intels())
     enrichments = dict(inv.get_all_enrichments())
-    containers = dict(inv.get_all_containers())
+    tags = dict(inv.get_all_tags())
 
-    # Build checks organized by scope (resolve proxies)
-    checks_by_scope: dict[str, list[Check]] = {}
-    for check in inv.get_all_checks().values():
-        if check.scope not in checks_by_scope:
-            checks_by_scope[check.scope] = []
-        checks_by_scope[check.scope].append(check)
+    # Get all checks
+    checks = dict(inv.get_all_checks())
 
     # Get root type
     root = inv.get_root()
@@ -64,10 +60,10 @@ def serialize_investigation(inv: Investigation, *, include_audit_log: bool = Tru
         whitelists=list(inv.get_whitelists()),
         audit_log=inv.get_audit_log() if include_audit_log else None,
         observables=observables,
-        checks=checks_by_scope,
+        checks=checks,
         threat_intels=threat_intels,
         enrichments=enrichments,
-        containers=containers,
+        tags=tags,
         stats=inv.get_statistics(),
         data_extraction={
             "root_type": root_type_value,
@@ -95,7 +91,7 @@ def save_investigation_json(inv: Investigation, filepath: str | Path, *, include
 
 def generate_markdown_report(
     inv: Investigation,
-    include_containers: bool = False,
+    include_tags: bool = False,
     include_enrichments: bool = False,
     include_observables: bool = True,
 ) -> str:
@@ -104,7 +100,7 @@ def generate_markdown_report(
 
     Args:
         inv: Investigation
-        include_containers: Include containers section in the report (default: False)
+        include_tags: Include tags section in the report (default: False)
         include_enrichments: Include enrichments section in the report (default: False)
         include_observables: Include observables section in the report (default: True)
 
@@ -150,19 +146,16 @@ def generate_markdown_report(
                 lines.append(f"  - Justification: {entry.justification}")
         lines.append("")
 
-    # Checks by Scope
-    lines.append("## Checks by Scope")
+    # Checks
+    lines.append("## Checks")
     lines.append("")
-    for scope, _count in inv.get_statistics().checks_by_scope.items():
-        lines.append(f"### {scope}")
-        lines.append("")
-        for check in inv.get_all_checks().values():
-            if check.scope == scope and check.level != Level.NONE:
-                lines.append(f"- **{check.check_id}**: Score: {check.score_display}, Level: {check.level.name}")
-                lines.append(f"  - Description: {check.description}")
-                if check.comment:
-                    lines.append(f"  - Comment: {check.comment}")
-        lines.append("")
+    for check in inv.get_all_checks().values():
+        if check.level != Level.NONE:
+            lines.append(f"- **{check.check_name}**: Score: {check.score_display}, Level: {check.level.name}")
+            lines.append(f"  - Description: {check.description}")
+            if check.comment:
+                lines.append(f"  - Comment: {check.comment}")
+    lines.append("")
 
     # Observables
     if include_observables and inv.get_all_observables():
@@ -205,17 +198,17 @@ def generate_markdown_report(
             lines.append(f"- **Data:** {json.dumps(enr.data, indent=2)}")
             lines.append("")
 
-    # Containers
-    if include_containers and inv.get_all_containers():
-        lines.append("## Containers")
+    # Tags
+    if include_tags and inv.get_all_tags():
+        lines.append("## Tags")
         lines.append("")
-        for ctr in inv.get_all_containers().values():
-            lines.append(f"### {ctr.path}")
-            lines.append(f"- **Description:** {ctr.description}")
-            lines.append(f"- **Aggregated Score:** {ctr.get_aggregated_score():.2f}")
-            lines.append(f"- **Aggregated Level:** {ctr.get_aggregated_level().name}")
-            lines.append(f"- **Checks:** {len(ctr.checks)}")
-            lines.append(f"- **Sub-containers:** {len(ctr.sub_containers)}")
+        for tag in inv.get_all_tags().values():
+            lines.append(f"### {tag.name}")
+            lines.append(f"- **Description:** {tag.description}")
+            lines.append(f"- **Direct Score:** {tag.get_direct_score():.2f}")
+            lines.append(f"- **Aggregated Score:** {inv.get_tag_aggregated_score(tag.name):.2f}")
+            lines.append(f"- **Aggregated Level:** {inv.get_tag_aggregated_level(tag.name).name}")
+            lines.append(f"- **Direct Checks:** {len(tag.checks)}")
             lines.append("")
 
     return "\n".join(lines)
@@ -224,7 +217,7 @@ def generate_markdown_report(
 def save_investigation_markdown(
     inv: Investigation,
     filepath: str | Path,
-    include_containers: bool = False,
+    include_tags: bool = False,
     include_enrichments: bool = False,
     include_observables: bool = True,
 ) -> None:
@@ -234,11 +227,11 @@ def save_investigation_markdown(
     Args:
         inv: Investigation to save
         filepath: Path to save the Markdown file
-        include_containers: Include containers section in the report (default: False)
+        include_tags: Include tags section in the report (default: False)
         include_enrichments: Include enrichments section in the report (default: False)
         include_observables: Include observables section in the report (default: True)
     """
-    markdown = generate_markdown_report(inv, include_containers, include_enrichments, include_observables)
+    markdown = generate_markdown_report(inv, include_tags, include_enrichments, include_observables)
     with open(filepath, "w", encoding="utf-8") as f:
         f.write(markdown)
 
@@ -380,35 +373,32 @@ def load_investigation_json(filepath: str | Path) -> Cyvest:
             cv._investigation.add_threat_intel(ti, observable)
 
     # Checks - leverage Pydantic model_validate
-    for scope_checks in data.get("checks", {}).values():
-        for check_info in scope_checks:
-            raw_links = check_info.get("observable_links", []) or []
-            normalized_links = []
-            for link in raw_links:
-                if isinstance(link, dict):
-                    normalized_links.append(
-                        {
-                            "observable_key": link.get("observable_key", ""),
-                            "propagation_mode": link.get("propagation_mode", "LOCAL_ONLY"),
-                        }
-                    )
-                else:
-                    normalized_links.append(link)
-            check_data = {
-                "check_id": check_info.get("check_id", ""),
-                "scope": check_info.get("scope", ""),
-                "description": check_info.get("description", ""),
-                "comment": check_info.get("comment", ""),
-                "extra": check_info.get("extra", {}),
-                "score": Decimal(str(check_info.get("score", 0))),
-                "level": check_info.get("level", "NONE"),
-                "origin_investigation_id": check_info.get("origin_investigation_id")
-                or cv._investigation.investigation_id,
-                "observable_links": normalized_links,
-                "key": check_info.get("key", ""),
-            }
-            check = Check.model_validate(check_data)
-            cv._investigation.add_check(check)
+    for check_info in data.get("checks", {}).values():
+        raw_links = check_info.get("observable_links", []) or []
+        normalized_links = []
+        for link in raw_links:
+            if isinstance(link, dict):
+                normalized_links.append(
+                    {
+                        "observable_key": link.get("observable_key", ""),
+                        "propagation_mode": link.get("propagation_mode", "LOCAL_ONLY"),
+                    }
+                )
+            else:
+                normalized_links.append(link)
+        check_data = {
+            "check_name": check_info.get("check_name", ""),
+            "description": check_info.get("description", ""),
+            "comment": check_info.get("comment", ""),
+            "extra": check_info.get("extra", {}),
+            "score": Decimal(str(check_info.get("score", 0))),
+            "level": check_info.get("level", "NONE"),
+            "origin_investigation_id": check_info.get("origin_investigation_id") or cv._investigation.investigation_id,
+            "observable_links": normalized_links,
+            "key": check_info.get("key", ""),
+        }
+        check = Check.model_validate(check_data)
+        cv._investigation.add_check(check)
 
     # Enrichments - leverage Pydantic model_validate
     for enr_info in data.get("enrichments", {}).values():
@@ -421,29 +411,25 @@ def load_investigation_json(filepath: str | Path) -> Cyvest:
         enrichment = Enrichment.model_validate(enr_data)
         cv._investigation.add_enrichment(enrichment)
 
-    # Containers
-    def build_container(container_info: dict[str, Any]) -> Container:
-        container_data = {
-            "path": container_info.get("path", ""),
-            "description": container_info.get("description", ""),
-            "key": container_info.get("key", ""),
+    # Tags
+    def build_tag(tag_info: dict[str, Any]) -> Tag:
+        tag_data = {
+            "name": tag_info.get("name", ""),
+            "description": tag_info.get("description", ""),
+            "key": tag_info.get("key", ""),
         }
-        container = Container.model_validate(container_data)
-        container = cv._investigation.add_container(container)
+        tag = Tag.model_validate(tag_data)
+        tag = cv._investigation.add_tag(tag)
 
-        for check_key in container_info.get("checks", []):
+        for check_key in tag_info.get("checks", []):
             check = cv._investigation.get_check(check_key)
             if check:
-                cv._investigation.add_check_to_container(container.key, check.key)
+                cv._investigation.add_check_to_tag(tag.key, check.key)
 
-        for sub_info in container_info.get("sub_containers", {}).values():
-            sub_container = build_container(sub_info)
-            cv._investigation.add_sub_container(container.key, sub_container.key)
+        return tag
 
-        return container
-
-    for container_info in data.get("containers", {}).values():
-        build_container(container_info)
+    for tag_info in data.get("tags", {}).values():
+        build_tag(tag_info)
 
     cv._investigation._refresh_check_links()
 

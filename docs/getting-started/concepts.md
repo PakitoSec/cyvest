@@ -107,8 +107,7 @@ obs = cv.observable(cv.OBS.URL, "https://example.com")
 - Any validation logic
 
 Each check has:
-- **Check ID**: Identifier for the verification
-- **Scope**: Category (email, network, endpoint, etc.)
+- **Check Name**: Identifier for the verification
 - **Description**: What the check does
 - **Score**: Contribution to overall severity
 - **Level**: Result classification
@@ -146,13 +145,13 @@ obs.with_ti_draft(draft)
 
 Drafts are plain `ThreatIntel` objects without an `observable_key`; the key is generated on attach.
 
-### Containers
+### Tags
 
-**Containers** organize checks hierarchically:
+**Tags** organize checks with automatic hierarchy based on `:` delimiter:
 - Group related checks together
 - Create logical investigation sections
-- Support nesting for complex structures
-- Provide aggregated scores and levels
+- Auto-create ancestor tags (e.g., `header:auth:dkim` creates `header` and `header:auth`)
+- Provide direct and aggregated scores/levels
 
 ### Enrichments
 
@@ -591,7 +590,7 @@ from cyvest import Cyvest
 cv = Cyvest()
 
 # Create a check
-check = cv.check_create("domain_check", "network", "Analyze domain reputation")
+check = cv.check_create("domain_check", "Analyze domain reputation")
 
 # Link a SAFE observable
 safe_domain = cv.observable_create(cv.OBS.DOMAIN_NAME, "trusted.example.com", level=cv.LVL.SAFE)
@@ -649,10 +648,10 @@ cv.observable_add_relationship(
 Every object has a unique, deterministic key:
 
 - **Observable**: `obs:{type}:{normalized_value}`
-- **Check**: `chk:{check_id}:{scope}`
+- **Check**: `chk:{check_name}`
 - **Threat Intel**: `ti:{source}:{observable_key}`
 - **Enrichment**: `enr:{name}[:{context_hash}]`
-- **Container**: `ctr:{path}`
+- **Tag**: `tag:{name}`
 
 Keys enable:
 - Fast object retrieval
@@ -665,8 +664,7 @@ The facade getters accept either keys or component parameters:
 obs = cv.observable_get(cv.OBS.URL, "https://malicious.com")
 obs_by_key = cv.observable_get("obs:url:https://malicious.com")
 
-check = cv.check_get("malware_detection", "endpoint")
-check_by_key = cv.check_get("chk:malware_detection:endpoint")
+check = cv.check_get("chk:malware_detection")
 ```
 
 Low-level `Investigation` getters accept keys only; use the facade for component-based lookups.
@@ -717,8 +715,8 @@ cv.observable_add_threat_intel(child.key, "urlscan", score=Decimal("5.0"))
 cv.relationship_add(root.key, child.key, cv.REL.RELATED_TO, direction=cv.DIR.OUTBOUND)
 
 # Create check for root
-check = cv.check_create("root-check", "validation")
-cv.check_link_observable(check.check_id, root.key)
+check = cv.check_create("root-check", "Validation check")
+cv.check_link_observable(check.key, root.key)
 
 # Results (MAX mode):
 # - root.score = max(9.0 TI, 5.0 child) = 9.0
@@ -742,7 +740,7 @@ stats = cv.get_statistics()
 stats['total_observables']
 stats['observables_by_type']
 stats['observables_by_level']
-stats['checks_by_scope']
+stats['checks_by_level']
 stats['total_threat_intel']
 ```
 
@@ -811,7 +809,7 @@ inv1.merge_investigation(inv2)
 - **Checks**: Higher score/level wins, observables merge by key (not identity)
 - **Threat Intel**: Higher score/level wins, taxonomies merge by name (incoming replaces same name)
 - **Enrichments**: Deep merge of data dictionaries
-- **Containers**: Recursive merge of checks and sub-containers
+- **Tags**: Merge of checks, hierarchy auto-reconstructed from names
 
 ## Next Steps
 

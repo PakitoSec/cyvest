@@ -10,7 +10,7 @@ from __future__ import annotations
 from collections import defaultdict
 
 from cyvest.levels import Level
-from cyvest.model import Check, Container, Observable, ThreatIntel
+from cyvest.model import Check, Observable, Tag, ThreatIntel
 from cyvest.model_schema import StatisticsSchema
 
 
@@ -27,7 +27,7 @@ class InvestigationStats:
         self._observables: dict[str, Observable] = {}
         self._checks: dict[str, Check] = {}
         self._threat_intels: dict[str, ThreatIntel] = {}
-        self._containers: dict[str, Container] = {}
+        self._tags: dict[str, Tag] = {}
 
     def register_observable(self, observable: Observable) -> None:
         """
@@ -56,14 +56,14 @@ class InvestigationStats:
         """
         self._threat_intels[ti.key] = ti
 
-    def register_container(self, container: Container) -> None:
+    def register_tag(self, tag: Tag) -> None:
         """
-        Register a container for statistics tracking.
+        Register a tag for statistics tracking.
 
         Args:
-            container: Container to track
+            tag: Tag to track
         """
-        self._containers[container.key] = container
+        self._tags[tag.key] = tag
 
     def get_observable_count_by_type(self) -> dict[str, int]:
         """
@@ -142,30 +142,6 @@ class InvestigationStats:
         """
         return sum(1 for obs in self._observables.values() if obs.whitelisted)
 
-    def get_check_count_by_scope(self) -> dict[str, int]:
-        """
-        Get count of checks by scope.
-
-        Returns:
-            Dictionary mapping scope to count
-        """
-        counts: dict[str, int] = defaultdict(int)
-        for check in self._checks.values():
-            counts[check.scope] += 1
-        return dict(counts)
-
-    def get_check_keys_by_scope(self) -> dict[str, list[str]]:
-        """
-        Get check keys grouped by scope.
-
-        Returns:
-            Dictionary mapping scope to list of check keys
-        """
-        keys: dict[str, list[str]] = defaultdict(list)
-        for check in self._checks.values():
-            keys[check.scope].append(check.key)
-        return dict(keys)
-
     def get_check_count_by_level(self) -> dict[Level, int]:
         """
         Get count of checks by level.
@@ -241,14 +217,14 @@ class InvestigationStats:
             counts[ti.level] += 1
         return dict(counts)
 
-    def get_container_count(self) -> int:
+    def get_tag_count(self) -> int:
         """
-        Get total number of containers.
+        Get total number of tags.
 
         Returns:
-            Total container count
+            Total tag count
         """
-        return len(self._containers)
+        return len(self._tags)
 
     def get_checks_by_level(self, level: Level) -> list[Check]:
         """
@@ -307,10 +283,9 @@ class InvestigationStats:
             },
             total_checks=self.get_total_check_count(),
             applied_checks=self.get_applied_check_count(),
-            checks_by_scope=self.get_check_keys_by_scope(),
             checks_by_level={str(k): v for k, v in self.get_check_keys_by_level().items()},
             total_threat_intel=self.get_threat_intel_count(),
             threat_intel_by_source=self.get_threat_intel_count_by_source(),
             threat_intel_by_level={str(k): v for k, v in self.get_threat_intel_count_by_level().items()},
-            total_containers=self.get_container_count(),
+            total_tags=self.get_tag_count(),
         )

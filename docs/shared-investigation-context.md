@@ -128,19 +128,18 @@ if domain:
     )
 ```
 
-##### `check_get(check_id: str, scope: str) -> Check | None`
-Retrieves a shared check by ID and scope.
+##### `check_get(check_name: str) -> Check | None`
+Retrieves a shared check by name.
 
 **Parameters:**
-- `check_id`: Check identifier
-- `scope`: Check scope
+- `check_name`: Check name
 
 **Returns:** Deep copy of the check, or `None` if not found
 
 **Examples:**
 ```python
-from_check = shared_context.check_get("from", "header")
-malware_check = shared_context.check_get("malware_scan", "attachment")
+from_check = shared_context.check_get("from_verification")
+malware_check = shared_context.check_get("malware_scan")
 ```
 
 ##### Existence checks
@@ -152,13 +151,13 @@ Returns whether the underlying investigation has whitelist entries.
 ##### `get_global_level() -> Level`
 Returns the global level of the underlying investigation.
 
-##### `io_to_markdown(include_containers: bool = False, include_enrichments: bool = False, include_observables: bool = True) -> str`
+##### `io_to_markdown(include_tags: bool = False, include_enrichments: bool = False, include_observables: bool = True) -> str`
 Generate a Markdown report of the shared investigation with optional sections.
 
 Thread-safe: Uses lock to ensure consistent read of investigation state.
 
 **Parameters:**
-- `include_containers`: Include containers section in the report (default: `False`)
+- `include_tags`: Include tags section in the report (default: `False`)
 - `include_enrichments`: Include enrichments section in the report (default: `False`)
 - `include_observables`: Include observables section in the report (default: `True`)
 
@@ -171,14 +170,14 @@ markdown = shared.io_to_markdown()
 print(markdown)
 ```
 
-##### `io_save_markdown(filepath: str | Path, include_containers: bool = False, include_enrichments: bool = False, include_observables: bool = True) -> str`
+##### `io_save_markdown(filepath: str | Path, include_tags: bool = False, include_enrichments: bool = False, include_observables: bool = True) -> str`
 Save the shared investigation as a Markdown report.
 
 Thread-safe: Uses lock to ensure consistent read. Relative paths are converted to absolute paths.
 
 **Parameters:**
 - `filepath`: Path to save the Markdown file (relative or absolute)
-- `include_containers`: Include containers section in the report (default: `False`)
+- `include_tags`: Include tags section in the report (default: `False`)
 - `include_enrichments`: Include enrichments section in the report (default: `False`)
 - `include_observables`: Include observables section in the report (default: `True`)
 

@@ -73,11 +73,11 @@ def test_auto_reconcile_on_context_exit():
 
     with shared.create_cyvest() as cy:
         cy.observable(Cyvest.OBS.EMAIL, "user@domain.com")
-        cy.check("email_check", "header", "Test check")
+        cy.check("email_check", "Test check")
 
     # After exiting context, observable should be in registry
     assert "obs:email:user@domain.com" in shared._observable_registry
-    assert "chk:email_check:header" in shared._check_registry
+    assert "chk:email_check" in shared._check_registry
 
 
 def test_manual_reconcile():
@@ -88,14 +88,14 @@ def test_manual_reconcile():
     # Create Cyvest without auto-reconcile
     cy = Cyvest({"test": "data"}, root_type=Cyvest.OBS.ARTIFACT)
     cy.observable(Cyvest.OBS.DOMAIN, "example.com")
-    cy.check("domain_check", "network", "Test")
+    cy.check("domain_check", "Test")
 
     # Manually reconcile
     shared.reconcile(cy)
 
     # Should be in registry
     assert "obs:domain:example.com" in shared._observable_registry
-    assert "chk:domain_check:network" in shared._check_registry
+    assert "chk:domain_check" in shared._check_registry
 
 
 def test_get_observable():
@@ -132,15 +132,14 @@ def test_get_check():
     shared = SharedInvestigationContext(root_cy)
 
     with shared.create_cyvest() as cy:
-        original = cy.check("test_check", "scope", "Description")
+        original = cy.check("test_check", "Description")
         original_check = cy._investigation.get_check(original.key)
 
     # Retrieve check
-    retrieved = shared.check_get("test_check", "scope")
+    retrieved = shared.check_get("test_check")
 
     assert retrieved is not None
-    assert retrieved.check_id == "test_check"
-    assert retrieved.scope == "scope"
+    assert retrieved.check_name == "test_check"
     # Should be a deep copy
     assert retrieved is not original_check
 
@@ -163,10 +162,10 @@ def test_has_check():
     shared = SharedInvestigationContext(root_cy)
 
     with shared.create_cyvest() as cy:
-        cy.check("my_check", "category", "Description")
+        cy.check("my_check", "Description")
 
-    assert shared.check_get("my_check", "category") is not None
-    assert shared.check_get("other_check", "category") is None
+    assert shared.check_get("my_check") is not None
+    assert shared.check_get("other_check") is None
 
 
 def test_list_observables():
@@ -191,11 +190,11 @@ def test_list_checks():
     shared = SharedInvestigationContext(root_cy)
 
     with shared.create_cyvest() as cy:
-        cy.check("check1", "scope1", "Description 1")
-        cy.check("check2", "scope2", "Description 2")
+        cy.check("check1", "Description 1")
+        cy.check("check2", "Description 2")
 
-    assert shared.check_get("check1", "scope1") is not None
-    assert shared.check_get("check2", "scope2") is not None
+    assert shared.check_get("check1") is not None
+    assert shared.check_get("check2") is not None
 
 
 def test_observable_get_and_list_observables():
@@ -388,7 +387,7 @@ def test_shared_context_with_checks_and_observables():
         email_obs = cy.observable(Cyvest.OBS.EMAIL, data["email"])
         email_obs.with_ti("EmailRep", Decimal("7.0"))
 
-        check = cy.check("email_analysis", "header", "Analyze sender")
+        check = cy.check("email_analysis", "Analyze sender")
         check.link_observable(email_obs)
 
     # Task 2: Analyze URL, reference email check
@@ -398,11 +397,11 @@ def test_shared_context_with_checks_and_observables():
         url_obs.with_ti("VT", Decimal("9.0"))
 
         # Verify we can see the email check
-        email_check = shared.check_get("email_analysis", "header")
+        email_check = shared.check_get("email_analysis")
         assert email_check is not None
-        assert email_check.check_id == "email_analysis"
+        assert email_check.check_name == "email_analysis"
 
-        check = cy.check("url_analysis", "body", "Analyze malicious URL")
+        check = cy.check("url_analysis", "Analyze malicious URL")
         check.link_observable(url_obs)
 
     # Verify final state
@@ -410,8 +409,8 @@ def test_shared_context_with_checks_and_observables():
     assert len(shared._check_registry) == 2
     assert shared.observable_get(Cyvest.OBS.EMAIL, "phishing@malicious.com") is not None
     assert shared.observable_get(Cyvest.OBS.URL, "https://malicious.com/payload") is not None
-    assert shared.check_get("email_analysis", "header") is not None
-    assert shared.check_get("url_analysis", "body") is not None
+    assert shared.check_get("email_analysis") is not None
+    assert shared.check_get("url_analysis") is not None
 
 
 def test_deep_copy_prevents_modification():
@@ -453,20 +452,17 @@ def test_observable_get_with_parameters():
 
 
 def test_check_get_with_parameters():
-    """Test check_get using check_id and scope parameters."""
+    """Test check_get using check_name parameter."""
     root_cy = Cyvest({"test": "data"}, root_type=Cyvest.OBS.ARTIFACT)
     shared = SharedInvestigationContext(root_cy)
 
     with shared.create_cyvest() as cy:
-        cy.check("malware_scan", "attachment", "Scan for malware")
+        cy.check("malware_scan", "Scan for malware")
 
     # Test parameter-based lookup
-    check = shared.check_get("malware_scan", "attachment")
+    check = shared.check_get("malware_scan")
     assert check is not None
-    assert check.check_id == "malware_scan"
-    assert check.scope == "attachment"
-
-    assert check.check_id == "malware_scan"
+    assert check.check_name == "malware_scan"
 
 
 def test_existence_checks_via_getters():
@@ -476,12 +472,12 @@ def test_existence_checks_via_getters():
 
     with shared.create_cyvest() as cy:
         cy.observable(Cyvest.OBS.DOMAIN, "malicious.com")
-        cy.check("url_reputation", "body", "Check URL reputation")
+        cy.check("url_reputation", "Check URL reputation")
 
     assert shared.observable_get(Cyvest.OBS.DOMAIN, "malicious.com") is not None
     assert shared.observable_get(Cyvest.OBS.DOMAIN, "safe.com") is None
-    assert shared.check_get("url_reputation", "body") is not None
-    assert shared.check_get("email_reputation", "header") is None
+    assert shared.check_get("url_reputation") is not None
+    assert shared.check_get("email_reputation") is None
 
 
 def test_cyvest_get_observable_with_parameters():
@@ -499,16 +495,16 @@ def test_cyvest_get_observable_with_parameters():
 
 
 def test_cyvest_get_check_with_parameters():
-    """Test Cyvest.check_get using parameters for API consistency."""
+    """Test Cyvest.check_get using key for lookup."""
     cy = Cyvest({"test": "data"}, root_type=Cyvest.OBS.ARTIFACT)
-    check_proxy = cy.check("dns_lookup", "network", "DNS reputation check")
+    check_proxy = cy.check("dns_lookup", "DNS reputation check")
 
-    # Test parameter-based lookup
-    check = cy.check_get("dns_lookup", "network")
+    # Test key-based lookup
+    check = cy.check_get(check_proxy.key)
     assert check is not None
-    assert check.check_id == "dns_lookup"
+    assert check.check_name == "dns_lookup"
 
-    # Test key-based lookup (backward compatibility)
+    # Test key-based lookup (same method)
     check_key = cy.check_get(check_proxy.key)
     assert check_key is not None
 
@@ -545,7 +541,7 @@ def test_getters_invalid_arguments_raise_typeerror():
         shared.observable_get("type", "value", "extra")  # type: ignore[arg-type]
 
     with pytest.raises(TypeError):
-        shared.check_get("id")  # type: ignore[arg-type]
+        shared.check_get("id", "extra")  # type: ignore[arg-type]
 
 
 def test_parameter_based_api_in_parallel_tasks():
@@ -556,14 +552,14 @@ def test_parameter_based_api_in_parallel_tasks():
     def task1(shared_ctx):
         with shared_ctx.create_cyvest() as cy:
             cy.observable(Cyvest.OBS.EMAIL, "sender@malicious.com").with_ti("EmailRep", Decimal("8.0"))
-            cy.check("sender_check", "header", "Analyze sender")
+            cy.check("sender_check", "Analyze sender")
 
     def task2(shared_ctx):
         with shared_ctx.create_cyvest() as cy:
             # Use parameter-based lookup to get observable from task1
             sender = shared_ctx.observable_get(Cyvest.OBS.EMAIL, "sender@malicious.com")
             if sender and sender.score > 5:
-                cy.check("high_risk_sender", "risk", "High risk detected").with_score(Decimal("9.0"))
+                cy.check("high_risk_sender", "High risk detected").with_score(Decimal("9.0"))
 
     # Execute tasks in parallel
     with ThreadPoolExecutor(max_workers=2) as executor:
@@ -574,8 +570,8 @@ def test_parameter_based_api_in_parallel_tasks():
 
     # Verify both tasks completed and parameter-based lookups worked
     assert shared.observable_get(Cyvest.OBS.EMAIL, "sender@malicious.com") is not None
-    assert shared.check_get("sender_check", "header") is not None
-    assert shared.check_get("high_risk_sender", "risk") is not None
+    assert shared.check_get("sender_check") is not None
+    assert shared.check_get("high_risk_sender") is not None
 
     sender_obs = shared.observable_get(Cyvest.OBS.EMAIL, "sender@malicious.com")
     assert sender_obs.score >= Decimal("8.0")
@@ -689,12 +685,12 @@ def test_async_context_manager_auto_reconcile():
     async def run():
         async with shared.create_cyvest() as cy:
             cy.observable(Cyvest.OBS.EMAIL, "async@domain.com")
-            cy.check("async_check", "scope", "Async check")
+            cy.check("async_check", "Async check")
 
     asyncio.run(run())
 
     assert shared.observable_get(Cyvest.OBS.EMAIL, "async@domain.com") is not None
-    assert shared.check_get("async_check", "scope") is not None
+    assert shared.check_get("async_check") is not None
 
 
 def test_areconcile_and_observable_aget():
@@ -949,7 +945,7 @@ def test_get_global_score():
     assert initial_score == Decimal("0")
 
     with shared.create_cyvest() as cy:
-        cy.check("test", "test", description="test").link_observable(cy.root(), propagation_mode="GLOBAL")
+        cy.check("test", description="test").link_observable(cy.root(), propagation_mode="GLOBAL")
 
     # Directly add threat to main investigation's root
     root = inv.get_root()
@@ -982,7 +978,7 @@ def test_get_global_level_reflects_main_investigation():
     assert shared.get_global_level() == Cyvest.LVL.INFO
 
     with shared.create_cyvest() as cy:
-        cy.check("c1", "s1", "desc").with_score(Decimal("10"))
+        cy.check("c1", "desc").with_score(Decimal("10"))
 
     assert shared.get_global_level() == Cyvest.LVL.MALICIOUS
 
@@ -1076,7 +1072,7 @@ def test_io_to_invest_basic():
 
     with shared.create_cyvest() as cy:
         cy.observable(Cyvest.OBS.IPV4, "192.168.1.1").with_ti("SEKOIA", Decimal("6.0"))
-        cy.check("ip_reputation", "network", "Check IP reputation").with_score(Decimal("5.0"))
+        cy.check("ip_reputation", "Check IP reputation").with_score(Decimal("5.0"))
 
     schema = shared.io_to_invest()
 
@@ -1088,7 +1084,7 @@ def test_io_to_invest_basic():
     assert hasattr(schema, "checks")
     assert hasattr(schema, "stats")
     assert "obs:ipv4:192.168.1.1" in schema.observables
-    assert "network" in schema.checks  # checks are grouped by scope
+    assert "chk:ip_reputation" in schema.checks  # checks keyed by key
 
 
 def test_io_save_json_creates_file(tmp_path):
@@ -1098,7 +1094,7 @@ def test_io_save_json_creates_file(tmp_path):
 
     with shared.create_cyvest() as cy:
         cy.observable(Cyvest.OBS.URL, "https://malicious.com/payload").with_ti("VT", Decimal("10.0"))
-        cy.check("url_check", "body", "Analyze URL")
+        cy.check("url_check", "Analyze URL")
 
     filepath = tmp_path / "shared_investigation.json"
     result_path = shared.io_save_json(filepath)
@@ -1287,10 +1283,8 @@ def test_export_comprehensive_investigation(tmp_path):
         url_obs.relate_to(domain_obs, Cyvest.REL.RELATED_TO)
 
         # Checks
-        cy.check("sender_reputation", "header", "High risk sender detected").link_observable(email_obs).with_score(
-            Decimal("8.5")
-        )
-        cy.check("url_analysis", "body", "Malicious URL detected").link_observable(url_obs).with_score(Decimal("9.0"))
+        cy.check("sender_reputation", "High risk sender detected").link_observable(email_obs).with_score(Decimal("8.5"))
+        cy.check("url_analysis", "Malicious URL detected").link_observable(url_obs).with_score(Decimal("9.0"))
 
         # Enrichments
         cy.enrichment_create("whois", {"registrar": "Evil Registrar", "created": "2024-01-01"}, context="evil.com")
@@ -1318,8 +1312,8 @@ def test_export_comprehensive_investigation(tmp_path):
 
     # Verify schema structure
     assert len(schema.observables) >= 4  # 3 created + 1 root
-    assert "header" in schema.checks  # checks grouped by scope
-    assert "body" in schema.checks
+    assert "chk:sender_reputation" in schema.checks  # checks keyed by key
+    assert "chk:url_analysis" in schema.checks
     assert len(schema.enrichments) == 2
 
     # Verify files exist and are valid
@@ -1368,7 +1362,7 @@ def test_export_parallel_updates(tmp_path):
     def create_observable(index: int):
         with shared.create_cyvest() as cy:
             cy.observable(Cyvest.OBS.IPV4, f"10.0.0.{index}")
-            cy.check(f"check_{index}", "scope", f"Check {index}")
+            cy.check(f"check_{index}", f"Check {index}")
 
     with ThreadPoolExecutor(max_workers=5) as executor:
         futures = [executor.submit(create_observable, i) for i in range(10)]
@@ -1378,7 +1372,7 @@ def test_export_parallel_updates(tmp_path):
     # Export should capture all observables and checks
     schema = shared.io_to_invest()
     assert len(schema.observables) == 11  # 10 created + 1 root
-    assert len(schema.stats.checks_by_scope["scope"]) == 10
+    assert schema.stats.total_checks == 10
 
     # Save and verify
     json_path = tmp_path / "parallel.json"

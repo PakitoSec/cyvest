@@ -1,7 +1,7 @@
 from cyvest import Cyvest
 from cyvest.io_serialization import load_investigation_json
 from cyvest.levels import Level
-from cyvest.model import Container, Enrichment, Observable, ObservableType
+from cyvest.model import Enrichment, Observable, ObservableType, Tag
 from cyvest.score import ScoreMode
 
 
@@ -34,45 +34,45 @@ def test_serialization_preserves_whitelisted_flag(tmp_path) -> None:
     assert any(entry.identifier == "wl-1" and entry.justification == "FP justification" for entry in whitelists)
 
 
-def test_markdown_excludes_containers_by_default() -> None:
-    """Test that containers section is excluded by default in markdown report."""
+def test_markdown_excludes_tags_by_default() -> None:
+    """Test that tags section is excluded by default in markdown report."""
     cv = Cyvest()
 
     # Add an observable
     obs = Observable(obs_type=ObservableType.DOMAIN, value="example.com", level=Level.INFO)
     cv._investigation.add_observable(obs)
 
-    # Add a container
-    container = Container(path="/test/container", description="Test container")
-    cv._investigation.add_container(container)
+    # Add a tag
+    tag = Tag(name="test:tag", description="Test tag")
+    cv._investigation.add_tag(tag)
 
-    # Generate markdown without include_containers
+    # Generate markdown without include_tags
     markdown = cv.io_to_markdown()
 
-    # Verify containers section is not present
-    assert "## Containers" not in markdown
-    assert "/test/container" not in markdown
+    # Verify tags section is not present
+    assert "## Tags" not in markdown
+    assert "test:tag" not in markdown
 
 
-def test_markdown_includes_containers_when_enabled() -> None:
-    """Test that containers section is included when include_containers=True."""
+def test_markdown_includes_tags_when_enabled() -> None:
+    """Test that tags section is included when include_tags=True."""
     cv = Cyvest()
 
     # Add an observable
     obs = Observable(obs_type=ObservableType.DOMAIN, value="example.com", level=Level.INFO)
     cv._investigation.add_observable(obs)
 
-    # Add a container
-    container = Container(path="/test/container", description="Test container")
-    cv._investigation.add_container(container)
+    # Add a tag
+    tag = Tag(name="test:tag", description="Test tag")
+    cv._investigation.add_tag(tag)
 
-    # Generate markdown with include_containers=True
-    markdown = cv.io_to_markdown(include_containers=True)
+    # Generate markdown with include_tags=True
+    markdown = cv.io_to_markdown(include_tags=True)
 
-    # Verify containers section is present
-    assert "## Containers" in markdown
-    assert "/test/container" in markdown
-    assert "Test container" in markdown
+    # Verify tags section is present
+    assert "## Tags" in markdown
+    assert "test:tag" in markdown
+    assert "Test tag" in markdown
 
 
 def test_markdown_excludes_enrichments_by_default() -> None:
@@ -164,12 +164,12 @@ def test_markdown_wrapper_methods_support_optional_parameters() -> None:
     """Test that Cyvest wrapper methods support optional parameters."""
     cv = Cyvest()
 
-    # Add observable, container, and enrichment
+    # Add observable, tag, and enrichment
     obs = Observable(obs_type=ObservableType.DOMAIN, value="example.com", level=Level.INFO)
     cv._investigation.add_observable(obs)
 
-    container = Container(path="/test", description="Test")
-    cv._investigation.add_container(container)
+    tag = Tag(name="test", description="Test")
+    cv._investigation.add_tag(tag)
 
     enrichment = Enrichment(name="Test", data={})
     cv._investigation.add_enrichment(enrichment)
@@ -177,22 +177,22 @@ def test_markdown_wrapper_methods_support_optional_parameters() -> None:
     # Test default behavior (excludes both)
     markdown_default = cv.io_to_markdown()
     assert "## Observables" in markdown_default
-    assert "## Containers" not in markdown_default
+    assert "## Tags" not in markdown_default
     assert "## Enrichments" not in markdown_default
 
-    # Test with containers enabled
-    markdown_containers = cv.io_to_markdown(include_containers=True)
-    assert "## Containers" in markdown_containers
-    assert "## Enrichments" not in markdown_containers
+    # Test with tags enabled
+    markdown_tags = cv.io_to_markdown(include_tags=True)
+    assert "## Tags" in markdown_tags
+    assert "## Enrichments" not in markdown_tags
 
     # Test with enrichments enabled
     markdown_enrichments = cv.io_to_markdown(include_enrichments=True)
-    assert "## Containers" not in markdown_enrichments
+    assert "## Tags" not in markdown_enrichments
     assert "## Enrichments" in markdown_enrichments
 
     # Test with both enabled
-    markdown_both = cv.io_to_markdown(include_containers=True, include_enrichments=True)
-    assert "## Containers" in markdown_both
+    markdown_both = cv.io_to_markdown(include_tags=True, include_enrichments=True)
+    assert "## Tags" in markdown_both
     assert "## Enrichments" in markdown_both
 
     # Test with observables disabled

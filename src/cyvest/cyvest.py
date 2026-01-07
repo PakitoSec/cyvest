@@ -29,10 +29,10 @@ from cyvest.io_serialization import (
     serialize_investigation,
 )
 from cyvest.levels import Level
-from cyvest.model import Check, Container, Enrichment, Observable, Taxonomy, ThreatIntel
+from cyvest.model import Check, Enrichment, Observable, Tag, Taxonomy, ThreatIntel
 from cyvest.model_enums import ObservableType, PropagationMode, RelationshipDirection, RelationshipType
 from cyvest.model_schema import InvestigationSchema, StatisticsSchema
-from cyvest.proxies import CheckProxy, ContainerProxy, EnrichmentProxy, ObservableProxy, ThreatIntelProxy
+from cyvest.proxies import CheckProxy, EnrichmentProxy, ObservableProxy, TagProxy, ThreatIntelProxy
 from cyvest.score import ScoreMode
 
 if TYPE_CHECKING:
@@ -44,7 +44,7 @@ class Cyvest:
     High-level facade for building and managing cybersecurity investigations.
 
     Provides methods for creating observables, checks, threat intel, enrichments,
-    and containers, with automatic score propagation and statistics tracking.
+    and tags, with automatic score propagation and statistics tracking.
     """
 
     OBS: Final[type[ObservableType]] = ObservableType
@@ -130,10 +130,10 @@ class Cyvest:
             return None
         return CheckProxy(self._investigation, check.key)
 
-    def _container_proxy(self, container: Container | None) -> ContainerProxy | None:
-        if container is None:
+    def _tag_proxy(self, tag: Tag | None) -> TagProxy | None:
+        if tag is None:
             return None
-        return ContainerProxy(self._investigation, container.key)
+        return TagProxy(self._investigation, tag.key)
 
     def _threat_intel_proxy(self, ti: ThreatIntel | None) -> ThreatIntelProxy | None:
         if ti is None:
@@ -581,8 +581,7 @@ class Cyvest:
 
     def check_create(
         self,
-        check_id: str,
-        scope: str,
+        check_name: str,
         description: str,
         comment: str = "",
         extra: dict[str, Any] | None = None,
@@ -593,8 +592,7 @@ class Cyvest:
         Create a new check.
 
         Args:
-            check_id: Check identifier
-            scope: Check scope
+            check_name: Check name
             description: Check description
             comment: Optional comment
             extra: Optional extra data
@@ -605,8 +603,7 @@ class Cyvest:
             The created check
         """
         check_kwargs: dict[str, Any] = {
-            "check_id": check_id,
-            "scope": scope,
+            "check_name": check_name,
             "description": description,
             "comment": comment,
             "extra": extra or {},
@@ -619,55 +616,16 @@ class Cyvest:
         check = Check(**check_kwargs)
         return self._check_proxy(self._investigation.add_check(check))
 
-    @overload
     def check_get(self, key: str) -> CheckProxy | None:
-        """Get a check by full key string."""
-        ...
-
-    @overload
-    def check_get(self, check_id: str, scope: str) -> CheckProxy | None:
-        """Get a check by ID and scope."""
-        ...
-
-    def check_get(self, *args, **kwargs) -> CheckProxy | None:
         """
-        Get a check by key or by check ID and scope.
+        Get a check by key.
 
         Args:
-            key: Check key (single argument)
-            check_id: Check identifier (when using two arguments)
-            scope: Check scope (when using two arguments)
+            key: Check key
 
         Returns:
             Check if found, None otherwise
-
-        Raises:
-            ValueError: If arguments are invalid or key generation fails
         """
-        if kwargs:
-            if not args and set(kwargs) == {"key"}:
-                key = kwargs["key"]
-            elif not args and set(kwargs) == {"check_id", "scope"}:
-                check_id = kwargs["check_id"]
-                scope = kwargs["scope"]
-                try:
-                    key = keys.generate_check_key(check_id, scope)
-                except Exception as e:
-                    raise ValueError(
-                        f"Failed to generate check key for check_id='{check_id}', scope='{scope}': {e}"
-                    ) from e
-            else:
-                raise ValueError("check_get() accepts either (key: str) or (check_id: str, scope: str)")
-        elif len(args) == 1:
-            key = args[0]
-        elif len(args) == 2:
-            check_id, scope = args
-            try:
-                key = keys.generate_check_key(check_id, scope)
-            except Exception as e:
-                raise ValueError(f"Failed to generate check key for check_id='{check_id}', scope='{scope}': {e}") from e
-        else:
-            raise ValueError("check_get() accepts either (key: str) or (check_id: str, scope: str)")
         return self._check_proxy(self._investigation.get_check(key))
 
     def check_get_all(self) -> dict[str, CheckProxy]:
@@ -717,32 +675,37 @@ class Cyvest:
         self._investigation.apply_score_change(check, Decimal(str(score)), reason=reason)
         return self._check_proxy(check)
 
-    # Container methods
+    # Tag methods
 
-    def container_create(self, path: str, description: str = "") -> ContainerProxy:
+    def tag_create(self, name: str, description: str = "") -> TagProxy:
         """
-        Create a new container.
+        Create a new tag, automatically creating ancestor tags.
+
+        When creating a tag with a hierarchical name (using ":" delimiter),
+        ancestor tags are automatically created if they don't exist.
+        For example, creating "header:auth:dkim" will auto-create
+        "header" and "header:auth" tags.
 
         Args:
-            path: Container path
-            description: Container description
+            name: Tag name (use ":" as hierarchy delimiter)
+            description: Tag description
 
         Returns:
-            The created container
+            The created tag
         """
-        container = Container(path=path, description=description)
-        return self._container_proxy(self._investigation.add_container(container))
+        tag = Tag(name=name, description=description)
+        return self._tag_proxy(self._investigation.add_tag(tag))
 
-    def container_get(self, *args, **kwargs) -> ContainerProxy | None:
+    def tag_get(self, *args, **kwargs) -> TagProxy | None:
         """
-        Get a container by key or by path.
+        Get a tag by key or by name.
 
         Args:
-            key: Container key (single argument, prefixed with ctr:)
-            path: Container path (single argument without prefix)
+            key: Tag key (single argument, prefixed with tag:)
+            name: Tag name (single argument without prefix)
 
         Returns:
-            Container if found, None otherwise
+            Tag if found, None otherwise
 
         Raises:
             ValueError: If arguments are invalid or key generation fails
@@ -750,66 +713,62 @@ class Cyvest:
         if kwargs:
             if not args and set(kwargs) == {"key"}:
                 key = kwargs["key"]
-            elif not args and set(kwargs) == {"path"}:
-                path = kwargs["path"]
+            elif not args and set(kwargs) == {"name"}:
+                name = kwargs["name"]
                 try:
-                    key = keys.generate_container_key(path)
+                    key = keys.generate_tag_key(name)
                 except Exception as e:
-                    raise ValueError(f"Failed to generate container key for path='{path}': {e}") from e
+                    raise ValueError(f"Failed to generate tag key for name='{name}': {e}") from e
             else:
-                raise ValueError("container_get() accepts either (key: str) or (path: str)")
+                raise ValueError("tag_get() accepts either (key: str) or (name: str)")
         elif len(args) == 1:
-            key_or_path = args[0]
-            if isinstance(key_or_path, str) and key_or_path.startswith("ctr:"):
-                key = key_or_path
+            key_or_name = args[0]
+            if isinstance(key_or_name, str) and key_or_name.startswith("tag:"):
+                key = key_or_name
             else:
                 try:
-                    key = keys.generate_container_key(key_or_path)
+                    key = keys.generate_tag_key(key_or_name)
                 except Exception as e:
-                    raise ValueError(f"Failed to generate container key for path='{key_or_path}': {e}") from e
+                    raise ValueError(f"Failed to generate tag key for name='{key_or_name}': {e}") from e
         else:
-            raise ValueError("container_get() accepts either (key: str) or (path: str)")
-        return self._container_proxy(self._investigation.get_container(key))
+            raise ValueError("tag_get() accepts either (key: str) or (name: str)")
+        return self._tag_proxy(self._investigation.get_tag(key))
 
-    def container_get_all(self) -> dict[str, ContainerProxy]:
-        """Get read-only proxies for all containers."""
-        return {
-            key: ContainerProxy(self._investigation, key) for key in self._investigation.get_all_containers().keys()
-        }
+    def tag_get_all(self) -> dict[str, TagProxy]:
+        """Get read-only proxies for all tags."""
+        return {key: TagProxy(self._investigation, key) for key in self._investigation.get_all_tags().keys()}
 
-    def container_add_check(self, container_key: str, check_key: str) -> ContainerProxy:
+    def tag_add_check(self, tag_key: str, check_key: str) -> TagProxy:
         """
-        Add a check to a container.
+        Add a check to a tag.
 
         Args:
-            container_key: Key of the container
+            tag_key: Key of the tag
             check_key: Key of the check
 
         Returns:
-            The container
+            The tag
 
         Raises:
-            KeyError: If the container or check does not exist
+            KeyError: If the tag or check does not exist
         """
-        container = self._investigation.add_check_to_container(container_key, check_key)
-        return self._container_proxy(container)
+        tag = self._investigation.add_check_to_tag(tag_key, check_key)
+        return self._tag_proxy(tag)
 
-    def container_add_sub_container(self, parent_key: str, child_key: str) -> ContainerProxy:
-        """
-        Add a sub-container to a container.
+    def tag_get_children(self, tag_name: str) -> list[TagProxy]:
+        """Get direct child tags of a tag."""
+        tags = self._investigation.get_tag_children(tag_name)
+        return [TagProxy(self._investigation, t.key) for t in tags]
 
-        Args:
-            parent_key: Key of the parent container
-            child_key: Key of the child container
+    def tag_get_descendants(self, tag_name: str) -> list[TagProxy]:
+        """Get all descendant tags of a tag."""
+        tags = self._investigation.get_tag_descendants(tag_name)
+        return [TagProxy(self._investigation, t.key) for t in tags]
 
-        Returns:
-            The parent container
-
-        Raises:
-            KeyError: If the parent or child container does not exist
-        """
-        parent = self._investigation.add_sub_container(parent_key, child_key)
-        return self._container_proxy(parent)
+    def tag_get_ancestors(self, tag_name: str) -> list[TagProxy]:
+        """Get all ancestor tags of a tag."""
+        tags = self._investigation.get_tag_ancestors(tag_name)
+        return [TagProxy(self._investigation, t.key) for t in tags]
 
     # Enrichment methods
 
@@ -971,7 +930,7 @@ class Cyvest:
     def io_save_markdown(
         self,
         filepath: str | Path,
-        include_containers: bool = False,
+        include_tags: bool = False,
         include_enrichments: bool = False,
         include_observables: bool = True,
     ) -> str:
@@ -982,7 +941,7 @@ class Cyvest:
 
         Args:
             filepath: Path to save the Markdown file (relative or absolute)
-            include_containers: Include containers section in the report (default: False)
+            include_tags: Include tags section in the report (default: False)
             include_enrichments: Include enrichments section in the report (default: False)
             include_observables: Include observables section in the report (default: True)
 
@@ -999,13 +958,13 @@ class Cyvest:
             >>> print(path)  # /absolute/path/to/report.md
         """
         save_investigation_markdown(
-            self._investigation, filepath, include_containers, include_enrichments, include_observables
+            self._investigation, filepath, include_tags, include_enrichments, include_observables
         )
         return str(Path(filepath).resolve())
 
     def io_to_markdown(
         self,
-        include_containers: bool = False,
+        include_tags: bool = False,
         include_enrichments: bool = False,
         include_observables: bool = True,
     ) -> str:
@@ -1013,7 +972,7 @@ class Cyvest:
         Generate a Markdown report of the investigation.
 
         Args:
-            include_containers: Include containers section in the report (default: False)
+            include_tags: Include tags section in the report (default: False)
             include_enrichments: Include enrichments section in the report (default: False)
             include_observables: Include observables section in the report (default: True)
 
@@ -1027,9 +986,7 @@ class Cyvest:
             # Cybersecurity Investigation Report
             ...
         """
-        return generate_markdown_report(
-            self._investigation, include_containers, include_enrichments, include_observables
-        )
+        return generate_markdown_report(self._investigation, include_tags, include_enrichments, include_observables)
 
     def io_to_invest(self, *, include_audit_log: bool = True) -> InvestigationSchema:
         """
@@ -1213,8 +1170,7 @@ class Cyvest:
 
     def check(
         self,
-        check_id: str,
-        scope: str,
+        check_name: str,
         description: str,
         comment: str = "",
         extra: dict[str, Any] | None = None,
@@ -1225,8 +1181,7 @@ class Cyvest:
         Create a check with fluent helper methods.
 
         Args:
-            check_id: Check identifier
-            scope: Check scope
+            check_name: Check name
             description: Check description
             comment: Optional comment
             extra: Optional extra data
@@ -1236,20 +1191,20 @@ class Cyvest:
         Returns:
             Check proxy exposing mutation helpers for chaining
         """
-        return self.check_create(check_id, scope, description, comment, extra, score, level)
+        return self.check_create(check_name, description, comment, extra, score, level)
 
-    def container(self, path: str, description: str = "") -> ContainerProxy:
+    def tag(self, name: str, description: str = "") -> TagProxy:
         """
-        Create a container with fluent helper methods.
+        Create a tag with fluent helper methods.
 
         Args:
-            path: Container path
-            description: Container description
+            name: Tag name (use ":" as hierarchy delimiter)
+            description: Tag description
 
         Returns:
-            Container proxy exposing mutation helpers for chaining
+            Tag proxy exposing mutation helpers for chaining
         """
-        return self.container_create(path, description)
+        return self.tag_create(name, description)
 
     def root(self) -> ObservableProxy:
         """

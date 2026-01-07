@@ -1,6 +1,6 @@
 {
   "name": "@cyvest/cyvest-vis",
-  "version": "4.4.1",
+  "version": "5.0.0",
   "type": "module",
   "main": "dist/index.cjs",
   "module": "dist/index.js",

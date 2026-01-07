@@ -27,7 +27,6 @@ cv.observable_add_threat_intel(
 
 url_check = cv.check_create(
     "url_analysis",
-    "email_body",
     "Analyze URLs in email",
     score=Decimal("8.5"),
 )
@@ -65,7 +64,7 @@ url = (
 )
 
 (
-    cv.check("url_check", "analysis", "Check suspicious URL")
+    cv.check("url_check", "Check suspicious URL")
     .link_observable(url)
     .with_score(Decimal("8.5"))
 )
@@ -120,14 +119,14 @@ cv.observable_add_relationship(
 cv = Cyvest()
 with cv.container("network_analysis", "Network telemetry") as network:
     (
-        cv.check("c2_detection", "network", "Detect C2 communication")
+        cv.check("c2_detection", "Detect C2 communication")
         .in_container(network)
     )
 
     # Nesting is encouraged for larger stories
     with network.sub_container("east_dc", "East datacenter") as east:
         (
-            cv.check("ids_east", "network", "IDS signals from east DC")
+            cv.check("ids_east", "IDS signals from east DC")
             .in_container(east)
         )
 ```

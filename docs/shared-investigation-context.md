@@ -128,19 +128,18 @@ if domain:
     )
 ```
 
-##### `check_get(check_id: str, scope: str) -> Check | None`
-Retrieves a shared check by ID and scope.
+##### `check_get(check_name: str) -> Check | None`
+Retrieves a shared check by name.
 
 **Parameters:**
-- `check_id`: Check identifier
-- `scope`: Check scope
+- `check_name`: Check name
 
 **Returns:** Deep copy of the check, or `None` if not found
 
 **Examples:**
 ```python
-from_check = shared_context.check_get("from", "header")
-malware_check = shared_context.check_get("malware_scan", "attachment")
+from_check = shared_context.check_get("from_verification")
+malware_check = shared_context.check_get("malware_scan")
 ```
 
 ##### Existence checks

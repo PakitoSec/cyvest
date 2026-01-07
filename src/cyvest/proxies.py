@@ -282,12 +282,8 @@ class CheckProxy(_ReadOnlyProxy[Check]):
         return check
 
     @property
-    def check_id(self) -> str:
-        return self._read_attr("check_id")
-
-    @property
-    def scope(self) -> str:
-        return self._read_attr("scope")
+    def check_name(self) -> str:
+        return self._read_attr("check_name")
 
     @property
     def description(self) -> str:

@@ -5,7 +5,7 @@ import {
   getObservable,
   getObservableByTypeValue,
   getCheck,
-  getCheckByIdScope,
+  getCheckByName,
   getAllChecks,
   getThreatIntel,
   getThreatIntelBySourceObservable,
@@ -26,7 +26,6 @@ import {
   findObservablesByValue,
   findInternalObservables,
   findWhitelistedObservables,
-  findChecksByScope,
   findChecksByLevel,
   findChecksAtLeast,
   findThreatIntelBySource,
@@ -35,7 +34,7 @@ import {
   getObservablesForCheck,
   getHighestScoringObservables,
   getMaliciousObservables,
-  getAllScopes,
+  getAllCheckKeys,
   getAllObservableTypes,
 } from "../src";
 
@@ -133,57 +132,50 @@ function createTestInvestigation(): CyvestInvestigation {
       },
     },
     checks: {
-      network: [
-        {
-          key: "chk:ip_check:network",
-          check_id: "ip_check",
-          scope: "network",
-          description: "IP address check",
-          comment: "",
-          extra: {},
-          score: 0,
-          score_display: "0.00",
-          level: "INFO",
-          origin_investigation_id: "01HXYZTESTINVESTIGATION",
-          observable_links: [
-            {
-              observable_key: "obs:ipv4-addr:192.168.1.1",
-            },
-          ],
-        },
-      ],
-      dns: [
-        {
-          key: "chk:domain_check:dns",
-          check_id: "domain_check",
-          scope: "dns",
-          description: "Domain reputation check",
-          comment: "",
-          extra: {},
-          score: 5,
-          score_display: "5.00",
-          level: "MALICIOUS",
-          origin_investigation_id: "01HXYZTESTINVESTIGATION",
-          observable_links: [
-            {
-              observable_key: "obs:domain-name:example.com",
-            },
-          ],
-        },
-        {
-          key: "chk:dns_lookup:dns",
-          check_id: "dns_lookup",
-          scope: "dns",
-          description: "DNS lookup",
-          comment: "",
-          extra: {},
-          score: 0,
-          score_display: "0.00",
-          level: "INFO",
-          origin_investigation_id: "01HXYZTESTINVESTIGATION",
-          observable_links: [],
-        },
-      ],
+      "chk:ip_check": {
+        key: "chk:ip_check",
+        check_name: "ip_check",
+        description: "IP address check",
+        comment: "",
+        extra: {},
+        score: 0,
+        score_display: "0.00",
+        level: "INFO",
+        origin_investigation_id: "01HXYZTESTINVESTIGATION",
+        observable_links: [
+          {
+            observable_key: "obs:ipv4-addr:192.168.1.1",
+          },
+        ],
+      },
+      "chk:domain_check": {
+        key: "chk:domain_check",
+        check_name: "domain_check",
+        description: "Domain reputation check",
+        comment: "",
+        extra: {},
+        score: 5,
+        score_display: "5.00",
+        level: "MALICIOUS",
+        origin_investigation_id: "01HXYZTESTINVESTIGATION",
+        observable_links: [
+          {
+            observable_key: "obs:domain-name:example.com",
+          },
+        ],
+      },
+      "chk:dns_lookup": {
+        key: "chk:dns_lookup",
+        check_name: "dns_lookup",
+        description: "DNS lookup",
+        comment: "",
+        extra: {},
+        score: 0,
+        score_display: "0.00",
+        level: "INFO",
+        origin_investigation_id: "01HXYZTESTINVESTIGATION",
+        observable_links: [],
+      },
     },
     threat_intels: {
       "ti:virustotal:obs:domain-name:example.com": {
@@ -217,7 +209,7 @@ function createTestInvestigation(): CyvestInvestigation {
             key: "ctr:email/headers",
             path: "email/headers",
             description: "Email headers",
-            checks: ["chk:ip_check:network"],
+            checks: ["chk:ip_check"],
             sub_containers: {},
             aggregated_score: 0,
             aggregated_level: "INFO",
@@ -237,8 +229,7 @@ function createTestInvestigation(): CyvestInvestigation {
       observables_by_type_and_level: {},
       total_checks: 3,
       applied_checks: 2,
-      checks_by_scope: { network: ["chk:ip_check:network"], dns: ["chk:domain_check:dns", "chk:dns_lookup:dns"] },
-      checks_by_level: { INFO: ["chk:ip_check:network", "chk:dns_lookup:dns"], MALICIOUS: ["chk:domain_check:dns"] },
+      checks_by_level: { INFO: ["chk:ip_check", "chk:dns_lookup"], MALICIOUS: ["chk:domain_check"] },
       total_threat_intel: 1,
       threat_intel_by_source: { virustotal: 1 },
       threat_intel_by_level: { MALICIOUS: 1 },
@@ -285,17 +276,17 @@ describe("Getters", () => {
 
   describe("getCheck", () => {
     it("returns check by key", () => {
-      const check = getCheck(inv, "chk:domain_check:dns");
+      const check = getCheck(inv, "chk:domain_check");
       expect(check).toBeDefined();
-      expect(check?.check_id).toBe("domain_check");
+      expect(check?.check_name).toBe("domain_check");
     });
   });
 
-  describe("getCheckByIdScope", () => {
-    it("finds check by id and scope", () => {
-      const check = getCheckByIdScope(inv, "domain_check", "dns");
+  describe("getCheckByName", () => {
+    it("finds check by name", () => {
+      const check = getCheckByName(inv, "domain_check");
       expect(check).toBeDefined();
-      expect(check?.key).toBe("chk:domain_check:dns");
+      expect(check?.key).toBe("chk:domain_check");
     });
   });
 
@@ -419,13 +410,6 @@ describe("Finders", () => {
     });
   });
 
-  describe("findChecksByScope", () => {
-    it("finds checks in scope", () => {
-      const dnsChecks = findChecksByScope(inv, "dns");
-      expect(dnsChecks).toHaveLength(2);
-    });
-  });
-
   describe("findChecksByLevel", () => {
     it("finds checks at level", () => {
       const malicious = findChecksByLevel(inv, "MALICIOUS");
@@ -444,7 +428,7 @@ describe("Finders", () => {
     it("finds checks that reference observable", () => {
       const checks = getChecksForObservable(inv, "obs:ipv4-addr:192.168.1.1");
       expect(checks).toHaveLength(1);
-      expect(checks[0].check_id).toBe("ip_check");
+      expect(checks[0].check_name).toBe("ip_check");
     });
   });
 
@@ -461,7 +445,7 @@ describe("Finders", () => {
 
   describe("getObservablesForCheck", () => {
     it("finds observables referenced by check", () => {
-      const obs = getObservablesForCheck(inv, "chk:ip_check:network");
+      const obs = getObservablesForCheck(inv, "chk:ip_check");
       expect(obs).toHaveLength(1);
       expect(obs[0].value).toBe("192.168.1.1");
     });
@@ -482,11 +466,11 @@ describe("Finders", () => {
     });
   });
 
-  describe("getAllScopes", () => {
-    it("returns all scopes", () => {
-      const scopes = getAllScopes(inv);
-      expect(scopes).toContain("network");
-      expect(scopes).toContain("dns");
+  describe("getAllCheckKeys", () => {
+    it("returns all check keys", () => {
+      const keys = getAllCheckKeys(inv);
+      expect(keys).toContain("chk:ip_check");
+      expect(keys).toContain("chk:domain_check");
     });
   });
 

@@ -44,7 +44,6 @@ def main() -> None:
     # Create checks
     sender_check = cv.check_create(
         "sender_verification",
-        "email_headers",
         "Verify sender authenticity",
         comment="Sender domain not in known contacts. SPF check failed.",
         score=Decimal("3.5"),
@@ -52,7 +51,6 @@ def main() -> None:
 
     url_check = cv.check_create(
         "url_analysis",
-        "email_body",
         "Analyze URLs in email body",
         comment="Found phishing URL attempting to steal credentials",
         score=Decimal("8.5"),

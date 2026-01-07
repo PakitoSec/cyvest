@@ -92,8 +92,8 @@
       ],
       "key": "obs:email:noreply@dmalicious.com",
       "check_links": [
-        "chk:from-proofpoint:header",
-        "chk:from:header"
+        "chk:from",
+        "chk:from-proofpoint"
       ],
       "score_display": "5.00"
     },
@@ -156,7 +156,7 @@
       ],
       "key": "obs:email:user@company.com",
       "check_links": [
-        "chk:receiver:header"
+        "chk:receiver"
       ],
       "score_display": "0.00"
     },
@@ -181,7 +181,7 @@
       ],
       "key": "obs:url:https://virus.com/payload.exe",
       "check_links": [
-        "chk:body-url-https://virus.com/payload.exe:body"
+        "chk:body-url-https://virus.com/payload.exe"
       ],
       "score_display": "5.00"
     },
@@ -206,7 +206,7 @@
       ],
       "key": "obs:domain:virus.com",
       "check_links": [
-        "chk:body-domain-virus.com:body"
+        "chk:body-domain-virus.com"
       ],
       "score_display": "5.00"
     },
@@ -231,7 +231,7 @@
       ],
       "key": "obs:url:https://virus.com/about",
       "check_links": [
-        "chk:body-url-https://virus.com/about:body"
+        "chk:body-url-https://virus.com/about"
       ],
       "score_display": "3.00"
     },
@@ -256,7 +256,7 @@
       ],
       "key": "obs:url:https://domain.com/ok/toto",
       "check_links": [
-        "chk:body-url-https://domain.com/ok/toto:body"
+        "chk:body-url-https://domain.com/ok/toto"
       ],
       "score_display": "-1.00"
     },
@@ -281,7 +281,7 @@
       ],
       "key": "obs:domain:domain.com",
       "check_links": [
-        "chk:body-domain-domain.com:body"
+        "chk:body-domain-domain.com"
       ],
       "score_display": "0.00"
     },
@@ -332,7 +332,7 @@
       ],
       "key": "obs:file:invoice.pdf",
       "check_links": [
-        "chk:attachment-invoice.pdf:attachment"
+        "chk:attachment-invoice.pdf"
       ],
       "score_display": "10.00"
     },
@@ -355,202 +355,183 @@
     }
   },
   "checks": {
-    "header": [
-      {
-        "check_id": "from",
-        "scope": "header",
-        "description": "test email vt 10",
-        "comment": "> ok boys",
-        "extra": {},
-        "score": 2.0,
-        "level": "NOTABLE",
-        "origin_investigation_id": "fragment-emailfrom",
-        "observable_links": [
-          {
-            "observable_key": "obs:email:noreply@dmalicious.com",
-            "propagation_mode": "LOCAL_ONLY"
-          }
-        ],
-        "key": "chk:from:header",
-        "score_display": "2.00"
-      },
-      {
-        "check_id": "from-proofpoint",
-        "scope": "header",
-        "description": "test email vt 10",
-        "comment": "> ok boys",
-        "extra": {},
-        "score": 5.0,
-        "level": "MALICIOUS",
-        "origin_investigation_id": "fragment-emailfrombis",
-        "observable_links": [
-          {
-            "observable_key": "obs:email:noreply@dmalicious.com",
-            "propagation_mode": "LOCAL_ONLY"
-          }
-        ],
-        "key": "chk:from-proofpoint:header",
-        "score_display": "5.00"
-      },
-      {
-        "check_id": "receiver",
-        "scope": "header",
-        "description": "description",
-        "comment": "> receiver",
-        "extra": {},
-        "score": 0.1,
-        "level": "NOTABLE",
-        "origin_investigation_id": "fragment-emailreciever",
-        "observable_links": [
-          {
-            "observable_key": "obs:email:user@company.com",
-            "propagation_mode": "LOCAL_ONLY"
-          }
-        ],
-        "key": "chk:receiver:header",
-        "score_display": "0.10"
-      }
-    ],
-    "body": [
-      {
-        "check_id": "body-url-https://virus.com/payload.exe",
-        "scope": "body",
-        "description": "URL analysis https://virus.com/payload.exe",
-        "comment": "> score: 5",
-        "extra": {},
-        "score": 5.0,
-        "level": "MALICIOUS",
-        "origin_investigation_id": "fragment-bodiesurltask",
-        "observable_links": [
-          {
-            "observable_key": "obs:url:https://virus.com/payload.exe",
-            "propagation_mode": "LOCAL_ONLY"
-          }
-        ],
-        "key": "chk:body-url-https://virus.com/payload.exe:body",
-        "score_display": "5.00"
-      },
-      {
-        "check_id": "body-url-https://virus.com/about",
-        "scope": "body",
-        "description": "URL analysis https://virus.com/about",
-        "comment": "> score: 3",
-        "extra": {},
-        "score": 3.0,
-        "level": "SUSPICIOUS",
-        "origin_investigation_id": "fragment-bodiesurltask",
-        "observable_links": [
-          {
-            "observable_key": "obs:url:https://virus.com/about",
-            "propagation_mode": "LOCAL_ONLY"
-          }
-        ],
-        "key": "chk:body-url-https://virus.com/about:body",
-        "score_display": "3.00"
-      },
-      {
-        "check_id": "body-url-https://domain.com/ok/toto",
-        "scope": "body",
-        "description": "URL analysis https://domain.com/ok/toto",
-        "comment": "> score: -1",
-        "extra": {},
-        "score": 0.0,
-        "level": "INFO",
-        "origin_investigation_id": "fragment-bodiesurltask",
-        "observable_links": [
-          {
-            "observable_key": "obs:url:https://domain.com/ok/toto",
-            "propagation_mode": "LOCAL_ONLY"
-          }
-        ],
-        "key": "chk:body-url-https://domain.com/ok/toto:body",
-        "score_display": "0.00"
-      },
-      {
-        "check_id": "body-domain-virus.com",
-        "scope": "body",
-        "description": "Domain analysis virus.com",
-        "comment": "> score: 3",
-        "extra": {},
-        "score": 5.0,
-        "level": "MALICIOUS",
-        "origin_investigation_id": "fragment-bodiesdomaintask",
-        "observable_links": [
-          {
-            "observable_key": "obs:domain:virus.com",
-            "propagation_mode": "GLOBAL"
-          }
-        ],
-        "key": "chk:body-domain-virus.com:body",
-        "score_display": "5.00"
-      },
-      {
-        "check_id": "body-domain-domain.com",
-        "scope": "body",
-        "description": "Domain analysis domain.com",
-        "comment": "> score: 0",
-        "extra": {},
-        "score": 0.0,
-        "level": "INFO",
-        "origin_investigation_id": "fragment-bodiesdomaintask",
-        "observable_links": [
-          {
-            "observable_key": "obs:domain:domain.com",
-            "propagation_mode": "GLOBAL"
-          }
-        ],
-        "key": "chk:body-domain-domain.com:body",
-        "score_display": "0.00"
-      }
-    ],
-    "attachment": [
-      {
-        "check_id": "attachment-invoice.pdf",
-        "scope": "attachment",
-        "description": "File: invoice.pdf (1024 bytes)",
-        "comment": "> MD5: d41d8cd98f00b204e9800998ecf8427e\n> SHA256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\n> Threat score: 10",
-        "extra": {},
-        "score": 10.0,
-        "level": "MALICIOUS",
-        "origin_investigation_id": "fragment-attachmenttask",
-        "observable_links": [
-          {
-            "observable_key": "obs:file:invoice.pdf",
-            "propagation_mode": "LOCAL_ONLY"
-          }
-        ],
-        "key": "chk:attachment-invoice.pdf:attachment",
-        "score_display": "10.00"
-      }
-    ],
-    "full": [
-      {
-        "check_id": "email_risk_aggregated",
-        "scope": "full",
-        "description": "Aggregated Email Risk Assessment",
-        "comment": "> **Aggregated Risk Assessment**\n> Total risk score: 6.0\n> Indicators analyzed: 2\n>\n> **Risk Factors:**\n> - Suspicious URLs detected (max score: 5)\n> - Malicious attachment detected (score: 10)\n>\n> **Component Analysis:**\n> - Header checks: 2\n> - URL checks: 3\n> - Attachment checks: 2\n",
-        "extra": {},
-        "score": 6.0,
-        "level": "MALICIOUS",
-        "origin_investigation_id": "fragment-aggregatedrisktask",
-        "observable_links": [],
-        "key": "chk:email_risk_aggregated:full",
-        "score_display": "6.00"
-      },
-      {
-        "check_id": "ai",
-        "scope": "full",
-        "description": "ai",
-        "comment": "",
-        "extra": {},
-        "score": 0.0,
-        "level": "MALICIOUS",
-        "origin_investigation_id": "fragment-ai",
-        "observable_links": [],
-        "key": "chk:ai:full",
-        "score_display": "0.00"
-      }
-    ]
+    "chk:from": {
+      "check_name": "from",
+      "description": "test email vt 10",
+      "comment": "> ok boys",
+      "extra": {},
+      "score": 2.0,
+      "level": "NOTABLE",
+      "origin_investigation_id": "fragment-emailfrom",
+      "observable_links": [
+        {
+          "observable_key": "obs:email:noreply@dmalicious.com",
+          "propagation_mode": "LOCAL_ONLY"
+        }
+      ],
+      "key": "chk:from",
+      "score_display": "2.00"
+    },
+    "chk:from-proofpoint": {
+      "check_name": "from-proofpoint",
+      "description": "test email vt 10",
+      "comment": "> ok boys",
+      "extra": {},
+      "score": 5.0,
+      "level": "MALICIOUS",
+      "origin_investigation_id": "fragment-emailfrombis",
+      "observable_links": [
+        {
+          "observable_key": "obs:email:noreply@dmalicious.com",
+          "propagation_mode": "LOCAL_ONLY"
+        }
+      ],
+      "key": "chk:from-proofpoint",
+      "score_display": "5.00"
+    },
+    "chk:receiver": {
+      "check_name": "receiver",
+      "description": "description",
+      "comment": "> receiver",
+      "extra": {},
+      "score": 0.1,
+      "level": "NOTABLE",
+      "origin_investigation_id": "fragment-emailreciever",
+      "observable_links": [
+        {
+          "observable_key": "obs:email:user@company.com",
+          "propagation_mode": "LOCAL_ONLY"
+        }
+      ],
+      "key": "chk:receiver",
+      "score_display": "0.10"
+    },
+    "chk:body-url-https://virus.com/payload.exe": {
+      "check_name": "body-url-https://virus.com/payload.exe",
+      "description": "URL analysis https://virus.com/payload.exe",
+      "comment": "> score: 5",
+      "extra": {},
+      "score": 5.0,
+      "level": "MALICIOUS",
+      "origin_investigation_id": "fragment-bodiesurltask",
+      "observable_links": [
+        {
+          "observable_key": "obs:url:https://virus.com/payload.exe",
+          "propagation_mode": "LOCAL_ONLY"
+        }
+      ],
+      "key": "chk:body-url-https://virus.com/payload.exe",
+      "score_display": "5.00"
+    },
+    "chk:body-url-https://virus.com/about": {
+      "check_name": "body-url-https://virus.com/about",
+      "description": "URL analysis https://virus.com/about",
+      "comment": "> score: 3",
+      "extra": {},
+      "score": 3.0,
+      "level": "SUSPICIOUS",
+      "origin_investigation_id": "fragment-bodiesurltask",
+      "observable_links": [
+        {
+          "observable_key": "obs:url:https://virus.com/about",
+          "propagation_mode": "LOCAL_ONLY"
+        }
+      ],
+      "key": "chk:body-url-https://virus.com/about",
+      "score_display": "3.00"
+    },
+    "chk:body-url-https://domain.com/ok/toto": {
+      "check_name": "body-url-https://domain.com/ok/toto",
+      "description": "URL analysis https://domain.com/ok/toto",
+      "comment": "> score: -1",
+      "extra": {},
+      "score": 0.0,
+      "level": "INFO",
+      "origin_investigation_id": "fragment-bodiesurltask",
+      "observable_links": [
+        {
+          "observable_key": "obs:url:https://domain.com/ok/toto",
+          "propagation_mode": "LOCAL_ONLY"
+        }
+      ],
+      "key": "chk:body-url-https://domain.com/ok/toto",
+      "score_display": "0.00"
+    },
+    "chk:body-domain-virus.com": {
+      "check_name": "body-domain-virus.com",
+      "description": "Domain analysis virus.com",
+      "comment": "> score: 3",
+      "extra": {},
+      "score": 5.0,
+      "level": "MALICIOUS",
+      "origin_investigation_id": "fragment-bodiesdomaintask",
+      "observable_links": [
+        {
+          "observable_key": "obs:domain:virus.com",
+          "propagation_mode": "GLOBAL"
+        }
+      ],
+      "key": "chk:body-domain-virus.com",
+      "score_display": "5.00"
+    },
+    "chk:body-domain-domain.com": {
+      "check_name": "body-domain-domain.com",
+      "description": "Domain analysis domain.com",
+      "comment": "> score: 0",
+      "extra": {},
+      "score": 0.0,
+      "level": "INFO",
+      "origin_investigation_id": "fragment-bodiesdomaintask",
+      "observable_links": [
+        {
+          "observable_key": "obs:domain:domain.com",
+          "propagation_mode": "GLOBAL"
+        }
+      ],
+      "key": "chk:body-domain-domain.com",
+      "score_display": "0.00"
+    },
+    "chk:attachment-invoice.pdf": {
+      "check_name": "attachment-invoice.pdf",
+      "description": "File: invoice.pdf (1024 bytes)",
+      "comment": "> MD5: d41d8cd98f00b204e9800998ecf8427e\n> SHA256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\n> Threat score: 10",
+      "extra": {},
+      "score": 10.0,
+      "level": "MALICIOUS",
+      "origin_investigation_id": "fragment-attachmenttask",
+      "observable_links": [
+        {
+          "observable_key": "obs:file:invoice.pdf",
+          "propagation_mode": "LOCAL_ONLY"
+        }
+      ],
+      "key": "chk:attachment-invoice.pdf",
+      "score_display": "10.00"
+    },
+    "chk:email_risk_aggregated": {
+      "check_name": "email_risk_aggregated",
+      "description": "Aggregated Email Risk Assessment",
+      "comment": "> **Aggregated Risk Assessment**\n> Total risk score: 6.0\n> Indicators analyzed: 2\n>\n> **Risk Factors:**\n> - Suspicious URLs detected (max score: 5)\n> - Malicious attachment detected (score: 10)\n>\n> **Component Analysis:**\n> - Header checks: 2\n> - URL checks: 3\n> - Attachment checks: 2\n",
+      "extra": {},
+      "score": 6.0,
+      "level": "MALICIOUS",
+      "origin_investigation_id": "fragment-aggregatedrisktask",
+      "observable_links": [],
+      "key": "chk:email_risk_aggregated",
+      "score_display": "6.00"
+    },
+    "chk:ai": {
+      "check_name": "ai",
+      "description": "AI Analysis",
+      "comment": "",
+      "extra": {},
+      "score": 0.0,
+      "level": "MALICIOUS",
+      "origin_investigation_id": "fragment-ai",
+      "observable_links": [],
+      "key": "chk:ai",
+      "score_display": "0.00"
+    }
   },
   "threat_intels": {
     "ti:vt:obs:domain:dmalicious.com": {
@@ -692,9 +673,9 @@
       "path": "emails",
       "description": "",
       "checks": [
-        "chk:from:header",
-        "chk:from-proofpoint:header",
-        "chk:receiver:header"
+        "chk:from",
+        "chk:from-proofpoint",
+        "chk:receiver"
       ],
       "sub_containers": {},
       "key": "ctr:emails",
@@ -705,9 +686,9 @@
       "path": "bodies-urls",
       "description": "Bodies URLs Analysis",
       "checks": [
-        "chk:body-url-https://virus.com/payload.exe:body",
-        "chk:body-url-https://virus.com/about:body",
-        "chk:body-url-https://domain.com/ok/toto:body"
+        "chk:body-url-https://virus.com/payload.exe",
+        "chk:body-url-https://virus.com/about",
+        "chk:body-url-https://domain.com/ok/toto"
       ],
       "sub_containers": {},
       "key": "ctr:bodies-urls",
@@ -718,8 +699,8 @@
       "path": "bodies-domains",
       "description": "Bodies Domains Analysis",
       "checks": [
-        "chk:body-domain-virus.com:body",
-        "chk:body-domain-domain.com:body"
+        "chk:body-domain-virus.com",
+        "chk:body-domain-domain.com"
       ],
       "sub_containers": {},
       "key": "ctr:bodies-domains",
@@ -730,7 +711,7 @@
       "path": "attachments",
       "description": "Email Attachments Analysis",
       "checks": [
-        "chk:attachment-invoice.pdf:attachment"
+        "chk:attachment-invoice.pdf"
       ],
       "sub_containers": {},
       "key": "ctr:attachments",
@@ -741,7 +722,7 @@
       "path": "risk_assessment",
       "description": "Aggregated Risk Analysis",
       "checks": [
-        "chk:email_risk_aggregated:full"
+        "chk:email_risk_aggregated"
       ],
       "sub_containers": {},
       "key": "ctr:risk_assessment",
@@ -800,46 +781,25 @@
     },
     "total_checks": 11,
     "applied_checks": 11,
-    "checks_by_scope": {
-      "header": [
-        "chk:from:header",
-        "chk:from-proofpoint:header",
-        "chk:receiver:header"
-      ],
-      "body": [
-        "chk:body-url-https://virus.com/payload.exe:body",
-        "chk:body-url-https://virus.com/about:body",
-        "chk:body-url-https://domain.com/ok/toto:body",
-        "chk:body-domain-virus.com:body",
-        "chk:body-domain-domain.com:body"
-      ],
-      "attachment": [
-        "chk:attachment-invoice.pdf:attachment"
-      ],
-      "full": [
-        "chk:email_risk_aggregated:full",
-        "chk:ai:full"
-      ]
-    },
     "checks_by_level": {
       "NOTABLE": [
-        "chk:from:header",
-        "chk:receiver:header"
+        "chk:from",
+        "chk:receiver"
       ],
       "MALICIOUS": [
-        "chk:from-proofpoint:header",
-        "chk:body-url-https://virus.com/payload.exe:body",
-        "chk:body-domain-virus.com:body",
-        "chk:attachment-invoice.pdf:attachment",
-        "chk:email_risk_aggregated:full",
-        "chk:ai:full"
+        "chk:from-proofpoint",
+        "chk:body-url-https://virus.com/payload.exe",
+        "chk:body-domain-virus.com",
+        "chk:attachment-invoice.pdf",
+        "chk:email_risk_aggregated",
+        "chk:ai"
       ],
       "SUSPICIOUS": [
-        "chk:body-url-https://virus.com/about:body"
+        "chk:body-url-https://virus.com/about"
       ],
       "INFO": [
-        "chk:body-url-https://domain.com/ok/toto:body",
-        "chk:body-domain-domain.com:body"
+        "chk:body-url-https://domain.com/ok/toto",
+        "chk:body-domain-domain.com"
       ]
     },
     "total_threat_intel": 11,

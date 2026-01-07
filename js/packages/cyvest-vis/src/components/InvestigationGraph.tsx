@@ -126,20 +126,16 @@ function createInvestigationGraph(
   }
 
   // Add check nodes
-  // Group checks by scope for better organization
-  const allChecks: Check[] = [];
-  for (const checksForKey of Object.values(investigation.checks)) {
-    allChecks.push(...checksForKey);
-  }
+  const allChecks = Object.values(investigation.checks);
 
-  // Create unique check nodes (by check_id to avoid duplicates)
+  // Create unique check nodes (by key to avoid duplicates)
   const seenCheckIds = new Set<string>();
   for (const check of allChecks) {
     if (seenCheckIds.has(check.key)) continue;
     seenCheckIds.add(check.key);
 
     const checkNodeData: InvestigationNodeData = {
-      label: truncateLabel(check.check_id, 20),
+      label: truncateLabel(check.check_name, 20),
       nodeType: "check",
       level: check.level,
       score: check.score,

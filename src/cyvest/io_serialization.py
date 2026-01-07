@@ -43,12 +43,8 @@ def serialize_investigation(inv: Investigation, *, include_audit_log: bool = Tru
     enrichments = dict(inv.get_all_enrichments())
     containers = dict(inv.get_all_containers())
 
-    # Build checks organized by scope (resolve proxies)
-    checks_by_scope: dict[str, list[Check]] = {}
-    for check in inv.get_all_checks().values():
-        if check.scope not in checks_by_scope:
-            checks_by_scope[check.scope] = []
-        checks_by_scope[check.scope].append(check)
+    # Get all checks
+    checks = dict(inv.get_all_checks())
 
     # Get root type
     root = inv.get_root()
@@ -64,7 +60,7 @@ def serialize_investigation(inv: Investigation, *, include_audit_log: bool = Tru
         whitelists=list(inv.get_whitelists()),
         audit_log=inv.get_audit_log() if include_audit_log else None,
         observables=observables,
-        checks=checks_by_scope,
+        checks=checks,
         threat_intels=threat_intels,
         enrichments=enrichments,
         containers=containers,
@@ -150,19 +146,16 @@ def generate_markdown_report(
                 lines.append(f"  - Justification: {entry.justification}")
         lines.append("")
 
-    # Checks by Scope
-    lines.append("## Checks by Scope")
+    # Checks
+    lines.append("## Checks")
     lines.append("")
-    for scope, _count in inv.get_statistics().checks_by_scope.items():
-        lines.append(f"### {scope}")
-        lines.append("")
-        for check in inv.get_all_checks().values():
-            if check.scope == scope and check.level != Level.NONE:
-                lines.append(f"- **{check.check_id}**: Score: {check.score_display}, Level: {check.level.name}")
-                lines.append(f"  - Description: {check.description}")
-                if check.comment:
-                    lines.append(f"  - Comment: {check.comment}")
-        lines.append("")
+    for check in inv.get_all_checks().values():
+        if check.level != Level.NONE:
+            lines.append(f"- **{check.check_name}**: Score: {check.score_display}, Level: {check.level.name}")
+            lines.append(f"  - Description: {check.description}")
+            if check.comment:
+                lines.append(f"  - Comment: {check.comment}")
+    lines.append("")
 
     # Observables
     if include_observables and inv.get_all_observables():
@@ -380,35 +373,33 @@ def load_investigation_json(filepath: str | Path) -> Cyvest:
             cv._investigation.add_threat_intel(ti, observable)
 
     # Checks - leverage Pydantic model_validate
-    for scope_checks in data.get("checks", {}).values():
-        for check_info in scope_checks:
-            raw_links = check_info.get("observable_links", []) or []
-            normalized_links = []
-            for link in raw_links:
-                if isinstance(link, dict):
-                    normalized_links.append(
-                        {
-                            "observable_key": link.get("observable_key", ""),
-                            "propagation_mode": link.get("propagation_mode", "LOCAL_ONLY"),
-                        }
-                    )
-                else:
-                    normalized_links.append(link)
-            check_data = {
-                "check_id": check_info.get("check_id", ""),
-                "scope": check_info.get("scope", ""),
-                "description": check_info.get("description", ""),
-                "comment": check_info.get("comment", ""),
-                "extra": check_info.get("extra", {}),
-                "score": Decimal(str(check_info.get("score", 0))),
-                "level": check_info.get("level", "NONE"),
-                "origin_investigation_id": check_info.get("origin_investigation_id")
-                or cv._investigation.investigation_id,
-                "observable_links": normalized_links,
-                "key": check_info.get("key", ""),
-            }
-            check = Check.model_validate(check_data)
-            cv._investigation.add_check(check)
+    for check_info in data.get("checks", {}).values():
+        raw_links = check_info.get("observable_links", []) or []
+        normalized_links = []
+        for link in raw_links:
+            if isinstance(link, dict):
+                normalized_links.append(
+                    {
+                        "observable_key": link.get("observable_key", ""),
+                        "propagation_mode": link.get("propagation_mode", "LOCAL_ONLY"),
+                    }
+                )
+            else:
+                normalized_links.append(link)
+        check_data = {
+            "check_name": check_info.get("check_name", ""),
+            "description": check_info.get("description", ""),
+            "comment": check_info.get("comment", ""),
+            "extra": check_info.get("extra", {}),
+            "score": Decimal(str(check_info.get("score", 0))),
+            "level": check_info.get("level", "NONE"),
+            "origin_investigation_id": check_info.get("origin_investigation_id")
+            or cv._investigation.investigation_id,
+            "observable_links": normalized_links,
+            "key": check_info.get("key", ""),
+        }
+        check = Check.model_validate(check_data)
+        cv._investigation.add_check(check)
 
     # Enrichments - leverage Pydantic model_validate
     for enr_info in data.get("enrichments", {}).values():

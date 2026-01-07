@@ -29,10 +29,9 @@ def test_generate_observable_key() -> None:
 
 def test_generate_check_key() -> None:
     """Test check key generation."""
-    key = generate_check_key("malware_check", "endpoint")
+    key = generate_check_key("malware_check")
     assert key.startswith("chk:")
     assert "malware_check" in key
-    assert "endpoint" in key
 
 
 def test_generate_threat_intel_key() -> None:
@@ -65,7 +64,7 @@ def test_generate_container_key() -> None:
 def test_parse_key_type() -> None:
     """Test key type parsing."""
     assert parse_key_type("obs:url:example.com") == "obs"
-    assert parse_key_type("chk:test:scope") == "chk"
+    assert parse_key_type("chk:test") == "chk"
     assert parse_key_type("ti:vt:obs_key") == "ti"
     assert parse_key_type("enr:name") == "enr"
     assert parse_key_type("ctr:path") == "ctr"
@@ -77,14 +76,14 @@ def test_parse_observable_key() -> None:
     assert parse_observable_key("obs:url:example.com") == ("url", "example.com")
     assert parse_observable_key("obs:url:https://example.com/path") == ("url", "https://example.com/path")
     assert parse_observable_key("obs:url:") is None
-    assert parse_observable_key("chk:test:scope") is None
+    assert parse_observable_key("chk:test") is None
     assert parse_observable_key("invalid") is None
 
 
 def test_validate_key() -> None:
     """Test key validation."""
     assert validate_key("obs:url:example.com") is True
-    assert validate_key("chk:test:scope") is True
+    assert validate_key("chk:test") is True
     assert validate_key("ti:vt:obs_key") is True
     assert validate_key("invalid") is False
     assert validate_key("obs:url:example.com", "obs") is True
@@ -96,4 +95,4 @@ def test_key_determinism() -> None:
     # Same inputs should always produce same keys
     for _ in range(10):
         assert generate_observable_key("ipv4", "192.168.1.1") == "obs:ipv4:192.168.1.1"
-        assert generate_check_key("test", "scope") == "chk:test:scope"
+        assert generate_check_key("test") == "chk:test"

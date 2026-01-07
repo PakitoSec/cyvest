@@ -581,8 +581,7 @@ class Cyvest:
 
     def check_create(
         self,
-        check_id: str,
-        scope: str,
+        check_name: str,
         description: str,
         comment: str = "",
         extra: dict[str, Any] | None = None,
@@ -593,8 +592,7 @@ class Cyvest:
         Create a new check.
 
         Args:
-            check_id: Check identifier
-            scope: Check scope
+            check_name: Check name
             description: Check description
             comment: Optional comment
             extra: Optional extra data
@@ -605,8 +603,7 @@ class Cyvest:
             The created check
         """
         check_kwargs: dict[str, Any] = {
-            "check_id": check_id,
-            "scope": scope,
+            "check_name": check_name,
             "description": description,
             "comment": comment,
             "extra": extra or {},
@@ -619,55 +616,16 @@ class Cyvest:
         check = Check(**check_kwargs)
         return self._check_proxy(self._investigation.add_check(check))
 
-    @overload
     def check_get(self, key: str) -> CheckProxy | None:
-        """Get a check by full key string."""
-        ...
-
-    @overload
-    def check_get(self, check_id: str, scope: str) -> CheckProxy | None:
-        """Get a check by ID and scope."""
-        ...
-
-    def check_get(self, *args, **kwargs) -> CheckProxy | None:
         """
-        Get a check by key or by check ID and scope.
+        Get a check by key.
 
         Args:
-            key: Check key (single argument)
-            check_id: Check identifier (when using two arguments)
-            scope: Check scope (when using two arguments)
+            key: Check key
 
         Returns:
             Check if found, None otherwise
-
-        Raises:
-            ValueError: If arguments are invalid or key generation fails
         """
-        if kwargs:
-            if not args and set(kwargs) == {"key"}:
-                key = kwargs["key"]
-            elif not args and set(kwargs) == {"check_id", "scope"}:
-                check_id = kwargs["check_id"]
-                scope = kwargs["scope"]
-                try:
-                    key = keys.generate_check_key(check_id, scope)
-                except Exception as e:
-                    raise ValueError(
-                        f"Failed to generate check key for check_id='{check_id}', scope='{scope}': {e}"
-                    ) from e
-            else:
-                raise ValueError("check_get() accepts either (key: str) or (check_id: str, scope: str)")
-        elif len(args) == 1:
-            key = args[0]
-        elif len(args) == 2:
-            check_id, scope = args
-            try:
-                key = keys.generate_check_key(check_id, scope)
-            except Exception as e:
-                raise ValueError(f"Failed to generate check key for check_id='{check_id}', scope='{scope}': {e}") from e
-        else:
-            raise ValueError("check_get() accepts either (key: str) or (check_id: str, scope: str)")
         return self._check_proxy(self._investigation.get_check(key))
 
     def check_get_all(self) -> dict[str, CheckProxy]:
@@ -1213,8 +1171,7 @@ class Cyvest:
 
     def check(
         self,
-        check_id: str,
-        scope: str,
+        check_name: str,
         description: str,
         comment: str = "",
         extra: dict[str, Any] | None = None,
@@ -1225,8 +1182,7 @@ class Cyvest:
         Create a check with fluent helper methods.
 
         Args:
-            check_id: Check identifier
-            scope: Check scope
+            check_name: Check name
             description: Check description
             comment: Optional comment
             extra: Optional extra data
@@ -1236,7 +1192,7 @@ class Cyvest:
         Returns:
             Check proxy exposing mutation helpers for chaining
         """
-        return self.check_create(check_id, scope, description, comment, extra, score, level)
+        return self.check_create(check_name, description, comment, extra, score, level)
 
     def container(self, path: str, description: str = "") -> ContainerProxy:
         """

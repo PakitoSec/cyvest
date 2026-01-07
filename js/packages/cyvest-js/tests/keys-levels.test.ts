@@ -47,8 +47,8 @@ describe("Key Generation", () => {
 
   describe("generateCheckKey", () => {
     it("generates correct check key", () => {
-      expect(generateCheckKey("sender_verification", "email_headers")).toBe(
-        "chk:sender_verification:email_headers"
+      expect(generateCheckKey("sender_verification")).toBe(
+        "chk:sender_verification"
       );
     });
   });
@@ -153,9 +153,8 @@ describe("Key Generation", () => {
 
   describe("parseCheckKey", () => {
     it("parses check key components", () => {
-      expect(parseCheckKey("chk:sender_verification:email_headers")).toEqual({
-        checkId: "sender_verification",
-        scope: "email_headers",
+      expect(parseCheckKey("chk:sender_verification")).toEqual({
+        checkName: "sender_verification",
       });
     });
   });

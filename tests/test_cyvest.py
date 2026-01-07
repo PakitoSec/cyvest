@@ -75,8 +75,7 @@ def test_facade_getters_accept_component_parameters() -> None:
     assert cv.observable_get(cv.OBS.URL, "https://example.com") is not None
     assert cv.observable_get(obs.key) is not None
 
-    check = cv.check_create("check_id", "scope", "desc")
-    assert cv.check_get("check_id", "scope") is not None
+    check = cv.check_create("check_id", "desc")
     assert cv.check_get(check.key) is not None
 
     ctr = cv.container_create("path/to/container")
@@ -122,7 +121,7 @@ def test_string_levels_are_accepted_by_api() -> None:
     obs = cv.observable_create(Cyvest.OBS.DOMAIN, "example.com", level="safe")
     assert obs.level == Cyvest.LVL.SAFE
 
-    check = cv.check_create("string_level", "scope", "desc", level="notable")
+    check = cv.check_create("string_level", "desc", level="notable")
     assert check.level == Cyvest.LVL.NOTABLE
 
     ti = cv.observable_add_threat_intel(obs.key, source="vt", score=Decimal("5.0"), level="malicious")
@@ -136,9 +135,8 @@ def test_string_levels_are_accepted_by_api() -> None:
 def test_check_creation() -> None:
     """Test creating checks."""
     cv = Cyvest()
-    check = cv.check_create("test_check", "network", "Test description", score=Decimal("5.0"))
-    assert check.check_id == "test_check"
-    assert check.scope == "network"
+    check = cv.check_create("test_check", "Test description", score=Decimal("5.0"))
+    assert check.check_name == "test_check"
     assert check.score == Decimal("5.0")
     assert cv.check_get(check.key) is not None
 
@@ -147,7 +145,7 @@ def test_check_observable_linking() -> None:
     """Test linking observables to checks."""
     cv = Cyvest()
     obs = cv.observable_create(Cyvest.OBS.URL, "https://bad.com")
-    check = cv.check_create("url_check", "analysis", "Check URL")
+    check = cv.check_create("url_check", "Check URL")
     cv.check_link_observable(check.key, obs.key)
     assert any(link.observable_key == obs.key for link in check.observable_links)
 
@@ -163,7 +161,7 @@ def test_container_creation() -> None:
 def test_container_check_addition() -> None:
     """Test adding checks to containers."""
     cv = Cyvest()
-    check = cv.check_create("c1", "s1", "d1")
+    check = cv.check_create("c1", "d1")
     ctr = cv.container_create("test_container")
     cv.container_add_check(ctr.key, check.key)
     assert any(c.key == check.key for c in ctr.checks)
@@ -578,7 +576,7 @@ def test_io_save_load_json_roundtrip() -> None:
 
     cv.observable_add_relationship(obs1.key, obs2.key, "related-to")
 
-    check = cv.check_create("malware_check", "network", "Detected malware communication", score=Decimal("9.0"))
+    check = cv.check_create("malware_check", "Detected malware communication", score=Decimal("9.0"))
     cv.check_link_observable(check.key, obs1.key)
 
     cv.enrichment_create("whois", {"registrar": "Evil Corp"}, context="Domain registration")
@@ -608,7 +606,7 @@ def test_io_save_load_json_roundtrip() -> None:
         assert len(loaded_cv.check_get_all()) == len(cv.check_get_all())
         loaded_check = loaded_cv.check_get(check.key)
         assert loaded_check is not None
-        assert loaded_check.scope == "network"
+        assert loaded_check.check_name == "malware_check"
         assert any(link.observable_key == obs1.key for link in loaded_check.observable_links)
 
         # Verify enrichments
@@ -780,7 +778,7 @@ def test_io_to_markdown_generates_report() -> None:
     cv = Cyvest()
     obs = cv.observable_create(Cyvest.OBS.DOMAIN, "test.com", internal=False)
     cv.observable_add_threat_intel(obs.key, source="abuse.ch", score=Decimal("5.0"))
-    check = cv.check_create("domain_check", "dns", "DNS analysis", score=Decimal("4.0"), level=Cyvest.LVL.SUSPICIOUS)
+    check = cv.check_create("domain_check", "DNS analysis", score=Decimal("4.0"), level=Cyvest.LVL.SUSPICIOUS)
     cv.check_link_observable(check.key, obs.key)
 
     markdown = cv.io_to_markdown()
@@ -789,7 +787,7 @@ def test_io_to_markdown_generates_report() -> None:
     assert "# Cybersecurity Investigation Report" in markdown
     assert "## Statistics" in markdown
     assert "## Observables" in markdown
-    assert "## Checks by Scope" in markdown
+    assert "## Checks" in markdown
 
     # Verify content
     assert "test.com" in markdown

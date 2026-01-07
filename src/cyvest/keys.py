@@ -56,22 +56,20 @@ def generate_observable_key(obs_type: str, value: str) -> str:
     return f"obs:{normalized_type}:{normalized_value}"
 
 
-def generate_check_key(check_id: str, scope: str) -> str:
+def generate_check_key(check_name: str) -> str:
     """
     Generate a unique key for a check.
 
-    Format: chk:{check_id}:{scope}
+    Format: chk:{check_name}
 
     Args:
-        check_id: Identifier of the check
-        scope: Scope of the check
+        check_name: Name of the check
 
     Returns:
         Unique check key
     """
-    normalized_id = _normalize_value(check_id)
-    normalized_scope = _normalize_value(scope)
-    return f"chk:{normalized_id}:{normalized_scope}"
+    normalized_name = _normalize_value(check_name)
+    return f"chk:{normalized_name}"
 
 
 def generate_threat_intel_key(source: str, observable_key: str) -> str:

@@ -311,23 +311,23 @@ class SharedInvestigationContext:
         except Exception as e:
             raise ValueError(f"Failed to generate observable key for type='{obs_type}', value='{value}': {e}") from e
 
-    def check_get(self, check_id: str, scope: str) -> Check | None:
-        key = self._check_key(check_id, scope)
+    def check_get(self, check_name: str) -> Check | None:
+        key = self._check_key(check_name)
         return self._lock.run(self._get_check_by_key_unlocked, key)
 
-    async def check_aget(self, check_id: str, scope: str) -> Check | None:
-        key = self._check_key(check_id, scope)
+    async def check_aget(self, check_name: str) -> Check | None:
+        key = self._check_key(check_name)
         return await self._lock.arun(self._get_check_by_key_unlocked, key)
 
     def _get_check_by_key_unlocked(self, key: str) -> Check | None:
         check = self._check_registry.get(key)
         return check.model_copy(deep=True) if check else None
 
-    def _check_key(self, check_id: str, scope: str) -> str:
+    def _check_key(self, check_name: str) -> str:
         try:
-            return keys.generate_check_key(check_id, scope)
+            return keys.generate_check_key(check_name)
         except Exception as e:
-            raise ValueError(f"Failed to generate check key for check_id='{check_id}', scope='{scope}': {e}") from e
+            raise ValueError(f"Failed to generate check key for check_name='{check_name}': {e}") from e
 
     def enrichment_get(self, name: str, context: str = "") -> Enrichment | None:
         key = self._enrichment_key(name, context)

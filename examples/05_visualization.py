@@ -117,7 +117,7 @@ def main(no_audit_log: bool = False, output: Path | None = None) -> None:
 
     # Create checks linking observables
     _ = (
-        cv.check("email_analysis", "email", "Phishing email analysis")
+        cv.check("email_analysis", "Phishing email analysis")
         .link_observable(email_message)
         .link_observable(attacker_email)
         .link_observable(victim_email)
@@ -126,7 +126,7 @@ def main(no_audit_log: bool = False, output: Path | None = None) -> None:
     )
 
     _ = (
-        cv.check("url_analysis", "network", "Malicious URLs found in email")
+        cv.check("url_analysis", "Malicious URLs found in email")
         .link_observable(phishing_url1)
         .link_observable(phishing_url2)
         .with_score(9.0)
@@ -134,7 +134,7 @@ def main(no_audit_log: bool = False, output: Path | None = None) -> None:
     )
 
     _ = (
-        cv.check("infrastructure", "network", "Malicious infrastructure identified")
+        cv.check("infrastructure", "Malicious infrastructure identified")
         .link_observable(malicious_domain)
         .link_observable(malicious_ip)
         .with_score(9.5)
@@ -142,7 +142,7 @@ def main(no_audit_log: bool = False, output: Path | None = None) -> None:
     )
 
     _ = (
-        cv.check("malware_detection", "file", "Malware file analysis")
+        cv.check("malware_detection", "Malware file analysis")
         .link_observable(malware_file)
         .with_score(10.0)
         .in_container(cv.container("phishing_investigation/malware"))

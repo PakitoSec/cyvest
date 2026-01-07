@@ -78,13 +78,11 @@ def test_observable_relationships() -> None:
 def test_check_creation() -> None:
     """Test creating a check."""
     check = Check(
-        check_id="test_check",
-        scope="network",
+        check_name="test_check",
         description="Test description",
         origin_investigation_id=_ORIGIN,
     )
-    assert check.check_id == "test_check"
-    assert check.scope == "network"
+    assert check.check_name == "test_check"
     assert check.description == "Test description"
     assert check.score == Decimal("0")
     assert check.level == Level.NONE
@@ -94,14 +92,12 @@ def test_check_creation() -> None:
 def test_check_creation_with_score() -> None:
     """Test creating a check."""
     check = Check(
-        check_id="test_check",
-        scope="network",
+        check_name="test_check",
         description="Test description",
         score=0.3,
         origin_investigation_id=_ORIGIN,
     )
-    assert check.check_id == "test_check"
-    assert check.scope == "network"
+    assert check.check_name == "test_check"
     assert check.description == "Test description"
     assert check.score == Decimal("0.3")
     assert check.level == Level.NOTABLE
@@ -111,7 +107,7 @@ def test_check_creation_with_score() -> None:
 def test_check_score_update() -> None:
     """Test updating check score."""
     inv = Investigation(root_data={})
-    check = Check(check_id="test", scope="scope", description="desc", origin_investigation_id=inv.investigation_id)
+    check = Check(check_name="test", description="desc", origin_investigation_id=inv.investigation_id)
     inv.add_check(check)
     inv.apply_score_change(check, Decimal("3.5"), reason="Update reason")
     assert check.score == Decimal("3.5")
@@ -121,7 +117,7 @@ def test_check_score_update() -> None:
 def test_check_add_observable_link_upgrades_level() -> None:
     """Test that adding an effective observable link to a check with level NONE upgrades it to INFO."""
     inv = Investigation(root_data={})
-    check = Check(check_id="test", scope="scope", description="desc", origin_investigation_id=inv.investigation_id)
+    check = Check(check_name="test", description="desc", origin_investigation_id=inv.investigation_id)
     inv.add_check(check)
     assert check.level == Level.NONE  # Default level for new checks
 
@@ -138,8 +134,7 @@ def test_check_add_observable_link_preserves_higher_level() -> None:
     """Test that adding an observable link doesn't downgrade an existing higher level."""
     inv = Investigation(root_data={})
     check = Check(
-        check_id="test",
-        scope="scope",
+        check_name="test",
         description="desc",
         level=Level.SUSPICIOUS,
         origin_investigation_id=inv.investigation_id,
@@ -157,7 +152,7 @@ def test_check_add_observable_link_preserves_higher_level() -> None:
 def test_check_add_observable_link_no_duplicate() -> None:
     """Test that adding the same observable link twice doesn't create duplicates."""
     inv = Investigation(root_data={})
-    check = Check(check_id="test", scope="scope", description="desc", origin_investigation_id=inv.investigation_id)
+    check = Check(check_name="test", description="desc", origin_investigation_id=inv.investigation_id)
     inv.add_check(check)
     obs = Observable(obs_type="url", value="https://example.com")
     inv.add_observable(obs)
@@ -223,15 +218,13 @@ def test_container_aggregated_score() -> None:
     inv = Investigation(root_data={})
     ctr = inv.add_container(Container(path="test"))
     check1 = Check(
-        check_id="c1",
-        scope="s1",
+        check_name="c1",
         description="d1",
         score=Decimal("3.0"),
         origin_investigation_id=inv.investigation_id,
     )
     check2 = Check(
-        check_id="c2",
-        scope="s2",
+        check_name="c2",
         description="d2",
         score=Decimal("5.0"),
         origin_investigation_id=inv.investigation_id,
@@ -250,15 +243,13 @@ def test_container_nested_aggregation() -> None:
     parent = inv.add_container(Container(path="parent"))
     child = inv.add_container(Container(path="parent/child"))
     check1 = Check(
-        check_id="c1",
-        scope="s",
+        check_name="c1",
         description="d",
         score=Decimal("2.0"),
         origin_investigation_id=inv.investigation_id,
     )
     check2 = Check(
-        check_id="c2",
-        scope="s",
+        check_name="c2",
         description="d",
         score=Decimal("3.0"),
         origin_investigation_id=inv.investigation_id,
@@ -294,8 +285,7 @@ def test_string_level_inputs_are_normalized() -> None:
     assert obs.level == Level.MALICIOUS
 
     check = Check(
-        check_id="string_level",
-        scope="scope",
+        check_name="string_level",
         description="desc",
         level="notable",
         origin_investigation_id=inv.investigation_id,

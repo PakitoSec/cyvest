@@ -58,22 +58,20 @@ export function generateObservableKey(obsType: string, value: string): string {
 /**
  * Generate a unique key for a check.
  *
- * Format: chk:{check_id}:{scope}
+ * Format: chk:{check_name}
  *
- * @param checkId - Identifier of the check
- * @param scope - Scope of the check
+ * @param checkName - Name of the check
  * @returns Unique check key
  *
  * @example
  * ```ts
- * generateCheckKey("sender_verification", "email_headers")
- * // => "chk:sender_verification:email_headers"
+ * generateCheckKey("sender_verification")
+ * // => "chk:sender_verification"
  * ```
  */
-export function generateCheckKey(checkId: string, scope: string): string {
-  const normalizedId = normalizeValue(checkId);
-  const normalizedScope = normalizeValue(scope);
-  return `chk:${normalizedId}:${normalizedScope}`;
+export function generateCheckKey(checkName: string): string {
+  const normalizedName = normalizeValue(checkName);
+  return `chk:${normalizedName}`;
 }
 
 /**
@@ -233,25 +231,24 @@ export function parseObservableKey(
  * Extract components from a check key.
  *
  * @param key - Check key to parse
- * @returns Object with checkId and scope, or null if invalid
+ * @returns Object with checkName, or null if invalid
  *
  * @example
  * ```ts
- * parseCheckKey("chk:sender_verification:email_headers")
- * // => { checkId: "sender_verification", scope: "email_headers" }
+ * parseCheckKey("chk:sender_verification")
+ * // => { checkName: "sender_verification" }
  * ```
  */
 export function parseCheckKey(
   key: string
-): { checkId: string; scope: string } | null {
+): { checkName: string } | null {
   if (!validateKey(key, "chk")) {
     return null;
   }
   const parts = key.split(":");
-  if (parts.length >= 3) {
+  if (parts.length >= 2) {
     return {
-      checkId: parts[1],
-      scope: parts.slice(2).join(":"),
+      checkName: parts.slice(1).join(":"),
     };
   }
   return null;

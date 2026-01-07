@@ -50,7 +50,6 @@ class StatisticsSchema(BaseModel):
     observables_by_type_and_level: dict[str, dict[str, Annotated[int, Field(ge=0)]]] = Field(default_factory=dict)
     total_checks: Annotated[int, Field(ge=0)]
     applied_checks: Annotated[int, Field(ge=0)]
-    checks_by_scope: dict[str, list[str]] = Field(default_factory=dict)
     checks_by_level: dict[str, list[str]] = Field(default_factory=dict)
     total_threat_intel: Annotated[int, Field(ge=0)]
     threat_intel_by_source: dict[str, Annotated[int, Field(ge=0)]] = Field(default_factory=dict)
@@ -117,9 +116,9 @@ class InvestigationSchema(BaseModel):
         ...,
         description="Observables keyed by their unique key.",
     )
-    checks: dict[str, list[Check]] = Field(
+    checks: dict[str, Check] = Field(
         ...,
-        description="Checks organized by scope.",
+        description="Checks keyed by their unique key.",
     )
     threat_intels: dict[str, ThreatIntel] = Field(
         ...,

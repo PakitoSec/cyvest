@@ -151,8 +151,7 @@ def test_proxy_dir_exposes_public_fields() -> None:
             "key",
         },
         check: {
-            "check_id",
-            "scope",
+            "check_name",
             "description",
             "comment",
             "extra",

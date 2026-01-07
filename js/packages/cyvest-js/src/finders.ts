@@ -188,39 +188,6 @@ export function findObservablesWithThreatIntel(
 // ============================================================================
 
 /**
- * Find all checks in a specific scope.
- *
- * @param inv - The investigation to search
- * @param scope - Check scope
- * @returns Array of checks in the scope
- *
- * @example
- * ```ts
- * const emailChecks = findChecksByScope(investigation, "email_headers");
- * ```
- */
-export function findChecksByScope(
-  inv: CyvestInvestigation,
-  scope: string
-): Check[] {
-  const normalizedScope = scope.trim().toLowerCase();
-
-  // Try direct lookup first
-  if (inv.checks[scope]) {
-    return inv.checks[scope];
-  }
-
-  // Fallback to normalized search
-  for (const [key, checks] of Object.entries(inv.checks)) {
-    if (key.toLowerCase() === normalizedScope) {
-      return checks;
-    }
-  }
-
-  return [];
-}
-
-/**
  * Find all checks at a specific level.
  *
  * @param inv - The investigation to search
@@ -231,15 +198,7 @@ export function findChecksByLevel(
   inv: CyvestInvestigation,
   level: Level
 ): Check[] {
-  const result: Check[] = [];
-  for (const checks of Object.values(inv.checks)) {
-    for (const check of checks) {
-      if (check.level === level) {
-        result.push(check);
-      }
-    }
-  }
-  return result;
+  return Object.values(inv.checks).filter((check) => check.level === level);
 }
 
 /**
@@ -253,39 +212,26 @@ export function findChecksAtLeast(
   inv: CyvestInvestigation,
   minLevel: Level
 ): Check[] {
-  const result: Check[] = [];
-  for (const checks of Object.values(inv.checks)) {
-    for (const check of checks) {
-      if (isLevelAtLeast(check.level, minLevel)) {
-        result.push(check);
-      }
-    }
-  }
-  return result;
+  return Object.values(inv.checks).filter((check) =>
+    isLevelAtLeast(check.level, minLevel)
+  );
 }
 
 /**
- * Find checks by check ID (across all scopes).
+ * Find checks by check name.
  *
  * @param inv - The investigation to search
- * @param checkId - Check identifier to search for
- * @returns Array of matching checks
+ * @param checkName - Check name to search for
+ * @returns The matching check or undefined
  */
-export function findChecksByCheckId(
+export function findCheckByName(
   inv: CyvestInvestigation,
-  checkId: string
-): Check[] {
-  const normalizedId = checkId.trim().toLowerCase();
-  const result: Check[] = [];
-
-  for (const checks of Object.values(inv.checks)) {
-    for (const check of checks) {
-      if (check.check_id.toLowerCase() === normalizedId) {
-        result.push(check);
-      }
-    }
-  }
-  return result;
+  checkName: string
+): Check | undefined {
+  const normalizedName = checkName.trim().toLowerCase();
+  return Object.values(inv.checks).find(
+    (check) => check.check_name.toLowerCase() === normalizedName
+  );
 }
 
 // ============================================================================
@@ -417,18 +363,11 @@ export function getChecksForObservable(
 ): Check[] {
   const result: Check[] = [];
   const seen = new Set<string>();
-  const checkLookup = new Map<string, Check>();
-
-  for (const checks of Object.values(inv.checks)) {
-    for (const check of checks) {
-      checkLookup.set(check.key, check);
-    }
-  }
 
   const observable = inv.observables[observableKey];
   if (observable) {
     for (const checkKey of observable.check_links) {
-      const check = checkLookup.get(checkKey);
+      const check = inv.checks[checkKey];
       if (check && !seen.has(check.key)) {
         result.push(check);
         seen.add(check.key);
@@ -436,7 +375,7 @@ export function getChecksForObservable(
     }
   }
 
-  for (const check of checkLookup.values()) {
+  for (const check of Object.values(inv.checks)) {
     if (seen.has(check.key)) {
       continue;
     }
@@ -486,20 +425,16 @@ export function getObservablesForCheck(
   inv: CyvestInvestigation,
   checkKey: string
 ): Observable[] {
-  // Find the check
-  for (const checks of Object.values(inv.checks)) {
-    for (const check of checks) {
-      if (check.key === checkKey) {
-        const keys = new Set<string>();
-        for (const link of check.observable_links) {
-          keys.add(link.observable_key);
-        }
-
-        return Array.from(keys)
-          .map((obsKey) => inv.observables[obsKey])
-          .filter((obs): obs is Observable => obs !== undefined);
-      }
+  const check = inv.checks[checkKey];
+  if (check) {
+    const keys = new Set<string>();
+    for (const link of check.observable_links) {
+      keys.add(link.observable_key);
     }
+
+    return Array.from(keys)
+      .map((obsKey) => inv.observables[obsKey])
+      .filter((obs): obs is Observable => obs !== undefined);
   }
   return [];
 }
@@ -534,12 +469,9 @@ export function getChecksForContainer(
 
   function collectChecks(container: Container): void {
     for (const checkKey of container.checks) {
-      for (const checks of Object.values(inv.checks)) {
-        for (const check of checks) {
-          if (check.key === checkKey) {
-            result.push(check);
-          }
-        }
+      const check = inv.checks[checkKey];
+      if (check) {
+        result.push(check);
       }
     }
 
@@ -635,11 +567,7 @@ export function getHighestScoringChecks(
   inv: CyvestInvestigation,
   n = 10
 ): Check[] {
-  const allChecks: Check[] = [];
-  for (const checks of Object.values(inv.checks)) {
-    allChecks.push(...checks);
-  }
-  return sortChecksByScore(allChecks).slice(0, n);
+  return sortChecksByScore(Object.values(inv.checks)).slice(0, n);
 }
 
 /**
@@ -683,12 +611,12 @@ export function getSuspiciousChecks(inv: CyvestInvestigation): Check[] {
 }
 
 /**
- * Get all scopes that have checks.
+ * Get all check keys in the investigation.
  *
  * @param inv - The investigation
- * @returns Array of scope names
+ * @returns Array of check keys
  */
-export function getAllScopes(inv: CyvestInvestigation): string[] {
+export function getAllCheckKeys(inv: CyvestInvestigation): string[] {
   return Object.keys(inv.checks);
 }
 

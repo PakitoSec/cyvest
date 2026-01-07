@@ -59,7 +59,7 @@
       "relationships": [],
       "key": "obs:domain:evil-phishing.com",
       "check_links": [
-        "chk:infrastructure:network"
+        "chk:infrastructure"
       ],
       "score_display": "9.00"
     },
@@ -84,7 +84,7 @@
       ],
       "key": "obs:ipv4:185.220.101.50",
       "check_links": [
-        "chk:infrastructure:network"
+        "chk:infrastructure"
       ],
       "score_display": "9.50"
     },
@@ -149,7 +149,7 @@
       ],
       "key": "obs:email:attacker@evil-phishing.com",
       "check_links": [
-        "chk:email_analysis:email"
+        "chk:email_analysis"
       ],
       "score_display": "8.00"
     },
@@ -168,7 +168,7 @@
       "relationships": [],
       "key": "obs:email:victim@company.com",
       "check_links": [
-        "chk:email_analysis:email"
+        "chk:email_analysis"
       ],
       "score_display": "-1.00"
     },
@@ -208,7 +208,7 @@
       ],
       "key": "obs:artifact:phishing email - invoice #12345",
       "check_links": [
-        "chk:email_analysis:email"
+        "chk:email_analysis"
       ],
       "score_display": "10.00"
     },
@@ -233,7 +233,7 @@
       ],
       "key": "obs:url:https://evil-phishing.com/login",
       "check_links": [
-        "chk:url_analysis:network"
+        "chk:url_analysis"
       ],
       "score_display": "10.00"
     },
@@ -258,7 +258,7 @@
       ],
       "key": "obs:url:https://evil-phishing.com/verify",
       "check_links": [
-        "chk:url_analysis:network"
+        "chk:url_analysis"
       ],
       "score_display": "9.00"
     },
@@ -288,7 +288,7 @@
       ],
       "key": "obs:file:invoice.exe",
       "check_links": [
-        "chk:malware_detection:file"
+        "chk:malware_detection"
       ],
       "score_display": "10.00"
     },
@@ -328,100 +328,90 @@
     }
   },
   "checks": {
-    "email": [
-      {
-        "check_id": "email_analysis",
-        "scope": "email",
-        "description": "Phishing email analysis",
-        "comment": "",
-        "extra": {},
-        "score": 10.0,
-        "level": "MALICIOUS",
-        "origin_investigation_id": "cyvest-visual-example",
-        "observable_links": [
-          {
-            "observable_key": "obs:artifact:phishing email - invoice #12345",
-            "propagation_mode": "LOCAL_ONLY"
-          },
-          {
-            "observable_key": "obs:email:attacker@evil-phishing.com",
-            "propagation_mode": "LOCAL_ONLY"
-          },
-          {
-            "observable_key": "obs:email:victim@company.com",
-            "propagation_mode": "LOCAL_ONLY"
-          }
-        ],
-        "key": "chk:email_analysis:email",
-        "score_display": "10.00"
-      }
-    ],
-    "network": [
-      {
-        "check_id": "url_analysis",
-        "scope": "network",
-        "description": "Malicious URLs found in email",
-        "comment": "",
-        "extra": {},
-        "score": 10.0,
-        "level": "MALICIOUS",
-        "origin_investigation_id": "cyvest-visual-example",
-        "observable_links": [
-          {
-            "observable_key": "obs:url:https://evil-phishing.com/login",
-            "propagation_mode": "LOCAL_ONLY"
-          },
-          {
-            "observable_key": "obs:url:https://evil-phishing.com/verify",
-            "propagation_mode": "LOCAL_ONLY"
-          }
-        ],
-        "key": "chk:url_analysis:network",
-        "score_display": "10.00"
-      },
-      {
-        "check_id": "infrastructure",
-        "scope": "network",
-        "description": "Malicious infrastructure identified",
-        "comment": "",
-        "extra": {},
-        "score": 9.5,
-        "level": "MALICIOUS",
-        "origin_investigation_id": "cyvest-visual-example",
-        "observable_links": [
-          {
-            "observable_key": "obs:domain:evil-phishing.com",
-            "propagation_mode": "LOCAL_ONLY"
-          },
-          {
-            "observable_key": "obs:ipv4:185.220.101.50",
-            "propagation_mode": "LOCAL_ONLY"
-          }
-        ],
-        "key": "chk:infrastructure:network",
-        "score_display": "9.50"
-      }
-    ],
-    "file": [
-      {
-        "check_id": "malware_detection",
-        "scope": "file",
-        "description": "Malware file analysis",
-        "comment": "",
-        "extra": {},
-        "score": 10.0,
-        "level": "MALICIOUS",
-        "origin_investigation_id": "cyvest-visual-example",
-        "observable_links": [
-          {
-            "observable_key": "obs:file:invoice.exe",
-            "propagation_mode": "LOCAL_ONLY"
-          }
-        ],
-        "key": "chk:malware_detection:file",
-        "score_display": "10.00"
-      }
-    ]
+    "chk:email_analysis": {
+      "check_name": "email_analysis",
+      "description": "Phishing email analysis",
+      "comment": "",
+      "extra": {},
+      "score": 10.0,
+      "level": "MALICIOUS",
+      "origin_investigation_id": "cyvest-visual-example",
+      "observable_links": [
+        {
+          "observable_key": "obs:artifact:phishing email - invoice #12345",
+          "propagation_mode": "LOCAL_ONLY"
+        },
+        {
+          "observable_key": "obs:email:attacker@evil-phishing.com",
+          "propagation_mode": "LOCAL_ONLY"
+        },
+        {
+          "observable_key": "obs:email:victim@company.com",
+          "propagation_mode": "LOCAL_ONLY"
+        }
+      ],
+      "key": "chk:email_analysis",
+      "score_display": "10.00"
+    },
+    "chk:url_analysis": {
+      "check_name": "url_analysis",
+      "description": "Malicious URLs found in email",
+      "comment": "",
+      "extra": {},
+      "score": 10.0,
+      "level": "MALICIOUS",
+      "origin_investigation_id": "cyvest-visual-example",
+      "observable_links": [
+        {
+          "observable_key": "obs:url:https://evil-phishing.com/login",
+          "propagation_mode": "LOCAL_ONLY"
+        },
+        {
+          "observable_key": "obs:url:https://evil-phishing.com/verify",
+          "propagation_mode": "LOCAL_ONLY"
+        }
+      ],
+      "key": "chk:url_analysis",
+      "score_display": "10.00"
+    },
+    "chk:infrastructure": {
+      "check_name": "infrastructure",
+      "description": "Malicious infrastructure identified",
+      "comment": "",
+      "extra": {},
+      "score": 9.5,
+      "level": "MALICIOUS",
+      "origin_investigation_id": "cyvest-visual-example",
+      "observable_links": [
+        {
+          "observable_key": "obs:domain:evil-phishing.com",
+          "propagation_mode": "LOCAL_ONLY"
+        },
+        {
+          "observable_key": "obs:ipv4:185.220.101.50",
+          "propagation_mode": "LOCAL_ONLY"
+        }
+      ],
+      "key": "chk:infrastructure",
+      "score_display": "9.50"
+    },
+    "chk:malware_detection": {
+      "check_name": "malware_detection",
+      "description": "Malware file analysis",
+      "comment": "",
+      "extra": {},
+      "score": 10.0,
+      "level": "MALICIOUS",
+      "origin_investigation_id": "cyvest-visual-example",
+      "observable_links": [
+        {
+          "observable_key": "obs:file:invoice.exe",
+          "propagation_mode": "LOCAL_ONLY"
+        }
+      ],
+      "key": "chk:malware_detection",
+      "score_display": "10.00"
+    }
   },
   "threat_intels": {
     "ti:virustotal:obs:domain:evil-phishing.com": {
@@ -574,7 +564,7 @@
       "path": "phishing_investigation/email",
       "description": "",
       "checks": [
-        "chk:email_analysis:email"
+        "chk:email_analysis"
       ],
       "sub_containers": {},
       "key": "ctr:phishing_investigation/email",
@@ -585,8 +575,8 @@
       "path": "phishing_investigation/network",
       "description": "",
       "checks": [
-        "chk:url_analysis:network",
-        "chk:infrastructure:network"
+        "chk:url_analysis",
+        "chk:infrastructure"
       ],
       "sub_containers": {},
       "key": "ctr:phishing_investigation/network",
@@ -597,7 +587,7 @@
       "path": "phishing_investigation/malware",
       "description": "",
       "checks": [
-        "chk:malware_detection:file"
+        "chk:malware_detection"
       ],
       "sub_containers": {},
       "key": "ctr:phishing_investigation/malware",
@@ -653,24 +643,12 @@
     },
     "total_checks": 4,
     "applied_checks": 4,
-    "checks_by_scope": {
-      "email": [
-        "chk:email_analysis:email"
-      ],
-      "network": [
-        "chk:url_analysis:network",
-        "chk:infrastructure:network"
-      ],
-      "file": [
-        "chk:malware_detection:file"
-      ]
-    },
     "checks_by_level": {
       "MALICIOUS": [
-        "chk:email_analysis:email",
-        "chk:url_analysis:network",
-        "chk:infrastructure:network",
-        "chk:malware_detection:file"
+        "chk:email_analysis",
+        "chk:url_analysis",
+        "chk:infrastructure",
+        "chk:malware_detection"
       ]
     },
     "total_threat_intel": 13,

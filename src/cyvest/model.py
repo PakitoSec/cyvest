@@ -391,8 +391,7 @@ class Check(BaseModel):
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    check_id: str = Field(...)
-    scope: str = Field(...)
+    check_name: str = Field(...)
     description: str = Field(...)
     comment: str = Field(...)
     extra: dict[str, Any] = Field(...)
@@ -442,7 +441,7 @@ class Check(BaseModel):
     def generate_key(self) -> Self:
         """Generate key."""
         if not self.key:
-            self.key = keys.generate_check_key(self.check_id, self.scope)
+            self.key = keys.generate_check_key(self.check_name)
         return self
 
     @field_serializer("score")

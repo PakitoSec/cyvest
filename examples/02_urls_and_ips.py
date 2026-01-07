@@ -65,14 +65,14 @@ def main() -> None:
 
         # Create checks
         _ = (
-            cv.check("c2_detection", "network", "Detect C2 communication")
+            cv.check("c2_detection", "Detect C2 communication")
             .link_observable(url1)
             .link_observable(ip1)
             .in_container(network_ctr)
         )
 
         _ = (
-            cv.check("malware_download", "network", "Detect malware download")
+            cv.check("malware_download", "Detect malware download")
             .link_observable(url2)
             .link_observable(ip2)
             .in_container(network_ctr)
@@ -81,7 +81,6 @@ def main() -> None:
         _ = (
             cv.check(
                 "compromised_host",
-                "endpoint",
                 "Identify compromised endpoint",
                 comment="Host made connections to known malicious infrastructure",
             )

@@ -45,7 +45,7 @@ phishing_url = (
 )
 
 (
-    cv.check("email:url", "body", "Analyze embedded URL")
+    cv.check("email_url_check", "Analyze embedded URL")
     .link_observable(phishing_url)
     .with_score(Decimal("8.5"))
 )

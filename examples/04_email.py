@@ -174,7 +174,7 @@ class EmailFrom(BaseRule):
 
         # Create check for header analysis
         (
-            cy.check("from", "header", "test email vt 10", "> ok boys")
+            cy.check("from", "test email vt 10", "> ok boys")
             .link_observable(obs)
             .in_container(cy.container("emails"))
         )
@@ -204,7 +204,7 @@ class EmailFromBIS(BaseRule):
 
         # Create check for header analysis
         (
-            cy.check("from-proofpoint", "header", "test email vt 10", "> ok boys")
+            cy.check("from-proofpoint", "test email vt 10", "> ok boys")
             .link_observable(obs)
             .in_container(cy.container("emails"))
         )
@@ -227,7 +227,7 @@ class EmailReciever(BaseRule):
         logger.info("Analyzing email receiver")
 
         cy.enrichment_create("receiver", {"receiver": ["ok"]}, context="from splunk")
-        cy.check("receiver", "header", "description", "> receiver").with_score(0.1).link_observable(
+        cy.check("receiver", "description", "> receiver").with_score(0.1).link_observable(
             cy.observable(cy.OBS.EMAIL, "user@company.com").relate_to(
                 cy.root(), cy.REL.RELATED_TO, direction=cy.DIR.INBOUND
             )
@@ -285,7 +285,7 @@ class BodiesUrlTask(BaseRule):
 
             # Create check and link to container
             chk = (
-                cy.check(f"body-url-{url}", "body", f"URL analysis {url}", comment=f"> score: {score}")
+                cy.check(f"body-url-{url}", f"URL analysis {url}", comment=f"> score: {score}")
                 .link_observable(url_obs)
                 .in_container(container)
             )
@@ -340,7 +340,7 @@ class BodiesDomainTask(BaseRule):
 
             # Create check and link to container
             chk = (
-                cy.check(f"body-domain-{domain}", "body", f"Domain analysis {domain}", comment=f"> score: {score}")
+                cy.check(f"body-domain-{domain}", f"Domain analysis {domain}", comment=f"> score: {score}")
                 .link_observable(domain_obs, propagation_mode=cy.PROP.GLOBAL)
                 .in_container(container)
             )
@@ -399,7 +399,6 @@ class AttachmentTask(BaseRule):
             check_desc = f"File: {filename} ({size} bytes)"
             cy.check(
                 f"attachment-{filename}",
-                "attachment",
                 check_desc,
                 comment=f"> MD5: {md5_hash}\n> SHA256: {sha256_hash}\n> Threat score: {score}",
             ).link_observable(file_obs).in_container(container)
@@ -435,8 +434,8 @@ class AggregatedRiskTask(BaseRule):
         logger.info("Starting aggregated risk assessment")
 
         # Access checks from other tasks using parameter-based API
-        from_check = self.shared_context.check_get("from", "header")
-        receiver_check = self.shared_context.check_get("receiver", "header")
+        from_check = self.shared_context.check_get("from")
+        receiver_check = self.shared_context.check_get("receiver")
 
         # Access observables from other tasks using parameter-based API
         sender_email = self.shared_context.observable_get(Cyvest.OBS.EMAIL, "noreply@domainmalicious.com")
@@ -479,7 +478,7 @@ class AggregatedRiskTask(BaseRule):
 
         # Create aggregated check
         aggregated_check = cy.check(
-            "email_risk_aggregated", "full", "Aggregated Email Risk Assessment", comment=comment
+            "email_risk_aggregated", "Aggregated Email Risk Assessment", comment=comment
         ).with_score(risk_score)
 
         # Link all relevant observables to the aggregated check
@@ -501,7 +500,7 @@ class AI(BaseRule):
 
     def run(self, cy: Cyvest) -> None:
         """Calculate aggregated risk score based on all previous checks."""
-        cy.check("ai", "full", "ai", score=0, level=cy.LVL.MALICIOUS)
+        cy.check("ai", "AI Analysis", score=0, level=cy.LVL.MALICIOUS)
 
 
 # ============================================================================
@@ -571,7 +570,7 @@ def main(workers, browser, stats, audit, no_audit_log, output):
     cy.finalize_relationships()
     cy._investigation._score_engine.recalculate_all()
 
-    c = cy.check_get("email_risk_aggregated", "full")
+    c = cy.check_get("chk:email_risk_aggregated")
     if c is not None:
         logger.info(c.comment)
 

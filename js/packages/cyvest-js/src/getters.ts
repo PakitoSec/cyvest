@@ -84,60 +84,32 @@ export function getCheck(
   inv: CyvestInvestigation,
   key: string
 ): Check | undefined {
-  for (const checks of Object.values(inv.checks)) {
-    for (const check of checks) {
-      if (check.key === key) {
-        return check;
-      }
-    }
-  }
-  return undefined;
+  return inv.checks[key];
 }
 
 /**
- * Get a check by its ID and scope.
+ * Get a check by its name.
  *
  * @param inv - The investigation to search
- * @param checkId - Check identifier
- * @param scope - Check scope
+ * @param checkName - Check name
  * @returns The check or undefined if not found
  *
  * @example
  * ```ts
- * const check = getCheckByIdScope(investigation, "sender_verification", "email_headers");
+ * const check = getCheckByName(investigation, "sender_verification");
  * ```
  */
-export function getCheckByIdScope(
+export function getCheckByName(
   inv: CyvestInvestigation,
-  checkId: string,
-  scope: string
+  checkName: string
 ): Check | undefined {
-  const normalizedId = checkId.trim().toLowerCase();
-  const normalizedScope = scope.trim().toLowerCase();
-
-  const scopeChecks = inv.checks[normalizedScope] || inv.checks[scope];
-  if (scopeChecks) {
-    return scopeChecks.find(
-      (c) => c.check_id.toLowerCase() === normalizedId
-    );
-  }
-
-  // Fallback: search all scopes
-  for (const checks of Object.values(inv.checks)) {
-    for (const check of checks) {
-      if (
-        check.check_id.toLowerCase() === normalizedId &&
-        check.scope.toLowerCase() === normalizedScope
-      ) {
-        return check;
-      }
-    }
-  }
-  return undefined;
+  const normalizedName = checkName.trim().toLowerCase();
+  const key = `chk:${normalizedName}`;
+  return inv.checks[key];
 }
 
 /**
- * Get all checks as a flat array (not grouped by scope).
+ * Get all checks as an array.
  *
  * @param inv - The investigation
  * @returns Array of all checks
@@ -149,11 +121,7 @@ export function getCheckByIdScope(
  * ```
  */
 export function getAllChecks(inv: CyvestInvestigation): Check[] {
-  const result: Check[] = [];
-  for (const checks of Object.values(inv.checks)) {
-    result.push(...checks);
-  }
-  return result;
+  return Object.values(inv.checks);
 }
 
 /**

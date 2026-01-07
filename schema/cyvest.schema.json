@@ -94,12 +94,8 @@
     "Check": {
       "description": "Represents a verification step in the investigation.\n\nA check validates a specific aspect of the data under investigation\nand contributes to the overall investigation score.",
       "properties": {
-        "check_id": {
-          "title": "Check Id",
-          "type": "string"
-        },
-        "scope": {
-          "title": "Scope",
+        "check_name": {
+          "title": "Check Name",
           "type": "string"
         },
         "description": {
@@ -144,8 +140,7 @@
         }
       },
       "required": [
-        "check_id",
-        "scope",
+        "check_name",
         "description",
         "comment",
         "extra",
@@ -536,16 +531,6 @@
           "title": "Applied Checks",
           "type": "integer"
         },
-        "checks_by_scope": {
-          "additionalProperties": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array"
-          },
-          "title": "Checks By Scope",
-          "type": "object"
-        },
         "checks_by_level": {
           "additionalProperties": {
             "items": {
@@ -749,12 +734,9 @@
     },
     "checks": {
       "additionalProperties": {
-        "items": {
-          "$ref": "#/$defs/Check"
-        },
-        "type": "array"
+        "$ref": "#/$defs/Check"
       },
-      "description": "Checks organized by scope.",
+      "description": "Checks keyed by their unique key.",
       "title": "Checks",
       "type": "object"
     },

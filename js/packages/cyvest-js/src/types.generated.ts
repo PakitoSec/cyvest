@@ -157,10 +157,10 @@ export interface Relationship {
   [k: string]: unknown;
 }
 /**
- * Checks organized by scope.
+ * Checks keyed by their unique key.
  */
 export interface Checks {
-  [k: string]: Check[];
+  [k: string]: Check;
 }
 /**
  * Represents a verification step in the investigation.
@@ -169,8 +169,7 @@ export interface Checks {
  * and contributes to the overall investigation score.
  */
 export interface Check {
-  check_id: string;
-  scope: string;
+  check_name: string;
   description: string;
   comment: string;
   extra: Extra1;
@@ -288,7 +287,6 @@ export interface StatisticsSchema {
   observables_by_type_and_level?: ObservablesByTypeAndLevel;
   total_checks: number;
   applied_checks: number;
-  checks_by_scope?: ChecksByScope;
   checks_by_level?: ChecksByLevel;
   total_threat_intel: number;
   threat_intel_by_source?: ThreatIntelBySource;
@@ -305,9 +303,6 @@ export interface ObservablesByTypeAndLevel {
   [k: string]: {
     [k: string]: number;
   };
-}
-export interface ChecksByScope {
-  [k: string]: string[];
 }
 export interface ChecksByLevel {
   [k: string]: string[];

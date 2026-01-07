@@ -69,14 +69,14 @@ def main() -> None:
         cv.check("c2_detection", "Detect C2 communication")
         .link_observable(url1)
         .link_observable(ip1)
-        .in_tag(network_tag)
+        .tagged(network_tag)
     )
 
     _ = (
         cv.check("malware_download", "Detect malware download")
         .link_observable(url2)
         .link_observable(ip2)
-        .in_tag(network_tag)
+        .tagged(network_tag)
     )
 
     _ = (
@@ -86,7 +86,7 @@ def main() -> None:
             comment="Host made connections to known malicious infrastructure",
         )
         .link_observable(internal_host)
-        .in_tag(network_tag)
+        .tagged(network_tag)
     )
 
     # Finalize

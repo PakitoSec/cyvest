@@ -236,3 +236,74 @@ def test_proxy_public_fields_are_deep_copied() -> None:
     assert check.key in linked_copy
     linked_copy.append("another-check")
     assert obs.check_links == [check.key]
+
+
+def test_check_proxy_tagged_with_string_auto_creates() -> None:
+    """CheckProxy.tagged should auto-create tags from strings."""
+    cv = Cyvest()
+    check = cv.check_create("check-id", "scope", "desc")
+
+    check.tagged("network")
+
+    tag = cv.tag_get("network")
+    assert tag is not None
+    assert tag.name == "network"
+    assert check.key in [c.key for c in tag.checks]
+
+
+def test_check_proxy_tagged_with_multiple_strings() -> None:
+    """CheckProxy.tagged should accept multiple string tags."""
+    cv = Cyvest()
+    check = cv.check_create("check-id", "scope", "desc")
+
+    check.tagged("network", "suspicious", "c2:detection")
+
+    assert cv.tag_get("network") is not None
+    assert cv.tag_get("suspicious") is not None
+    assert cv.tag_get("c2:detection") is not None
+    # Hierarchy auto-created
+    assert cv.tag_get("c2") is not None
+
+
+def test_check_proxy_tagged_with_tag_proxy() -> None:
+    """CheckProxy.tagged should accept TagProxy objects."""
+    cv = Cyvest()
+    check = cv.check_create("check-id", "scope", "desc")
+    tag = cv.tag_create("analysis", "Analysis tag")
+
+    check.tagged(tag)
+
+    assert check.key in [c.key for c in tag.checks]
+
+
+def test_check_proxy_tagged_mixed_types() -> None:
+    """CheckProxy.tagged should accept a mix of strings and TagProxy."""
+    cv = Cyvest()
+    check = cv.check_create("check-id", "scope", "desc")
+    existing_tag = cv.tag_create("existing", "Existing tag")
+
+    check.tagged(existing_tag, "new_tag", "another:nested")
+
+    assert check.key in [c.key for c in existing_tag.checks]
+    assert cv.tag_get("new_tag") is not None
+    assert cv.tag_get("another:nested") is not None
+    assert cv.tag_get("another") is not None
+
+
+def test_check_proxy_tagged_returns_self() -> None:
+    """CheckProxy.tagged should return self for chaining."""
+    cv = Cyvest()
+    check = cv.check_create("check-id", "scope", "desc")
+
+    result = check.tagged("network").tagged("suspicious")
+
+    assert result is check
+
+
+def test_check_proxy_tagged_invalid_type_raises() -> None:
+    """CheckProxy.tagged should raise TypeError for invalid input."""
+    cv = Cyvest()
+    check = cv.check_create("check-id", "scope", "desc")
+
+    with pytest.raises(TypeError, match="Tag must provide a key"):
+        check.tagged(123)  # type: ignore[arg-type]

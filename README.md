@@ -184,10 +184,13 @@ ti.remove_taxonomy("confidence")
 Tags organize checks with automatic hierarchy based on `:` delimiter:
 
 ```python
-# Creating "network:c2:detection" auto-creates "network" and "network:c2" tags
-tag = cv.tag("network:c2:detection", "C2 Detection Checks")
+# Simple: pass tag names directly (auto-creates tags)
 check = cv.check("beacon_detection", "Detect C2 beacons")
-check.in_tag(tag)
+check.tagged("network", "c2:detection", "suspicious")
+
+# With description: create tag first, then reference it
+tag = cv.tag("network:c2:detection", "C2 Detection Checks")
+check.tagged(tag)
 
 # Query hierarchy
 children = cv.tag_get_children("network")  # ["network:c2"]

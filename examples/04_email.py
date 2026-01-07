@@ -173,7 +173,7 @@ class EmailFrom(BaseRule):
         )
 
         # Create check for header analysis
-        (cy.check("from", "test email vt 10", "> ok boys").link_observable(obs).in_tag(cy.tag("emails")))
+        cy.check("from", "test email vt 10", "> ok boys").link_observable(obs).tagged("emails")
 
         logger.info(f"Email header analysis complete: {obs.key}")
 
@@ -199,7 +199,7 @@ class EmailFromBIS(BaseRule):
         obs = cy.observable(cy.OBS.EMAIL, from_addr).with_ti("PROOFPOINT", 5, "> test")
 
         # Create check for header analysis
-        (cy.check("from-proofpoint", "test email vt 10", "> ok boys").link_observable(obs).in_tag(cy.tag("emails")))
+        (cy.check("from-proofpoint", "test email vt 10", "> ok boys").link_observable(obs).tagged("emails"))
 
         logger.info(f"Email header analysis complete: {obs.key}")
 
@@ -223,7 +223,7 @@ class EmailReciever(BaseRule):
             cy.observable(cy.OBS.EMAIL, "user@company.com").relate_to(
                 cy.root(), cy.REL.RELATED_TO, direction=cy.DIR.INBOUND
             )
-        ).in_tag(cy.tag("emails"))
+        ).tagged("emails")
 
         logger.info("Email receiver analysis complete")
 
@@ -279,7 +279,7 @@ class BodiesUrlTask(BaseRule):
             chk = (
                 cy.check(f"body-url-{url}", f"URL analysis {url}", comment=f"> score: {score}")
                 .link_observable(url_obs)
-                .in_tag(tag)
+                .tagged(tag)
             )
 
             logger.info("[bold red]Check Score: {}[/bold red]", chk.score)
@@ -334,7 +334,7 @@ class BodiesDomainTask(BaseRule):
             chk = (
                 cy.check(f"body-domain-{domain}", f"Domain analysis {domain}", comment=f"> score: {score}")
                 .link_observable(domain_obs, propagation_mode=cy.PROP.GLOBAL)
-                .in_tag(tag)
+                .tagged(tag)
             )
 
             logger.info("[bold red]Check Score: {}[/bold red]", chk.score)
@@ -393,7 +393,7 @@ class AttachmentTask(BaseRule):
                 f"attachment-{filename}",
                 check_desc,
                 comment=f"> MD5: {md5_hash}\n> SHA256: {sha256_hash}\n> Threat score: {score}",
-            ).link_observable(file_obs).in_tag(tag)
+            ).link_observable(file_obs).tagged(tag)
 
         logger.info(f"Attachments analysis complete: {len(attachments)} files processed")
 
@@ -480,7 +480,7 @@ class AggregatedRiskTask(BaseRule):
             aggregated_check.link_observable(malicious_domain)
 
         # Put in a dedicated tag
-        aggregated_check.in_tag(cy.tag("risk_assessment", "Aggregated Risk Analysis"))
+        aggregated_check.tagged(cy.tag("risk_assessment", "Aggregated Risk Analysis"))
 
         logger.info(f"Aggregated risk assessment complete: score={risk_score}")
         logger.info(f"Risk indicators: {len(risk_indicators)}")
@@ -492,7 +492,7 @@ class AI(BaseRule):
 
     def run(self, cy: Cyvest) -> None:
         """Calculate aggregated risk score based on all previous checks."""
-        cy.check("ai", "AI Analysis", score=0, level=cy.LVL.MALICIOUS).in_tag(
+        cy.check("ai", "AI Analysis", score=0, level=cy.LVL.MALICIOUS).tagged(
             cy.tag("risk_assessment:ai", "AI Analysis Tag")
         )
 

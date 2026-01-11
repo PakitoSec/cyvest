@@ -17,6 +17,8 @@ from logurich.opt_click import click_logger_params
 from rich.console import Console
 
 from cyvest import __version__
+from cyvest.compare import ExpectedResult, compare_investigations
+from cyvest.io_rich import display_diff
 from cyvest.io_schema import get_investigation_schema
 from cyvest.io_serialization import load_investigation_json
 from cyvest.io_visualization import VisualizationDependencyMissingError
@@ -354,6 +356,66 @@ def visualize(
 
     if not no_browser:
         logger.info("[cyan]Opening visualization in browser...[/cyan]")
+
+
+@cli.command()
+@click.argument("actual", type=click.Path(exists=True, dir_okay=False, path_type=Path))
+@click.argument("expected", type=click.Path(exists=True, dir_okay=False, path_type=Path))
+@click.option(
+    "-r",
+    "--rules",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    help="JSON file with ExpectedResult tolerance rules.",
+)
+@click.option(
+    "--title",
+    default="Investigation Diff",
+    show_default=True,
+    help="Title for the diff table.",
+)
+def diff(actual: Path, expected: Path, rules: Path | None, title: str) -> None:
+    """
+    Compare two investigation JSON files and display differences.
+
+    ACTUAL is the investigation to validate (actual results).
+    EXPECTED is the reference investigation (expected results).
+
+    Optionally provide a rules file with tolerance rules in JSON format:
+
+    \b
+    [
+      {"check_name": "domain-check", "score": ">= 1.0"},
+      {"key": "chk:ai-analysis", "level": "SUSPICIOUS", "score": "< 3.0"}
+    ]
+
+    Supported operators: >=, <=, >, <, ==, !=
+    """
+    logger.info("[cyan]Comparing investigations...[/cyan]")
+    logger.info(f"  Actual:   {actual}")
+    logger.info(f"  Expected: {expected}")
+
+    actual_cv = load_investigation_json(actual)
+    expected_cv = load_investigation_json(expected)
+
+    # Load tolerance rules if provided
+    result_expected: list[ExpectedResult] | None = None
+    if rules:
+        logger.info(f"  Rules:    {rules}")
+        with rules.open("r", encoding="utf-8") as f:
+            rules_data = json.load(f)
+        result_expected = [ExpectedResult(**r) for r in rules_data]
+
+    logger.info("")
+
+    # Compare investigations
+    diffs = compare_investigations(actual_cv, expected_cv, result_expected=result_expected)
+
+    if not diffs:
+        logger.info("[green]✓ No differences found[/green]")
+        return
+
+    # Display diff table
+    display_diff(diffs, lambda r: logger.rich("INFO", r, width=150), title=title)
 
 
 def main() -> None:

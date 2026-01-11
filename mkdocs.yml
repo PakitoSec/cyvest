@@ -53,6 +53,7 @@ nav:
       - Quickstart: getting-started/quickstart.md
       - Concepts: getting-started/concepts.md
   - Shared Investigation Context: shared-investigation-context.md
+  - Comparing Investigations: comparing-investigations.md
   - JavaScript Packages: js-packages.md
   - Contributing: contributing.md
 

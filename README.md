@@ -18,6 +18,7 @@
 - 💾 **Multiple Export Formats**: JSON and Markdown output for reporting and LLM consumption
 - 🎨 **Rich Console Output**: Beautiful terminal displays with the Rich library
 - 🧩 **Fluent helpers**: Convenient API with method chaining for rapid development
+- 🔬 **Investigation Comparison**: Compare investigations with tolerance rules and visual diff output
 
 ## Installation
 
@@ -361,6 +362,88 @@ Its key is derived from type + value (e.g. `obs:file:root` or `obs:artifact:root
 
 This design enables flexible investigation structures while preventing unintended score contamination.
 
+### Comparing Investigations
+
+Compare two investigations to identify differences in checks, observables, and threat intelligence:
+
+```python
+from decimal import Decimal
+from cyvest import Cyvest, ExpectedResult, Level, compare_investigations
+from cyvest.io_rich import display_diff
+
+# Create expected and actual investigations
+expected = Cyvest(investigation_name="expected")
+expected.check_create("domain-check", "Verify domain", score=Decimal("1.0"))
+
+actual = Cyvest(investigation_name="actual")
+actual.check_create("domain-check", "Verify domain", score=Decimal("2.0"))
+actual.check_create("new-check", "New detection", score=Decimal("1.5"))
+
+# Compare investigations
+diffs = compare_investigations(actual, expected)
+# diffs contains:
+#   - MISMATCH for domain-check (score changed 1.0 -> 2.0)
+#   - ADDED for new-check
+```
+
+**Tolerance Rules**
+
+Use `result_expected` rules to define acceptable score variations:
+
+```python
+# Define tolerance rules
+rules = [
+    # Accept any score >= 1.0 for this check
+    ExpectedResult(check_name="domain-check", score=">= 1.0"),
+    # Accept any score < 3.0 for roger-ai
+    ExpectedResult(key="chk:roger-ai", level=Level.SUSPICIOUS, score="< 3.0"),
+]
+
+# Compare with tolerance - checks satisfying rules are not flagged as diffs
+diffs = compare_investigations(actual, expected, result_expected=rules)
+```
+
+Supported operators: `>=`, `<=`, `>`, `<`, `==`, `!=`
+
+**Visual Diff Display**
+
+Display differences in a rich table format:
+
+```python
+from cyvest.io_rich import display_diff
+from logurich import logger
+
+# Display diff table with tree structure showing observables and threat intel
+display_diff(diffs, lambda r: logger.rich("INFO", r), title="Investigation Diff")
+```
+
+Output:
+```
+╭────────────────────────────────────────────────┬────────────────────┬─────────────────┬────────╮
+│ Key                                            │      Expected      │     Actual      │ Status │
+├────────────────────────────────────────────────┼────────────────────┼─────────────────┼────────┤
+│ chk:new-check                                  │         -          │  NOTABLE 1.50   │   +    │
+│ └── domain: example.com                        │         -          │   INFO 0.00     │        │
+│     └── VirusTotal                             │         -          │   INFO 0.00     │        │
+├────────────────────────────────────────────────┼────────────────────┼─────────────────┼────────┤
+│ chk:domain-check                               │   NOTABLE 1.00     │  NOTABLE 2.00   │   ✗    │
+╰────────────────────────────────────────────────┴────────────────────┴─────────────────┴────────╯
+```
+
+Status symbols: `+` (added), `-` (removed), `✗` (mismatch)
+
+**Convenience Methods**
+
+Use methods directly on Cyvest objects:
+
+```python
+# Compare and get diff items
+diffs = actual.compare(expected=expected, result_expected=rules)
+
+# Compare and display in one call
+actual.display_diff(expected=expected, title="My Investigation Diff")
+```
+
 ## Examples
 
 See the `examples/` directory for complete examples:
@@ -370,6 +453,7 @@ See the `examples/` directory for complete examples:
 - **03_merge_demo.py**: Multi-process investigation merging
 - **04_email.py**: Multi-threaded investigation with SharedInvestigationContext
 - **05_visualization.py**: Interactive HTML visualization showcasing scores, levels, and relationship flows
+- **06_compare_investigations.py**: Compare investigations with tolerance rules and visual diff output
 
 Run an example:
 
@@ -500,6 +584,7 @@ Cyvest is designed for:
 - **Malware Analysis**: Track relationships between artifacts
 - **Phishing Analysis**: Analyze emails and linked resources
 - **Integration**: Combine results from multiple security tools
+- **Regression Testing**: Compare investigation outputs across rule or detection updates
 
 ## Architecture Highlights
 
@@ -509,6 +594,7 @@ Cyvest is designed for:
 - **Score Propagation**: Automatic hierarchical score calculation
 - **Flexible Export**: JSON for storage, Markdown for LLM analysis
 - **Audit Trail**: Score change history for debugging
+- **Investigation Comparison**: Compare investigations with tolerance rules for regression testing
 
 ## Future Enhancements
 

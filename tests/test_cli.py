@@ -177,3 +177,93 @@ def test_display_summary_audit_log_table() -> None:
 
     assert "Audit Log" in rendered
     assert "virustotal" in rendered
+
+
+def test_cli_diff_no_differences(tmp_path: Path) -> None:
+    """CLI 'diff' command succeeds for identical investigations."""
+    from decimal import Decimal
+
+    cv = Cyvest()
+    cv.check("test-check", "test", "Test check").with_score(Decimal("1.0"))
+
+    file1 = tmp_path / "inv1.json"
+    file2 = tmp_path / "inv2.json"
+    cv.io_save_json(file1)
+    cv.io_save_json(file2)
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["diff", str(file1), str(file2)])
+
+    assert result.exit_code == 0
+
+
+def test_cli_diff_with_differences(tmp_path: Path) -> None:
+    """CLI 'diff' command succeeds when differences exist."""
+    from decimal import Decimal
+
+    from cyvest.compare import compare_investigations
+
+    # Create actual investigation
+    actual = Cyvest(investigation_name="actual")
+    actual.check("check-a", "test", "Check A").with_score(Decimal("2.0"))
+    actual.check("check-new", "test", "New check").with_score(Decimal("1.0"))
+
+    # Create expected investigation
+    expected = Cyvest(investigation_name="expected")
+    expected.check("check-a", "test", "Check A").with_score(Decimal("1.0"))
+    expected.check("check-old", "test", "Old check").with_score(Decimal("1.0"))
+
+    actual_file = tmp_path / "actual.json"
+    expected_file = tmp_path / "expected.json"
+    actual.io_save_json(actual_file)
+    expected.io_save_json(expected_file)
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["diff", str(actual_file), str(expected_file)])
+
+    assert result.exit_code == 0
+
+    # Verify differences using the compare module directly
+    diffs = compare_investigations(actual, expected)
+    assert len(diffs) == 3  # Added, Removed, Mismatch
+    diff_keys = {d.key for d in diffs}
+    assert "chk:check-new" in diff_keys
+    assert "chk:check-old" in diff_keys
+    assert "chk:check-a" in diff_keys
+
+
+def test_cli_diff_with_rules_file(tmp_path: Path) -> None:
+    """CLI 'diff' command applies tolerance rules from file."""
+    import json
+    from decimal import Decimal
+
+    from cyvest.compare import ExpectedResult, compare_investigations
+
+    # Create investigations with different scores
+    actual = Cyvest(investigation_name="actual")
+    actual.check("tolerant-check", "test", "Tolerant check").with_score(Decimal("1.5"))
+
+    expected = Cyvest(investigation_name="expected")
+    expected.check("tolerant-check", "test", "Tolerant check").with_score(Decimal("1.0"))
+
+    actual_file = tmp_path / "actual.json"
+    expected_file = tmp_path / "expected.json"
+    actual.io_save_json(actual_file)
+    expected.io_save_json(expected_file)
+
+    # Create rules file that tolerates the difference
+    rules_file = tmp_path / "rules.json"
+    rules_file.write_text(
+        json.dumps([{"check_name": "tolerant-check", "score": ">= 1.0"}]),
+        encoding="utf-8",
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["diff", str(actual_file), str(expected_file), "-r", str(rules_file)])
+
+    assert result.exit_code == 0
+
+    # Verify tolerance rules work
+    rules = [ExpectedResult(check_name="tolerant-check", score=">= 1.0")]
+    diffs = compare_investigations(actual, expected, result_expected=rules)
+    assert len(diffs) == 0  # No differences with tolerance

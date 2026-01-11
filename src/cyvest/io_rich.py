@@ -566,3 +566,118 @@ def display_statistics(cv: Cyvest, rich_print: Callable[[Any], None]) -> None:
             ti_table.add_row(source, str(count))
 
         rich_print(ti_table)
+
+
+def _format_level_score(
+    level: Level | None,
+    score: Decimal | None,
+    score_rule: str | None = None,
+) -> str:
+    """Format level and score for display."""
+    if level is None and score is None and not score_rule:
+        return "[dim]-[/dim]"
+
+    parts: list[str] = []
+    if level:
+        color = get_color_level(level)
+        parts.append(f"[{color}]{level.name}[/{color}]")
+
+    if score_rule:
+        parts.append(score_rule)
+    elif score is not None:
+        color = get_color_score(score)
+        parts.append(f"[{color}]{_format_score_decimal(score)}[/{color}]")
+
+    return " ".join(parts) if parts else "[dim]-[/dim]"
+
+
+def display_diff(
+    diffs: list,
+    rich_print: Callable[[Any], None],
+    title: str = "Diff",
+) -> None:
+    """
+    Display investigation diff in a rich table with tree structure.
+
+    Args:
+        diffs: List of DiffItem objects representing differences
+        rich_print: A rich renderable handler called with renderables for output
+        title: Title for the diff table
+    """
+    # Import here to avoid circular dependency
+    from cyvest.compare import DiffStatus
+
+    # Count diffs by status
+    added = sum(1 for d in diffs if d.status == DiffStatus.ADDED)
+    removed = sum(1 for d in diffs if d.status == DiffStatus.REMOVED)
+    mismatch = sum(1 for d in diffs if d.status == DiffStatus.MISMATCH)
+
+    # Build caption with combined legend and counts
+    caption = (
+        f"[green]+ {added}[/green] added | [red]- {removed}[/red] removed | [yellow]\u2717 {mismatch}[/yellow] mismatch"
+    )
+
+    table = Table(title=title, caption=caption, expand=True)
+    table.add_column("Key")
+    table.add_column("Expected", justify="center")
+    table.add_column("Actual", justify="center")
+    table.add_column("Status", justify="center", width=8)
+
+    status_styles = {
+        DiffStatus.ADDED: "green",
+        DiffStatus.REMOVED: "red",
+        DiffStatus.MISMATCH: "yellow",
+    }
+
+    for idx, diff in enumerate(diffs):
+        # Add section separator between checks (except before first)
+        if idx > 0:
+            table.add_section()
+
+        status_style = status_styles.get(diff.status, "white")
+
+        # Check row (main row)
+        expected_str = _format_level_score(diff.expected_level, diff.expected_score, diff.expected_score_rule)
+        actual_str = _format_level_score(diff.actual_level, diff.actual_score)
+
+        table.add_row(
+            escape(diff.key),
+            expected_str,
+            actual_str,
+            f"[{status_style}]{diff.status.value}[/{status_style}]",
+        )
+
+        # Observable rows (indented with └──)
+        for obs_idx, obs in enumerate(diff.observable_diffs):
+            is_last_obs = obs_idx == len(diff.observable_diffs) - 1
+            obs_prefix = "└──" if is_last_obs else "├──"
+
+            obs_label = obs.observable_key
+            obs_expected = _format_level_score(obs.expected_level, obs.expected_score)
+            obs_actual = _format_level_score(obs.actual_level, obs.actual_score)
+
+            table.add_row(
+                f"{obs_prefix} [cyan]{escape(obs_label)}[/cyan]",
+                obs_expected,
+                obs_actual,
+                "",
+            )
+
+            # Threat intel rows (indented further with │   └── or     └──)
+            for ti_idx, ti in enumerate(obs.threat_intel_diffs):
+                is_last_ti = ti_idx == len(obs.threat_intel_diffs) - 1
+                # Use │ continuation if not last observable, else spaces
+                continuation = "│   " if not is_last_obs else "    "
+                ti_prefix = "└──" if is_last_ti else "├──"
+
+                ti_expected = _format_level_score(ti.expected_level, ti.expected_score)
+                ti_actual = _format_level_score(ti.actual_level, ti.actual_score)
+
+                table.add_row(
+                    f"{continuation}{ti_prefix} [magenta]{escape(ti.source)}[/magenta]",
+                    ti_expected,
+                    ti_actual,
+                    "",
+                )
+
+    rich_print(table)

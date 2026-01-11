@@ -11,7 +11,7 @@ and investigation export (io_to_invest, io_to_markdown) methods.
 from __future__ import annotations
 
 import threading
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from decimal import Decimal
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Final, Literal, overload
@@ -19,8 +19,9 @@ from typing import TYPE_CHECKING, Any, Final, Literal, overload
 from logurich import logger
 
 from cyvest import keys
+from cyvest.compare import compare_investigations
 from cyvest.investigation import Investigation, InvestigationWhitelist
-from cyvest.io_rich import display_statistics, display_summary
+from cyvest.io_rich import display_diff, display_statistics, display_summary
 from cyvest.io_serialization import (
     generate_markdown_report,
     load_investigation_json,
@@ -28,6 +29,7 @@ from cyvest.io_serialization import (
     save_investigation_markdown,
     serialize_investigation,
 )
+from cyvest.io_visualization import generate_network_graph
 from cyvest.levels import Level
 from cyvest.model import Check, Enrichment, Observable, Tag, Taxonomy, ThreatIntel
 from cyvest.model_enums import ObservableType, PropagationMode, RelationshipDirection, RelationshipType
@@ -1010,8 +1012,6 @@ class Cyvest:
         """
         return serialize_investigation(self._investigation, include_audit_log=include_audit_log)
 
-    # Merge methods
-
     def merge_investigation(self, other: Cyvest) -> None:
         """
         Merge another investigation into this one.
@@ -1030,22 +1030,93 @@ class Cyvest:
         """
         self._investigation.finalize_relationships()
 
+    def compare(
+        self,
+        expected: Cyvest | None = None,
+        result_expected: list | None = None,
+    ) -> list:
+        """
+        Compare this investigation against expected results.
+
+        Args:
+            expected: The reference investigation (expected results), optional
+            result_expected: List of ExpectedResult tolerance rules for specific checks
+
+        Returns:
+            List of DiffItem for all differences found
+        """
+        return compare_investigations(actual=self, expected=expected, result_expected=result_expected)
+
     def display_summary(
         self,
         show_graph: bool = True,
         exclude_levels: Level | Iterable[Level] = Level.NONE,
         show_audit_log: bool = False,
+        rich_print: Callable[[Any], None] | None = None,
     ) -> None:
+        """
+        Display a comprehensive summary of the investigation using Rich.
+
+        Args:
+            show_graph: Whether to display the observable graph
+            exclude_levels: Level(s) to omit from the report (default: Level.NONE)
+            show_audit_log: Whether to display the investigation audit log
+            rich_print: Optional callable that takes a renderable and returns None
+        """
+        if rich_print is None:
+
+            def rich_print(renderables: Any) -> None:
+                logger.rich("INFO", renderables)
+
         display_summary(
             self,
-            lambda renderables: logger.rich("INFO", renderables),
+            rich_print,
             show_graph=show_graph,
             exclude_levels=exclude_levels,
             show_audit_log=show_audit_log,
         )
 
-    def display_statistics(self) -> None:
-        display_statistics(self, lambda renderables: logger.rich("INFO", renderables))
+    def display_statistics(
+        self,
+        rich_print: Callable[[Any], None] | None = None,
+    ) -> None:
+        """
+        Display investigation statistics using Rich.
+
+        Args:
+            rich_print: Optional callable that takes a renderable and returns None.
+                        If not provided, uses the default logger.
+        """
+        if rich_print is None:
+
+            def rich_print(renderables: Any) -> None:
+                logger.rich("INFO", renderables)
+
+        display_statistics(self, rich_print)
+
+    def display_diff(
+        self,
+        expected: Cyvest | None = None,
+        result_expected: list | None = None,
+        title: str = "Diff",
+        rich_print: Callable[[Any], None] | None = None,
+    ) -> None:
+        """
+        Compare and display diff against expected results.
+
+        Args:
+            expected: The reference investigation (expected results), optional
+            result_expected: List of ExpectedResult tolerance rules for specific checks
+            title: Title for the diff table
+            rich_print: Optional callable that takes a renderable and returns None
+        """
+        if rich_print is None:
+
+            def rich_print(renderables):
+                return logger.rich("INFO", renderables, width=150)
+
+        diffs = compare_investigations(actual=self, expected=expected, result_expected=result_expected)
+        display_diff(diffs, rich_print, title=title)
 
     def display_network(
         self,
@@ -1084,8 +1155,6 @@ class Cyvest:
             >>> cv.display_network()
             '/tmp/cyvest_12345/cyvest_network.html'
         """
-        from cyvest.io_visualization import generate_network_graph
-
         return generate_network_graph(
             self,
             output_dir=output_dir,

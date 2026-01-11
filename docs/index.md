@@ -27,6 +27,7 @@ Build, score, and narrate cybersecurity investigations with a single fluent Pyth
 | **Deterministic scoring** | MAX/SUM propagation, centralized audit log, and automatic level classification | `cyvest.score`, [Scoring System](getting-started/concepts.md#scoring-system) |
 | **Fluent helpers** | Builder-style methods with deterministic keys and safe merges | `cyvest.cyvest`, [Quick Start](getting-started/quickstart.md#using-the-fluent-api) |
 | **Shared context** | Thread-safe fragments that can reconcile into a single story | `cyvest.shared.SharedInvestigationContext`, [Guide](shared-investigation-context.md) |
+| **Comparison** | Compare investigations with tolerance rules for regression testing | `cyvest.compare`, [Guide](comparing-investigations.md) |
 | **Reporting** | Export JSON, Markdown, or render rich terminal summaries | `cyvest.io_serialization`, `cyvest.io_rich`, [Quick Start](getting-started/quickstart.md#exporting-results) |
 
 ---
@@ -89,6 +90,7 @@ Cyvest (facade + fluent proxies)
 | Evaluate Cyvest in <10 minutes | [Getting Started](getting-started/quickstart.md) |
 | Understand observables vs. checks | [Core Concepts](getting-started/concepts.md#investigation-structure) |
 | Share state across threads | [Shared Investigation Context](shared-investigation-context.md) |
+| Compare investigations or regression test | [Comparing Investigations](comparing-investigations.md) |
 | Extend scoring or fluent helpers | [Contributing](contributing.md#architecture-overview) |
 | Embed results in other tools | [Quick Start → Exporting Results](getting-started/quickstart.md#exporting-results) |
 

@@ -267,3 +267,98 @@ def test_cli_diff_with_rules_file(tmp_path: Path) -> None:
     rules = [ExpectedResult(check_name="tolerant-check", score=">= 1.0")]
     diffs = compare_investigations(actual, expected, result_expected=rules)
     assert len(diffs) == 0  # No differences with tolerance
+
+
+def _write_detailed_sample(tmp_path: Path) -> Path:
+    """Create a detailed sample investigation for query tests."""
+    from decimal import Decimal
+
+    cv = Cyvest()
+
+    # Create observables with relationships
+    domain_obs = cv.observable(Cyvest.OBS.DOMAIN, "example.com", internal=False)
+    ip_obs = cv.observable(Cyvest.OBS.IPV4, "192.168.1.1", internal=True)
+
+    # Add threat intel to domain
+    domain_obs.with_ti(
+        "virustotal",
+        score=Decimal("6.0"),
+        level=Cyvest.LVL.MALICIOUS,
+        comment="Detected by 10/70 engines",
+        extra={"positives": 10, "total": 70},
+        taxonomies=[{"level": Cyvest.LVL.MALICIOUS, "name": "verdict", "value": "malicious"}],
+    )
+    domain_obs.with_ti(
+        "urlscan",
+        score=Decimal("3.5"),
+        level=Cyvest.LVL.SUSPICIOUS,
+        comment="Phishing detected",
+    )
+
+    # Add relationship
+    domain_obs.relate_to(ip_obs, Cyvest.REL.RELATED_TO, Cyvest.DIR.OUTBOUND)
+
+    # Create check linked to domain
+    check = cv.check("domain-check", "network", "Domain validation check")
+    check.link_observable(domain_obs)
+    check.with_score(Decimal("6.0"))
+
+    sample_path = tmp_path / "detailed_sample.json"
+    cv.io_save_json(sample_path)
+    return sample_path
+
+
+def test_cli_query_check(tmp_path: Path) -> None:
+    """CLI 'query' command displays check information."""
+    sample = _write_detailed_sample(tmp_path)
+    runner = CliRunner()
+
+    result = runner.invoke(cli, ["query", str(sample), "--key", "chk:domain-check"])
+    assert result.exit_code == 0
+
+
+def test_cli_query_observable(tmp_path: Path) -> None:
+    """CLI 'query' command displays observable information with score breakdown."""
+    sample = _write_detailed_sample(tmp_path)
+    runner = CliRunner()
+
+    result = runner.invoke(cli, ["query", str(sample), "-k", "obs:domain:example.com"])
+    assert result.exit_code == 0
+
+
+def test_cli_query_observable_with_depth(tmp_path: Path) -> None:
+    """CLI 'query' command respects depth parameter."""
+    sample = _write_detailed_sample(tmp_path)
+    runner = CliRunner()
+
+    result = runner.invoke(cli, ["query", str(sample), "-k", "obs:domain:example.com", "--depth", "2"])
+    assert result.exit_code == 0
+
+
+def test_cli_query_threat_intel(tmp_path: Path) -> None:
+    """CLI 'query' command displays threat intel information."""
+    sample = _write_detailed_sample(tmp_path)
+    runner = CliRunner()
+
+    result = runner.invoke(cli, ["query", str(sample), "-k", "ti:virustotal:obs:domain:example.com"])
+    assert result.exit_code == 0
+
+
+def test_cli_query_invalid_key(tmp_path: Path) -> None:
+    """CLI 'query' command rejects invalid key formats."""
+    sample = _write_detailed_sample(tmp_path)
+    runner = CliRunner()
+
+    result = runner.invoke(cli, ["query", str(sample), "-k", "invalid-key"])
+    assert result.exit_code != 0
+    assert "Invalid key format" in result.output
+
+
+def test_cli_query_not_found(tmp_path: Path) -> None:
+    """CLI 'query' command handles missing objects gracefully."""
+    sample = _write_detailed_sample(tmp_path)
+    runner = CliRunner()
+
+    result = runner.invoke(cli, ["query", str(sample), "-k", "chk:nonexistent"])
+    assert result.exit_code != 0
+    assert "not found" in result.output

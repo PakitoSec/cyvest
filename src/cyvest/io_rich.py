@@ -6,18 +6,21 @@ Provides formatted display of investigation results using the Rich library.
 
 from __future__ import annotations
 
+import json
 from collections.abc import Callable, Iterable
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 from typing import TYPE_CHECKING, Any
 
 from rich.align import Align
+from rich.console import Group
 from rich.markup import escape
+from rich.panel import Panel
 from rich.rule import Rule
 from rich.table import Table
 from rich.tree import Tree
 
-from cyvest.levels import Level, get_color_level, get_color_score, normalize_level
+from cyvest.levels import Level, get_color_level, get_color_score, get_level_from_score, normalize_level
 from cyvest.model import Observable, Relationship, RelationshipDirection, _format_score_decimal
 
 if TYPE_CHECKING:
@@ -664,3 +667,486 @@ def display_diff(
                 )
 
     rich_print(table)
+
+
+def _format_extra_data(extra: dict[str, Any]) -> str:
+    """Format extra data as a compact JSON string."""
+    if not extra:
+        return "[dim]-[/dim]"
+    try:
+        return escape(json.dumps(extra, indent=2, default=str))
+    except (TypeError, ValueError):
+        return escape(str(extra))
+
+
+def _build_ti_tree_for_observable(
+    ti_list: list,
+    parent_tree: Tree,
+) -> None:
+    """Build a tree of threat intel entries for an observable."""
+    for ti in ti_list:
+        color_level = get_color_level(ti.level)
+        color_score = get_color_score(ti.score)
+        ti_label = (
+            f"[magenta]{escape(ti.source)}[/magenta] "
+            f"[{color_score}]{ti.score_display}[/{color_score}] "
+            f"[bold {color_level}]{ti.level.name}[/bold {color_level}]"
+        )
+        ti_node = parent_tree.add(ti_label)
+
+        # Add taxonomies as children
+        if ti.taxonomies:
+            for tax in ti.taxonomies:
+                tax_color = get_color_level(tax.level)
+                tax_label = f"[{tax_color}]{tax.level.name}[/{tax_color}] {escape(tax.name)}: {escape(tax.value)}"
+                ti_node.add(tax_label)
+
+        # Add comment if present
+        if ti.comment:
+            ti_node.add(f"[dim]Comment:[/dim] {escape(ti.comment)}")
+
+
+def _build_relationship_tree_depth(
+    obs_key: str,
+    all_observables: dict[str, Any],
+    all_threat_intels: dict[str, Any],
+    max_depth: int,
+) -> Tree:
+    """Build a tree showing relationships up to max_depth with scores and levels."""
+    tree = Tree(f"[bold]Relationships[/bold] (depth={max_depth})")
+
+    if max_depth < 1:
+        tree.add("[dim]No relationships (depth=0)[/dim]")
+        return tree
+
+    obs = all_observables.get(obs_key)
+    if not obs:
+        return tree
+
+    # Build reverse relationship map
+    reverse_relationships: dict[str, list[tuple[Any, Relationship]]] = {}
+    for source_obs in all_observables.values():
+        for rel in source_obs.relationships:
+            reverse_relationships.setdefault(rel.target_key, []).append((source_obs, rel))
+
+    visited: set[str] = {obs_key}
+
+    def _add_relationships(current_obs: Any, parent_tree: Tree, depth: int) -> None:
+        if depth > max_depth:
+            return
+
+        # Outbound relationships
+        for rel in current_obs.relationships:
+            target_obs = all_observables.get(rel.target_key)
+            if not target_obs or target_obs.key in visited:
+                continue
+
+            visited.add(target_obs.key)
+            direction_symbol = _get_direction_symbol(rel, reversed_edge=False)
+            color_level = get_color_level(target_obs.level)
+            color_score = get_color_score(target_obs.score)
+
+            rel_label = (
+                f"{direction_symbol} [dim]{rel.relationship_type_name}[/dim] "
+                f"[bold]{escape(target_obs.key)}[/bold] "
+                f"[{color_score}]{target_obs.score_display}[/{color_score}] "
+                f"[bold {color_level}]{target_obs.level.name}[/bold {color_level}]"
+            )
+            child_node = parent_tree.add(rel_label)
+
+            if depth < max_depth:
+                _add_relationships(target_obs, child_node, depth + 1)
+
+        # Inbound relationships
+        for source_obs, rel in reverse_relationships.get(current_obs.key, []):
+            if source_obs.key == current_obs.key or source_obs.key in visited:
+                continue
+
+            visited.add(source_obs.key)
+            direction_symbol = _get_direction_symbol(rel, reversed_edge=True)
+            color_level = get_color_level(source_obs.level)
+            color_score = get_color_score(source_obs.score)
+
+            rel_label = (
+                f"{direction_symbol} [dim]{rel.relationship_type_name}[/dim] "
+                f"[bold]{escape(source_obs.key)}[/bold] "
+                f"[{color_score}]{source_obs.score_display}[/{color_score}] "
+                f"[bold {color_level}]{source_obs.level.name}[/bold {color_level}]"
+            )
+            child_node = parent_tree.add(rel_label)
+
+            if depth < max_depth:
+                _add_relationships(source_obs, child_node, depth + 1)
+
+    _add_relationships(obs, tree, 1)
+
+    return tree
+
+
+def display_check_query(
+    cv: Cyvest,
+    check_key: str,
+    rich_print: Callable[[Any], None],
+) -> None:
+    """
+    Display detailed information about a check.
+
+    Args:
+        cv: Cyvest investigation
+        check_key: Key of the check to display
+        rich_print: Rich renderable handler
+
+    Raises:
+        KeyError: If check not found
+    """
+    check = cv.check_get(check_key)
+    if check is None:
+        raise KeyError(f"Check '{check_key}' not found in investigation.")
+
+    color_level = get_color_level(check.level)
+    color_score = get_color_score(check.score)
+
+    # Build info table
+    table = Table(show_header=False, box=None)
+    table.add_column("Field", style="cyan")
+    table.add_column("Value")
+
+    table.add_row("Key", f"[bold]{escape(check.key)}[/bold]")
+    table.add_row("Name", escape(check.check_name))
+    table.add_row("Description", escape(check.description) if check.description else "[dim]-[/dim]")
+    table.add_row(
+        "Score",
+        f"[bold {color_score}]{check.score_display}[/bold {color_score}]",
+    )
+    table.add_row(
+        "Level",
+        f"[bold {color_level}]{check.level.name}[/bold {color_level}]",
+    )
+    table.add_row("Comment", escape(check.comment) if check.comment else "[dim]-[/dim]")
+    table.add_row(
+        "Origin Investigation",
+        escape(check.origin_investigation_id) if check.origin_investigation_id else "[dim]-[/dim]",
+    )
+
+    # Extra data
+    if check.extra:
+        table.add_row("Extra", _format_extra_data(check.extra))
+
+    rich_print(
+        Panel(
+            table,
+            title=f"[bold]Check:[/bold] {escape(check.check_name)}",
+            border_style="blue",
+            expand=False,
+        )
+    )
+
+    # Linked observables tree
+    observable_links = check.observable_links
+    if observable_links:
+        all_observables = cv.observable_get_all()
+
+        tree = Tree("[bold]Linked Observables[/bold]")
+
+        for link in observable_links:
+            obs = all_observables.get(link.observable_key)
+            if not obs:
+                tree.add(f"[dim]{escape(link.observable_key)} (not found)[/dim]")
+                continue
+
+            obs_color_level = get_color_level(obs.level)
+            obs_color_score = get_color_score(obs.score)
+            whitelisted_str = " [green]WHITELISTED[/green]" if obs.whitelisted else ""
+            prop_mode = f" [dim]({link.propagation_mode.value})[/dim]" if hasattr(link, "propagation_mode") else ""
+
+            obs_label = (
+                f"[bold]{escape(obs.key)}[/bold] "
+                f"[{obs_color_score}]{obs.score_display}[/{obs_color_score}] "
+                f"[bold {obs_color_level}]{obs.level.name}[/bold {obs_color_level}]"
+                f"{whitelisted_str}{prop_mode}"
+            )
+            obs_node = tree.add(obs_label)
+
+            # Add threat intel for this observable
+            for ti in obs.threat_intels:
+                ti_color_level = get_color_level(ti.level)
+                ti_color_score = get_color_score(ti.score)
+                ti_label = (
+                    f"[magenta]{escape(ti.source)}[/magenta] "
+                    f"[{ti_color_score}]{ti.score_display}[/{ti_color_score}] "
+                    f"[bold {ti_color_level}]{ti.level.name}[/bold {ti_color_level}]"
+                )
+                obs_node.add(ti_label)
+
+        rich_print(Panel(tree, border_style="green", expand=False))
+
+
+def display_observable_query(
+    cv: Cyvest,
+    observable_key: str,
+    rich_print: Callable[[Any], None],
+    *,
+    depth: int = 1,
+) -> None:
+    """
+    Display detailed information about an observable.
+
+    Args:
+        cv: Cyvest investigation
+        observable_key: Key of the observable to display
+        rich_print: Rich renderable handler
+        depth: Relationship traversal depth (default 1)
+
+    Raises:
+        KeyError: If observable not found
+    """
+    obs = cv.observable_get(observable_key)
+    if obs is None:
+        raise KeyError(f"Observable '{observable_key}' not found in investigation.")
+
+    color_level = get_color_level(obs.level)
+    color_score = get_color_score(obs.score)
+
+    # Build info table
+    obs_type_str = obs.obs_type.value if hasattr(obs.obs_type, "value") else str(obs.obs_type)
+    table = Table(show_header=False, box=None)
+    table.add_column("Field", style="cyan")
+    table.add_column("Value")
+
+    table.add_row("Key", f"[bold]{escape(obs.key)}[/bold]")
+    table.add_row("Type", escape(obs_type_str))
+    table.add_row("Value", escape(obs.value))
+    table.add_row(
+        "Score",
+        f"[bold {color_score}]{obs.score_display}[/bold {color_score}]",
+    )
+    table.add_row(
+        "Level",
+        f"[bold {color_level}]{obs.level.name}[/bold {color_level}]",
+    )
+    table.add_row("Internal", "[green]Yes[/green]" if obs.internal else "[yellow]No[/yellow]")
+    table.add_row("Whitelisted", "[green]Yes[/green]" if obs.whitelisted else "[dim]No[/dim]")
+    table.add_row("Comment", escape(obs.comment) if obs.comment else "[dim]-[/dim]")
+
+    # Check links
+    if obs.check_links:
+        checks_str = ", ".join(escape(ck) for ck in obs.check_links)
+        table.add_row("Linked Checks", f"[cyan]{checks_str}[/cyan]")
+
+    # Extra data
+    if obs.extra:
+        table.add_row("Extra", _format_extra_data(obs.extra))
+
+    rich_print(
+        Panel(
+            table,
+            title=f"[bold]Observable:[/bold] {escape(obs_type_str)}",
+            border_style="green",
+            expand=False,
+        )
+    )
+
+    # Build score breakdown, threat intel, and relationships panel
+    all_observables = cv.observable_get_all()
+    renderables = []
+
+    # Get score mode from investigation
+    score_mode = "MAX"
+    try:
+        score_mode = cv._investigation._score_engine._score_mode_obs.value.upper()
+    except AttributeError:
+        pass
+
+    # Score breakdown table
+    ti_scores: list[Decimal] = []
+    child_scores: list[Decimal] = []
+
+    if obs.threat_intels or obs.relationships:
+        score_table = Table(title=f"[bold]Score Breakdown[/bold] (mode: {score_mode})")
+        score_table.add_column("Source", style="cyan")
+        score_table.add_column("Score", justify="right")
+        score_table.add_column("Level", justify="center")
+        score_table.add_column("Type", style="dim")
+
+        # Add threat intel contributions
+        for ti in obs.threat_intels:
+            ti_color_score = get_color_score(ti.score)
+            ti_color_level = get_color_level(ti.level)
+            score_table.add_row(
+                escape(ti.key),
+                f"[{ti_color_score}]{ti.score_display}[/{ti_color_score}]",
+                f"[{ti_color_level}]{ti.level.name}[/{ti_color_level}]",
+                "threat_intel",
+            )
+            ti_scores.append(ti.score)
+
+        # Add child observable contributions (OUTBOUND relationships)
+        for rel in obs.relationships:
+            if rel.direction == RelationshipDirection.OUTBOUND:
+                child = all_observables.get(rel.target_key)
+                if child and child.value != "root":
+                    child_color_score = get_color_score(child.score)
+                    child_color_level = get_color_level(child.level)
+                    score_table.add_row(
+                        escape(child.key),
+                        f"[{child_color_score}]{child.score_display}[/{child_color_score}]",
+                        f"[{child_color_level}]{child.level.name}[/{child_color_level}]",
+                        "child",
+                    )
+                    child_scores.append(child.score)
+
+        # Add computed total row
+        if ti_scores or child_scores:
+            score_table.add_section()
+            if score_mode == "MAX":
+                computed = max(ti_scores + child_scores, default=Decimal("0"))
+                mode_label = "Computed (MAX)"
+            else:
+                max_ti = max(ti_scores, default=Decimal("0"))
+                sum_children = sum(child_scores, Decimal("0"))
+                computed = max_ti + sum_children
+                mode_label = "Computed (SUM)"
+
+            computed_color_score = get_color_score(computed)
+            computed_level = get_level_from_score(computed)
+            computed_color_level = get_color_level(computed_level)
+            score_table.add_row(
+                f"[bold]{mode_label}[/bold]",
+                f"[bold {computed_color_score}]{_format_score_decimal(computed)}[/bold {computed_color_score}]",
+                f"[bold {computed_color_level}]{computed_level.name}[/bold {computed_color_level}]",
+                "",
+            )
+            renderables.append(score_table)
+
+    # Threat intelligence tree
+    if obs.threat_intels:
+        if renderables:
+            renderables.append("")
+        ti_tree = Tree("[bold]Threat Intelligence[/bold]")
+        _build_ti_tree_for_observable(obs.threat_intels, ti_tree)
+        renderables.append(ti_tree)
+
+    # Relationships tree
+    if depth > 0:
+        rel_tree = _build_relationship_tree_depth(
+            observable_key,
+            all_observables,
+            cv.threat_intel_get_all(),
+            depth,
+        )
+        if renderables:
+            renderables.append("")
+        renderables.append(rel_tree)
+
+    if renderables:
+        rich_print(Panel(Group(*renderables), border_style="magenta", expand=False))
+    else:
+        rich_print("[dim]No score contributions (no threat intel or child observables)[/dim]")
+
+
+def display_threat_intel_query(
+    cv: Cyvest,
+    ti_key: str,
+    rich_print: Callable[[Any], None],
+) -> None:
+    """
+    Display detailed information about a threat intel entry.
+
+    Args:
+        cv: Cyvest investigation
+        ti_key: Key of the threat intel to display
+        rich_print: Rich renderable handler
+
+    Raises:
+        KeyError: If threat intel not found
+    """
+    ti = cv.threat_intel_get(ti_key)
+    if ti is None:
+        raise KeyError(f"Threat intel '{ti_key}' not found in investigation.")
+
+    color_level = get_color_level(ti.level)
+    color_score = get_color_score(ti.score)
+
+    # Build info table
+    table = Table(show_header=False, box=None)
+    table.add_column("Field", style="cyan")
+    table.add_column("Value")
+
+    table.add_row("Key", f"[bold]{escape(ti.key)}[/bold]")
+    table.add_row("Source", f"[magenta]{escape(ti.source)}[/magenta]")
+    table.add_row("Observable", f"[cyan]{escape(ti.observable_key)}[/cyan]")
+    table.add_row(
+        "Score",
+        f"[bold {color_score}]{ti.score_display}[/bold {color_score}]",
+    )
+    table.add_row(
+        "Level",
+        f"[bold {color_level}]{ti.level.name}[/bold {color_level}]",
+    )
+    table.add_row("Comment", escape(ti.comment) if ti.comment else "[dim]-[/dim]")
+
+    rich_print(
+        Panel(
+            table,
+            title=f"[bold]Threat Intel:[/bold] {escape(ti.source)}",
+            border_style="magenta",
+            expand=False,
+        )
+    )
+
+    # Taxonomies tree
+    if ti.taxonomies:
+        tax_tree = Tree("[bold]Taxonomies[/bold]")
+        for tax in ti.taxonomies:
+            tax_color = get_color_level(tax.level)
+            tax_label = (
+                f"[{tax_color}]{tax.level.name}[/{tax_color}] {escape(tax.name)}: [bold]{escape(tax.value)}[/bold]"
+            )
+            tax_tree.add(tax_label)
+        rich_print(tax_tree)
+
+    # Extra data
+    if ti.extra:
+        extra_str = _format_extra_data(ti.extra)
+        extra_panel = Panel(
+            extra_str,
+            title="[bold]Extra Data[/bold]",
+            border_style="dim",
+        )
+        rich_print(extra_panel)
+
+    # Show linked observable info
+    obs = cv.observable_get(ti.observable_key)
+    if obs:
+        obs_color_level = get_color_level(obs.level)
+        obs_color_score = get_color_score(obs.score)
+        obs_type_str = obs.obs_type.value if hasattr(obs.obs_type, "value") else str(obs.obs_type)
+
+        obs_table = Table(
+            show_header=False,
+            box=None,
+        )
+        obs_table.add_column("Field", style="cyan")
+        obs_table.add_column("Value")
+
+        obs_table.add_row("Key", f"[bold]{escape(obs.key)}[/bold]")
+        obs_table.add_row("Type", escape(obs_type_str))
+        obs_table.add_row("Value", escape(obs.value))
+        obs_table.add_row(
+            "Score",
+            f"[{obs_color_score}]{obs.score_display}[/{obs_color_score}]",
+        )
+        obs_table.add_row(
+            "Level",
+            f"[{obs_color_level}]{obs.level.name}[/{obs_color_level}]",
+        )
+
+        # Combine table and threat intel tree in one panel
+        if obs.threat_intels:
+            obs_ti_tree = Tree("[bold]Threat Intelligence[/bold]")
+            _build_ti_tree_for_observable(obs.threat_intels, obs_ti_tree)
+            content = Group(obs_table, "", obs_ti_tree)
+        else:
+            content = obs_table
+
+        rich_print(Panel(content, title="[bold]Linked Observable[/bold]", border_style="green", expand=False))

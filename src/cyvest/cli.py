@@ -18,10 +18,11 @@ from rich.console import Console
 
 from cyvest import __version__
 from cyvest.compare import ExpectedResult, compare_investigations
-from cyvest.io_rich import display_diff
+from cyvest.io_rich import display_check_query, display_diff, display_observable_query, display_threat_intel_query
 from cyvest.io_schema import get_investigation_schema
 from cyvest.io_serialization import load_investigation_json
 from cyvest.io_visualization import VisualizationDependencyMissingError
+from cyvest.keys import parse_key_type
 
 CONTEXT_SETTINGS = {"help_option_names": ["-h", "--help"]}
 console = Console()
@@ -416,6 +417,65 @@ def diff(actual: Path, expected: Path, rules: Path | None, title: str) -> None:
 
     # Display diff table
     display_diff(diffs, lambda r: logger.rich("INFO", r, width=150), title=title)
+
+
+@cli.command()
+@click.argument("input", type=click.Path(exists=True, dir_okay=False, path_type=Path))
+@click.option(
+    "-k",
+    "--key",
+    required=True,
+    help="Key of the object to query (chk:..., obs:..., or ti:...).",
+)
+@click.option(
+    "-d",
+    "--depth",
+    type=int,
+    default=1,
+    show_default=True,
+    help="Relationship traversal depth for observable queries.",
+)
+def query(input: Path, key: str, depth: int) -> None:
+    """
+    Query a specific object from an investigation file by its key.
+
+    Displays detailed information about the object, including linked
+    objects, scores, levels, and how scores were calculated.
+
+    \b
+    Supports querying:
+    - Checks: --key chk:check-name
+    - Observables: --key obs:type:value
+    - Threat Intel: --key ti:source:obs:type:value
+
+    \b
+    Examples:
+        cyvest query investigation.json --key chk:dns-check
+        cyvest query investigation.json --key obs:domain:example.com --depth 2
+        cyvest query investigation.json -k ti:virustotal:obs:domain:example.com
+    """
+    cv = load_investigation_json(input)
+
+    # Determine key type
+    key_type = parse_key_type(key)
+
+    if key_type is None or key_type not in ("chk", "obs", "ti"):
+        raise click.ClickException(f"Invalid key format: '{key}'. Expected chk:..., obs:..., or ti:...")
+
+    logger.info(f"[cyan]Querying: {key}[/cyan]\n")
+
+    def rich_print(r):
+        return logger.rich("INFO", r, prefix=False)
+
+    try:
+        if key_type == "chk":
+            display_check_query(cv, key, rich_print)
+        elif key_type == "obs":
+            display_observable_query(cv, key, rich_print, depth=depth)
+        elif key_type == "ti":
+            display_threat_intel_query(cv, key, rich_print)
+    except KeyError as exc:
+        raise click.ClickException(str(exc)) from exc
 
 
 def main() -> None:

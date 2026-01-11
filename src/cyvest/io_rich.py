@@ -373,48 +373,14 @@ def display_summary(
     table.add_column("Score", justify="right")
     table.add_column("Level", justify="center")
 
-    # Checks section
-    rule = Rule("[bold magenta]CHECKS[/bold magenta]")
-    table.add_row(rule, "-", "-")
-
-    checks = [c for c in cv.check_get_all().values() if c.level not in resolved_excluded_levels]
-    checks = sorted(checks, key=_sort_key_by_score)
-    for check in checks:
-        color_level = get_color_level(check.level)
-        color_score = get_color_score(check.score)
-        name = f"  {check.check_name}"
-        score = f"[{color_score}]{check.score_display}[/{color_score}]"
-        level = f"[{color_level}]{check.level.name}[/{color_level}]"
-        table.add_row(name, score, level)
-
-    # Tags section (if any)
-    if cv.tag_get_all():
-        table.add_section()
-        rule = Rule("[bold magenta]TAGS[/bold magenta]")
-        table.add_row(rule, "-", "-")
-
-        for tag in cv.tag_get_all().values():
-            agg_score = tag.get_aggregated_score()
-            agg_level = tag.get_aggregated_level()
-            color_level = get_color_level(agg_level)
-            color_score = get_color_score(agg_score)
-
-            name = f"  {tag.name}"
-            score = f"[{color_score}]{agg_score:.2f}[/{color_score}]"
-            level = f"[{color_level}]{agg_level.name}[/{color_level}]"
-            table.add_row(name, score, level)
-
     # Checks by level section
-    table.add_section()
-    rule = Rule("[bold magenta]BY LEVEL[/bold magenta]")
+    rule = Rule(f"[bold magenta]CHECKS[/bold magenta]: {len(cv.check_get_all())} checks")
     table.add_row(rule, "-", "-")
 
-    for level_enum in [Level.MALICIOUS, Level.SUSPICIOUS, Level.NOTABLE, Level.SAFE, Level.INFO, Level.TRUSTED]:
+    for level_enum in sorted(Level, reverse=True):
         if level_enum in resolved_excluded_levels:
             continue
-        checks = [
-            c for c in cv.check_get_all().values() if c.level == level_enum and c.level not in resolved_excluded_levels
-        ]
+        checks = [c for c in cv.check_get_all().values() if c.level == level_enum]
         checks = sorted(checks, key=_sort_key_by_score)
         if checks:
             color_level = get_color_level(level_enum)
@@ -430,6 +396,23 @@ def display_summary(
                 score = f"[{color_score}]{check.score_display}[/{color_score}]"
                 level = f"[{color_level}]{check.level.name}[/{color_level}]"
                 table.add_row(name, score, level)
+
+    # Tags section (if any)
+    if cv.tag_get_all():
+        table.add_section()
+        rule = Rule(f"[bold magenta]TAGS[/bold magenta]: {len(cv.tag_get_all())} tags")
+        table.add_row(rule, "-", "-")
+
+        for tag in cv.tag_get_all().values():
+            agg_score = tag.get_aggregated_score()
+            agg_level = tag.get_aggregated_level()
+            color_level = get_color_level(agg_level)
+            color_score = get_color_score(agg_score)
+
+            name = f"  {tag.name}"
+            score = f"[{color_score}]{agg_score:.2f}[/{color_score}]"
+            level = f"[{color_level}]{agg_level.name}[/{color_level}]"
+            table.add_row(name, score, level)
 
     # Enrichments section (if any)
     if cv.enrichment_get_all():
@@ -617,7 +600,7 @@ def display_diff(
         f"[green]+ {added}[/green] added | [red]- {removed}[/red] removed | [yellow]\u2717 {mismatch}[/yellow] mismatch"
     )
 
-    table = Table(title=title, caption=caption, expand=True)
+    table = Table(title=title, caption=caption)
     table.add_column("Key")
     table.add_column("Expected", justify="center")
     table.add_column("Actual", justify="center")

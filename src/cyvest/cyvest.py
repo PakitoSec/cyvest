@@ -4,7 +4,7 @@ Cyvest facade - high-level API for building cybersecurity investigations.
 Provides a simplified interface for creating and managing investigation objects,
 handling score propagation, and generating reports.
 
-Includes JSON/Markdown export (io_save_json, io_save_markdown), import (io_load_json),
+Includes JSON/Markdown export (io_save_json, io_save_markdown), import (io_load_json, io_load_dict),
 and investigation export (io_to_invest, io_to_markdown) methods.
 """
 
@@ -24,6 +24,7 @@ from cyvest.investigation import Investigation, InvestigationWhitelist
 from cyvest.io_rich import display_diff, display_statistics, display_summary
 from cyvest.io_serialization import (
     generate_markdown_report,
+    load_investigation_dict,
     load_investigation_json,
     save_investigation_json,
     save_investigation_markdown,
@@ -102,6 +103,28 @@ class Cyvest:
             >>> cv = Cyvest.io_load_json("/absolute/path/to/investigation.json")
         """
         return load_investigation_json(filepath)
+
+    @staticmethod
+    def io_load_dict(data: dict[str, Any]) -> Cyvest:
+        """
+        Load an investigation from a dictionary (parsed JSON).
+
+        Args:
+            data: Dictionary containing the serialized investigation data
+
+        Returns:
+            Reconstructed Cyvest investigation
+
+        Raises:
+            ValueError: If required fields are missing or invalid
+
+        Example:
+            >>> import json
+            >>> with open("investigation.json") as f:
+            ...     data = json.load(f)
+            >>> cv = Cyvest.io_load_dict(data)
+        """
+        return load_investigation_dict(data)
 
     def shared_context(
         self,

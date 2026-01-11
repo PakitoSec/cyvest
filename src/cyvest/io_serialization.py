@@ -236,21 +236,18 @@ def save_investigation_markdown(
         f.write(markdown)
 
 
-def load_investigation_json(filepath: str | Path) -> Cyvest:
+def load_investigation_dict(data: dict[str, Any]) -> Cyvest:
     """
-    Load an investigation from a JSON file into a Cyvest object.
+    Load an investigation from a dictionary (parsed JSON) into a Cyvest object.
 
     Args:
-        filepath: Path to the JSON file
+        data: Dictionary containing the serialized investigation data
 
     Returns:
         Reconstructed Cyvest investigation
     """
     from cyvest.cyvest import Cyvest
     from cyvest.investigation import Investigation
-
-    with open(filepath, encoding="utf-8") as handle:
-        data = json.load(handle)
 
     investigation_id = data.get("investigation_id")
     if not isinstance(investigation_id, str) or not investigation_id.strip():
@@ -443,3 +440,19 @@ def load_investigation_json(filepath: str | Path) -> Cyvest:
     cv._investigation._audit_enabled = True
 
     return cv
+
+
+def load_investigation_json(filepath: str | Path) -> Cyvest:
+    """
+    Load an investigation from a JSON file into a Cyvest object.
+
+    Args:
+        filepath: Path to the JSON file
+
+    Returns:
+        Reconstructed Cyvest investigation
+    """
+    with open(filepath, encoding="utf-8") as handle:
+        data = json.load(handle)
+
+    return load_investigation_dict(data)

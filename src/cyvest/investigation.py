@@ -358,7 +358,6 @@ class Investigation:
             details={"old_name": old_name, "new_name": name},
         )
 
-
     def _merge_observable(self, existing: Observable, incoming: Observable) -> tuple[Observable, list]:
         """
         Merge an incoming observable into an existing observable.
@@ -901,7 +900,6 @@ class Investigation:
         )
         return tag
 
-
     def add_relationship(
         self,
         source: Observable | str,
@@ -1270,7 +1268,6 @@ class Investigation:
         """Get all tags."""
         return self._tags.copy()
 
-
     def get_global_score(self) -> Decimal:
         """Get the global investigation score."""
         return self._score_engine.get_global_score()
@@ -1439,7 +1436,6 @@ class Investigation:
                     },
                 )
         self._score_engine.recalculate_all()
-
 
     def merge_investigation(self, other: Investigation) -> None:
         """

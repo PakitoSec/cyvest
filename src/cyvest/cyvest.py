@@ -5,7 +5,7 @@ Provides a simplified interface for creating and managing investigation objects,
 handling score propagation, and generating reports.
 
 Includes JSON/Markdown export (io_save_json, io_save_markdown), import (io_load_json, io_load_dict),
-and investigation export (io_to_invest, io_to_markdown) methods.
+and investigation export (io_to_invest, io_to_dict, io_to_markdown) methods.
 """
 
 from __future__ import annotations
@@ -82,68 +82,7 @@ class Cyvest:
             investigation_id=investigation_id,
         )
 
-    @staticmethod
-    def io_load_json(filepath: str | Path) -> Cyvest:
-        """
-        Load an investigation from a JSON file.
-
-        Args:
-            filepath: Path to the JSON file (relative or absolute)
-
-        Returns:
-            Reconstructed Cyvest investigation
-
-        Raises:
-            FileNotFoundError: If the file does not exist
-            json.JSONDecodeError: If the file contains invalid JSON
-            Exception: For other file-related errors
-
-        Example:
-            >>> cv = Cyvest.io_load_json("investigation.json")
-            >>> cv = Cyvest.io_load_json("/absolute/path/to/investigation.json")
-        """
-        return load_investigation_json(filepath)
-
-    @staticmethod
-    def io_load_dict(data: dict[str, Any]) -> Cyvest:
-        """
-        Load an investigation from a dictionary (parsed JSON).
-
-        Args:
-            data: Dictionary containing the serialized investigation data
-
-        Returns:
-            Reconstructed Cyvest investigation
-
-        Raises:
-            ValueError: If required fields are missing or invalid
-
-        Example:
-            >>> import json
-            >>> with open("investigation.json") as f:
-            ...     data = json.load(f)
-            >>> cv = Cyvest.io_load_dict(data)
-        """
-        return load_investigation_dict(data)
-
-    def shared_context(
-        self,
-        *,
-        lock: threading.RLock | None = None,
-        max_async_workers: int | None = None,
-    ) -> SharedInvestigationContext:
-        """
-        Create a SharedInvestigationContext tied to this Cyvest instance.
-
-        Args:
-            lock: Optional shared lock for advanced synchronization scenarios.
-            max_async_workers: Optional limit for concurrent async reconciliation workers.
-        """
-        from cyvest.shared import SharedInvestigationContext
-
-        return SharedInvestigationContext(self, lock=lock, max_async_workers=max_async_workers)
-
-    # Internal helpers -------------------------------------------------
+    # Internal helpers
 
     def _observable_proxy(self, observable: Observable | None) -> ObservableProxy | None:
         if observable is None:
@@ -171,7 +110,7 @@ class Cyvest:
         return EnrichmentProxy(self._investigation, enrichment.key)
 
     @staticmethod
-    def _resolve_key(value: Observable | ObservableProxy | str) -> str:
+    def _resolve_observable_key(value: Observable | ObservableProxy | str) -> str:
         if isinstance(value, str):
             return value
         if isinstance(value, (Observable, ObservableProxy)):
@@ -395,8 +334,8 @@ class Cyvest:
         Raises:
             KeyError: If the source or target observable does not exist
         """
-        source_key = self._resolve_key(source)
-        target_key = self._resolve_key(target)
+        source_key = self._resolve_observable_key(source)
+        target_key = self._resolve_observable_key(target)
         result = self._investigation.add_relationship(source_key, target_key, relationship_type, direction)
         return self._observable_proxy(result)
 
@@ -428,7 +367,7 @@ class Cyvest:
         Raises:
             KeyError: If the observable does not exist
         """
-        observable_key = self._resolve_key(observable)
+        observable_key = self._resolve_observable_key(observable)
         observable = self._require_observable(observable_key)
 
         ti_kwargs: dict[str, Any] = {
@@ -466,7 +405,7 @@ class Cyvest:
         if not isinstance(threat_intel, ThreatIntel):
             raise TypeError("Threat intel draft must be a ThreatIntel instance.")
 
-        observable_key = self._resolve_key(observable)
+        observable_key = self._resolve_observable_key(observable)
         model_observable = self._require_observable(observable_key)
 
         if threat_intel.observable_key and threat_intel.observable_key != observable_key:
@@ -499,7 +438,7 @@ class Cyvest:
         Raises:
             KeyError: If the observable does not exist
         """
-        observable_key = self._resolve_key(observable)
+        observable_key = self._resolve_observable_key(observable)
         model_observable = self._require_observable(observable_key)
         self._investigation.apply_level_change(
             model_observable,
@@ -677,7 +616,7 @@ class Cyvest:
         Raises:
             KeyError: If the check or observable does not exist
         """
-        observable_key = self._resolve_key(observable)
+        observable_key = self._resolve_observable_key(observable)
         result = self._investigation.link_check_observable(check_key, observable_key, propagation_mode=propagation_mode)
         return self._check_proxy(result)
 
@@ -1035,6 +974,90 @@ class Cyvest:
         """
         return serialize_investigation(self._investigation, include_audit_log=include_audit_log)
 
+    def io_to_dict(self, *, include_audit_log: bool = True) -> dict[str, Any]:
+        """
+        Convert the investigation to a Python dictionary.
+
+        Args:
+            include_audit_log: Include audit log in output (default: True).
+                When False, audit_log is set to None for compact, deterministic output.
+
+        Returns:
+            Dictionary representation of the investigation
+
+        Examples:
+            >>> cv = Cyvest()
+            >>> data = cv.io_to_dict()
+            >>> print(data["score"], data["level"])
+            >>> # For compact, deterministic output:
+            >>> data = cv.io_to_dict(include_audit_log=False)
+            >>> assert data["audit_log"] is None
+        """
+        return self.io_to_invest(include_audit_log=include_audit_log).model_dump(by_alias=True)
+
+    @staticmethod
+    def io_load_json(filepath: str | Path) -> Cyvest:
+        """
+        Load an investigation from a JSON file.
+
+        Args:
+            filepath: Path to the JSON file (relative or absolute)
+
+        Returns:
+            Reconstructed Cyvest investigation
+
+        Raises:
+            FileNotFoundError: If the file does not exist
+            json.JSONDecodeError: If the file contains invalid JSON
+            Exception: For other file-related errors
+
+        Example:
+            >>> cv = Cyvest.io_load_json("investigation.json")
+            >>> cv = Cyvest.io_load_json("/absolute/path/to/investigation.json")
+        """
+        return load_investigation_json(filepath)
+
+    @staticmethod
+    def io_load_dict(data: dict[str, Any]) -> Cyvest:
+        """
+        Load an investigation from a dictionary (parsed JSON).
+
+        Args:
+            data: Dictionary containing the serialized investigation data
+
+        Returns:
+            Reconstructed Cyvest investigation
+
+        Raises:
+            ValueError: If required fields are missing or invalid
+
+        Example:
+            >>> import json
+            >>> with open("investigation.json") as f:
+            ...     data = json.load(f)
+            >>> cv = Cyvest.io_load_dict(data)
+        """
+        return load_investigation_dict(data)
+
+    # Shared context, investigation merging, finalization, comparison
+
+    def shared_context(
+        self,
+        *,
+        lock: threading.RLock | None = None,
+        max_async_workers: int | None = None,
+    ) -> SharedInvestigationContext:
+        """
+        Create a SharedInvestigationContext tied to this Cyvest instance.
+
+        Args:
+            lock: Optional shared lock for advanced synchronization scenarios.
+            max_async_workers: Optional limit for concurrent async reconciliation workers.
+        """
+        from cyvest.shared import SharedInvestigationContext
+
+        return SharedInvestigationContext(self, lock=lock, max_async_workers=max_async_workers)
+
     def merge_investigation(self, other: Cyvest) -> None:
         """
         Merge another investigation into this one.
@@ -1069,6 +1092,8 @@ class Cyvest:
             List of DiffItem for all differences found
         """
         return compare_investigations(actual=self, expected=expected, result_expected=result_expected)
+
+    # Display helpers
 
     def display_summary(
         self,

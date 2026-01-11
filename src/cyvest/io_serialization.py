@@ -37,7 +37,7 @@ def serialize_investigation(inv: Investigation, *, include_audit_log: bool = Tru
     Returns:
         InvestigationSchema instance (use .model_dump() for dict)
     """
-    inv._refresh_check_links()
+    inv._rebuild_all_check_links()
     observables = dict(inv.get_all_observables())
     threat_intels = dict(inv.get_all_threat_intels())
     enrichments = dict(inv.get_all_enrichments())
@@ -428,7 +428,7 @@ def load_investigation_dict(data: dict[str, Any]) -> Cyvest:
     for tag_info in data.get("tags", {}).values():
         build_tag(tag_info)
 
-    cv._investigation._refresh_check_links()
+    cv._investigation._rebuild_all_check_links()
 
     audit_log = []
     for event_info in data.get("audit_log", []) or []:

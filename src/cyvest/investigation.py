@@ -173,12 +173,12 @@ class Investigation:
         # Fallback if no INVESTIGATION_STARTED event (shouldn't happen)
         return datetime.now(timezone.utc)
 
-    def _add_threat_intel_to_observable(self, observable: Observable, ti: ThreatIntel) -> None:
+    def _link_threat_intel_to_observable(self, observable: Observable, ti: ThreatIntel) -> None:
         if any(existing.key == ti.key for existing in observable.threat_intels):
             return
         observable.threat_intels.append(ti)
 
-    def _add_relationship_internal(
+    def _create_relationship(
         self,
         source_obs: Observable,
         target_key: str,
@@ -191,7 +191,7 @@ class Investigation:
         if rel_tuple not in existing_rels:
             source_obs.relationships.append(rel)
 
-    def _add_check_observable_link(self, check: Check, link: ObservableLink) -> bool:
+    def _link_check_to_observable(self, check: Check, link: ObservableLink) -> bool:
         existing: dict[tuple[str, PropagationMode], int] = {}
         for idx, existing_link in enumerate(check.observable_links):
             existing[(existing_link.observable_key, existing_link.propagation_mode)] = idx
@@ -202,12 +202,12 @@ class Investigation:
         check.observable_links.append(link)
         return True
 
-    def _tag_add_check(self, tag: Tag, check: Check) -> None:
+    def _link_check_to_tag(self, tag: Tag, check: Check) -> None:
         if any(existing.key == check.key for existing in tag.checks):
             return
         tag.checks.append(check)
 
-    def _infer_object_type(self, obj: Any) -> str | None:
+    def _get_object_type(self, obj: Any) -> str | None:
         if isinstance(obj, Observable):
             return "observable"
         if isinstance(obj, Check):
@@ -219,6 +219,24 @@ class Investigation:
         if isinstance(obj, Tag):
             return "tag"
         return None
+
+    @staticmethod
+    def _normalize_taxonomies(value: Any) -> list[Taxonomy]:
+        if value is None:
+            return []
+        if not isinstance(value, list):
+            raise TypeError("taxonomies must be a list of taxonomy objects.")
+        taxonomies = [Taxonomy.model_validate(item) for item in value]
+        seen: set[str] = set()
+        duplicates: set[str] = set()
+        for taxonomy in taxonomies:
+            if taxonomy.name in seen:
+                duplicates.add(taxonomy.name)
+            seen.add(taxonomy.name)
+        if duplicates:
+            dupes = ", ".join(sorted(duplicates))
+            raise ValueError(f"Duplicate taxonomy name(s): {dupes}")
+        return taxonomies
 
     def apply_score_change(
         self,
@@ -258,7 +276,7 @@ class Investigation:
 
         self._record_event(
             event_type=event_type,
-            object_type=self._infer_object_type(obj),
+            object_type=self._get_object_type(obj),
             object_key=getattr(obj, "key", None),
             reason=reason,
             details=details,
@@ -282,7 +300,7 @@ class Investigation:
         obj.level = new_level
         self._record_event(
             event_type=event_type,
-            object_type=self._infer_object_type(obj),
+            object_type=self._get_object_type(obj),
             object_key=getattr(obj, "key", None),
             reason=reason,
             details={
@@ -293,16 +311,16 @@ class Investigation:
         )
         return True
 
-    def _sync_check_links_for_observable(self, observable_key: str) -> None:
+    def _update_observable_check_links(self, observable_key: str) -> None:
         obs = self._observables.get(observable_key)
         if not obs:
             return
         check_keys = self._score_engine.get_check_links_for_observable(observable_key)
         obs._check_links = check_keys
 
-    def _refresh_check_links(self) -> None:
+    def _rebuild_all_check_links(self) -> None:
         for observable_key in self._observables:
-            self._sync_check_links_for_observable(observable_key)
+            self._update_observable_check_links(observable_key)
 
     def get_audit_log(self) -> list[AuditEvent]:
         """Return a deep copy of the audit log."""
@@ -340,7 +358,6 @@ class Investigation:
             details={"old_name": old_name, "new_name": name},
         )
 
-    # Private merge methods
 
     def _merge_observable(self, existing: Observable, incoming: Observable) -> tuple[Observable, list]:
         """
@@ -395,7 +412,7 @@ class Investigation:
         existing_ti_keys = {ti.key for ti in existing.threat_intels}
         for ti in incoming.threat_intels:
             if ti.key not in existing_ti_keys:
-                self._add_threat_intel_to_observable(existing, ti)
+                self._link_threat_intel_to_observable(existing, ti)
                 existing_ti_keys.add(ti.key)
 
         # Merge relationships (defer if target not yet available)
@@ -403,7 +420,7 @@ class Investigation:
         for rel in incoming.relationships:
             if rel.target_key in self._observables:
                 # Target exists - add relationship immediately
-                self._add_relationship_internal(existing, rel.target_key, rel.relationship_type, rel.direction)
+                self._create_relationship(existing, rel.target_key, rel.relationship_type, rel.direction)
             else:
                 # Target doesn't exist yet - defer for Pass 2 of merge_investigation()
                 deferred_relationships.append((existing.key, rel))
@@ -580,11 +597,80 @@ class Investigation:
                 self._merge_check(existing_checks_dict[incoming_check.key], incoming_check)
             else:
                 # Add new check
-                self._tag_add_check(existing, incoming_check)
+                self._link_check_to_tag(existing, incoming_check)
 
         return existing
 
-    # Public add methods with merge-on-create
+    def _clone_for_merge(
+        self, other: Investigation
+    ) -> tuple[
+        dict[str, Observable],
+        dict[str, ThreatIntel],
+        dict[str, Check],
+        dict[str, Enrichment],
+        dict[str, Tag],
+    ]:
+        """Clone incoming models while preserving shared object references."""
+        incoming_threat_intels = {key: ti.model_copy(deep=True) for key, ti in other._threat_intels.items()}
+        incoming_checks = {key: check.model_copy(deep=True) for key, check in other._checks.items()}
+        incoming_enrichments = {key: enrichment.model_copy(deep=True) for key, enrichment in other._enrichments.items()}
+
+        orphan_threat_intels: dict[str, ThreatIntel] = {}
+
+        def _copy_threat_intel(ti: ThreatIntel) -> ThreatIntel:
+            if ti.key in incoming_threat_intels:
+                return incoming_threat_intels[ti.key]
+            existing = orphan_threat_intels.get(ti.key)
+            if existing:
+                return existing
+            copied = ti.model_copy(deep=True)
+            orphan_threat_intels[ti.key] = copied
+            return copied
+
+        incoming_observables: dict[str, Observable] = {}
+        for obs in other._observables.values():
+            copied_obs = obs.model_copy(deep=True)
+            if obs.threat_intels:
+                copied_obs.threat_intels = [_copy_threat_intel(ti) for ti in obs.threat_intels]
+            incoming_observables[obs.key] = copied_obs
+
+        orphan_checks: dict[str, Check] = {}
+
+        def _copy_check(check: Check) -> Check:
+            if check.key in incoming_checks:
+                return incoming_checks[check.key]
+            existing = orphan_checks.get(check.key)
+            if existing:
+                return existing
+            copied = check.model_copy(deep=True)
+            orphan_checks[check.key] = copied
+            return copied
+
+        incoming_tags: dict[str, Tag] = {}
+
+        def _copy_tag(tag: Tag) -> Tag:
+            existing = incoming_tags.get(tag.key)
+            if existing:
+                return existing
+            copied = Tag(
+                name=tag.name,
+                description=tag.description,
+                checks=[_copy_check(check) for check in tag.checks],
+                key=tag.key,
+            )
+            incoming_tags[tag.key] = copied
+            return copied
+
+        for tag in other._tags.values():
+            _copy_tag(tag)
+
+        return (
+            incoming_observables,
+            incoming_threat_intels,
+            incoming_checks,
+            incoming_enrichments,
+            incoming_tags,
+        )
 
     def add_observable(self, obs: Observable) -> tuple[Observable, list]:
         """
@@ -605,7 +691,7 @@ class Investigation:
         self._observables[obs.key] = obs
         self._score_engine.register_observable(obs)
         self._stats.register_observable(obs)
-        self._sync_check_links_for_observable(obs.key)
+        self._update_observable_check_links(obs.key)
         self._record_event(
             event_type="OBSERVABLE_CREATED",
             object_type="observable",
@@ -628,7 +714,7 @@ class Investigation:
             self._score_engine.rebuild_link_index()
             self._score_engine.recalculate_all()
             for link in r.observable_links:
-                self._sync_check_links_for_observable(link.observable_key)
+                self._update_observable_check_links(link.observable_key)
             return r
 
         if not getattr(check, "origin_investigation_id", None):
@@ -639,7 +725,7 @@ class Investigation:
         self._score_engine.register_check(check)
         self._stats.register_check(check)
         for link in check.observable_links:
-            self._sync_check_links_for_observable(link.observable_key)
+            self._update_observable_check_links(link.observable_key)
         self._record_event(
             event_type="CHECK_CREATED",
             object_type="check",
@@ -680,7 +766,7 @@ class Investigation:
         self._stats.register_threat_intel(ti)
 
         # Add to observable
-        self._add_threat_intel_to_observable(observable, ti)
+        self._link_threat_intel_to_observable(observable, ti)
 
         # Propagate score
         self._score_engine.propagate_threat_intel_to_observable(ti, observable)
@@ -815,7 +901,6 @@ class Investigation:
         )
         return tag
 
-    # Relationship and linking methods
 
     def add_relationship(
         self,
@@ -871,7 +956,7 @@ class Investigation:
             raise KeyError(f"observable '{target_key}' not found in investigation.")
 
         # Add relationship using internal method
-        self._add_relationship_internal(source_obs, target_key, relationship_type, direction)
+        self._create_relationship(source_obs, target_key, relationship_type, direction)
 
         self._record_event(
             event_type="RELATIONSHIP_CREATED",
@@ -923,10 +1008,10 @@ class Investigation:
                 observable_key=observable_key,
                 propagation_mode=propagation_mode,
             )
-            created = self._add_check_observable_link(check, link)
+            created = self._link_check_to_observable(check, link)
             if created:
                 self._score_engine.register_check_observable_link(check_key=check.key, observable_key=observable_key)
-                self._sync_check_links_for_observable(observable_key)
+                self._update_observable_check_links(observable_key)
                 self._record_event(
                     event_type="CHECK_LINKED_TO_OBSERVABLE",
                     object_type="check",
@@ -969,7 +1054,7 @@ class Investigation:
             raise KeyError(f"check '{check_key}' not found in investigation.")
 
         if tag and check:
-            self._tag_add_check(tag, check)
+            self._link_check_to_tag(tag, check)
             self._record_event(
                 event_type="TAG_CHECK_ADDED",
                 object_type="tag",
@@ -979,7 +1064,9 @@ class Investigation:
 
         return tag
 
-    # Query methods
+    def get_root(self) -> Observable:
+        """Get the root observable."""
+        return self._root_observable
 
     def get_observable(self, key: str) -> Observable | None:
         """Get observable by full key string."""
@@ -1079,28 +1166,6 @@ class Investigation:
     def get_threat_intel(self, key: str) -> ThreatIntel | None:
         """Get a threat intel by key."""
         return self._threat_intels.get(key)
-
-    @staticmethod
-    def _normalize_taxonomies(value: Any) -> list[Taxonomy]:
-        if value is None:
-            return []
-        if not isinstance(value, list):
-            raise TypeError("taxonomies must be a list of taxonomy objects.")
-        taxonomies = [Taxonomy.model_validate(item) for item in value]
-        seen: set[str] = set()
-        duplicates: set[str] = set()
-        for taxonomy in taxonomies:
-            if taxonomy.name in seen:
-                duplicates.add(taxonomy.name)
-            seen.add(taxonomy.name)
-        if duplicates:
-            dupes = ", ".join(sorted(duplicates))
-            raise ValueError(f"Duplicate taxonomy name(s): {dupes}")
-        return taxonomies
-
-    def get_root(self) -> Observable:
-        """Get the root observable."""
-        return self._root_observable
 
     def update_model_metadata(
         self,
@@ -1205,7 +1270,6 @@ class Investigation:
         """Get all tags."""
         return self._tags.copy()
 
-    # Scoring and statistics
 
     def get_global_score(self) -> Decimal:
         """Get the global investigation score."""
@@ -1362,7 +1426,7 @@ class Investigation:
 
             # Link the best starting node to root
             if best_node:
-                self._add_relationship_internal(self._root_observable, best_node, RelationshipType.RELATED_TO)
+                self._create_relationship(self._root_observable, best_node, RelationshipType.RELATED_TO)
                 self._record_event(
                     event_type="RELATIONSHIP_CREATED",
                     object_type="observable",
@@ -1376,7 +1440,6 @@ class Investigation:
                 )
         self._score_engine.recalculate_all()
 
-    # Investigation merging
 
     def merge_investigation(self, other: Investigation) -> None:
         """
@@ -1496,7 +1559,7 @@ class Investigation:
             source_obs = self._observables.get(source_key)
             if source_obs and rel.target_key in self._observables:
                 # Both source and target exist - add relationship
-                self._add_relationship_internal(source_obs, rel.target_key, rel.relationship_type, rel.direction)
+                self._create_relationship(source_obs, rel.target_key, rel.relationship_type, rel.direction)
             else:
                 # Genuine error - target still doesn't exist after Pass 2
                 logger.critical(
@@ -1599,7 +1662,7 @@ class Investigation:
 
         # Rebuild link index after merges
         self._score_engine.rebuild_link_index()
-        self._refresh_check_links()
+        self._rebuild_all_check_links()
 
         # Final score recalculation
         self._score_engine.recalculate_all()
@@ -1615,75 +1678,4 @@ class Investigation:
                 "into_investigation_name": self.investigation_name,
                 "object_changes": merge_summary,
             },
-        )
-
-    def _clone_for_merge(
-        self, other: Investigation
-    ) -> tuple[
-        dict[str, Observable],
-        dict[str, ThreatIntel],
-        dict[str, Check],
-        dict[str, Enrichment],
-        dict[str, Tag],
-    ]:
-        """Clone incoming models while preserving shared object references."""
-        incoming_threat_intels = {key: ti.model_copy(deep=True) for key, ti in other._threat_intels.items()}
-        incoming_checks = {key: check.model_copy(deep=True) for key, check in other._checks.items()}
-        incoming_enrichments = {key: enrichment.model_copy(deep=True) for key, enrichment in other._enrichments.items()}
-
-        orphan_threat_intels: dict[str, ThreatIntel] = {}
-
-        def _copy_threat_intel(ti: ThreatIntel) -> ThreatIntel:
-            if ti.key in incoming_threat_intels:
-                return incoming_threat_intels[ti.key]
-            existing = orphan_threat_intels.get(ti.key)
-            if existing:
-                return existing
-            copied = ti.model_copy(deep=True)
-            orphan_threat_intels[ti.key] = copied
-            return copied
-
-        incoming_observables: dict[str, Observable] = {}
-        for obs in other._observables.values():
-            copied_obs = obs.model_copy(deep=True)
-            if obs.threat_intels:
-                copied_obs.threat_intels = [_copy_threat_intel(ti) for ti in obs.threat_intels]
-            incoming_observables[obs.key] = copied_obs
-
-        orphan_checks: dict[str, Check] = {}
-
-        def _copy_check(check: Check) -> Check:
-            if check.key in incoming_checks:
-                return incoming_checks[check.key]
-            existing = orphan_checks.get(check.key)
-            if existing:
-                return existing
-            copied = check.model_copy(deep=True)
-            orphan_checks[check.key] = copied
-            return copied
-
-        incoming_tags: dict[str, Tag] = {}
-
-        def _copy_tag(tag: Tag) -> Tag:
-            existing = incoming_tags.get(tag.key)
-            if existing:
-                return existing
-            copied = Tag(
-                name=tag.name,
-                description=tag.description,
-                checks=[_copy_check(check) for check in tag.checks],
-                key=tag.key,
-            )
-            incoming_tags[tag.key] = copied
-            return copied
-
-        for tag in other._tags.values():
-            _copy_tag(tag)
-
-        return (
-            incoming_observables,
-            incoming_threat_intels,
-            incoming_checks,
-            incoming_enrichments,
-            incoming_tags,
         )

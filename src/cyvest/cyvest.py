@@ -21,7 +21,14 @@ from logurich import logger
 from cyvest import keys
 from cyvest.compare import compare_investigations
 from cyvest.investigation import Investigation, InvestigationWhitelist
-from cyvest.io_rich import display_diff, display_statistics, display_summary
+from cyvest.io_rich import (
+    display_check_query,
+    display_diff,
+    display_observable_query,
+    display_statistics,
+    display_summary,
+    display_threat_intel_query,
+)
 from cyvest.io_serialization import (
     generate_markdown_report,
     load_investigation_dict,
@@ -448,6 +455,19 @@ class Cyvest:
         return self._observable_proxy(model_observable)
 
     # Threat intel methods
+
+    def threat_intel_get(self, key: str) -> ThreatIntelProxy | None:
+        """
+        Get a threat intel entry by key.
+
+        Args:
+            key: Threat intel key (format: ti:{source}:{observable_key})
+
+        Returns:
+            ThreatIntelProxy if found, None otherwise
+        """
+        ti = self._investigation.get_threat_intel(key)
+        return self._threat_intel_proxy(ti)
 
     def threat_intel_draft_create(
         self,
@@ -1165,6 +1185,80 @@ class Cyvest:
 
         diffs = compare_investigations(actual=self, expected=expected, result_expected=result_expected)
         display_diff(diffs, rich_print, title=title)
+
+    def display_check(
+        self,
+        check_key: str,
+        rich_print: Callable[[Any], None] | None = None,
+    ) -> None:
+        """
+        Display detailed information about a check.
+
+        Args:
+            check_key: Key of the check to display (format: chk:check-name)
+            rich_print: Optional callable that takes a renderable and returns None.
+                        If not provided, uses the default logger.
+
+        Raises:
+            KeyError: If check not found
+        """
+        if rich_print is None:
+
+            def rich_print(renderables: Any) -> None:
+                logger.rich("INFO", renderables, width=150, prefix=False)
+
+        display_check_query(self, check_key, rich_print)
+
+    def display_observable(
+        self,
+        observable_key: str,
+        depth: int = 1,
+        rich_print: Callable[[Any], None] | None = None,
+    ) -> None:
+        """
+        Display detailed information about an observable.
+
+        Shows observable info, score breakdown (how the score was calculated),
+        threat intelligence, and relationships up to the specified depth.
+
+        Args:
+            observable_key: Key of the observable to display (format: obs:type:value)
+            depth: Relationship traversal depth (default 1)
+            rich_print: Optional callable that takes a renderable and returns None.
+                        If not provided, uses the default logger.
+
+        Raises:
+            KeyError: If observable not found
+        """
+        if rich_print is None:
+
+            def rich_print(renderables: Any) -> None:
+                logger.rich("INFO", renderables, width=150, prefix=False)
+
+        display_observable_query(self, observable_key, rich_print, depth=depth)
+
+    def display_threat_intel(
+        self,
+        ti_key: str,
+        rich_print: Callable[[Any], None] | None = None,
+    ) -> None:
+        """
+        Display detailed information about a threat intel entry.
+
+        Args:
+            ti_key: Key of the threat intel to display (format: ti:source:obs:type:value)
+            rich_print: Optional callable that takes a renderable and returns None.
+                        If not provided, uses the default logger.
+
+        Raises:
+            KeyError: If threat intel not found
+        """
+        if rich_print is None:
+
+            def rich_print(renderables: Any) -> None:
+                logger.rich("INFO", renderables, width=150, prefix=False)
+
+        display_threat_intel_query(self, ti_key, rich_print)
 
     def display_network(
         self,

@@ -128,6 +128,14 @@ class TestExpectedResult:
         assert rule.check_name == "my-check"
         assert rule.key == "chk:custom-key"  # Provided key takes precedence
 
+    def test_create_with_ignore(self) -> None:
+        rule = ExpectedResult(check_name="test-check", ignore={DiffStatus.ADDED, DiffStatus.REMOVED})
+        assert rule.ignore == {DiffStatus.ADDED, DiffStatus.REMOVED}
+
+    def test_create_with_ignore_single_status(self) -> None:
+        rule = ExpectedResult(check_name="test-check", ignore={DiffStatus.MISMATCH})
+        assert rule.ignore == {DiffStatus.MISMATCH}
+
 
 class TestCompareInvestigations:
     """Tests for compare_investigations function."""
@@ -264,6 +272,110 @@ class TestCompareInvestigations:
         assert ti_diff.source == "VirusTotal"
         assert ti_diff.expected_score == Decimal("0.0")
         assert ti_diff.actual_score == Decimal("1.0")
+
+    def test_ignore_added_check(self) -> None:
+        """Test that ignore={ADDED} suppresses ADDED diffs."""
+        expected = Cyvest()
+
+        actual = Cyvest()
+        actual.check_create("new-check", "New check", score=Decimal("1.0"), level=Level.NOTABLE)
+
+        # Without ignore rule - should be ADDED
+        diffs_no_rule = compare_investigations(actual, expected)
+        assert len(diffs_no_rule) == 1
+        assert diffs_no_rule[0].status == DiffStatus.ADDED
+
+        # With ignore rule - should be suppressed
+        rules = [ExpectedResult(check_name="new-check", ignore={DiffStatus.ADDED})]
+        diffs_with_rule = compare_investigations(actual, expected, result_expected=rules)
+        assert len(diffs_with_rule) == 0
+
+    def test_ignore_removed_check(self) -> None:
+        """Test that ignore={REMOVED} suppresses REMOVED diffs."""
+        expected = Cyvest()
+        expected.check_create("old-check", "Old check", score=Decimal("1.0"), level=Level.NOTABLE)
+
+        actual = Cyvest()
+
+        # Without ignore rule - should be REMOVED
+        diffs_no_rule = compare_investigations(actual, expected)
+        assert len(diffs_no_rule) == 1
+        assert diffs_no_rule[0].status == DiffStatus.REMOVED
+
+        # With ignore rule - should be suppressed
+        rules = [ExpectedResult(check_name="old-check", ignore={DiffStatus.REMOVED})]
+        diffs_with_rule = compare_investigations(actual, expected, result_expected=rules)
+        assert len(diffs_with_rule) == 0
+
+    def test_ignore_mismatch_check(self) -> None:
+        """Test that ignore={MISMATCH} suppresses MISMATCH diffs."""
+        expected = Cyvest()
+        expected.check_create("test-check", "Test", score=Decimal("1.0"), level=Level.NOTABLE)
+
+        actual = Cyvest()
+        actual.check_create("test-check", "Test", score=Decimal("2.0"), level=Level.NOTABLE)
+
+        # Without ignore rule - should be MISMATCH
+        diffs_no_rule = compare_investigations(actual, expected)
+        assert len(diffs_no_rule) == 1
+        assert diffs_no_rule[0].status == DiffStatus.MISMATCH
+
+        # With ignore rule - should be suppressed
+        rules = [ExpectedResult(check_name="test-check", ignore={DiffStatus.MISMATCH})]
+        diffs_with_rule = compare_investigations(actual, expected, result_expected=rules)
+        assert len(diffs_with_rule) == 0
+
+    def test_ignore_multiple_statuses(self) -> None:
+        """Test that ignore with multiple statuses works correctly."""
+        expected = Cyvest()
+        expected.check_create("removed-check", "Removed", score=Decimal("1.0"), level=Level.NOTABLE)
+
+        actual = Cyvest()
+        actual.check_create("added-check", "Added", score=Decimal("1.0"), level=Level.NOTABLE)
+
+        # Create rules that ignore both ADDED and REMOVED
+        rules = [
+            ExpectedResult(check_name="added-check", ignore={DiffStatus.ADDED, DiffStatus.REMOVED}),
+            ExpectedResult(check_name="removed-check", ignore={DiffStatus.ADDED, DiffStatus.REMOVED}),
+        ]
+        diffs = compare_investigations(actual, expected, result_expected=rules)
+        assert len(diffs) == 0
+
+    def test_ignore_does_not_affect_other_statuses(self) -> None:
+        """Test that ignoring ADDED doesn't suppress REMOVED or MISMATCH."""
+        expected = Cyvest()
+        expected.check_create("removed-check", "Removed", score=Decimal("1.0"), level=Level.NOTABLE)
+
+        actual = Cyvest()
+        actual.check_create("added-check", "Added", score=Decimal("1.0"), level=Level.NOTABLE)
+
+        # Rule ignores ADDED only - should not affect REMOVED
+        rules = [
+            ExpectedResult(check_name="added-check", ignore={DiffStatus.ADDED}),
+            ExpectedResult(check_name="removed-check", ignore={DiffStatus.ADDED}),  # Wrong status
+        ]
+        diffs = compare_investigations(actual, expected, result_expected=rules)
+        # ADDED is suppressed, REMOVED is NOT suppressed
+        assert len(diffs) == 1
+        assert diffs[0].status == DiffStatus.REMOVED
+
+    def test_ignore_all_statuses(self) -> None:
+        """Test that ignore with all statuses suppresses everything for that check."""
+        expected = Cyvest()
+        expected.check_create("volatile-check", "Volatile", score=Decimal("1.0"), level=Level.NOTABLE)
+
+        actual = Cyvest()
+        actual.check_create("volatile-check", "Volatile", score=Decimal("2.0"), level=Level.SUSPICIOUS)
+
+        # Ignore all statuses
+        rules = [
+            ExpectedResult(
+                check_name="volatile-check",
+                ignore={DiffStatus.ADDED, DiffStatus.REMOVED, DiffStatus.MISMATCH},
+            )
+        ]
+        diffs = compare_investigations(actual, expected, result_expected=rules)
+        assert len(diffs) == 0
 
 
 class TestDisplayDiff:

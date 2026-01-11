@@ -22,6 +22,14 @@ if TYPE_CHECKING:
     from cyvest.proxies import CheckProxy
 
 
+class DiffStatus(str, Enum):
+    """Status indicating the type of difference found."""
+
+    ADDED = "+"
+    REMOVED = "-"
+    MISMATCH = "\u2717"  # ✗
+
+
 class ExpectedResult(BaseModel):
     """Tolerance rule for a specific check."""
 
@@ -29,6 +37,7 @@ class ExpectedResult(BaseModel):
     key: str | None = None
     level: Level | None = None
     score: str | None = None  # Tolerance rule: ">= 0.01", "< 3", "== 1.0"
+    ignore: set[DiffStatus] | None = None  # Statuses to ignore: ADDED, REMOVED, MISMATCH
 
     @model_validator(mode="after")
     def validate_key_or_name(self) -> ExpectedResult:
@@ -40,14 +49,6 @@ class ExpectedResult(BaseModel):
         return self
 
     model_config = {"extra": "forbid"}
-
-
-class DiffStatus(str, Enum):
-    """Status indicating the type of difference found."""
-
-    ADDED = "+"
-    REMOVED = "-"
-    MISMATCH = "\u2717"  # ✗
 
 
 class ThreatIntelDiff(BaseModel):
@@ -162,7 +163,9 @@ def compare_investigations(
         rule = rules.get(key)
 
         if actual_check and not expected_check:
-            # Check added in actual
+            # Check added in actual - skip if rule ignores ADDED
+            if rule and rule.ignore and DiffStatus.ADDED in rule.ignore:
+                continue
             diffs.append(
                 _create_diff_item(
                     status=DiffStatus.ADDED,
@@ -172,7 +175,9 @@ def compare_investigations(
                 )
             )
         elif expected_check and not actual_check:
-            # Check removed from actual
+            # Check removed from actual - skip if rule ignores REMOVED
+            if rule and rule.ignore and DiffStatus.REMOVED in rule.ignore:
+                continue
             diffs.append(
                 _create_diff_item(
                     status=DiffStatus.REMOVED,
@@ -184,6 +189,9 @@ def compare_investigations(
         else:
             # Check exists in both - compare values
             if _is_mismatch(expected_check, actual_check, rule):
+                # Skip if rule ignores MISMATCH
+                if rule and rule.ignore and DiffStatus.MISMATCH in rule.ignore:
+                    continue
                 diffs.append(
                     _create_diff_item(
                         status=DiffStatus.MISMATCH,

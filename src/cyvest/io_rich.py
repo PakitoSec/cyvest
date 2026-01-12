@@ -406,7 +406,7 @@ def display_summary(
         rule = Rule(f"[bold magenta]TAGS[/bold magenta]: {len(cv.tag_get_all())} tags")
         table.add_row(rule, "-", "-")
 
-        for tag in cv.tag_get_all().values():
+        for tag in sorted(cv.tag_get_all().values(), key=lambda t: t.name):
             agg_score = tag.get_aggregated_score()
             agg_level = tag.get_aggregated_level()
             color_level = get_color_level(agg_level)

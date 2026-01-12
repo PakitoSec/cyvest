@@ -401,12 +401,13 @@ def display_summary(
                 table.add_row(name, score, level)
 
     # Tags section (if any)
-    if cv.tag_get_all():
+    all_tags = cv.tag_get_all()
+    if all_tags:
         table.add_section()
-        rule = Rule(f"[bold magenta]TAGS[/bold magenta]: {len(cv.tag_get_all())} tags")
+        rule = Rule(f"[bold magenta]TAGS[/bold magenta]: {len(all_tags)} tags")
         table.add_row(rule, "-", "-")
 
-        for tag in sorted(cv.tag_get_all().values(), key=lambda t: t.name):
+        for tag in sorted(all_tags.values(), key=lambda t: t.name):
             agg_score = tag.get_aggregated_score()
             agg_level = tag.get_aggregated_level()
             color_level = get_color_level(agg_level)

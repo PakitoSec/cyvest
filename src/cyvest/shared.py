@@ -396,12 +396,14 @@ class SharedInvestigationContext:
         include_tags: bool = False,
         include_enrichments: bool = False,
         include_observables: bool = True,
+        exclude_levels: set[Level] | None = None,
     ) -> str:
         return self._lock.run(
             self._io_to_markdown_unlocked,
             include_tags,
             include_enrichments,
             include_observables,
+            exclude_levels,
         )
 
     async def aio_to_markdown(
@@ -409,12 +411,14 @@ class SharedInvestigationContext:
         include_tags: bool = False,
         include_enrichments: bool = False,
         include_observables: bool = True,
+        exclude_levels: set[Level] | None = None,
     ) -> str:
         return await self._lock.arun(
             self._io_to_markdown_unlocked,
             include_tags,
             include_enrichments,
             include_observables,
+            exclude_levels,
         )
 
     def _io_to_markdown_unlocked(
@@ -422,12 +426,14 @@ class SharedInvestigationContext:
         include_tags: bool,
         include_enrichments: bool,
         include_observables: bool,
+        exclude_levels: set[Level] | None,
     ) -> str:
         return generate_markdown_report(
             self._main_investigation,
             include_tags,
             include_enrichments,
             include_observables,
+            exclude_levels,
         )
 
     def io_save_markdown(
@@ -436,6 +442,7 @@ class SharedInvestigationContext:
         include_tags: bool = False,
         include_enrichments: bool = False,
         include_observables: bool = True,
+        exclude_levels: set[Level] | None = None,
     ) -> str:
         return self._lock.run(
             self._io_save_markdown_unlocked,
@@ -443,6 +450,7 @@ class SharedInvestigationContext:
             include_tags,
             include_enrichments,
             include_observables,
+            exclude_levels,
         )
 
     async def aio_save_markdown(
@@ -451,6 +459,7 @@ class SharedInvestigationContext:
         include_tags: bool = False,
         include_enrichments: bool = False,
         include_observables: bool = True,
+        exclude_levels: set[Level] | None = None,
     ) -> str:
         return await self._lock.arun(
             self._io_save_markdown_unlocked,
@@ -458,6 +467,7 @@ class SharedInvestigationContext:
             include_tags,
             include_enrichments,
             include_observables,
+            exclude_levels,
         )
 
     def _io_save_markdown_unlocked(
@@ -466,6 +476,7 @@ class SharedInvestigationContext:
         include_tags: bool,
         include_enrichments: bool,
         include_observables: bool,
+        exclude_levels: set[Level] | None,
     ) -> str:
         save_investigation_markdown(
             self._main_investigation,
@@ -473,6 +484,7 @@ class SharedInvestigationContext:
             include_tags,
             include_enrichments,
             include_observables,
+            exclude_levels,
         )
         return str(Path(filepath).resolve())
 

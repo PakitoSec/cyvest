@@ -434,6 +434,7 @@ class Investigation:
         - Update score (take maximum)
         - Update level (take maximum)
         - Update extra (merge dicts)
+        - Overwrite description (if incoming is non-empty)
         - Overwrite comment (if incoming is non-empty)
         - Merge observable links (tuple-based deduplication, provenance-preserving)
 
@@ -463,6 +464,10 @@ class Investigation:
 
         # Update extra (merge dictionaries)
         existing.extra.update(incoming.extra)
+
+        # Overwrite description if incoming is non-empty
+        if incoming.description:
+            existing.description = incoming.description
 
         # Overwrite comment if incoming is non-empty
         if incoming.comment:

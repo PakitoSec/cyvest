@@ -87,17 +87,18 @@ fluent `cv.observable()`/`cv.check()` convenience methods return `ObservableProx
 These proxies reflect the live investigation state but raise `AttributeError` if you try to assign to their attributes.
 All mutations are routed through the Investigation layer, so use the facade helpers (`cv.observable_set_level`,
 `cv.check_update_score`, `cv.observable_add_threat_intel`) or the built-in fluent methods on the proxies themselves
-(`with_ti`, `relate_to`, `link_observable`, `with_score`, …) so the score engine and audit log stay consistent.
+(`with_ti`, `relate_to`, `link_observable`, `with_score`, `set_level`, …) so the score engine and audit log stay consistent.
 
 Mutation helpers that reference existing objects (for example, `cv.observable_add_relationship`,
 `cv.check_link_observable`, `cv.tag_add_check`) raise `KeyError` when a key is missing.
 
 Safe metadata fields like `comment`, `extra`, or `internal` can be updated through the proxies without breaking score
-consistency:
+consistency. Use `set_level()` to update the level without changing the score:
 
 ```python
 url_obs.update_metadata(comment="triaged", internal=False, extra={"ticket": "INC-4242"})
 check.update_metadata(description="New scope", extra={"playbook": "url-analysis"})
+check.set_level(cv.LVL.SAFE, reason="Verified clean")
 ```
 
 Dictionary fields merge by default; pass `merge_extra=False` (or `merge_data=False` for enrichments) to overwrite them.

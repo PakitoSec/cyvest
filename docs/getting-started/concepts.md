@@ -46,13 +46,14 @@ Each observable has:
 > instances rather than raw dataclasses. These proxies provide live scores/levels but raise an error if you
 > attempt to assign attributes. All mutations flow through the Investigation layer, so use the facade helpers
 > (`cv.observable_add_threat_intel`, `cv.observable_set_level`, …) or the fluent methods on the proxies themselves
-> (`with_ti`, `relate_to`, `link_observable`, etc.) so the score engine and audit log remain consistent.
+> (`with_ti`, `relate_to`, `link_observable`, `set_level`, etc.) so the score engine and audit log remain consistent.
 > Safe metadata fields (`comment`, `extra`, `internal`, etc.) can be updated via the dedicated `update_metadata()`
-> helpers on each proxy:
+> helpers on each proxy. Use `set_level()` to update the level without changing the score:
 >
 > ```python
 > url_obs.update_metadata(comment="triaged", extra={"ticket": "INC-4242"})
 > check.update_metadata(description="Updated scope")
+> check.set_level(cv.LVL.SAFE, reason="Verified clean")
 > ```
 >
 > Dictionary fields are merged by default; pass `merge_extra=False` (or `merge_data=False`) to overwrite them completely.
@@ -806,7 +807,7 @@ inv1.merge_investigation(inv2)
 
 **Merge strategies:**
 - **Observables**: Higher score/level wins, comments overwrite (if incoming non-empty), relationships and threat intel merge
-- **Checks**: Higher score/level wins, comments overwrite (if incoming non-empty), observables merge by key (not identity)
+- **Checks**: Higher score/level wins, description/comment overwrite (if incoming non-empty), observables merge by key (not identity)
 - **Threat Intel**: Higher score/level wins, taxonomies merge by name (incoming replaces same name)
 - **Enrichments**: Deep merge of data dictionaries
 - **Tags**: Merge of checks, hierarchy auto-reconstructed from names

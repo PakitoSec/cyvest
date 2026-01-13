@@ -951,6 +951,7 @@ class Cyvest:
         include_tags: bool = False,
         include_enrichments: bool = False,
         include_observables: bool = True,
+        exclude_levels: set[Level] | None = None,
     ) -> str:
         """
         Generate a Markdown report of the investigation.
@@ -959,6 +960,7 @@ class Cyvest:
             include_tags: Include tags section in the report (default: False)
             include_enrichments: Include enrichments section in the report (default: False)
             include_observables: Include observables section in the report (default: True)
+            exclude_levels: Set of levels to exclude from checks section (default: {Level.NONE})
 
         Returns:
             Markdown formatted report as a string
@@ -970,7 +972,9 @@ class Cyvest:
             # Cybersecurity Investigation Report
             ...
         """
-        return generate_markdown_report(self._investigation, include_tags, include_enrichments, include_observables)
+        return generate_markdown_report(
+            self._investigation, include_tags, include_enrichments, include_observables, exclude_levels
+        )
 
     def io_to_invest(self, *, include_audit_log: bool = True) -> InvestigationSchema:
         """

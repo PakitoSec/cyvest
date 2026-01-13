@@ -94,6 +94,7 @@ def generate_markdown_report(
     include_tags: bool = False,
     include_enrichments: bool = False,
     include_observables: bool = True,
+    exclude_levels: set[Level] | None = None,
 ) -> str:
     """
     Generate a Markdown report of the investigation for LLM consumption.
@@ -103,10 +104,14 @@ def generate_markdown_report(
         include_tags: Include tags section in the report (default: False)
         include_enrichments: Include enrichments section in the report (default: False)
         include_observables: Include observables section in the report (default: True)
+        exclude_levels: Set of levels to exclude from checks section (default: {Level.NONE})
 
     Returns:
         Markdown formatted report
     """
+    if exclude_levels is None:
+        exclude_levels = {Level.NONE}
+
     lines = []
 
     # Header
@@ -150,7 +155,7 @@ def generate_markdown_report(
     lines.append("## Checks")
     lines.append("")
     for check in inv.get_all_checks().values():
-        if check.level != Level.NONE:
+        if check.level not in exclude_levels:
             lines.append(f"- **{check.check_name}**: Score: {check.score_display}, Level: {check.level.name}")
             lines.append(f"  - Description: {check.description}")
             if check.comment:
@@ -220,6 +225,7 @@ def save_investigation_markdown(
     include_tags: bool = False,
     include_enrichments: bool = False,
     include_observables: bool = True,
+    exclude_levels: set[Level] | None = None,
 ) -> None:
     """
     Save an investigation as a Markdown report.
@@ -230,8 +236,9 @@ def save_investigation_markdown(
         include_tags: Include tags section in the report (default: False)
         include_enrichments: Include enrichments section in the report (default: False)
         include_observables: Include observables section in the report (default: True)
+        exclude_levels: Set of levels to exclude from checks section (default: {Level.NONE})
     """
-    markdown = generate_markdown_report(inv, include_tags, include_enrichments, include_observables)
+    markdown = generate_markdown_report(inv, include_tags, include_enrichments, include_observables, exclude_levels)
     with open(filepath, "w", encoding="utf-8") as f:
         f.write(markdown)
 

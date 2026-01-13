@@ -50,7 +50,7 @@ def test_check_proxy_update_metadata() -> None:
 
 
 def test_threat_intel_proxy_update_metadata() -> None:
-    """ThreatIntelProxy.update_metadata should allow comment/level/extra."""
+    """ThreatIntelProxy.update_metadata should allow comment/extra."""
     cv = Cyvest()
     obs = cv.observable_create(Cyvest.OBS.DOMAIN, "example.com")
     ti = cv.observable_add_threat_intel(
@@ -62,7 +62,8 @@ def test_threat_intel_proxy_update_metadata() -> None:
     )
     assert ti is not None
 
-    ti.update_metadata(comment="Escalated", level=Cyvest.LVL.MALICIOUS, extra={"confidence": "high"})
+    ti.update_metadata(comment="Escalated", extra={"confidence": "high"})
+    ti.set_level(Cyvest.LVL.MALICIOUS)
     assert ti.comment == "Escalated"
     assert ti.level == Cyvest.LVL.MALICIOUS
     assert ti.extra["confidence"] == "high"

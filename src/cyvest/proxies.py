@@ -188,6 +188,12 @@ class ObservableProxy(_ReadOnlyProxy[Observable]):
         self._get_investigation().update_model_metadata("observable", self.key, updates, dict_merge=dict_merge)
         return self
 
+    def set_level(self, level: Level, reason: str | None = None) -> ObservableProxy:
+        """Set the level without changing score."""
+        observable = self._resolve()
+        self._get_investigation().apply_level_change(observable, level, reason=reason or "Manual level update")
+        return self
+
     def with_ti(
         self,
         source: str,
@@ -344,6 +350,12 @@ class CheckProxy(_ReadOnlyProxy[Check]):
 
         dict_merge = {"extra": merge_extra} if extra is not None else None
         self._get_investigation().update_model_metadata("check", self.key, updates, dict_merge=dict_merge)
+        return self
+
+    def set_level(self, level: Level, reason: str | None = None) -> CheckProxy:
+        """Set the level without changing score."""
+        check = self._resolve()
+        self._get_investigation().apply_level_change(check, level, reason=reason or "Manual level update")
         return self
 
     def tagged(self, *tags: Tag | TagProxy | str) -> CheckProxy:
@@ -517,7 +529,6 @@ class ThreatIntelProxy(_ReadOnlyProxy[ThreatIntel]):
         *,
         comment: str | None = None,
         extra: dict[str, Any] | None = None,
-        level: Level | None = None,
         merge_extra: bool = True,
     ) -> ThreatIntelProxy:
         """Update mutable metadata on the threat intel entry."""
@@ -526,14 +537,18 @@ class ThreatIntelProxy(_ReadOnlyProxy[ThreatIntel]):
             updates["comment"] = comment
         if extra is not None:
             updates["extra"] = extra
-        if level is not None:
-            updates["level"] = level
 
         if not updates:
             return self
 
         dict_merge = {"extra": merge_extra} if extra is not None else None
         self._get_investigation().update_model_metadata("threat_intel", self.key, updates, dict_merge=dict_merge)
+        return self
+
+    def set_level(self, level: Level, reason: str | None = None) -> ThreatIntelProxy:
+        """Set the level without changing score."""
+        ti = self._resolve()
+        self._get_investigation().apply_level_change(ti, level, reason=reason or "Manual level update")
         return self
 
 

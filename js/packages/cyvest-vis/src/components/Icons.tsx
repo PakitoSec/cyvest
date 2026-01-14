@@ -652,46 +652,21 @@ export const OBSERVABLE_ICON_MAP: Record<
   string,
   React.FC<IconProps>
 > = {
-  // Network
-  "ipv4-addr": GlobeIcon,
-  "ipv6-addr": GlobeIcon,
-  "domain-name": DomainIcon,
+  // Network (canonical Python enum values)
+  ipv4: GlobeIcon,
+  ipv6: GlobeIcon,
+  domain: DomainIcon,
   url: LinkIcon,
-  "autonomous-system": WorldIcon,
-  "mac-addr": WifiIcon,
+
+  // Hash
+  hash: HashIcon,
 
   // Email
-  "email-addr": MailIcon,
-  "email-message": EnvelopeIcon,
+  email: MailIcon,
 
   // File
   file: FileIcon,
-  "file-hash": HashIcon,
-  "file:hash:md5": HashIcon,
-  "file:hash:sha1": HashIcon,
-  "file:hash:sha256": HashIcon,
-
-  // User/Identity
-  user: UserIcon,
-  "user-account": UserIcon,
-  identity: IdCardIcon,
-
-  // Process/System
-  process: GearIcon,
-  software: AppIcon,
-  "windows-registry-key": RegistryIcon,
-
-  // Threat Intelligence
-  "threat-actor": ThreatActorIcon,
-  malware: BugIcon,
-  "attack-pattern": SwordIcon,
-  campaign: TargetIcon,
-  indicator: AlertIcon,
-
-  // Artifacts
   artifact: FlaskIcon,
-  certificate: CertificateIcon,
-  "x509-certificate": CertificateIcon,
 
   // Default
   unknown: QuestionIcon,

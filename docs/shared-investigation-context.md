@@ -34,7 +34,7 @@ shared_context = main_cy.shared_context()
 def my_worker(shared_context):
     with shared_context.create_cyvest() as cy:
         data = cy.root().extra
-        cy.observable(cy.OBS.EMAIL_ADDR, data.get("email"))
+        cy.observable(cy.OBS.EMAIL, data.get("email"))
 ```
 
 ## Cross-Task Observable Sharing
@@ -45,16 +45,16 @@ Tasks can access observables created by other tasks:
 def email_from(shared_context):
     with shared_context.create_cyvest() as cy:
         data = cy.root().extra
-        cy.observable(cy.OBS.DOMAIN_NAME, data.get("domain"))
+        cy.observable(cy.OBS.DOMAIN, data.get("domain"))
 
 
 def bodies_url(shared_context):
     with shared_context.create_cyvest() as cy:
         data = cy.root().extra
-        domain_info = shared_context.observable_get(cy.OBS.DOMAIN_NAME, "malicious.com")
+        domain_info = shared_context.observable_get(cy.OBS.DOMAIN, "malicious.com")
         if domain_info:
             cy.observable(cy.OBS.URL, data.get("url")).relate_to(
-                cy.observable(cy.OBS.DOMAIN_NAME, domain_info.value),
+                cy.observable(cy.OBS.DOMAIN, domain_info.value),
                 cy.REL.RELATED_TO,
             )
 ```
@@ -117,13 +117,13 @@ Retrieves a shared observable by type and value.
 ```python
 from cyvest import Cyvest
 
-domain = shared_context.observable_get(Cyvest.OBS.DOMAIN_NAME, "malicious.com")
-email = shared_context.observable_get(Cyvest.OBS.EMAIL_ADDR, "user@example.com")
+domain = shared_context.observable_get(Cyvest.OBS.DOMAIN, "malicious.com")
+email = shared_context.observable_get(Cyvest.OBS.EMAIL, "user@example.com")
 
 # Use in task to reference observables from other tasks
 if domain:
     cy.observable(cy.OBS.URL, "https://example.com").relate_to(
-        cy.observable(cy.OBS.DOMAIN_NAME, domain.value),
+        cy.observable(cy.OBS.DOMAIN, domain.value),
         cy.REL.RELATED_TO,
     )
 ```
@@ -250,7 +250,7 @@ from cyvest.shared import SharedInvestigationContext
 
 async def worker(shared: SharedInvestigationContext):
     async with shared.create_cyvest() as cy:
-        cy.observable(cy.OBS.DOMAIN_NAME, "example.com")
+        cy.observable(cy.OBS.DOMAIN, "example.com")
 
 asyncio.run(worker(shared_context))
 ```

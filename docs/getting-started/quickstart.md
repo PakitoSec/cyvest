@@ -84,16 +84,16 @@ from cyvest import Cyvest
 
 cv = Cyvest()
 url = cv.observable_create(cv.OBS.URL, "http://c2-server.com")
-ip = cv.observable_create(cv.OBS.IPV4_ADDR, "192.0.2.100", internal=False)
+ip = cv.observable_create(cv.OBS.IPV4, "192.0.2.100", internal=False)
 cv.observable_add_relationship(url, ip, cv.REL.RELATED_TO)  # BIDIRECTIONAL
 
 domain = (
-    cv.observable(cv.OBS.DOMAIN_NAME, "c2-server.com", internal=False)
+    cv.observable(cv.OBS.DOMAIN, "c2-server.com", internal=False)
     .relate_to(ip, cv.REL.RELATED_TO)
 )
 
-host1 = cv.observable_create(cv.OBS.IPV4_ADDR, "10.0.1.10", internal=True)
-host2 = cv.observable_create(cv.OBS.IPV4_ADDR, "10.0.1.20", internal=True)
+host1 = cv.observable_create(cv.OBS.IPV4, "10.0.1.10", internal=True)
+host2 = cv.observable_create(cv.OBS.IPV4, "10.0.1.20", internal=True)
 cv.observable_add_relationship(host1, host2, cv.REL.RELATED_TO)  # BIDIRECTIONAL
 
 malware = cv.observable_create(cv.OBS.FILE, "payload.exe", internal=False)

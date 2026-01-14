@@ -23,7 +23,7 @@ export interface ObservableNodeData extends Record<string, unknown> {
   label: string;
   /** Full observable value */
   fullValue: string;
-  /** Observable type (e.g., "domain-name", "ipv4-addr") */
+  /** Observable type (e.g., "domain", "ipv4") */
   observableType: string;
   /** Security level */
   level: Level;

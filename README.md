@@ -128,7 +128,7 @@ cv = Cyvest()
 
 url_obs = cv.observable_create(cv.OBS.URL, "https://malicious.com", internal=False)
 
-ip_obs = cv.observable_create(cv.OBS.IPV4_ADDR, "192.0.2.1", internal=False)
+ip_obs = cv.observable_create(cv.OBS.IPV4, "192.0.2.1", internal=False)
 
 cv.observable_add_relationship(
     url_obs,  # Can pass ObservableProxy directly
@@ -235,7 +235,7 @@ def email_analysis(shared_context):
     # create_cyvest() yields a task-local Cyvest that auto-merges on context exit
     with shared_context.create_cyvest() as cy:
         data = cy.root().extra
-        cy.observable(cy.OBS.DOMAIN_NAME, data.get("domain"))
+        cy.observable(cy.OBS.DOMAIN, data.get("domain"))
 
 # Create shared context
 main_cy = Cyvest(root_data=email_data, root_type=Cyvest.OBS.ARTIFACT)
@@ -314,7 +314,7 @@ The SAFE level has special protection for trusted/whitelisted observables:
 ```python
 # Mark a known-good domain as SAFE
 trusted = cv.observable_create(
-    cv.OBS.DOMAIN_NAME,
+    cv.OBS.DOMAIN,
     "trusted.example.com",
     level=cv.LVL.SAFE
 )
@@ -328,7 +328,7 @@ cv.observable_add_threat_intel(trusted.key, "source2", score=Decimal("6.0"))
 # Level upgrades to MALICIOUS, score updates to 6.0
 
 # Threat intel with SAFE level can also mark observables as SAFE
-uncertain = cv.observable_create(cv.OBS.DOMAIN_NAME, "example.com")
+uncertain = cv.observable_create(cv.OBS.DOMAIN, "example.com")
 cv.observable_add_threat_intel(
     uncertain.key,
     "whitelist_service",

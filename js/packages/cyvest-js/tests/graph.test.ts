@@ -37,9 +37,9 @@ function createGraphTestInvestigation(): CyvestInvestigation {
     ],
     whitelists: [],
     observables: {
-      "obs:email-message:msg1": {
-        key: "obs:email-message:msg1",
-        type: "email-message",
+      "obs:file:msg1": {
+        key: "obs:file:msg1",
+        type: "file",
         value: "msg1",
         internal: false,
         whitelisted: false,
@@ -50,12 +50,12 @@ function createGraphTestInvestigation(): CyvestInvestigation {
         level: "INFO",
         relationships: [
           {
-            target_key: "obs:email-addr:sender@example.com",
+            target_key: "obs:email:sender@example.com",
             relationship_type: "from",
             direction: "outbound",
           },
           {
-            target_key: "obs:ipv4-addr:192.168.1.1",
+            target_key: "obs:ipv4:192.168.1.1",
             relationship_type: "originated-from",
             direction: "outbound",
           },
@@ -63,9 +63,9 @@ function createGraphTestInvestigation(): CyvestInvestigation {
         threat_intels: [],
         check_links: [],
       },
-      "obs:email-addr:sender@example.com": {
-        key: "obs:email-addr:sender@example.com",
-        type: "email-addr",
+      "obs:email:sender@example.com": {
+        key: "obs:email:sender@example.com",
+        type: "email",
         value: "sender@example.com",
         internal: false,
         whitelisted: false,
@@ -76,7 +76,7 @@ function createGraphTestInvestigation(): CyvestInvestigation {
         level: "INFO",
         relationships: [
           {
-            target_key: "obs:domain-name:example.com",
+            target_key: "obs:domain:example.com",
             relationship_type: "related-to",
             direction: "outbound",
           },
@@ -84,9 +84,9 @@ function createGraphTestInvestigation(): CyvestInvestigation {
         threat_intels: [],
         check_links: [],
       },
-      "obs:ipv4-addr:192.168.1.1": {
-        key: "obs:ipv4-addr:192.168.1.1",
-        type: "ipv4-addr",
+      "obs:ipv4:192.168.1.1": {
+        key: "obs:ipv4:192.168.1.1",
+        type: "ipv4",
         value: "192.168.1.1",
         internal: true,
         whitelisted: false,
@@ -99,9 +99,9 @@ function createGraphTestInvestigation(): CyvestInvestigation {
         threat_intels: [],
         check_links: [],
       },
-      "obs:domain-name:example.com": {
-        key: "obs:domain-name:example.com",
-        type: "domain-name",
+      "obs:domain:example.com": {
+        key: "obs:domain:example.com",
+        type: "domain",
         value: "example.com",
         internal: false,
         whitelisted: false,
@@ -114,9 +114,9 @@ function createGraphTestInvestigation(): CyvestInvestigation {
         threat_intels: [],
         check_links: [],
       },
-      "obs:file-hash:abc123": {
-        key: "obs:file-hash:abc123",
-        type: "file-hash",
+      "obs:hash:abc123": {
+        key: "obs:hash:abc123",
+        type: "hash",
         value: "abc123",
         internal: false,
         whitelisted: false,
@@ -166,7 +166,7 @@ describe("Graph Traversal", () => {
 
   describe("getRelatedObservables", () => {
     it("returns all directly connected observables", () => {
-      const related = getRelatedObservables(inv, "obs:email-message:msg1");
+      const related = getRelatedObservables(inv, "obs:file:msg1");
       expect(related).toHaveLength(2);
       const values = related.map((o) => o.value);
       expect(values).toContain("sender@example.com");
@@ -180,7 +180,7 @@ describe("Graph Traversal", () => {
     it("includes inbound relationships", () => {
       const related = getRelatedObservables(
         inv,
-        "obs:email-addr:sender@example.com"
+        "obs:email:sender@example.com"
       );
       // Has outbound to domain and inbound from email message
       expect(related.length).toBeGreaterThanOrEqual(2);
@@ -189,12 +189,12 @@ describe("Graph Traversal", () => {
 
   describe("getObservableChildren", () => {
     it("returns outbound related observables", () => {
-      const children = getObservableChildren(inv, "obs:email-message:msg1");
+      const children = getObservableChildren(inv, "obs:file:msg1");
       expect(children).toHaveLength(2);
     });
 
     it("returns empty for leaf nodes", () => {
-      const children = getObservableChildren(inv, "obs:ipv4-addr:192.168.1.1");
+      const children = getObservableChildren(inv, "obs:ipv4:192.168.1.1");
       expect(children).toHaveLength(0);
     });
   });
@@ -203,14 +203,14 @@ describe("Graph Traversal", () => {
     it("returns observables pointing to this one", () => {
       const parents = getObservableParents(
         inv,
-        "obs:email-addr:sender@example.com"
+        "obs:email:sender@example.com"
       );
       expect(parents).toHaveLength(1);
       expect(parents[0].value).toBe("msg1");
     });
 
     it("returns empty for root nodes", () => {
-      const parents = getObservableParents(inv, "obs:email-message:msg1");
+      const parents = getObservableParents(inv, "obs:file:msg1");
       expect(parents).toHaveLength(0);
     });
   });
@@ -219,7 +219,7 @@ describe("Graph Traversal", () => {
     it("filters by relationship type", () => {
       const fromRelated = getRelatedObservablesByType(
         inv,
-        "obs:email-message:msg1",
+        "obs:file:msg1",
         "from"
       );
       expect(fromRelated).toHaveLength(1);
@@ -241,10 +241,10 @@ describe("Graph Traversal", () => {
     it("nodes have correct structure", () => {
       const graph = getObservableGraph(inv);
       const emailNode = graph.nodes.find(
-        (n) => n.id === "obs:email-message:msg1"
+        (n) => n.id === "obs:file:msg1"
       );
       expect(emailNode).toBeDefined();
-      expect(emailNode?.type).toBe("email-message");
+      expect(emailNode?.type).toBe("file");
       expect(emailNode?.value).toBe("msg1");
       expect(emailNode?.level).toBe("INFO");
     });
@@ -253,15 +253,15 @@ describe("Graph Traversal", () => {
       const graph = getObservableGraph(inv);
       const fromEdge = graph.edges.find((e) => e.type === "from");
       expect(fromEdge).toBeDefined();
-      expect(fromEdge?.source).toBe("obs:email-message:msg1");
-      expect(fromEdge?.target).toBe("obs:email-addr:sender@example.com");
+      expect(fromEdge?.source).toBe("obs:file:msg1");
+      expect(fromEdge?.target).toBe("obs:email:sender@example.com");
     });
   });
 
   describe("findSourceObservables", () => {
     it("finds observables with no incoming relationships", () => {
       const sources = findSourceObservables(inv);
-      // email-message and file-hash are sources
+      // file and hash are sources
       expect(sources.length).toBeGreaterThanOrEqual(2);
       const values = sources.map((o) => o.value);
       expect(values).toContain("msg1");
@@ -272,7 +272,7 @@ describe("Graph Traversal", () => {
   describe("findOrphanObservables", () => {
     it("finds observables with no relationships", () => {
       const orphans = findOrphanObservables(inv);
-      // file-hash has no relationships
+      // hash has no relationships
       expect(orphans).toHaveLength(1);
       expect(orphans[0].value).toBe("abc123");
     });
@@ -290,7 +290,7 @@ describe("Graph Traversal", () => {
   describe("areConnected", () => {
     it("returns true for directly connected", () => {
       expect(
-        areConnected(inv, "obs:email-message:msg1", "obs:ipv4-addr:192.168.1.1")
+        areConnected(inv, "obs:file:msg1", "obs:ipv4:192.168.1.1")
       ).toBe(true);
     });
 
@@ -298,21 +298,21 @@ describe("Graph Traversal", () => {
       expect(
         areConnected(
           inv,
-          "obs:email-message:msg1",
-          "obs:domain-name:example.com"
+          "obs:file:msg1",
+          "obs:domain:example.com"
         )
       ).toBe(true);
     });
 
     it("returns false for disconnected", () => {
       expect(
-        areConnected(inv, "obs:file-hash:abc123", "obs:email-message:msg1")
+        areConnected(inv, "obs:hash:abc123", "obs:file:msg1")
       ).toBe(false);
     });
 
     it("returns true for same node", () => {
       expect(
-        areConnected(inv, "obs:email-message:msg1", "obs:email-message:msg1")
+        areConnected(inv, "obs:file:msg1", "obs:file:msg1")
       ).toBe(true);
     });
   });
@@ -321,32 +321,32 @@ describe("Graph Traversal", () => {
     it("finds direct path", () => {
       const path = findPath(
         inv,
-        "obs:email-message:msg1",
-        "obs:ipv4-addr:192.168.1.1"
+        "obs:file:msg1",
+        "obs:ipv4:192.168.1.1"
       );
       expect(path).toEqual([
-        "obs:email-message:msg1",
-        "obs:ipv4-addr:192.168.1.1",
+        "obs:file:msg1",
+        "obs:ipv4:192.168.1.1",
       ]);
     });
 
     it("finds transitive path", () => {
       const path = findPath(
         inv,
-        "obs:email-message:msg1",
-        "obs:domain-name:example.com"
+        "obs:file:msg1",
+        "obs:domain:example.com"
       );
       expect(path).not.toBeNull();
       expect(path?.length).toBe(3);
-      expect(path?.[0]).toBe("obs:email-message:msg1");
-      expect(path?.[path.length - 1]).toBe("obs:domain-name:example.com");
+      expect(path?.[0]).toBe("obs:file:msg1");
+      expect(path?.[path.length - 1]).toBe("obs:domain:example.com");
     });
 
     it("returns null for no path", () => {
       const path = findPath(
         inv,
-        "obs:file-hash:abc123",
-        "obs:email-message:msg1"
+        "obs:hash:abc123",
+        "obs:file:msg1"
       );
       expect(path).toBeNull();
     });
@@ -354,23 +354,23 @@ describe("Graph Traversal", () => {
     it("returns single node for same source/target", () => {
       const path = findPath(
         inv,
-        "obs:email-message:msg1",
-        "obs:email-message:msg1"
+        "obs:file:msg1",
+        "obs:file:msg1"
       );
-      expect(path).toEqual(["obs:email-message:msg1"]);
+      expect(path).toEqual(["obs:file:msg1"]);
     });
   });
 
   describe("getReachableObservables", () => {
     it("returns all reachable from start", () => {
-      const reachable = getReachableObservables(inv, "obs:email-message:msg1");
+      const reachable = getReachableObservables(inv, "obs:file:msg1");
       expect(reachable).toHaveLength(4); // msg1 + sender + ip + domain
     });
 
     it("respects max depth", () => {
       const reachable = getReachableObservables(
         inv,
-        "obs:email-message:msg1",
+        "obs:file:msg1",
         1
       );
       expect(reachable).toHaveLength(3); // msg1 + sender + ip (depth 1)
@@ -399,7 +399,7 @@ describe("Graph Traversal", () => {
     it("returns outbound and inbound relationships", () => {
       const rels = getRelationshipsForObservable(
         inv,
-        "obs:email-addr:sender@example.com"
+        "obs:email:sender@example.com"
       );
       expect(rels.outbound).toHaveLength(1);
       expect(rels.inbound).toHaveLength(1);

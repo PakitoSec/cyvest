@@ -23,12 +23,12 @@ import { isLevelAtLeast, isLevelHigherThan, LEVEL_VALUES } from "./levels";
  * Find all observables of a specific type.
  *
  * @param inv - The investigation to search
- * @param type - Observable type (e.g., "ipv4-addr", "url", "domain-name")
+ * @param type - Observable type (e.g., "ipv4", "url", "domain")
  * @returns Array of matching observables
  *
  * @example
  * ```ts
- * const ips = findObservablesByType(investigation, "ipv4-addr");
+ * const ips = findObservablesByType(investigation, "ipv4");
  * const urls = findObservablesByType(investigation, "url");
  * ```
  */
@@ -346,7 +346,7 @@ export function findTagsByNamePattern(
  *
  * @example
  * ```ts
- * const checks = findChecksForObservable(investigation, "obs:ipv4-addr:192.168.1.1");
+ * const checks = findChecksForObservable(investigation, "obs:ipv4:192.168.1.1");
  * ```
  */
 export function findChecksForObservable(

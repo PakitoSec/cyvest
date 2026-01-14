@@ -73,7 +73,7 @@ export interface InvestigationGraph {
  *
  * @example
  * ```ts
- * const related = getRelatedObservables(investigation, "obs:email-addr:test@example.com");
+ * const related = getRelatedObservables(investigation, "obs:email:test@example.com");
  * ```
  */
 export function getRelatedObservables(

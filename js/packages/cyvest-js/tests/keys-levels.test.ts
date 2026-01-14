@@ -27,20 +27,20 @@ import {
 describe("Key Generation", () => {
   describe("generateObservableKey", () => {
     it("generates correct observable key", () => {
-      expect(generateObservableKey("ipv4-addr", "192.168.1.1")).toBe(
-        "obs:ipv4-addr:192.168.1.1"
+      expect(generateObservableKey("ipv4", "192.168.1.1")).toBe(
+        "obs:ipv4:192.168.1.1"
       );
     });
 
     it("normalizes to lowercase", () => {
       expect(generateObservableKey("IPV4-ADDR", "192.168.1.1")).toBe(
-        "obs:ipv4-addr:192.168.1.1"
+        "obs:ipv4:192.168.1.1"
       );
     });
 
     it("trims whitespace", () => {
-      expect(generateObservableKey("  ipv4-addr  ", "  192.168.1.1  ")).toBe(
-        "obs:ipv4-addr:192.168.1.1"
+      expect(generateObservableKey("  ipv4  ", "  192.168.1.1  ")).toBe(
+        "obs:ipv4:192.168.1.1"
       );
     });
   });
@@ -56,8 +56,8 @@ describe("Key Generation", () => {
   describe("generateThreatIntelKey", () => {
     it("generates correct threat intel key", () => {
       expect(
-        generateThreatIntelKey("virustotal", "obs:ipv4-addr:192.168.1.1")
-      ).toBe("ti:virustotal:obs:ipv4-addr:192.168.1.1");
+        generateThreatIntelKey("virustotal", "obs:ipv4:192.168.1.1")
+      ).toBe("ti:virustotal:obs:ipv4:192.168.1.1");
     });
   });
 
@@ -88,7 +88,7 @@ describe("Key Generation", () => {
 
   describe("parseKeyType", () => {
     it("parses observable key type", () => {
-      expect(parseKeyType("obs:ipv4-addr:192.168.1.1")).toBe("obs");
+      expect(parseKeyType("obs:ipv4:192.168.1.1")).toBe("obs");
     });
 
     it("parses check key type", () => {
@@ -115,13 +115,13 @@ describe("Key Generation", () => {
 
   describe("validateKey", () => {
     it("validates correct keys", () => {
-      expect(validateKey("obs:ipv4-addr:192.168.1.1")).toBe(true);
+      expect(validateKey("obs:ipv4:192.168.1.1")).toBe(true);
       expect(validateKey("chk:sender:email")).toBe(true);
     });
 
     it("validates key type", () => {
-      expect(validateKey("obs:ipv4-addr:192.168.1.1", "obs")).toBe(true);
-      expect(validateKey("obs:ipv4-addr:192.168.1.1", "chk")).toBe(false);
+      expect(validateKey("obs:ipv4:192.168.1.1", "obs")).toBe(true);
+      expect(validateKey("obs:ipv4:192.168.1.1", "chk")).toBe(false);
     });
 
     it("rejects invalid keys", () => {
@@ -133,8 +133,8 @@ describe("Key Generation", () => {
 
   describe("parseObservableKey", () => {
     it("parses observable key components", () => {
-      expect(parseObservableKey("obs:ipv4-addr:192.168.1.1")).toEqual({
-        type: "ipv4-addr",
+      expect(parseObservableKey("obs:ipv4:192.168.1.1")).toEqual({
+        type: "ipv4",
         value: "192.168.1.1",
       });
     });
@@ -162,10 +162,10 @@ describe("Key Generation", () => {
   describe("parseThreatIntelKey", () => {
     it("parses threat intel key components", () => {
       expect(
-        parseThreatIntelKey("ti:virustotal:obs:ipv4-addr:192.168.1.1")
+        parseThreatIntelKey("ti:virustotal:obs:ipv4:192.168.1.1")
       ).toEqual({
         source: "virustotal",
-        observableKey: "obs:ipv4-addr:192.168.1.1",
+        observableKey: "obs:ipv4:192.168.1.1",
       });
     });
   });

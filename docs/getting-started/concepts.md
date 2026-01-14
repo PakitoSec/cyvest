@@ -64,33 +64,20 @@ Each observable has:
 from cyvest import Cyvest
 
 # Network observables
-Cyvest.OBS.IPV4_ADDR          # "ipv4-addr"
-Cyvest.OBS.IPV6_ADDR          # "ipv6-addr"
-Cyvest.OBS.DOMAIN_NAME        # "domain-name"
-Cyvest.OBS.URL                # "url"
-Cyvest.OBS.MAC_ADDR           # "mac-addr"
-Cyvest.OBS.NETWORK_TRAFFIC    # "network-traffic"
+Cyvest.OBS.IPV4              # "ipv4"
+Cyvest.OBS.IPV6              # "ipv6"
+Cyvest.OBS.DOMAIN            # "domain"
+Cyvest.OBS.URL               # "url"
+
+# Hash observables
+Cyvest.OBS.HASH              # "hash"
 
 # Email observables
-Cyvest.OBS.EMAIL_ADDR         # "email-addr"
-Cyvest.OBS.EMAIL_MESSAGE      # "email-message"
-Cyvest.OBS.EMAIL_MIME_PART    # "email-mime-part"
+Cyvest.OBS.EMAIL             # "email"
 
 # File observables
-Cyvest.OBS.FILE               # "file"
-Cyvest.OBS.DIRECTORY          # "directory"
-Cyvest.OBS.ARTIFACT           # "artifact"
-
-# System observables
-Cyvest.OBS.PROCESS            # "process"
-Cyvest.OBS.SOFTWARE           # "software"
-Cyvest.OBS.USER_ACCOUNT       # "user-account"
-Cyvest.OBS.WINDOWS_REGISTRY_KEY  # "windows-registry-key"
-
-# Other observables
-Cyvest.OBS.AUTONOMOUS_SYSTEM  # "autonomous-system"
-Cyvest.OBS.MUTEX              # "mutex"
-Cyvest.OBS.X509_CERTIFICATE   # "x509-certificate"
+Cyvest.OBS.FILE              # "file"
+Cyvest.OBS.ARTIFACT          # "artifact"
 ```
 
 Use the facade namespace for autocomplete:
@@ -223,7 +210,7 @@ All meaningful changes are recorded in a centralized, append-only audit log at t
 
 ```python
 # Observable score changes
-obs = cv.observable_create(cv.OBS.IPV4_ADDR, "10.0.0.1")
+obs = cv.observable_create(cv.OBS.IPV4, "10.0.0.1")
 cv.observable_add_threat_intel(obs.key, "source1", score=Decimal("5.0"))
 cv.observable_add_threat_intel(obs.key, "source2", score=Decimal("8.0"))
 
@@ -298,10 +285,10 @@ When root appears as a child of other observables, it is **SKIPPED** in their sc
 
 ```python
 # Example: Cross-contamination prevention
-domain = cv.observable(cv.OBS.DOMAIN_NAME, "branch1.com")
+domain = cv.observable(cv.OBS.DOMAIN, "branch1.com")
 domain.with_ti("source1", score=Decimal("9.0"))
 
-ip = cv.observable(cv.OBS.IPV4_ADDR, "192.0.2.1")
+ip = cv.observable(cv.OBS.IPV4, "192.0.2.1")
 ip.with_ti("source2", score=Decimal("1.0"))
 
 root = cv.root()
@@ -354,10 +341,10 @@ from decimal import Decimal
 cv = Cyvest()
 
 # Example 1: OUTBOUND - Domain → IP (IP is child)
-domain = cv.observable_create(cv.OBS.DOMAIN_NAME, "malware.com")
+domain = cv.observable_create(cv.OBS.DOMAIN, "malware.com")
 cv.observable_add_threat_intel(domain.key, "virustotal", score=Decimal("2.0"))
 
-ip = cv.observable_create(cv.OBS.IPV4_ADDR, "198.51.100.42")
+ip = cv.observable_create(cv.OBS.IPV4, "198.51.100.42")
 cv.observable_add_threat_intel(ip.key, "abuseipdb", score=Decimal("8.0"))
 
 # Domain resolves to IP (OUTBOUND by default)
@@ -384,10 +371,10 @@ print(f"URL score: {url.score}")        # 9.0 (includes child file score)
 
 
 # Example 3: BIDIRECTIONAL - No hierarchy
-host1 = cv.observable_create(cv.OBS.IPV4_ADDR, "10.0.1.10")
+host1 = cv.observable_create(cv.OBS.IPV4, "10.0.1.10")
 cv.observable_add_threat_intel(host1.key, "ids", score=Decimal("7.0"))
 
-host2 = cv.observable_create(cv.OBS.IPV4_ADDR, "10.0.1.20")
+host2 = cv.observable_create(cv.OBS.IPV4, "10.0.1.20")
 cv.observable_add_threat_intel(host2.key, "ids", score=Decimal("2.0"))
 
 # Hosts communicate (BIDIRECTIONAL by default)
@@ -399,10 +386,10 @@ print(f"Host2 score: {host2.score}")  # 2.0
 
 
 # Example 4: Override semantic defaults
-domain2 = cv.observable_create(cv.OBS.DOMAIN_NAME, "example.com")
+domain2 = cv.observable_create(cv.OBS.DOMAIN, "example.com")
 cv.observable_add_threat_intel(domain2.key, "source", score=Decimal("1.0"))
 
-ip2 = cv.observable_create(cv.OBS.IPV4_ADDR, "192.0.2.1")
+ip2 = cv.observable_create(cv.OBS.IPV4, "192.0.2.1")
 cv.observable_add_threat_intel(ip2.key, "source", score=Decimal("5.0"))
 
 # Override default to BIDIRECTIONAL (no hierarchy)
@@ -423,13 +410,13 @@ Score propagation works recursively through multiple levels:
 
 ```python
 # Grandparent → Parent → Child hierarchy
-grandparent = cv.observable_create(cv.OBS.DOMAIN_NAME, "root.com")
+grandparent = cv.observable_create(cv.OBS.DOMAIN, "root.com")
 cv.observable_add_threat_intel(grandparent.key, "source1", score=Decimal("1.0"))
 
-parent = cv.observable_create(cv.OBS.DOMAIN_NAME, "sub.root.com")
+parent = cv.observable_create(cv.OBS.DOMAIN, "sub.root.com")
 cv.observable_add_threat_intel(parent.key, "source2", score=Decimal("2.0"))
 
-child = cv.observable_create(cv.OBS.IPV4_ADDR, "203.0.113.10")
+child = cv.observable_create(cv.OBS.IPV4, "203.0.113.10")
 cv.observable_add_threat_intel(child.key, "source3", score=Decimal("9.0"))
 
 cv.observable_add_relationship(grandparent.key, parent.key, cv.REL.RELATED_TO, cv.DIR.OUTBOUND)
@@ -502,7 +489,7 @@ cv = Cyvest()
 
 # Create a SAFE observable (e.g., known-good domain)
 trusted = cv.observable_create(
-    cv.OBS.DOMAIN_NAME,
+    cv.OBS.DOMAIN,
     "trusted.example.com",
     score=0,
     level=cv.LVL.SAFE
@@ -539,7 +526,7 @@ print(f"Score: {trusted.score}, Level: {trusted.level}")
 # Output: Score: 6.0, Level: MALICIOUS
 
 # Threat intel with SAFE level can also mark observables as SAFE
-uncertain = cv.observable_create(cv.OBS.DOMAIN_NAME, "example.com")
+uncertain = cv.observable_create(cv.OBS.DOMAIN, "example.com")
 cv.observable_add_threat_intel(
     uncertain.key,
     "whitelist_service",
@@ -594,14 +581,14 @@ cv = Cyvest()
 check = cv.check_create("domain_check", "Analyze domain reputation")
 
 # Link a SAFE observable
-safe_domain = cv.observable_create(cv.OBS.DOMAIN_NAME, "trusted.example.com", level=cv.LVL.SAFE)
+safe_domain = cv.observable_create(cv.OBS.DOMAIN, "trusted.example.com", level=cv.LVL.SAFE)
 cv.check_link_observable(check.key, safe_domain.key)
 
 # Check inherits SAFE level from the observable
 print(f"Check level: {check.level}")  # Output: Check level: SAFE
 
 # Add INFO-level observables - check remains SAFE
-info_ip = cv.observable_create(cv.OBS.IPV4_ADDR, "192.0.2.1")
+info_ip = cv.observable_create(cv.OBS.IPV4, "192.0.2.1")
 cv.check_link_observable(check.key, info_ip.key)
 print(f"Check level: {check.level}")  # Output: Check level: SAFE
 
@@ -796,7 +783,7 @@ inv1 = Cyvest()
 inv1.observable_create(inv1.OBS.URL, "https://example.com")
 
 inv2 = Cyvest()
-inv2.observable_create(inv2.OBS.IPV4_ADDR, "192.168.1.1")
+inv2.observable_create(inv2.OBS.IPV4, "192.168.1.1")
 
 # Merge inv2 into inv1 - automatic deduplication
 inv1.merge_investigation(inv2)

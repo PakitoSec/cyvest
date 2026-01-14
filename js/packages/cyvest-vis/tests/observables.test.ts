@@ -11,12 +11,12 @@ import {
 describe("observables utils", () => {
   it("returns shapes based on root flag (all non-root nodes are circles)", () => {
     // All non-root nodes are now circles for a cleaner design
-    expect(getObservableShape("domain-name", false)).toBe("circle");
-    expect(getObservableShape("ipv6-addr", false)).toBe("circle");
+    expect(getObservableShape("domain", false)).toBe("circle");
+    expect(getObservableShape("ipv6", false)).toBe("circle");
     expect(getObservableShape("anything-else", false)).toBe("circle");
     // Root nodes get a rectangle (pill shape)
     expect(getObservableShape("anything-else", true)).toBe("rectangle");
-    expect(getObservableShape("domain-name", true)).toBe("rectangle");
+    expect(getObservableShape("domain", true)).toBe("rectangle");
   });
 
   it("truncates long labels in the middle by default", () => {

@@ -21,12 +21,12 @@ import { getLevelFromScore } from "./levels";
  * Get an observable by its key.
  *
  * @param inv - The investigation to search
- * @param key - Observable key (e.g., "obs:ipv4-addr:192.168.1.1")
+ * @param key - Observable key (e.g., "obs:ipv4:192.168.1.1")
  * @returns The observable or undefined if not found
  *
  * @example
  * ```ts
- * const obs = getObservable(investigation, "obs:ipv4-addr:192.168.1.1");
+ * const obs = getObservable(investigation, "obs:ipv4:192.168.1.1");
  * if (obs) {
  *   console.log(obs.value, obs.level);
  * }
@@ -43,13 +43,13 @@ export function getObservable(
  * Get an observable by type and value.
  *
  * @param inv - The investigation to search
- * @param type - Observable type (e.g., "ipv4-addr", "url")
+ * @param type - Observable type (e.g., "ipv4", "url")
  * @param value - Observable value
  * @returns The observable or undefined if not found
  *
  * @example
  * ```ts
- * const obs = getObservableByTypeValue(investigation, "ipv4-addr", "192.168.1.1");
+ * const obs = getObservableByTypeValue(investigation, "ipv4", "192.168.1.1");
  * ```
  */
 export function getObservableByTypeValue(
@@ -156,7 +156,7 @@ export function getAllChecks(inv: CyvestInvestigation): Check[] {
  * Get a threat intel entry by its key.
  *
  * @param inv - The investigation to search
- * @param key - Threat intel key (e.g., "ti:virustotal:obs:ipv4-addr:192.168.1.1")
+ * @param key - Threat intel key (e.g., "ti:virustotal:obs:ipv4:192.168.1.1")
  * @returns The threat intel or undefined if not found
  */
 export function getThreatIntel(

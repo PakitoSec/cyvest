@@ -108,7 +108,7 @@ Access icon components for custom UIs:
 import { getObservableIcon, getInvestigationIcon, GlobeIcon, MailIcon } from "@cyvest/cyvest-vis";
 
 // Get icon by observable type
-const Icon = getObservableIcon("ipv4-addr"); // Returns GlobeIcon
+const Icon = getObservableIcon("ipv4"); // Returns GlobeIcon
 <Icon size={24} color="#3b82f6" />
 
 // Or use icons directly

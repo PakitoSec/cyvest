@@ -68,9 +68,9 @@ function createTestInvestigation(): CyvestInvestigation {
       },
     ],
     observables: {
-      "obs:ipv4-addr:192.168.1.1": {
-        key: "obs:ipv4-addr:192.168.1.1",
-        type: "ipv4-addr",
+      "obs:ipv4:192.168.1.1": {
+        key: "obs:ipv4:192.168.1.1",
+        type: "ipv4",
         value: "192.168.1.1",
         internal: true,
         whitelisted: false,
@@ -81,7 +81,7 @@ function createTestInvestigation(): CyvestInvestigation {
         level: "INFO",
         relationships: [
           {
-            target_key: "obs:domain-name:example.com",
+            target_key: "obs:domain:example.com",
             relationship_type: "related-to",
             direction: "outbound",
           },
@@ -89,9 +89,9 @@ function createTestInvestigation(): CyvestInvestigation {
         threat_intels: [],
         check_links: ["chk:ip_check:network"],
       },
-      "obs:ipv4-addr:8.8.8.8": {
-        key: "obs:ipv4-addr:8.8.8.8",
-        type: "ipv4-addr",
+      "obs:ipv4:8.8.8.8": {
+        key: "obs:ipv4:8.8.8.8",
+        type: "ipv4",
         value: "8.8.8.8",
         internal: false,
         whitelisted: true,
@@ -104,9 +104,9 @@ function createTestInvestigation(): CyvestInvestigation {
         threat_intels: [],
         check_links: [],
       },
-      "obs:domain-name:example.com": {
-        key: "obs:domain-name:example.com",
-        type: "domain-name",
+      "obs:domain:example.com": {
+        key: "obs:domain:example.com",
+        type: "domain",
         value: "example.com",
         internal: false,
         whitelisted: false,
@@ -116,7 +116,7 @@ function createTestInvestigation(): CyvestInvestigation {
         score_display: "5.00",
         level: "MALICIOUS",
         relationships: [],
-        threat_intels: ["ti:virustotal:obs:domain-name:example.com"],
+        threat_intels: ["ti:virustotal:obs:domain:example.com"],
         check_links: ["chk:domain_check:dns"],
       },
       "obs:url:http://malware.com/bad": {
@@ -148,7 +148,7 @@ function createTestInvestigation(): CyvestInvestigation {
         origin_investigation_id: "01HXYZTESTINVESTIGATION",
         observable_links: [
           {
-            observable_key: "obs:ipv4-addr:192.168.1.1",
+            observable_key: "obs:ipv4:192.168.1.1",
           },
         ],
       },
@@ -164,7 +164,7 @@ function createTestInvestigation(): CyvestInvestigation {
         origin_investigation_id: "01HXYZTESTINVESTIGATION",
         observable_links: [
           {
-            observable_key: "obs:domain-name:example.com",
+            observable_key: "obs:domain:example.com",
           },
         ],
       },
@@ -182,10 +182,10 @@ function createTestInvestigation(): CyvestInvestigation {
       },
     },
     threat_intels: {
-      "ti:virustotal:obs:domain-name:example.com": {
-        key: "ti:virustotal:obs:domain-name:example.com",
+      "ti:virustotal:obs:domain:example.com": {
+        key: "ti:virustotal:obs:domain:example.com",
         source: "virustotal",
-        observable_key: "obs:domain-name:example.com",
+        observable_key: "obs:domain:example.com",
         comment: "",
         extra: {},
         score: 5,
@@ -241,7 +241,7 @@ function createTestInvestigation(): CyvestInvestigation {
       internal_observables: 1,
       external_observables: 3,
       whitelisted_observables: 1,
-      observables_by_type: { "ipv4-addr": 2, "domain-name": 1, url: 1 },
+      observables_by_type: { "ipv4": 2, "domain": 1, url: 1 },
       observables_by_level: { INFO: 1, TRUSTED: 1, MALICIOUS: 2 },
       observables_by_type_and_level: {},
       total_checks: 3,
@@ -268,7 +268,7 @@ describe("Getters", () => {
 
   describe("getObservable", () => {
     it("returns observable by key", () => {
-      const obs = getObservable(inv, "obs:ipv4-addr:192.168.1.1");
+      const obs = getObservable(inv, "obs:ipv4:192.168.1.1");
       expect(obs).toBeDefined();
       expect(obs?.value).toBe("192.168.1.1");
     });
@@ -280,9 +280,9 @@ describe("Getters", () => {
 
   describe("getObservableByTypeValue", () => {
     it("finds observable by type and value", () => {
-      const obs = getObservableByTypeValue(inv, "ipv4-addr", "192.168.1.1");
+      const obs = getObservableByTypeValue(inv, "ipv4", "192.168.1.1");
       expect(obs).toBeDefined();
-      expect(obs?.key).toBe("obs:ipv4-addr:192.168.1.1");
+      expect(obs?.key).toBe("obs:ipv4:192.168.1.1");
     });
 
     it("is case insensitive", () => {
@@ -318,7 +318,7 @@ describe("Getters", () => {
     it("returns threat intel by key", () => {
       const ti = getThreatIntel(
         inv,
-        "ti:virustotal:obs:domain-name:example.com"
+        "ti:virustotal:obs:domain:example.com"
       );
       expect(ti).toBeDefined();
       expect(ti?.source).toBe("virustotal");
@@ -387,7 +387,7 @@ describe("Finders", () => {
 
   describe("findObservablesByType", () => {
     it("finds observables of specific type", () => {
-      const ips = findObservablesByType(inv, "ipv4-addr");
+      const ips = findObservablesByType(inv, "ipv4");
       expect(ips).toHaveLength(2);
     });
 
@@ -443,7 +443,7 @@ describe("Finders", () => {
 
   describe("findChecksForObservable", () => {
     it("finds checks that reference observable", () => {
-      const checks = findChecksForObservable(inv, "obs:ipv4-addr:192.168.1.1");
+      const checks = findChecksForObservable(inv, "obs:ipv4:192.168.1.1");
       expect(checks).toHaveLength(1);
       expect(checks[0].check_name).toBe("ip_check");
     });
@@ -453,7 +453,7 @@ describe("Finders", () => {
     it("finds threat intel for observable", () => {
       const tis = findThreatIntelsForObservable(
         inv,
-        "obs:domain-name:example.com"
+        "obs:domain:example.com"
       );
       expect(tis).toHaveLength(1);
       expect(tis[0].source).toBe("virustotal");
@@ -494,8 +494,8 @@ describe("Finders", () => {
   describe("getAllObservableTypes", () => {
     it("returns all observable types", () => {
       const types = getAllObservableTypes(inv);
-      expect(types).toContain("ipv4-addr");
-      expect(types).toContain("domain-name");
+      expect(types).toContain("ipv4");
+      expect(types).toContain("domain");
       expect(types).toContain("url");
     });
   });

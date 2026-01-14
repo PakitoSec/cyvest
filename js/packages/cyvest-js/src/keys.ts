@@ -45,8 +45,8 @@ function hashString(content: string, length: number = 16): string {
  *
  * @example
  * ```ts
- * generateObservableKey("ipv4-addr", "192.168.1.1")
- * // => "obs:ipv4-addr:192.168.1.1"
+ * generateObservableKey("ipv4", "192.168.1.1")
+ * // => "obs:ipv4:192.168.1.1"
  * ```
  */
 export function generateObservableKey(obsType: string, value: string): string {
@@ -85,8 +85,8 @@ export function generateCheckKey(checkName: string): string {
  *
  * @example
  * ```ts
- * generateThreatIntelKey("virustotal", "obs:ipv4-addr:192.168.1.1")
- * // => "ti:virustotal:obs:ipv4-addr:192.168.1.1"
+ * generateThreatIntelKey("virustotal", "obs:ipv4:192.168.1.1")
+ * // => "ti:virustotal:obs:ipv4:192.168.1.1"
  * ```
  */
 export function generateThreatIntelKey(
@@ -210,7 +210,7 @@ export function isTagDescendantOf(descendantName: string, ancestorName: string):
  *
  * @example
  * ```ts
- * parseKeyType("obs:ipv4-addr:192.168.1.1") // => "obs"
+ * parseKeyType("obs:ipv4:192.168.1.1") // => "obs"
  * parseKeyType("invalid") // => null
  * ```
  */
@@ -233,9 +233,9 @@ export function parseKeyType(key: string): KeyType | null {
  *
  * @example
  * ```ts
- * validateKey("obs:ipv4-addr:192.168.1.1") // => true
- * validateKey("obs:ipv4-addr:192.168.1.1", "obs") // => true
- * validateKey("obs:ipv4-addr:192.168.1.1", "chk") // => false
+ * validateKey("obs:ipv4:192.168.1.1") // => true
+ * validateKey("obs:ipv4:192.168.1.1", "obs") // => true
+ * validateKey("obs:ipv4:192.168.1.1", "chk") // => false
  * validateKey("invalid") // => false
  * ```
  */
@@ -264,8 +264,8 @@ export function validateKey(key: string, expectedType?: KeyType): boolean {
  *
  * @example
  * ```ts
- * parseObservableKey("obs:ipv4-addr:192.168.1.1")
- * // => { type: "ipv4-addr", value: "192.168.1.1" }
+ * parseObservableKey("obs:ipv4:192.168.1.1")
+ * // => { type: "ipv4", value: "192.168.1.1" }
  * ```
  */
 export function parseObservableKey(
@@ -319,8 +319,8 @@ export function parseCheckKey(
  *
  * @example
  * ```ts
- * parseThreatIntelKey("ti:virustotal:obs:ipv4-addr:192.168.1.1")
- * // => { source: "virustotal", observableKey: "obs:ipv4-addr:192.168.1.1" }
+ * parseThreatIntelKey("ti:virustotal:obs:ipv4:192.168.1.1")
+ * // => { source: "virustotal", observableKey: "obs:ipv4:192.168.1.1" }
  * ```
  */
 export function parseThreatIntelKey(

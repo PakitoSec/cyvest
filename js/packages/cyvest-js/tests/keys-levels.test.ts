@@ -33,7 +33,7 @@ describe("Key Generation", () => {
     });
 
     it("normalizes to lowercase", () => {
-      expect(generateObservableKey("IPV4-ADDR", "192.168.1.1")).toBe(
+      expect(generateObservableKey("IPV4", "192.168.1.1")).toBe(
         "obs:ipv4:192.168.1.1"
       );
     });

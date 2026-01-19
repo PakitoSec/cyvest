@@ -286,7 +286,7 @@ describe("Getters", () => {
     });
 
     it("is case insensitive", () => {
-      const obs = getObservableByTypeValue(inv, "IPV4-ADDR", "192.168.1.1");
+      const obs = getObservableByTypeValue(inv, "IPV4", "192.168.1.1");
       expect(obs).toBeDefined();
     });
   });
@@ -392,7 +392,7 @@ describe("Finders", () => {
     });
 
     it("is case insensitive", () => {
-      const ips = findObservablesByType(inv, "IPV4-ADDR");
+      const ips = findObservablesByType(inv, "IPV4");
       expect(ips).toHaveLength(2);
     });
   });

@@ -19,6 +19,7 @@
 - 🎨 **Rich Console Output**: Beautiful terminal displays with the Rich library
 - 🧩 **Fluent helpers**: Convenient API with method chaining for rapid development
 - 🔬 **Investigation Comparison**: Compare investigations with tolerance rules and visual diff output
+- 🔎 **Observable Extraction**: Extract IOCs (IPs, URLs, domains, emails, hashes) from text, markdown, or web pages with defang/refang support
 
 ## Installation
 
@@ -490,8 +491,91 @@ cyvest merge inv1.json inv2.json -o merged.json -f rich --stats
 # Generate an interactive visualization (requires visualization extra)
 cyvest visualize investigation.json --min-level SUSPICIOUS --group-by-type
 
+# Extract observables (IOCs) from text
+echo "Check IP 192.168.1.1 and https://evil.com" | cyvest extract
+cyvest extract report.txt -t url -t ip -o iocs.txt
+cyvest extract --from-url https://example.com/indicators.txt -f json
+
 # Output the JSON Schema describing serialized investigations and generate types
 uv run cyvest schema -o ./schema/cyvest.schema.json && pnpm -C js/packages/cyvest-js run generate:types
+```
+
+### Observable Extraction
+
+Extract cyber observables (IOCs) from raw text, markdown, or web pages:
+
+```bash
+# From stdin (pipe text)
+echo "Malicious IP: 192[.]168[.]1[.]1, URL: hxxps://evil[.]com/malware" | cyvest extract
+
+# From file
+cyvest extract threat_report.txt
+
+# Filter by type
+cyvest extract report.txt -t url -t ip -t hash
+
+# Output as JSON
+cyvest extract report.txt -f json -o extracted.json
+
+# Markdown output for LLM consumption
+cyvest extract report.txt --format markdown --title "Threat IOCs"
+cyvest extract report.txt --format markdown-table --defang-output
+
+# Fetch from URL and extract
+cyvest extract --from-url https://example.com/ioc-feed.txt
+
+# Keep defanged format (don't refang)
+cyvest extract -R < defanged_iocs.txt
+```
+
+**Supported observable types:**
+
+| Type | Description | Examples |
+|------|-------------|----------|
+| `url` | URLs with various schemes | http, https, ftp, sftp, tcp, udp |
+| `ip` / `ipv4` / `ipv6` | IP addresses | 192.168.1.1, 2001:db8::1 |
+| `email` | Email addresses | user@example.com |
+| `hash` | Cryptographic hashes | MD5, SHA1, SHA256, SHA512 |
+| `domain` | Domain names | example.com |
+
+**Defanged indicator support:**
+
+- URLs: `hxxp://`, `hxxps://`, `[.]`, `[/]`
+- IPs: `192[.]168[.]1[.]1`, `10(dot)0(dot)0(dot)1`
+- Emails: `user[@]example.com`, `user at example.com`
+
+**Programmatic usage:**
+
+```python
+from cyvest.extract import (
+    extract_all,
+    extract_from_url,
+    refang,
+    defang,
+    observables_to_markdown,
+    observables_to_markdown_table,
+)
+
+# Extract from text
+text = "Check IP 192[.]168[.]1[.]1 and hxxps://evil[.]com"
+observables = extract_all(text)
+for obs in observables:
+    print(f"{obs.obs_type.value}: {obs.value} (count: {obs.count})")
+
+# Generate markdown for LLM consumption
+md = observables_to_markdown(observables, title="Extracted IOCs", group_by_type=True)
+print(md)
+
+# Generate compact markdown table
+table = observables_to_markdown_table(observables, defang_values=True)
+print(table)
+
+# Extract from URL
+observables = extract_from_url("https://example.com/ioc-feed.txt")
+
+# Refang/defang utilities
+safe_text = defang("https://malware.com")  # -> hxxps://malware[.]com
+original = refang("hxxps://malware[.]com")  # -> https://malware.com
 ```
 
 ## Development

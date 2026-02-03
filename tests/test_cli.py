@@ -362,3 +362,131 @@ def test_cli_query_not_found(tmp_path: Path) -> None:
     result = runner.invoke(cli, ["query", str(sample), "-k", "chk:nonexistent"])
     assert result.exit_code != 0
     assert "not found" in result.output
+
+
+# =============================================================================
+# Extract Command Markdown Format Tests
+# =============================================================================
+
+
+class TestExtractMarkdownFormat:
+    """Tests for extract command markdown output formats."""
+
+    def test_extract_format_markdown(self, tmp_path: Path) -> None:
+        """Extract command outputs markdown format."""
+        runner = CliRunner()
+        input_text = "Visit https://example.com or email admin@test.org"
+        output_file = tmp_path / "output.md"
+
+        result = runner.invoke(cli, ["extract", "--format", "markdown", "-o", str(output_file)], input=input_text)
+        assert result.exit_code == 0
+        content = output_file.read_text()
+        assert "- URL" in content
+        assert "- EMAIL" in content
+
+    def test_extract_format_markdown_table(self, tmp_path: Path) -> None:
+        """Extract command outputs markdown table format."""
+        runner = CliRunner()
+        input_text = "IP: 192.168.1.1"
+        output_file = tmp_path / "output.md"
+
+        result = runner.invoke(cli, ["extract", "--format", "markdown-table", "-o", str(output_file)], input=input_text)
+        assert result.exit_code == 0
+        content = output_file.read_text()
+        assert "| Type | Value | Defanged |" in content
+        assert "| IPV4 |" in content
+
+    def test_extract_markdown_with_title(self, tmp_path: Path) -> None:
+        """Extract command adds title header to markdown output."""
+        runner = CliRunner()
+        input_text = "https://example.com"
+        output_file = tmp_path / "output.md"
+
+        result = runner.invoke(
+            cli,
+            ["extract", "--format", "markdown", "--title", "Threat IOCs", "-o", str(output_file)],
+            input=input_text,
+        )
+        assert result.exit_code == 0
+        content = output_file.read_text()
+        assert "## Threat IOCs" in content
+
+    def test_extract_markdown_group_by_type(self, tmp_path: Path) -> None:
+        """Extract command groups by type in markdown output."""
+        runner = CliRunner()
+        input_text = "URL: https://a.com Email: test@example.com IP: 1.2.3.4"
+        output_file = tmp_path / "output.md"
+
+        result = runner.invoke(
+            cli,
+            ["extract", "--format", "markdown", "--group-by-type", "-o", str(output_file)],
+            input=input_text,
+        )
+        assert result.exit_code == 0
+        content = output_file.read_text()
+        # Should have type headers
+        assert "### IPV4" in content or "### URL" in content
+
+    def test_extract_markdown_include_original(self, tmp_path: Path) -> None:
+        """Extract command includes original text in markdown output."""
+        runner = CliRunner()
+        input_text = "Malicious: hxxps://evil[.]com"
+        output_file = tmp_path / "output.md"
+
+        result = runner.invoke(
+            cli,
+            ["extract", "--format", "markdown", "--include-original", "-o", str(output_file)],
+            input=input_text,
+        )
+        assert result.exit_code == 0
+        content = output_file.read_text()
+        assert "Original:" in content
+        assert "hxxps://evil[.]com" in content
+
+    def test_extract_markdown_defang_output(self, tmp_path: Path) -> None:
+        """Extract command defangs values in markdown output."""
+        runner = CliRunner()
+        input_text = "https://malware.com/payload"
+        output_file = tmp_path / "output.md"
+
+        result = runner.invoke(
+            cli,
+            ["extract", "--format", "markdown", "--defang-output", "-o", str(output_file)],
+            input=input_text,
+        )
+        assert result.exit_code == 0
+        content = output_file.read_text()
+        assert "hxxps://" in content
+        assert "[.]" in content
+
+    def test_extract_markdown_table_defang_output(self, tmp_path: Path) -> None:
+        """Extract command defangs values in markdown table output."""
+        runner = CliRunner()
+        input_text = "admin@malware.com"
+        output_file = tmp_path / "output.md"
+
+        result = runner.invoke(
+            cli,
+            ["extract", "--format", "markdown-table", "--defang-output", "-o", str(output_file)],
+            input=input_text,
+        )
+        assert result.exit_code == 0
+        content = output_file.read_text()
+        assert "[@]" in content
+        assert "[.]" in content
+
+    def test_extract_markdown_table_with_title(self, tmp_path: Path) -> None:
+        """Extract command adds title header to markdown table output."""
+        runner = CliRunner()
+        input_text = "192.168.1.1"
+        output_file = tmp_path / "output.md"
+
+        result = runner.invoke(
+            cli,
+            ["extract", "--format", "markdown-table", "--title", "Network IOCs", "-o", str(output_file)],
+            input=input_text,
+        )
+        assert result.exit_code == 0
+        content = output_file.read_text()
+        assert "## Network IOCs" in content
+        assert "| Type | Value | Defanged |" in content

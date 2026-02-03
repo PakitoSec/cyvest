@@ -54,6 +54,7 @@ nav:
       - Concepts: getting-started/concepts.md
   - Shared Investigation Context: shared-investigation-context.md
   - Comparing Investigations: comparing-investigations.md
+  - Observable Extraction: observable-extraction.md
   - JavaScript Packages: js-packages.md
   - Contributing: contributing.md
 

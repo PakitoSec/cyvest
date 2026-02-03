@@ -517,6 +517,10 @@ cyvest extract report.txt -t url -t ip -t hash
 # Output as JSON
 cyvest extract report.txt -f json -o extracted.json
 
+# Markdown output for LLM consumption
+cyvest extract report.txt --format markdown --title "Threat IOCs"
+cyvest extract report.txt --format markdown-table --defang-output
+
 # Fetch from URL and extract
 cyvest extract --from-url https://example.com/ioc-feed.txt
 
@@ -543,13 +547,28 @@ cyvest extract -R < defanged_iocs.txt
 **Programmatic usage:**
 
 ```python
-from cyvest.extract import extract_all, extract_from_url, refang, defang
+from cyvest.extract import (
+    extract_all,
+    extract_from_url,
+    refang,
+    defang,
+    observables_to_markdown,
+    observables_to_markdown_table,
+)
 
 # Extract from text
 text = "Check IP 192[.]168[.]1[.]1 and hxxps://evil[.]com"
 observables = extract_all(text)
 for obs in observables:
-    print(f"{obs.obs_type.value}: {obs.value} (defanged: {obs.defanged})")
+    print(f"{obs.obs_type.value}: {obs.value} (count: {obs.count})")
+
+# Generate markdown for LLM consumption
+md = observables_to_markdown(observables, title="Extracted IOCs", group_by_type=True)
+print(md)
+
+# Generate compact markdown table
+table = observables_to_markdown_table(observables, defang_values=True)
+print(table)
 
 # Extract from URL
 observables = extract_from_url("https://example.com/ioc-feed.txt")

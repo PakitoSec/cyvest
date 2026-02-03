@@ -11,8 +11,9 @@ The `cyvest.extract` module provides utilities to identify and extract indicator
 - **Multiple observable types**: URLs, IP addresses (IPv4/IPv6), email addresses, cryptographic hashes, and domain names
 - **Defanged indicators**: Automatic recognition and refanging of common defang patterns (`hxxp://`, `[.]`, `[@]`, etc.)
 - **Encoded URLs**: Hex-encoded, URL-encoded, and base64-encoded URLs
-- **Deduplication**: Extracted observables are automatically deduplicated by value
+- **Deduplication with counting**: Extracted observables are automatically deduplicated by value and occurrence counts are tracked
 - **Web fetching**: Extract observables directly from web pages
+- **Markdown output**: Generate markdown lists or tables for LLM consumption with defang support
 
 ---
 
@@ -48,8 +49,12 @@ cyvest extract -R < defanged_iocs.txt
 | `-t, --types` | Types to extract: `url`, `ip`, `ipv4`, `ipv6`, `email`, `hash`, `domain`, `all` (default: `all`) |
 | `-r/-R, --refang/--no-refang` | Refang extracted observables (default: enabled) |
 | `-o, --output` | Output file (defaults to stdout) |
-| `-f, --format` | Output format: `text` or `json` (default: `text`) |
+| `-f, --format` | Output format: `text`, `json`, `markdown`, or `markdown-table` (default: `text`) |
 | `--from-url` | Fetch content from URL and extract observables |
+| `--title` | Title for markdown output (rendered as `## Title`) |
+| `--group-by-type` | Group observables by type in markdown list output |
+| `--include-original` | Include original text in markdown output |
+| `--defang-output` | Defang values in markdown output for safe sharing |
 
 ### Output Formats
 
@@ -71,16 +76,54 @@ domain  malware.io
     "obs_type": "url",
     "value": "https://evil.com/malware",
     "original": "hxxps://evil[.]com/malware",
-    "defanged": true
+    "defanged": true,
+    "count": 1
   },
   {
     "obs_type": "ipv4",
     "value": "192.168.1.1",
     "original": "192[.]168[.]1[.]1",
-    "defanged": true
+    "defanged": true,
+    "count": 3
   }
 ]
 ```
+
+**Markdown list format** (`--format markdown`): Human-readable list for LLM consumption:
+
+```bash
+cyvest extract report.txt --format markdown --title "Threat IOCs" --group-by-type
+```
+
+```markdown
+## Threat IOCs
+
+### URL
+
+- URL: `https://evil.com/malware`
+  - Defanged: Yes
+
+### IPV4
+
+- IPV4: `192.168.1.1`
+  - Defanged: Yes
+  - Count: 3
+```
+
+**Markdown table format** (`--format markdown-table`): Compact table view:
+
+```bash
+cyvest extract report.txt --format markdown-table --defang-output
+```
+
+```markdown
+| Type | Value | Count | Defanged |
+|------|-------|-------|----------|
+| URL | `hxxps://evil[.]com/malware` | 1 | ✓ |
+| IPV4 | `192[.]168[.]1[.]1` | 3 | ✓ |
+```
+
+> **Note:** The Count column only appears when any observable has count > 1.
 
 ---
 
@@ -273,7 +316,94 @@ obs.obs_type   # ObservableType enum (URL, IPV4, IPV6, EMAIL, HASH, DOMAIN)
 obs.value      # Normalized (refanged) value
 obs.original   # Original matched text
 obs.defanged   # Boolean indicating if original was defanged
+obs.count      # Number of occurrences in the source text
 ```
+
+### Markdown Serialization
+
+Each observable can be serialized to markdown for LLM consumption:
+
+```python
+# Single observable
+md = obs.to_markdown()
+md = obs.to_markdown(include_original=True, defang_value=True)
+```
+
+---
+
+## Markdown Output Functions
+
+### List Format
+
+Generate a markdown list of observables:
+
+```python
+from cyvest.extract import extract_all, observables_to_markdown
+
+text = "IP: 192.168.1.1, URL: https://evil.com"
+observables = extract_all(text)
+
+# Basic list
+md = observables_to_markdown(observables)
+
+# With options
+md = observables_to_markdown(
+    observables,
+    title="Extracted IOCs",        # Add ## title header
+    group_by_type=True,            # Group by observable type with ### sub-headers
+    include_original=True,         # Include original text if different
+    defang_values=True,            # Defang values for safe sharing
+)
+print(md)
+```
+
+Output:
+```markdown
+## Extracted IOCs
+
+### IPV4
+
+- IPV4: `192[.]168[.]1[.]1`
+  - Defanged: Yes
+
+### URL
+
+- URL: `hxxps://evil[.]com`
+  - Defanged: Yes
+```
+
+### Table Format
+
+Generate a compact markdown table:
+
+```python
+from cyvest.extract import extract_all, observables_to_markdown_table
+
+observables = extract_all(text)
+
+# Basic table
+md = observables_to_markdown_table(observables)
+
+# With options
+md = observables_to_markdown_table(
+    observables,
+    title="IOC Summary",           # Add ## title header
+    defang_values=True,            # Defang values for safe sharing
+)
+print(md)
+```
+
+Output:
+```markdown
+## IOC Summary
+
+| Type | Value | Defanged |
+|------|-------|----------|
+| IPV4 | `192[.]168[.]1[.]1` | ✓ |
+| URL | `hxxps://evil[.]com` | ✓ |
+```
+
+> **Tip:** The table automatically adds a Count column when any observable appears multiple times.
 
 ---
 

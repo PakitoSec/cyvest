@@ -35,6 +35,46 @@ class ExtractedObservable(BaseModel):
     value: str = Field(..., description="Normalized (refanged) value")
     original: str = Field(..., description="Original matched text")
     defanged: bool = Field(default=False, description="Whether the original was defanged")
+    count: int = Field(default=1, description="Number of times this observable was seen")
+
+    def __str__(self) -> str:
+        """Return a simple string representation for debugging."""
+        if self.count > 1:
+            return f"{self.obs_type.value}:{self.value} (x{self.count})"
+        return f"{self.obs_type.value}:{self.value}"
+
+    def to_markdown(
+        self,
+        *,
+        include_original: bool = False,
+        defang_value: bool = False,
+    ) -> str:
+        """
+        Generate markdown representation of this extracted observable.
+
+        Useful for providing structured data to LLM models.
+
+        Args:
+            include_original: Include original (pre-refanged) text if different from value.
+            defang_value: Defang the value for safe sharing.
+
+        Returns:
+            Markdown formatted string as a list item.
+        """
+        # Use defang function defined later in this module
+        display_value = defang(self.value) if defang_value else self.value
+        lines = [f"- {self.obs_type.value.upper()}: `{display_value}`"]
+
+        if self.defanged:
+            lines.append("  - Defanged: Yes")
+
+        if self.count > 1:
+            lines.append(f"  - Count: {self.count}")
+
+        if include_original and self.original != self.value:
+            lines.append(f"  - Original: `{self.original}`")
+
+        return "\n".join(lines)
 
 
 # =============================================================================
@@ -262,8 +302,6 @@ def extract_urls(text: str, refang_output: bool = True) -> Iterator[ExtractedObs
     Yields:
         ExtractedObservable for each URL found.
     """
-    seen: set[str] = set()
-
     # Extract standard and defanged URLs
     for match in _URL_PATTERN.finditer(text):
         original = match.group(0)
@@ -276,22 +314,19 @@ def extract_urls(text: str, refang_output: bool = True) -> Iterator[ExtractedObs
         # URL decode the value
         value = _decode_url_encoded(value)
 
-        if value not in seen:
-            seen.add(value)
-            yield ExtractedObservable(
-                obs_type=ObservableType.URL,
-                value=value,
-                original=original,
-                defanged=defanged,
-            )
+        yield ExtractedObservable(
+            obs_type=ObservableType.URL,
+            value=value,
+            original=original,
+            defanged=defanged,
+        )
 
     # Extract hex-encoded URLs
     hex_pattern = re.compile(r"\b([0-9a-fA-F]{14,})\b")
     for match in hex_pattern.finditer(text):
         hex_str = match.group(1)
         decoded = _decode_hex_url(hex_str)
-        if decoded and decoded not in seen:
-            seen.add(decoded)
+        if decoded:
             yield ExtractedObservable(
                 obs_type=ObservableType.URL,
                 value=decoded,
@@ -303,8 +338,7 @@ def extract_urls(text: str, refang_output: bool = True) -> Iterator[ExtractedObs
     for match in _BASE64_PATTERN.finditer(text):
         b64_str = match.group(0)
         decoded = _decode_base64_url(b64_str)
-        if decoded and decoded not in seen:
-            seen.add(decoded)
+        if decoded:
             yield ExtractedObservable(
                 obs_type=ObservableType.URL,
                 value=decoded,
@@ -377,16 +411,13 @@ def extract_ipv4(text: str, refang_output: bool = True) -> Iterator[ExtractedObs
     Yields:
         ExtractedObservable for each valid IPv4 found.
     """
-    seen: set[str] = set()
-
     for match in _IPV4_PATTERN.finditer(text):
         original = match.group(0)
         defanged = _is_defanged(original)
         value = refang(original) if refang_output else original
 
         # Validate the IP
-        if _validate_ipv4(value) and value not in seen:
-            seen.add(value)
+        if _validate_ipv4(value):
             yield ExtractedObservable(
                 obs_type=ObservableType.IPV4,
                 value=value,
@@ -405,14 +436,11 @@ def extract_ipv6(text: str) -> Iterator[ExtractedObservable]:
     Yields:
         ExtractedObservable for each valid IPv6 found.
     """
-    seen: set[str] = set()
-
     for match in _IPV6_PATTERN.finditer(text):
         original = match.group(1)
 
         # Validate the IP
-        if _validate_ipv6(original) and original not in seen:
-            seen.add(original)
+        if _validate_ipv6(original):
             yield ExtractedObservable(
                 obs_type=ObservableType.IPV6,
                 value=original,
@@ -475,22 +503,18 @@ def extract_emails(text: str, refang_output: bool = True) -> Iterator[ExtractedO
     Yields:
         ExtractedObservable for each email found.
     """
-    seen: set[str] = set()
-
     # Match standard @ variants
     for match in _EMAIL_PATTERN.finditer(text):
         original = match.group(0)
         defanged = _is_defanged(original)
         value = refang(original) if refang_output else original
 
-        if value not in seen:
-            seen.add(value)
-            yield ExtractedObservable(
-                obs_type=ObservableType.EMAIL,
-                value=value,
-                original=original,
-                defanged=defanged,
-            )
+        yield ExtractedObservable(
+            obs_type=ObservableType.EMAIL,
+            value=value,
+            original=original,
+            defanged=defanged,
+        )
 
     # Match " at " format (word-based)
     for match in _EMAIL_PATTERN_WORD_AT.finditer(text):
@@ -498,14 +522,12 @@ def extract_emails(text: str, refang_output: bool = True) -> Iterator[ExtractedO
         defanged = True  # " at " format is always defanged
         value = refang(original) if refang_output else original
 
-        if value not in seen:
-            seen.add(value)
-            yield ExtractedObservable(
-                obs_type=ObservableType.EMAIL,
-                value=value,
-                original=original,
-                defanged=defanged,
-            )
+        yield ExtractedObservable(
+            obs_type=ObservableType.EMAIL,
+            value=value,
+            original=original,
+            defanged=defanged,
+        )
 
 
 # =============================================================================
@@ -542,22 +564,21 @@ def extract_hashes(text: str) -> Iterator[ExtractedObservable]:
         for match in pattern.finditer(text):
             hash_value = match.group(1).lower()
 
-            if hash_value not in seen:
-                # Check it's not a substring of an already-found longer hash
-                is_substring = False
-                for existing in seen:
-                    if hash_value in existing:
-                        is_substring = True
-                        break
+            # Check it's not a substring of an already-found longer hash
+            is_substring = False
+            for existing in seen:
+                if hash_value in existing:
+                    is_substring = True
+                    break
 
-                if not is_substring:
-                    seen.add(hash_value)
-                    yield ExtractedObservable(
-                        obs_type=ObservableType.HASH,
-                        value=hash_value,
-                        original=match.group(1),
-                        defanged=False,
-                    )
+            if not is_substring:
+                seen.add(hash_value)
+                yield ExtractedObservable(
+                    obs_type=ObservableType.HASH,
+                    value=hash_value,
+                    original=match.group(1),
+                    defanged=False,
+                )
 
 
 # =============================================================================
@@ -600,8 +621,6 @@ def extract_domains(text: str, refang_output: bool = True) -> Iterator[Extracted
     Yields:
         ExtractedObservable for each domain found.
     """
-    seen: set[str] = set()
-
     # First, find all URLs to exclude their domains
     url_domains: set[str] = set()
     for url_obs in extract_urls(text, refang_output=True):
@@ -621,14 +640,12 @@ def extract_domains(text: str, refang_output: bool = True) -> Iterator[Extracted
         if value in url_domains:
             continue
 
-        if value not in seen:
-            seen.add(value)
-            yield ExtractedObservable(
-                obs_type=ObservableType.DOMAIN,
-                value=value,
-                original=original,
-                defanged=defanged,
-            )
+        yield ExtractedObservable(
+            obs_type=ObservableType.DOMAIN,
+            value=value,
+            original=original,
+            defanged=defanged,
+        )
 
 
 # =============================================================================
@@ -650,7 +667,7 @@ def extract_all(
         refang_output: Whether to refang extracted observables.
 
     Returns:
-        Deduplicated list of extracted observables.
+        Deduplicated list of extracted observables with occurrence counts.
     """
     if types is None:
         types = {
@@ -662,50 +679,55 @@ def extract_all(
             ObservableType.DOMAIN,
         }
 
-    results: list[ExtractedObservable] = []
-    seen: set[tuple[ObservableType, str]] = set()
+    # Track counts per observable
+    counts: dict[tuple[ObservableType, str], int] = {}
+    # Store first occurrence of each observable (for original/defanged info)
+    first_seen: dict[tuple[ObservableType, str], ExtractedObservable] = {}
+
+    def _process_obs(obs: ExtractedObservable) -> None:
+        key = (obs.obs_type, obs.value)
+        if key in counts:
+            counts[key] += 1
+        else:
+            counts[key] = 1
+            first_seen[key] = obs
 
     if ObservableType.URL in types:
         for obs in extract_urls(text, refang_output):
-            key = (obs.obs_type, obs.value)
-            if key not in seen:
-                seen.add(key)
-                results.append(obs)
+            _process_obs(obs)
 
     if ObservableType.IPV4 in types:
         for obs in extract_ipv4(text, refang_output):
-            key = (obs.obs_type, obs.value)
-            if key not in seen:
-                seen.add(key)
-                results.append(obs)
+            _process_obs(obs)
 
     if ObservableType.IPV6 in types:
         for obs in extract_ipv6(text):
-            key = (obs.obs_type, obs.value)
-            if key not in seen:
-                seen.add(key)
-                results.append(obs)
+            _process_obs(obs)
 
     if ObservableType.EMAIL in types:
         for obs in extract_emails(text, refang_output):
-            key = (obs.obs_type, obs.value)
-            if key not in seen:
-                seen.add(key)
-                results.append(obs)
+            _process_obs(obs)
 
     if ObservableType.HASH in types:
         for obs in extract_hashes(text):
-            key = (obs.obs_type, obs.value)
-            if key not in seen:
-                seen.add(key)
-                results.append(obs)
+            _process_obs(obs)
 
     if ObservableType.DOMAIN in types:
         for obs in extract_domains(text, refang_output):
-            key = (obs.obs_type, obs.value)
-            if key not in seen:
-                seen.add(key)
-                results.append(obs)
+            _process_obs(obs)
+
+    # Build results with counts
+    results: list[ExtractedObservable] = []
+    for key, obs in first_seen.items():
+        results.append(
+            ExtractedObservable(
+                obs_type=obs.obs_type,
+                value=obs.value,
+                original=obs.original,
+                defanged=obs.defanged,
+                count=counts[key],
+            )
+        )
 
     return results
 
@@ -756,3 +778,140 @@ def extract_from_url(
             text = response.read().decode("utf-8", errors="replace")
 
     return extract_all(text, types=types, refang_output=refang_output)
+
+
+# =============================================================================
+# Markdown Serialization
+# =============================================================================
+
+
+def observables_to_markdown(
+    observables: list[ExtractedObservable],
+    *,
+    include_original: bool = False,
+    group_by_type: bool = False,
+    title: str | None = None,
+    defang_values: bool = False,
+) -> str:
+    """
+    Generate markdown report for a list of extracted observables.
+
+    Useful for providing structured data to LLM models.
+
+    Args:
+        observables: List of extracted observables.
+        include_original: Include original text for each observable.
+        group_by_type: Group observables by type with sub-headers.
+        title: Optional title header (rendered as ## Title).
+        defang_values: Defang all values for safe sharing.
+
+    Returns:
+        Markdown formatted string.
+
+    Example:
+        >>> obs = extract_all("Contact admin@example.com or visit https://example.com")
+        >>> print(observables_to_markdown(obs, title="Extracted IOCs"))
+        ## Extracted IOCs
+
+        - **URL:** `https://example.com`
+        - **EMAIL:** `admin@example.com`
+    """
+    if not observables:
+        if title:
+            return f"## {title}\n\nNo observables found."
+        return "No observables found."
+
+    lines: list[str] = []
+
+    if title:
+        lines.append(f"## {title}")
+        lines.append("")
+
+    if group_by_type:
+        from collections import defaultdict
+
+        by_type: dict[ObservableType, list[ExtractedObservable]] = defaultdict(list)
+        for obs in observables:
+            by_type[obs.obs_type].append(obs)
+
+        for obs_type in ObservableType:
+            if obs_type in by_type:
+                lines.append(f"### {obs_type.value.upper()}")
+                lines.append("")
+                for obs in by_type[obs_type]:
+                    lines.append(
+                        obs.to_markdown(
+                            include_original=include_original,
+                            defang_value=defang_values,
+                        )
+                    )
+                lines.append("")
+    else:
+        for obs in observables:
+            lines.append(
+                obs.to_markdown(
+                    include_original=include_original,
+                    defang_value=defang_values,
+                )
+            )
+
+    return "\n".join(lines).rstrip()
+
+
+def observables_to_markdown_table(
+    observables: list[ExtractedObservable],
+    *,
+    title: str | None = None,
+    defang_values: bool = False,
+) -> str:
+    """
+    Generate a compact markdown table of extracted observables.
+
+    Useful for quick summaries when providing data to LLM models.
+
+    Args:
+        observables: List of extracted observables.
+        title: Optional title header (rendered as ## Title).
+        defang_values: Defang all values for safe sharing.
+
+    Returns:
+        Markdown table formatted string.
+
+    Example:
+        >>> obs = extract_all("IP: 192.168.1.1, Hash: d41d8cd98f00b204e9800998ecf8427e")
+        >>> print(observables_to_markdown_table(obs))
+        | Type | Value | Defanged |
+        |------|-------|----------|
+        | IPV4 | `192.168.1.1` |  |
+        | HASH | `d41d8cd98f00b204e9800998ecf8427e` |  |
+    """
+    if not observables:
+        if title:
+            return f"## {title}\n\nNo observables found."
+        return "No observables found."
+
+    lines: list[str] = []
+
+    if title:
+        lines.append(f"## {title}")
+        lines.append("")
+
+    # Check if any observable has count > 1
+    show_count = any(obs.count > 1 for obs in observables)
+
+    if show_count:
+        lines.append("| Type | Value | Count | Defanged |")
+        lines.append("|------|-------|-------|----------|")
+    else:
+        lines.append("| Type | Value | Defanged |")
+        lines.append("|------|-------|----------|")
+
+    for obs in observables:
+        display_value = defang(obs.value) if defang_values else obs.value
+        defanged_mark = "✓" if obs.defanged else ""
+        if show_count:
+            lines.append(f"| {obs.obs_type.value.upper()} | `{display_value}` | {obs.count} | {defanged_mark} |")
+        else:
+            lines.append(f"| {obs.obs_type.value.upper()} | `{display_value}` | {defanged_mark} |")
+
+    return "\n".join(lines)

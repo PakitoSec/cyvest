@@ -18,7 +18,13 @@ from rich.console import Console
 
 from cyvest import __version__
 from cyvest.compare import ExpectedResult, compare_investigations
-from cyvest.extract import ExtractedObservable, extract_all, extract_from_url
+from cyvest.extract import (
+    ExtractedObservable,
+    extract_all,
+    extract_from_url,
+    observables_to_markdown,
+    observables_to_markdown_table,
+)
 from cyvest.io_rich import display_check_query, display_diff, display_observable_query, display_threat_intel_query
 from cyvest.io_schema import get_investigation_schema
 from cyvest.io_serialization import load_investigation_json
@@ -513,7 +519,15 @@ def _parse_extract_types(types: tuple[str, ...]) -> set[ObservableType] | None:
     return result if result else None
 
 
-def _format_observables(observables: list[ExtractedObservable], output_format: str) -> str:
+def _format_observables(
+    observables: list[ExtractedObservable],
+    output_format: str,
+    *,
+    group_by_type: bool = False,
+    include_original: bool = False,
+    defang_output: bool = False,
+    title: str | None = None,
+) -> str:
     """Format extracted observables for output."""
     import json as json_module
 
@@ -522,6 +536,20 @@ def _format_observables(observables: list[ExtractedObservable], output_format: s
             [obs.model_dump(mode="json") for obs in observables],
             indent=2,
             ensure_ascii=False,
+        )
+    elif output_format == "markdown":
+        return observables_to_markdown(
+            observables,
+            include_original=include_original,
+            group_by_type=group_by_type,
+            title=title,
+            defang_values=defang_output,
+        )
+    elif output_format == "markdown-table":
+        return observables_to_markdown_table(
+            observables,
+            title=title,
+            defang_values=defang_output,
         )
     else:
         # Text format: one per line, with type prefix
@@ -560,16 +588,40 @@ def _format_observables(observables: list[ExtractedObservable], output_format: s
     "-f",
     "--format",
     "output_format",
-    type=click.Choice(["text", "json"], case_sensitive=False),
+    type=click.Choice(["text", "json", "markdown", "markdown-table"], case_sensitive=False),
     default="text",
     show_default=True,
-    help="Output format.",
+    help="Output format. Use 'markdown' or 'markdown-table' for LLM-friendly output.",
 )
 @click.option(
     "--from-url",
     "from_url",
     type=str,
     help="Fetch content from URL and extract observables (ignores INPUT argument).",
+)
+@click.option(
+    "--group-by-type",
+    is_flag=True,
+    default=False,
+    help="Group observables by type in markdown output.",
+)
+@click.option(
+    "--include-original",
+    is_flag=True,
+    default=False,
+    help="Include original (defanged) text in markdown output.",
+)
+@click.option(
+    "--defang-output",
+    is_flag=True,
+    default=False,
+    help="Defang values in output for safe sharing (markdown formats only).",
+)
+@click.option(
+    "--title",
+    type=str,
+    default=None,
+    help="Title header for markdown output.",
 )
 def extract(
     input,
@@ -578,6 +630,10 @@ def extract(
     output,
     output_format: str,
     from_url: str | None,
+    group_by_type: bool,
+    include_original: bool,
+    defang_output: bool,
+    title: str | None,
 ) -> None:
     """
     Extract observables (IOCs) from text input.
@@ -600,6 +656,8 @@ def extract(
         cyvest extract report.txt -t url -t email
         cyvest extract -t ip --format json < input.txt
         cyvest extract --from-url https://example.com/iocs.txt -o extracted.txt
+        cyvest extract report.txt --format markdown --group-by-type --title "IOCs"
+        cyvest extract report.txt --format markdown-table --defang-output
     """
     observable_types = _parse_extract_types(types)
 
@@ -627,10 +685,24 @@ def extract(
 
     logger.info(f"[green]✓ Extracted {len(observables)} observable(s)[/green]")
 
-    formatted = _format_observables(observables, output_format)
-    output.write(formatted)
-    if not formatted.endswith("\n"):
-        output.write("\n")
+    formatted = _format_observables(
+        observables,
+        output_format,
+        group_by_type=group_by_type,
+        include_original=include_original,
+        defang_output=defang_output,
+        title=title,
+    )
+
+    # Use Rich Markdown rendering for markdown formats when outputting to stdout
+    if output.name == "<stdout>" and output_format in ("markdown", "markdown-table"):
+        from rich.markdown import Markdown
+
+        logger.rich("INFO", Markdown(formatted), prefix=False)
+    else:
+        output.write(formatted)
+        if not formatted.endswith("\n"):
+            output.write("\n")
 
 
 def main() -> None:

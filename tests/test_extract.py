@@ -12,6 +12,7 @@ from click.testing import CliRunner
 
 from cyvest.cli import cli
 from cyvest.extract import (
+    ExtractedObservable,
     defang,
     extract_all,
     extract_domains,
@@ -22,6 +23,8 @@ from cyvest.extract import (
     extract_ipv4,
     extract_ipv6,
     extract_urls,
+    observables_to_markdown,
+    observables_to_markdown_table,
     refang,
 )
 from cyvest.model_enums import ObservableType
@@ -198,9 +201,14 @@ class TestExtractUrls:
         assert len(urls) == 2
 
     def test_extract_urls_deduplicates(self):
+        # Deduplication happens in extract_all, not in extract_urls
         text = "Visit http://example.com and http://example.com again"
         urls = list(extract_urls(text))
-        assert len(urls) == 1
+        assert len(urls) == 2  # extract_urls yields all matches
+        # extract_all deduplicates and counts
+        all_obs = extract_all(text, types={ObservableType.URL})
+        assert len(all_obs) == 1
+        assert all_obs[0].count == 2
 
     def test_extract_no_refang(self):
         text = "C2: hxxps://evil[.]com"
@@ -274,9 +282,14 @@ class TestExtractIPs:
         assert len(ips) == 2
 
     def test_extract_ips_deduplicates(self):
+        # Deduplication happens in extract_all, not in extract_ips
         text = "IP 8.8.8.8 and again 8.8.8.8"
         ips = list(extract_ips(text))
-        assert len(ips) == 1
+        assert len(ips) == 2  # extract_ips yields all matches
+        # extract_all deduplicates and counts
+        all_obs = extract_all(text, types={ObservableType.IPV4})
+        assert len(all_obs) == 1
+        assert all_obs[0].count == 2
 
 
 # =============================================================================
@@ -332,9 +345,14 @@ class TestExtractEmails:
         assert emails[0].value == "user+tag@example.com"
 
     def test_extract_emails_deduplicates(self):
+        # Deduplication happens in extract_all, not in extract_emails
         text = "Contact user@test.com or user@test.com"
         emails = list(extract_emails(text))
-        assert len(emails) == 1
+        assert len(emails) == 2  # extract_emails yields all matches
+        # extract_all deduplicates and counts
+        all_obs = extract_all(text, types={ObservableType.EMAIL})
+        assert len(all_obs) == 1
+        assert all_obs[0].count == 2
 
 
 # =============================================================================
@@ -442,9 +460,14 @@ class TestExtractDomains:
         assert all(d.value != "example.com" for d in domains)
 
     def test_extract_domains_deduplicates(self):
+        # Deduplication happens in extract_all, not in extract_domains
         text = "Check example.com and example.com"
         domains = list(extract_domains(text))
-        assert len(domains) == 1
+        assert len(domains) == 2  # extract_domains yields all matches
+        # extract_all deduplicates and counts
+        all_obs = extract_all(text, types={ObservableType.DOMAIN})
+        assert len(all_obs) == 1
+        assert all_obs[0].count == 2
 
 
 # =============================================================================
@@ -724,3 +747,354 @@ class TestEdgeCases:
         hashes = list(extract_hashes(text))
         # Should not extract as any hash type since it's too long
         assert len(hashes) <= 2  # At most SHA512 (128) extracted
+
+
+# =============================================================================
+# Markdown Serialization Tests
+# =============================================================================
+
+
+class TestExtractedObservableStr:
+    """Tests for ExtractedObservable.__str__ method."""
+
+    def test_str_url(self):
+        obs = ExtractedObservable(
+            obs_type=ObservableType.URL,
+            value="https://example.com",
+            original="https://example.com",
+            defanged=False,
+        )
+        assert str(obs) == "url:https://example.com"
+
+    def test_str_email(self):
+        obs = ExtractedObservable(
+            obs_type=ObservableType.EMAIL,
+            value="admin@example.com",
+            original="admin@example.com",
+            defanged=False,
+        )
+        assert str(obs) == "email:admin@example.com"
+
+    def test_str_ipv4(self):
+        obs = ExtractedObservable(
+            obs_type=ObservableType.IPV4,
+            value="192.168.1.1",
+            original="192[.]168[.]1[.]1",
+            defanged=True,
+        )
+        assert str(obs) == "ipv4:192.168.1.1"
+
+
+class TestExtractedObservableToMarkdown:
+    """Tests for ExtractedObservable.to_markdown method."""
+
+    def test_to_markdown_basic(self):
+        obs = ExtractedObservable(
+            obs_type=ObservableType.URL,
+            value="https://example.com",
+            original="https://example.com",
+            defanged=False,
+        )
+        md = obs.to_markdown()
+        assert md == "- URL: `https://example.com`"
+
+    def test_to_markdown_with_defanged_flag(self):
+        obs = ExtractedObservable(
+            obs_type=ObservableType.IPV4,
+            value="192.168.1.1",
+            original="192[.]168[.]1[.]1",
+            defanged=True,
+        )
+        md = obs.to_markdown()
+        assert "- IPV4: `192.168.1.1`" in md
+        assert "Defanged: Yes" in md
+
+    def test_to_markdown_include_original(self):
+        obs = ExtractedObservable(
+            obs_type=ObservableType.URL,
+            value="https://example.com",
+            original="hxxps://example[.]com",
+            defanged=True,
+        )
+        md = obs.to_markdown(include_original=True)
+        assert "- URL: `https://example.com`" in md
+        assert "Original: `hxxps://example[.]com`" in md
+
+    def test_to_markdown_include_original_same_value(self):
+        """Original should not be shown if it equals value."""
+        obs = ExtractedObservable(
+            obs_type=ObservableType.URL,
+            value="https://example.com",
+            original="https://example.com",
+            defanged=False,
+        )
+        md = obs.to_markdown(include_original=True)
+        assert "Original:" not in md
+
+    def test_to_markdown_defang_value(self):
+        obs = ExtractedObservable(
+            obs_type=ObservableType.URL,
+            value="https://example.com",
+            original="https://example.com",
+            defanged=False,
+        )
+        md = obs.to_markdown(defang_value=True)
+        assert "hxxps://" in md
+        assert "[.]" in md
+
+
+class TestObservablesToMarkdown:
+    """Tests for observables_to_markdown function."""
+
+    def test_empty_list(self):
+        md = observables_to_markdown([])
+        assert md == "No observables found."
+
+    def test_empty_list_with_title(self):
+        md = observables_to_markdown([], title="IOCs")
+        assert "## IOCs" in md
+        assert "No observables found." in md
+
+    def test_basic_list(self):
+        obs = [
+            ExtractedObservable(
+                obs_type=ObservableType.URL,
+                value="https://example.com",
+                original="https://example.com",
+                defanged=False,
+            ),
+            ExtractedObservable(
+                obs_type=ObservableType.IPV4,
+                value="192.168.1.1",
+                original="192.168.1.1",
+                defanged=False,
+            ),
+        ]
+        md = observables_to_markdown(obs)
+        assert "- URL: `https://example.com`" in md
+        assert "- IPV4: `192.168.1.1`" in md
+
+    def test_with_title(self):
+        obs = [
+            ExtractedObservable(
+                obs_type=ObservableType.DOMAIN,
+                value="example.com",
+                original="example.com",
+                defanged=False,
+            ),
+        ]
+        md = observables_to_markdown(obs, title="Extracted Domains")
+        assert md.startswith("## Extracted Domains")
+
+    def test_group_by_type(self):
+        obs = [
+            ExtractedObservable(
+                obs_type=ObservableType.URL,
+                value="https://a.com",
+                original="https://a.com",
+                defanged=False,
+            ),
+            ExtractedObservable(
+                obs_type=ObservableType.IPV4,
+                value="1.2.3.4",
+                original="1.2.3.4",
+                defanged=False,
+            ),
+            ExtractedObservable(
+                obs_type=ObservableType.URL,
+                value="https://b.com",
+                original="https://b.com",
+                defanged=False,
+            ),
+        ]
+        md = observables_to_markdown(obs, group_by_type=True)
+        assert "### URL" in md
+        assert "### IPV4" in md
+        # IPV4 comes before URL in ObservableType enum order
+        ipv4_section_start = md.find("### IPV4")
+        url_section_start = md.find("### URL")
+        assert ipv4_section_start < url_section_start
+
+    def test_defang_values(self):
+        obs = [
+            ExtractedObservable(
+                obs_type=ObservableType.URL,
+                value="https://malware.com/payload",
+                original="https://malware.com/payload",
+                defanged=False,
+            ),
+        ]
+        md = observables_to_markdown(obs, defang_values=True)
+        assert "hxxps://" in md
+        assert "[.]" in md
+
+
+class TestObservablesToMarkdownTable:
+    """Tests for observables_to_markdown_table function."""
+
+    def test_empty_list(self):
+        md = observables_to_markdown_table([])
+        assert md == "No observables found."
+
+    def test_empty_list_with_title(self):
+        md = observables_to_markdown_table([], title="IOCs")
+        assert "## IOCs" in md
+        assert "No observables found." in md
+
+    def test_basic_table(self):
+        obs = [
+            ExtractedObservable(
+                obs_type=ObservableType.URL,
+                value="https://example.com",
+                original="https://example.com",
+                defanged=False,
+            ),
+            ExtractedObservable(
+                obs_type=ObservableType.IPV4,
+                value="192.168.1.1",
+                original="192[.]168[.]1[.]1",
+                defanged=True,
+            ),
+        ]
+        md = observables_to_markdown_table(obs)
+        assert "| Type | Value | Defanged |" in md
+        assert "|------|-------|----------|" in md
+        assert "| URL | `https://example.com` |  |" in md
+        assert "| IPV4 | `192.168.1.1` | ✓ |" in md
+
+    def test_with_title(self):
+        obs = [
+            ExtractedObservable(
+                obs_type=ObservableType.HASH,
+                value="d41d8cd98f00b204e9800998ecf8427e",
+                original="d41d8cd98f00b204e9800998ecf8427e",
+                defanged=False,
+            ),
+        ]
+        md = observables_to_markdown_table(obs, title="File Hashes")
+        assert md.startswith("## File Hashes")
+
+    def test_defang_values(self):
+        obs = [
+            ExtractedObservable(
+                obs_type=ObservableType.EMAIL,
+                value="evil@malware.com",
+                original="evil@malware.com",
+                defanged=False,
+            ),
+        ]
+        md = observables_to_markdown_table(obs, defang_values=True)
+        assert "[@]" in md
+        assert "[.]" in md
+
+
+class TestMarkdownIntegration:
+    """Integration tests for markdown serialization with extract functions."""
+
+    def test_extract_and_serialize_to_markdown(self):
+        text = """
+        Malicious IP: 192[.]168[.]1[.]100
+        C2 server: hxxps://evil[.]com/callback
+        Contact: admin[@]evil[.]com
+        """
+        obs = extract_all(text)
+        md = observables_to_markdown(obs, title="Threat IOCs", group_by_type=True)
+        assert "## Threat IOCs" in md
+        assert "192.168.1.100" in md
+        assert "https://evil.com/callback" in md
+        assert "admin@evil.com" in md
+
+    def test_extract_and_serialize_to_table(self):
+        text = "Visit https://example.com or contact user@example.com"
+        obs = extract_all(text)
+        md = observables_to_markdown_table(obs)
+        assert "| URL |" in md
+        assert "| EMAIL |" in md
+
+
+class TestOccurrenceCounting:
+    """Tests for occurrence counting functionality."""
+
+    def test_count_duplicate_ips(self):
+        text = "IP: 192.168.1.1 and again 192.168.1.1 and 192.168.1.1"
+        obs = extract_all(text)
+        assert len(obs) == 1
+        assert obs[0].value == "192.168.1.1"
+        assert obs[0].count == 3
+
+    def test_count_single_occurrence(self):
+        text = "IP: 192.168.1.1"
+        obs = extract_all(text)
+        assert len(obs) == 1
+        assert obs[0].count == 1
+
+    def test_count_multiple_types(self):
+        text = """
+        192.168.1.1 192.168.1.1
+        https://example.com https://example.com https://example.com
+        test@example.com
+        """
+        obs = extract_all(text)
+        ip_obs = [o for o in obs if o.obs_type == ObservableType.IPV4][0]
+        url_obs = [o for o in obs if o.obs_type == ObservableType.URL][0]
+        email_obs = [o for o in obs if o.obs_type == ObservableType.EMAIL][0]
+
+        assert ip_obs.count == 2
+        assert url_obs.count == 3
+        assert email_obs.count == 1
+
+    def test_str_with_count(self):
+        obs = ExtractedObservable(
+            obs_type=ObservableType.IPV4,
+            value="192.168.1.1",
+            original="192.168.1.1",
+            defanged=False,
+            count=5,
+        )
+        assert "(x5)" in str(obs)
+
+    def test_to_markdown_with_count(self):
+        obs = ExtractedObservable(
+            obs_type=ObservableType.IPV4,
+            value="192.168.1.1",
+            original="192.168.1.1",
+            defanged=False,
+            count=3,
+        )
+        md = obs.to_markdown()
+        assert "Count: 3" in md
+
+    def test_table_with_count_column(self):
+        obs = [
+            ExtractedObservable(
+                obs_type=ObservableType.IPV4,
+                value="192.168.1.1",
+                original="192.168.1.1",
+                defanged=False,
+                count=3,
+            ),
+            ExtractedObservable(
+                obs_type=ObservableType.URL,
+                value="https://example.com",
+                original="https://example.com",
+                defanged=False,
+                count=1,
+            ),
+        ]
+        md = observables_to_markdown_table(obs)
+        assert "| Count |" in md
+        assert "| 3 |" in md
+        assert "| 1 |" in md
+
+    def test_table_without_count_column_when_all_one(self):
+        obs = [
+            ExtractedObservable(
+                obs_type=ObservableType.IPV4,
+                value="192.168.1.1",
+                original="192.168.1.1",
+                defanged=False,
+                count=1,
+            ),
+        ]
+        md = observables_to_markdown_table(obs)
+        assert "| Count |" not in md

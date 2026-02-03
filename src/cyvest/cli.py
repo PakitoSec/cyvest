@@ -18,11 +18,13 @@ from rich.console import Console
 
 from cyvest import __version__
 from cyvest.compare import ExpectedResult, compare_investigations
+from cyvest.extract import ExtractedObservable, extract_all, extract_from_url
 from cyvest.io_rich import display_check_query, display_diff, display_observable_query, display_threat_intel_query
 from cyvest.io_schema import get_investigation_schema
 from cyvest.io_serialization import load_investigation_json
 from cyvest.io_visualization import VisualizationDependencyMissingError
 from cyvest.keys import parse_key_type
+from cyvest.model_enums import ObservableType
 
 CONTEXT_SETTINGS = {"help_option_names": ["-h", "--help"]}
 console = Console()
@@ -476,6 +478,159 @@ def query(input: Path, key: str, depth: int) -> None:
             display_threat_intel_query(cv, key, rich_print)
     except KeyError as exc:
         raise click.ClickException(str(exc)) from exc
+
+
+# =============================================================================
+# Extract Command
+# =============================================================================
+
+_EXTRACT_TYPE_CHOICES = ["url", "ip", "ipv4", "ipv6", "email", "hash", "domain", "all"]
+
+
+def _parse_extract_types(types: tuple[str, ...]) -> set[ObservableType] | None:
+    """Parse extract type choices into ObservableType set."""
+    if "all" in types or not types:
+        return None  # None means all types
+
+    result: set[ObservableType] = set()
+    for t in types:
+        t_lower = t.lower()
+        if t_lower == "ip":
+            result.add(ObservableType.IPV4)
+            result.add(ObservableType.IPV6)
+        elif t_lower == "ipv4":
+            result.add(ObservableType.IPV4)
+        elif t_lower == "ipv6":
+            result.add(ObservableType.IPV6)
+        elif t_lower == "url":
+            result.add(ObservableType.URL)
+        elif t_lower == "email":
+            result.add(ObservableType.EMAIL)
+        elif t_lower == "hash":
+            result.add(ObservableType.HASH)
+        elif t_lower == "domain":
+            result.add(ObservableType.DOMAIN)
+    return result if result else None
+
+
+def _format_observables(observables: list[ExtractedObservable], output_format: str) -> str:
+    """Format extracted observables for output."""
+    import json as json_module
+
+    if output_format == "json":
+        return json_module.dumps(
+            [obs.model_dump(mode="json") for obs in observables],
+            indent=2,
+            ensure_ascii=False,
+        )
+    else:
+        # Text format: one per line, with type prefix
+        lines = []
+        for obs in observables:
+            lines.append(f"{obs.obs_type.value}\t{obs.value}")
+        return "\n".join(lines)
+
+
+@cli.command()
+@click.argument("input", type=click.File("r", encoding="utf-8"), default="-", required=False)
+@click.option(
+    "-t",
+    "--types",
+    multiple=True,
+    type=click.Choice(_EXTRACT_TYPE_CHOICES, case_sensitive=False),
+    default=["all"],
+    show_default=True,
+    help="Types of observables to extract. Can be specified multiple times.",
+)
+@click.option(
+    "-r/-R",
+    "--refang/--no-refang",
+    default=True,
+    show_default=True,
+    help="Refang extracted observables (convert hxxp to http, [.] to ., etc.).",
+)
+@click.option(
+    "-o",
+    "--output",
+    type=click.File("w", encoding="utf-8"),
+    default="-",
+    help="Output file (defaults to stdout).",
+)
+@click.option(
+    "-f",
+    "--format",
+    "output_format",
+    type=click.Choice(["text", "json"], case_sensitive=False),
+    default="text",
+    show_default=True,
+    help="Output format.",
+)
+@click.option(
+    "--from-url",
+    "from_url",
+    type=str,
+    help="Fetch content from URL and extract observables (ignores INPUT argument).",
+)
+def extract(
+    input,
+    types: tuple[str, ...],
+    refang: bool,
+    output,
+    output_format: str,
+    from_url: str | None,
+) -> None:
+    """
+    Extract observables (IOCs) from text input.
+
+    Reads from stdin by default, or from a file if INPUT is specified.
+    Use --from-url to fetch and extract from a web page.
+
+    Supported observable types:
+    - url: URLs (http, https, ftp, sftp, tcp, udp) including encoded
+    - ip/ipv4/ipv6: IP addresses
+    - email: Email addresses
+    - hash: MD5, SHA1, SHA256, SHA512 hashes
+    - domain: Domain names
+
+    Supports defanged indicators (hxxp://, [.], [@], etc.) with automatic refanging.
+
+    \b
+    Examples:
+        cat report.txt | cyvest extract
+        cyvest extract report.txt -t url -t email
+        cyvest extract -t ip --format json < input.txt
+        cyvest extract --from-url https://example.com/iocs.txt -o extracted.txt
+    """
+    observable_types = _parse_extract_types(types)
+
+    try:
+        if from_url:
+            logger.info(f"[cyan]Fetching content from: {from_url}[/cyan]")
+            observables = extract_from_url(
+                from_url,
+                types=observable_types,
+                refang_output=refang,
+            )
+        else:
+            text = input.read()
+            observables = extract_all(
+                text,
+                types=observable_types,
+                refang_output=refang,
+            )
+    except Exception as exc:
+        raise click.ClickException(f"Extraction failed: {exc}") from exc
+
+    if not observables:
+        logger.info("[yellow]No observables found.[/yellow]")
+        return
+
+    logger.info(f"[green]✓ Extracted {len(observables)} observable(s)[/green]")
+
+    formatted = _format_observables(observables, output_format)
+    output.write(formatted)
+    if not formatted.endswith("\n"):
+        output.write("\n")
 
 
 def main() -> None:

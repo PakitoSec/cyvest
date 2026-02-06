@@ -494,7 +494,7 @@ class Investigation:
         - Update score (take maximum)
         - Update level (take maximum)
         - Update extra (merge dicts)
-        - Concatenate comments
+        - Overwrite comment (if incoming is non-empty)
         - Merge taxonomies
 
         Args:
@@ -519,12 +519,9 @@ class Investigation:
         # Update extra (merge dictionaries)
         existing.extra.update(incoming.extra)
 
-        # Concatenate comments
+        # Overwrite comment if incoming is non-empty
         if incoming.comment:
-            if existing.comment:
-                existing.comment += "\n\n" + incoming.comment
-            else:
-                existing.comment = incoming.comment
+            existing.comment = incoming.comment
 
         # Merge taxonomies (ensure unique names)
         existing_by_name: dict[str, int] = {taxonomy.name: idx for idx, taxonomy in enumerate(existing.taxonomies)}

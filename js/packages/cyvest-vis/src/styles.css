@@ -1,0 +1,132 @@
+.cyvest-canvas {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--cyvest-panel-border);
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at 8% 12%, rgba(255, 255, 255, 0.9), transparent 52%),
+    radial-gradient(circle at 90% 84%, rgba(31, 111, 235, 0.12), transparent 50%),
+    var(--cyvest-background);
+  font-family: var(--cyvest-font-family);
+}
+
+.cyvest-canvas::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: linear-gradient(
+      to right,
+      rgba(120, 138, 170, 0.2) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      to bottom,
+      rgba(120, 138, 170, 0.2) 1px,
+      transparent 1px
+    );
+  background-size: 28px 28px;
+  opacity: 0.34;
+  z-index: 0;
+}
+
+.cyvest-canvas__surface {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
+.cyvest-toolbar {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 12;
+  display: flex;
+  gap: 6px;
+  padding: 6px;
+  border-radius: 10px;
+  border: 1px solid var(--cyvest-panel-border);
+  background: var(--cyvest-panel-bg);
+  box-shadow: 0 8px 18px rgba(13, 27, 52, 0.16);
+}
+
+.cyvest-toolbar__button {
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--cyvest-panel-text);
+  background: transparent;
+  cursor: pointer;
+  transition: background-color 0.14s ease, border-color 0.14s ease,
+    color 0.14s ease;
+}
+
+.cyvest-toolbar__button:hover {
+  background: rgba(31, 111, 235, 0.12);
+  border-color: rgba(31, 111, 235, 0.24);
+  color: var(--cyvest-accent);
+}
+
+.cyvest-toolbar__button svg {
+  width: 17px;
+  height: 17px;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.cyvest-view-toggle {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 22;
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 11px;
+  border: 1px solid var(--cyvest-panel-border, #d3dae6);
+  background: var(--cyvest-panel-bg, rgba(255, 255, 255, 0.96));
+  box-shadow: 0 8px 18px rgba(13, 27, 52, 0.16);
+  font-family: var(--cyvest-font-family, "IBM Plex Sans", "Segoe UI", sans-serif);
+}
+
+.cyvest-view-toggle__button {
+  border: none;
+  border-radius: 8px;
+  padding: 8px 12px;
+  color: var(--cyvest-panel-muted, #556079);
+  background: transparent;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition: background-color 0.14s ease, color 0.14s ease;
+}
+
+.cyvest-view-toggle__button:hover {
+  background: rgba(31, 111, 235, 0.12);
+  color: var(--cyvest-accent, #1f6feb);
+}
+
+.cyvest-view-toggle__button--active,
+.cyvest-view-toggle__button--active:hover {
+  background: var(--cyvest-accent, #1f6feb);
+  color: #ffffff;
+}
+
+@media (max-width: 768px) {
+  .cyvest-view-toggle {
+    top: 8px;
+    left: 8px;
+  }
+
+  .cyvest-toolbar {
+    top: 8px;
+    right: 8px;
+  }
+}

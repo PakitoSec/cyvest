@@ -1,35 +1,65 @@
 import { describe, expect, it } from "vitest";
 
-import { LEVEL_COLORS } from "@cyvest/cyvest-js";
+import { parseCyvest } from "@cyvest/cyvest-js";
+
+import { buildInvestigationElements } from "../src/adapters/investigationElements";
+import { buildObservablesElements } from "../src/adapters/observablesElements";
 import {
-  getLevelBackgroundColor,
-  getLevelColor,
-  getObservableShape,
-  truncateLabel,
-} from "../src/utils/observables";
+  getInvestigationIconSvg,
+  getObservableIconSvg,
+} from "../src/icons/svg";
+import { truncateLabel } from "../src/utils/labels";
 
-describe("observables utils", () => {
-  it("returns shapes based on root flag (all non-root nodes are circles)", () => {
-    // All non-root nodes are now circles for a cleaner design
-    expect(getObservableShape("domain", false)).toBe("circle");
-    expect(getObservableShape("ipv6", false)).toBe("circle");
-    expect(getObservableShape("anything-else", false)).toBe("circle");
-    // Root nodes get a rectangle (pill shape)
-    expect(getObservableShape("anything-else", true)).toBe("rectangle");
-    expect(getObservableShape("domain", true)).toBe("rectangle");
-  });
+import cyvestVisualData from "../../cyvest-app/src/investigations/cyvest_visual.json";
 
+const investigation = parseCyvest(cyvestVisualData);
+
+describe("label utilities", () => {
   it("truncates long labels in the middle by default", () => {
     expect(truncateLabel("short", 10)).toBe("short");
-    expect(truncateLabel("averyverylongvalue", 10)).toBe("ave…lue");
+    expect(truncateLabel("averyverylongvalue", 10)).toBe("avery…alue");
     expect(truncateLabel("averyverylongvalue", 10, false)).toBe("averyvery…");
   });
+});
 
-  it("maps levels to colors", () => {
-    expect(getLevelColor("SUSPICIOUS")).toBe(LEVEL_COLORS.SUSPICIOUS);
-    // Background color is the level color lightened by 88%
-    const bgColor = getLevelBackgroundColor("SUSPICIOUS");
-    // Just verify it's a valid hex color that's lighter than the original
-    expect(bgColor).toMatch(/^#[0-9a-f]{6}$/i);
+describe("icon helpers", () => {
+  it("creates data URI icons for observables and investigation nodes", () => {
+    const observableIcon = getObservableIconSvg("domain");
+    const investigationIcon = getInvestigationIconSvg("tag");
+
+    expect(observableIcon.startsWith("data:image/svg+xml;utf8,")).toBe(true);
+    expect(investigationIcon.startsWith("data:image/svg+xml;utf8,")).toBe(true);
+  });
+});
+
+describe("cytoscape adapters", () => {
+  it("builds observable nodes and edges", () => {
+    const elements = buildObservablesElements(investigation);
+
+    const nodes = elements.filter((item) => item.group === "nodes");
+    const edges = elements.filter((item) => item.group === "edges");
+
+    expect(nodes.length).toBeGreaterThan(0);
+    expect(edges.length).toBeGreaterThan(0);
+
+    const firstNodeData = nodes[0]?.data as Record<string, unknown>;
+    expect(typeof firstNodeData.labelShort).toBe("string");
+    expect(typeof firstNodeData.icon).toBe("string");
+  });
+
+  it("builds investigation hierarchy nodes and edges", () => {
+    const elements = buildInvestigationElements(investigation);
+
+    const nodes = elements.filter((item) => item.group === "nodes");
+    const edges = elements.filter((item) => item.group === "edges");
+
+    expect(nodes.length).toBeGreaterThan(0);
+    expect(edges.length).toBeGreaterThan(0);
+
+    const rootNode = nodes.find(
+      (node) => (node.data as Record<string, unknown>).nodeType === "root"
+    );
+
+    expect(rootNode).toBeDefined();
   });
 });

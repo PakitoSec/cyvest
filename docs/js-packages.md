@@ -10,31 +10,32 @@ recorded as an `INVESTIGATION_STARTED` event in the `audit_log`.
 ## Packages
 
 - **@cyvest/cyvest-js** — Generated types, schema validation, graph builders, tag hierarchy utilities (including aggregated score/level), and helper functions for Cyvest investigation JSON. Ships ESM/CJS builds and `.d.ts` files.
-- **@cyvest/cyvest-vis** — React 19+ visualization components (powered by React Flow + D3) to visualize investigations with level-aware styling. Depends on `@cyvest/cyvest-js`.
+- **@cyvest/cyvest-vis** — React 19+ visualization components (powered by Cytoscape) to visualize investigations with level-aware styling. Uses ELK for observables and Dagre for investigation hierarchy. Depends on `@cyvest/cyvest-js`.
 - **@cyvest/cyvest-app** — Private Vite demo that bundles sample investigations and renders them via `CyvestGraph`. Useful for tweaking visuals and testing UI flows.
 
 ## @cyvest/cyvest-vis
 
-Interactive graph visualization for Cyvest investigations.
+Interactive graph visualization for Cyvest investigations with a clean v2 API.
 
 ### Features
 
-- **Observables Graph**: Force-directed layout showing all observables and relationships
-- **Investigation Graph**: Hierarchical Dagre layout showing root → tags → checks
+- **Observables Graph**: ELK `stress` layout showing all observables and relationships
+- **Investigation Graph**: Dagre `LR` layout showing root → tags → checks
 - **Professional icons**: SVG icons for all observable types (IPs, domains, emails, files, etc.)
-- **Interactive controls**: Drag nodes, adjust force parameters, zoom/pan
+- **Interactive controls**: Pan/zoom, fit, and re-run layout
 - **Level-aware colors**: Nodes styled by security level (SAFE → MALICIOUS)
 
 ### Quick Start
 
 ```tsx
 import { CyvestGraph } from "@cyvest/cyvest-vis";
+import "@cyvest/cyvest-vis/styles.css";
 
 <CyvestGraph
   investigation={investigation}
   height={600}
   showViewToggle
-  onNodeClick={(id) => console.log(id)}
+  onNodeSelect={(event) => console.log(event.nodeId, event.label)}
 />
 ```
 
@@ -43,10 +44,10 @@ import { CyvestGraph } from "@cyvest/cyvest-vis";
 | Component | Description |
 |-----------|-------------|
 | `CyvestGraph` | Combined view with toggle between Observables and Investigation |
-| `ObservablesGraph` | Force-directed graph of observables and relationships |
-| `InvestigationGraph` | Hierarchical graph of root, checks, and tags |
+| `CyvestObservablesView` | ELK-based graph of observables and relationships |
+| `CyvestInvestigationView` | Dagre-based graph of root, checks, and tags |
 
-See `js/packages/cyvest-vis/src/components` for advanced hooks and utilities.
+See `js/packages/cyvest-vis/README.md` for full v2 API and theming details.
 
 ## Workspace commands
 

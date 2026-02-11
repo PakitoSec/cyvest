@@ -1,20 +1,20 @@
 # @cyvest/cyvest-vis
 
-React components for visualizing Cyvest investigations using React Flow + D3 force layouts.
+Cytoscape-based React components for rendering Cyvest investigations.
 
-## Features
+## Highlights
 
-- **Two visualization modes**: Observables graph (force-directed) and Investigation graph (hierarchical Dagre layout)
-- **Interactive force simulation**: Drag nodes, adjust forces in real-time
-- **Professional SVG icons**: Clean icons for all observable types (IPs, domains, emails, files, threats, etc.)
-- **Level-aware styling**: Nodes colored by security level (SAFE, INFORMATIVE, SUSPICIOUS, MALICIOUS)
-- **Responsive design**: Works at any size with zoom, pan, and minimap controls
-- Uses `@cyvest/cyvest-js` for types, colors, and graph data extraction
+- Built on `@cyvest/cyvest-js` investigation and graph helpers
+- Two views: observables graph and investigation hierarchy
+- Layouts: ELK `stress` for observables, Dagre `LR` for investigation
+- Professional built-in SVG icons for nodes
+- Label truncation with full-value events
+- Themeable with CSS variables and typed React props
 
-## Installation
+## Install / Build
 
 ```bash
-pnpm install          # from repo root
+pnpm install
 pnpm --filter @cyvest/cyvest-vis build
 ```
 
@@ -26,129 +26,50 @@ pnpm --filter @cyvest/cyvest-vis test
 
 ## Usage
 
-### Basic Usage
-
 ```tsx
 import { CyvestGraph } from "@cyvest/cyvest-vis";
-import type { CyvestInvestigation } from "@cyvest/cyvest-js";
+import "@cyvest/cyvest-vis/styles.css";
 
-function InvestigationView({ investigation }: { investigation: CyvestInvestigation }) {
-  return (
-    <CyvestGraph
-      investigation={investigation}
-      height={600}
-      showViewToggle
-      onNodeClick={(id) => console.log("Selected:", id)}
-    />
-  );
-}
-```
-
-### Components
-
-#### `CyvestGraph`
-
-Main component with toggle between Observables and Investigation views.
-
-```tsx
 <CyvestGraph
   investigation={investigation}
-  height={600}
-  width="100%"
-  initialView="observables"  // or "investigation"
-  showViewToggle={true}
-  onNodeClick={(nodeId) => {}}
-/>
-```
-
-#### `ObservablesGraph`
-
-Force-directed graph showing all observables and their relationships.
-
-```tsx
-import { ObservablesGraph } from "@cyvest/cyvest-vis";
-
-<ObservablesGraph
-  investigation={investigation}
-  height={600}
-  width="100%"
-  showControls={true}  // Show force layout controls
-  forceConfig={{
-    chargeStrength: -200,
-    linkDistance: 80,
-    collisionRadius: 45,
-  }}
-  onNodeClick={(nodeId) => {}}
-  onNodeDoubleClick={(nodeId) => {}}
-/>
-```
-
-#### `InvestigationGraph`
-
-Hierarchical graph showing root → tags → checks structure.
-
-```tsx
-import { InvestigationGraph } from "@cyvest/cyvest-vis";
-
-<InvestigationGraph
-  investigation={investigation}
-  height={600}
-  width="100%"
-  onNodeClick={(nodeId, nodeType) => {
-    // nodeType: "root" | "check" | "tag"
+  height={620}
+  initialView="observables"
+  onNodeSelect={(event) => {
+    console.log(event.nodeId, event.label, event.nodeType);
   }}
 />
 ```
 
-### Custom Icons
+## Main Exports
 
-Access icon components for custom UIs:
+- `CyvestGraph`
+- `CyvestObservablesView`
+- `CyvestInvestigationView`
+- `createElkLayout`
+- `truncateLabel`
+- `getObservableIconSvg`
+- `getInvestigationIconSvg`
 
-```tsx
-import { getObservableIcon, getInvestigationIcon, GlobeIcon, MailIcon } from "@cyvest/cyvest-vis";
+## Theming
 
-// Get icon by observable type
-const Icon = getObservableIcon("ipv4"); // Returns GlobeIcon
-<Icon size={24} color="#3b82f6" />
+Use the `theme` prop or override CSS variables.
 
-// Or use icons directly
-<GlobeIcon size={16} color="currentColor" />
-<MailIcon size={16} color="#ef4444" />
-```
-
-Available icons: `GlobeIcon`, `DomainIcon`, `LinkIcon`, `MailIcon`, `EnvelopeIcon`, `FileIcon`, `HashIcon`, `UserIcon`, `IdCardIcon`, `GearIcon`, `AppIcon`, `RegistryIcon`, `ThreatActorIcon`, `BugIcon`, `SwordIcon`, `TargetIcon`, `AlertIcon`, `FlaskIcon`, `CertificateIcon`, `WifiIcon`, `WorldIcon`, `QuestionIcon`, `CheckIcon`, `TagIcon`, `CrosshairIcon`
-
-## Types
-
-```tsx
-import type {
-  CyvestGraphProps,
-  ObservablesGraphProps,
-  InvestigationGraphProps,
-  ForceLayoutConfig,
-  ObservableNodeData,
-  InvestigationNodeData,
-  InvestigationNodeType,
-} from "@cyvest/cyvest-vis";
-```
-
-### Force Layout Configuration
-
-```tsx
-interface ForceLayoutConfig {
-  chargeStrength: number;   // Repulsion strength (default: -200)
-  linkDistance: number;     // Target link distance (default: 80)
-  centerStrength: number;   // Center pull strength (default: 0.05)
-  collisionRadius: number;  // Node collision radius (default: 45)
-  iterations: number;       // Iterations for static layout (default: 300)
+```css
+:root {
+  --cyvest-background: #f4f7fb;
+  --cyvest-grid-color: #d7dfeb;
+  --cyvest-panel-bg: rgba(255, 255, 255, 0.96);
+  --cyvest-panel-border: #d3dae6;
+  --cyvest-panel-text: #172033;
+  --cyvest-panel-muted: #556079;
+  --cyvest-accent: #1f6feb;
+  --cyvest-font-family: 'IBM Plex Sans', 'Segoe UI', sans-serif;
 }
 ```
 
-## Peer Dependencies
+## Breaking Changes vs v1
 
-- React 19+
-- React DOM 19+
-
-## License
-
-See repository root for license information.
+- Rendering engine changed from React Flow to Cytoscape.
+- Events moved to `onNodeSelect` / `onEdgeSelect`.
+- Component names are now `CyvestObservablesView` and `CyvestInvestigationView`.
+- Import stylesheet with `@cyvest/cyvest-vis/styles.css`.

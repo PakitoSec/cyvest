@@ -1,36 +1,39 @@
-/**
- * Cyvest Visualization Library
- *
- * React components for visualizing Cyvest investigations using React Flow.
- *
- * @packageDocumentation
- */
-
-// Main component exports
 export { CyvestGraph } from "./components/CyvestGraph";
-export { ObservablesGraph } from "./components/ObservablesGraph";
-export { InvestigationGraph } from "./components/InvestigationGraph";
+export { CyvestObservablesView } from "./components/CyvestObservablesView";
+export { CyvestInvestigationView } from "./components/CyvestInvestigationView";
 
-// Icon exports for customization
 export {
-  getObservableIcon,
-  getInvestigationIcon,
-  OBSERVABLE_ICON_MAP,
-  INVESTIGATION_ICON_MAP,
-  type IconProps,
-} from "./components/Icons";
+  getObservableIconSvg,
+  getInvestigationIconSvg,
+  OBSERVABLE_ICON_NAME_MAP,
+  INVESTIGATION_ICON_NAME_MAP,
+  type IconRenderOptions,
+} from "./icons/svg";
 
-// Re-export types for consumers
-export type {
-  CyvestGraphProps,
-  ObservablesGraphProps,
-  InvestigationGraphProps,
-  ForceLayoutConfig,
-  ObservableNodeData,
-  ObservableEdgeData,
-  InvestigationNodeData,
-  InvestigationNodeType,
-  ObservableShape,
+export { truncateLabel } from "./utils/labels";
+export {
+  getLevelColor,
+  getLevelBackgroundColor,
+  lightenHexColor,
+} from "./utils/colors";
+
+export { createElkLayout, getDefaultElkOptions } from "./layout/elk";
+
+export {
+  DEFAULT_CYVEST_THEME,
+  type CyvestThemeTokens,
+  type CyvestViewMode,
+  type CyvestElkDirection,
+  type CyvestElkOptions,
+  type CyNodeSelectEvent,
+  type CyEdgeSelectEvent,
+  type CyvestBaseViewProps,
+  type CyvestGraphProps,
+  type CyvestObservablesViewProps,
+  type CyvestInvestigationViewProps,
+  type ObservableCyNodeData,
+  type ObservableCyEdgeData,
+  type InvestigationCyNodeType,
+  type InvestigationCyNodeData,
+  type InvestigationCyEdgeData,
 } from "./types";
-
-export { DEFAULT_FORCE_CONFIG } from "./types";

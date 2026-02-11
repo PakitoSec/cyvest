@@ -1,17 +1,17 @@
 # @cyvest/cyvest-app
 
-Vite-based demo app that ships with sample Cyvest investigations and renders them with `@cyvest/cyvest-vis`.
+Vite demo application for the `@cyvest/cyvest-vis` Cytoscape visualization library (ELK for observables, Dagre for investigation view).
 
 ## What it does
 
-- Loads bundled investigations (`src/investigations/*.json`) and validates them with `@cyvest/cyvest-js`.
-- Visualizes the graph and levels via the `CyvestGraph` component.
-- Serves as a quick playground for design tweaks to the visualization layer.
+- Loads bundled investigations (`src/investigations/*.json`) and validates them with `@cyvest/cyvest-js`
+- Renders both observables and investigation views with `CyvestGraph`
+- Demonstrates node selection events and basic layout customization
 
 ## Run locally
 
 ```bash
-pnpm install                    # from repo root
+pnpm install
 pnpm --filter @cyvest/cyvest-app dev
 ```
 
@@ -22,9 +22,7 @@ pnpm --filter @cyvest/cyvest-app build
 pnpm --filter @cyvest/cyvest-app preview
 ```
 
-## Customize the demo
+## Notes
 
-- Drop new investigations under `src/investigations/` and register them in `src/api.ts`.
-- Adjust layout/controls in `src/App.tsx` to try new `CyvestGraph` props or styling.
-
-Note: The app is marked `private` and intended for demos and development, not publishing.
+- The app imports `@cyvest/cyvest-vis/styles.css` for default visual styling.
+- The package is private and intended as a development/demo surface.

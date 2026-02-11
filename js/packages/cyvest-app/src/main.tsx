@@ -1,9 +1,12 @@
+import "@cyvest/cyvest-vis/styles.css";
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { App } from "./App";
 
 const rootElement = document.getElementById("root");
-if (!rootElement) throw new Error("Missing #root");
+if (!rootElement) {
+  throw new Error("Missing #root");
+}
 
 ReactDOM.createRoot(rootElement).render(
   <React.StrictMode>

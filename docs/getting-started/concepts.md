@@ -141,20 +141,18 @@ ti = Cyvest.io_load_threat_intel_draft(report)
 obs.with_ti_draft(ti)
 ```
 
-An optional `preprocessor` callback lets you normalise source-specific data before validation:
+An optional `preprocessor` callback lets you normalise source-specific data before validation.
+For the common case of forcing certain reports to **SAFE**, use `safe_getter` and `safe_values` instead:
 
 ```python
-def misp_warning_list_preprocessor(data: dict) -> dict:
-    extra = data.get("extra")
-    task_name = str(extra.get("task_name", "")) if isinstance(extra, dict) else ""
-    warning_list_tasks = {"MISP.analyzer.DBWarningList", "MISP.analyzer.SearchWarningList"}
-    if task_name in warning_list_tasks and data.get("level") not in ("INFO", "SAFE"):
-        data["level"] = "SAFE"
-        data["score"] = 0.0
-    return data
-
-ti = Cyvest.io_load_threat_intel_draft(report, preprocessor=misp_warning_list_preprocessor)
+ti = Cyvest.io_load_threat_intel_draft(
+    report,
+    safe_getter=lambda d: d.get("extra", {}).get("task_name", ""),
+    safe_values=["MISP.analyzer.DBWarningList", "MISP.analyzer.SearchWarningList"],
+)
 ```
+
+When `safe_getter(report)` matches any entry in `safe_values` and the level is not already INFO or SAFE, the score is set to `0.0` and the level to `SAFE`.
 
 ### Tags
 - Group related checks together

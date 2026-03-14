@@ -1,6 +1,6 @@
 [project]
 name = "cyvest"
-version = "5.3.2"
+version = "5.3.3"
 description = "Cybersecurity investigation model"
 readme = {file = "README.md", content-type = "text/markdown"}
 requires-python = ">=3.10"

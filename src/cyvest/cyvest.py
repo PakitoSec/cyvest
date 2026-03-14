@@ -1068,6 +1068,8 @@ class Cyvest:
         report: dict[str, Any],
         *,
         preprocessor: Callable[[dict[str, Any]], dict[str, Any]] | None = None,
+        safe_getter: Callable[[dict[str, Any]], Any] | None = None,
+        safe_values: Iterable[str] | None = None,
     ) -> ThreatIntel:
         """
         Load a ThreatIntel draft from an external API report dict.
@@ -1084,14 +1086,19 @@ class Cyvest:
                 external service (e.g. a SOAR/TIP API response).
             preprocessor: Optional callback that receives a **shallow copy**
                 of *report* and returns a (possibly modified) dict before
-                validation.  Useful for source-specific normalisation such
-                as overriding the level for warning-list entries.
+                validation.  Runs before the safe-override check.
+            safe_getter: Optional callable that extracts a value from the
+                report dict to match against *safe_values*.
+            safe_values: Values that, when matched by *safe_getter*, force
+                score to ``0.0`` and level to ``SAFE``.  Requires
+                *safe_getter* to be set.
 
         Returns:
             Unbound ThreatIntel instance (observable_key is empty).
 
         Raises:
             TypeError: If *report* is not a dict.
+            ValueError: If *safe_values* is set without *safe_getter*.
             pydantic.ValidationError: If the extracted payload fails
                 ThreatIntel model validation.
 
@@ -1099,28 +1106,34 @@ class Cyvest:
             Basic usage::
 
                 report = {"source": "virustotal", "score": 4.256, "level": "SUSPICIOUS"}
-                ti = cv.io_load_threat_intel_draft(report)
+                ti = Cyvest.io_load_threat_intel_draft(report)
                 obs.with_ti_draft(ti)
 
-            With a preprocessor that forces MISP warning-list reports to SAFE::
+            Force MISP warning-list reports to SAFE with ``safe_getter``::
 
-                def misp_warning_list_preprocessor(data: dict) -> dict:
-                    extra = data.get("extra")
-                    task_name = str(extra.get("task_name", "")) if isinstance(extra, dict) else ""
-                    warning_list_tasks = {"MISP.analyzer.DBWarningList", "MISP.analyzer.SearchWarningList"}
-                    if task_name in warning_list_tasks and data.get("level") not in ("INFO", "SAFE"):
-                        data["level"] = "SAFE"
-                        data["score"] = 0.0
-                    return data
-
-                ti = cv.io_load_threat_intel_draft(report, preprocessor=misp_warning_list_preprocessor)
+                ti = Cyvest.io_load_threat_intel_draft(
+                    report,
+                    safe_getter=lambda d: d.get("extra", {}).get("task_name", ""),
+                    safe_values=["MISP.analyzer.DBWarningList", "MISP.analyzer.SearchWarningList"],
+                )
         """
         if not isinstance(report, dict):
             raise TypeError(f"report must be a dict, got {type(report).__name__}")
+        if safe_values is not None and safe_getter is None:
+            raise ValueError("safe_values requires safe_getter to be set.")
 
         data: dict[str, Any] = dict(report)  # shallow copy
         if preprocessor is not None:
             data = preprocessor(data)
+
+        # Built-in safe override: if safe_getter(data) matches any safe_values
+        # and level is not already INFO or SAFE, force SAFE + score 0.
+        if safe_getter is not None and safe_values is not None:
+            matched = safe_getter(data)
+            safe_set = set(safe_values)
+            if matched in safe_set and data.get("level") not in ("INFO", "SAFE"):
+                data["level"] = "SAFE"
+                data["score"] = 0.0
 
         raw_score = data.get("score")
         if raw_score is not None:

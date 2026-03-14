@@ -872,6 +872,66 @@ def test_threat_intel_from_report_preprocessor() -> None:
     assert ti.score == Decimal("0.00")
 
 
+def test_threat_intel_from_report_safe_getter_triggers() -> None:
+    """safe_getter + safe_values overrides level/score to SAFE/0 when matched."""
+    report = {
+        "source": "misp",
+        "score": 7.5,
+        "level": "MALICIOUS",
+        "extra": {"task_name": "MISP.analyzer.DBWarningList"},
+    }
+    ti = Cyvest.io_load_threat_intel_draft(
+        report,
+        safe_getter=lambda d: d.get("extra", {}).get("task_name", ""),
+        safe_values=["MISP.analyzer.DBWarningList", "MISP.analyzer.SearchWarningList"],
+    )
+    assert ti.level.value == "SAFE"
+    assert ti.score == Decimal("0.00")
+
+
+def test_threat_intel_from_report_safe_getter_no_match() -> None:
+    """safe_getter that doesn't match keeps original level/score."""
+    report = {
+        "source": "misp",
+        "score": 7.5,
+        "level": "MALICIOUS",
+        "extra": {"task_name": "MISP.analyzer.SomeOtherTask"},
+    }
+    ti = Cyvest.io_load_threat_intel_draft(
+        report,
+        safe_getter=lambda d: d.get("extra", {}).get("task_name", ""),
+        safe_values=["MISP.analyzer.DBWarningList"],
+    )
+    assert ti.level.value == "MALICIOUS"
+    assert ti.score == Decimal("7.50")
+
+
+def test_threat_intel_from_report_safe_getter_already_safe() -> None:
+    """safe_getter match with level already SAFE keeps SAFE (no double override)."""
+    report = {
+        "source": "misp",
+        "score": 0.0,
+        "level": "SAFE",
+        "extra": {"task_name": "MISP.analyzer.DBWarningList"},
+    }
+    ti = Cyvest.io_load_threat_intel_draft(
+        report,
+        safe_getter=lambda d: d.get("extra", {}).get("task_name", ""),
+        safe_values=["MISP.analyzer.DBWarningList"],
+    )
+    assert ti.level.value == "SAFE"
+    assert ti.score == Decimal("0.00")
+
+
+def test_threat_intel_from_report_safe_values_without_getter_raises() -> None:
+    """safe_values without safe_getter raises ValueError."""
+    with pytest.raises(ValueError, match="safe_values requires safe_getter"):
+        Cyvest.io_load_threat_intel_draft(
+            {"source": "test", "score": 1.0},
+            safe_values=["something"],
+        )
+
+
 def test_threat_intel_from_report_does_not_mutate_input() -> None:
     """Original report dict is not modified."""
     cv = Cyvest()
@@ -899,3 +959,45 @@ def test_threat_intel_from_report_attach_to_observable() -> None:
     refreshed = cv.observable_get(obs.key)
     assert refreshed is not None
     assert refreshed.score >= Decimal("8.00")
+
+
+def test_threat_intel_from_report_preprocessor_then_safe_getter() -> None:
+    """Preprocessor runs first, then safe_getter evaluates the modified data."""
+    report = {
+        "source": "misp",
+        "score": 6.0,
+        "level": "MALICIOUS",
+        "extra": {"raw_task": "DBWarningList"},
+    }
+
+    # Preprocessor normalises task_name so safe_getter can match it
+    def normalise(data: dict) -> dict:
+        raw = data.get("extra", {}).get("raw_task", "")
+        data.setdefault("extra", {})["task_name"] = f"MISP.analyzer.{raw}"
+        return data
+
+    ti = Cyvest.io_load_threat_intel_draft(
+        report,
+        preprocessor=normalise,
+        safe_getter=lambda d: d.get("extra", {}).get("task_name", ""),
+        safe_values=["MISP.analyzer.DBWarningList"],
+    )
+    assert ti.level.value == "SAFE"
+    assert ti.score == Decimal("0.00")
+
+
+def test_threat_intel_from_report_safe_getter_with_info_level_unchanged() -> None:
+    """safe_getter match with level=INFO keeps INFO (not overridden to SAFE)."""
+    report = {
+        "source": "misp",
+        "score": 0.0,
+        "level": "INFO",
+        "extra": {"task_name": "MISP.analyzer.SearchWarningList"},
+    }
+    ti = Cyvest.io_load_threat_intel_draft(
+        report,
+        safe_getter=lambda d: d.get("extra", {}).get("task_name", ""),
+        safe_values=["MISP.analyzer.SearchWarningList"],
+    )
+    assert ti.level.value == "INFO"
+    assert ti.score == Decimal("0.00")

@@ -49,17 +49,22 @@ class AliasDumpModel(BaseModel):
         return super().model_dump_json(by_alias=by_alias, **kwargs)
 
 
-def _format_score_decimal(value: Decimal | None, *, places: int = _DEFAULT_SCORE_PLACES) -> str:
-    if value is None:
-        return "-"
+def round_score_decimal(value: Decimal, *, places: int = _DEFAULT_SCORE_PLACES) -> Decimal:
+    """Round a Decimal score to *places* decimal places (ROUND_HALF_UP)."""
     if places < 0:
         raise ValueError("places must be >= 0")
     quantizer = Decimal("1").scaleb(-places)
+    quantized = value.quantize(quantizer, rounding=ROUND_HALF_UP)
+    if quantized == 0:
+        quantized = Decimal("0").quantize(quantizer)
+    return quantized
+
+
+def _format_score_decimal(value: Decimal | None, *, places: int = _DEFAULT_SCORE_PLACES) -> str:
+    if value is None:
+        return "-"
     try:
-        quantized = value.quantize(quantizer, rounding=ROUND_HALF_UP)
-        if quantized == 0:
-            quantized = Decimal("0").quantize(quantizer)
-        return format(quantized, "f")
+        return format(round_score_decimal(value, places=places), "f")
     except InvalidOperation:
         return str(value)
 

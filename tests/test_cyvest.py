@@ -809,3 +809,93 @@ def test_io_save_json_with_invalid_path() -> None:
     # Try to write to a directory that doesn't exist
     with pytest.raises(OSError):
         cv.io_save_json("/nonexistent/directory/investigation.json")
+
+
+# ── threat_intel_from_report ──────────────────────────────────────────
+
+
+def test_threat_intel_from_report_basic() -> None:
+    """Valid report dict returns an unbound ThreatIntel with rounded score."""
+    cv = Cyvest()
+    report = {
+        "source": "virustotal",
+        "score": 4.256,
+        "level": "SUSPICIOUS",
+        "comment": "Detected by 12 engines",
+        "extra": {"engines": 12},
+        "taxonomies": [{"level": "SUSPICIOUS", "name": "VT", "value": "12/70"}],
+    }
+    ti = cv.io_load_threat_intel_draft(report)
+
+    assert ti.source == "virustotal"
+    assert ti.score == Decimal("4.26")  # rounded
+    assert ti.level.value == "SUSPICIOUS"
+    assert ti.comment == "Detected by 12 engines"
+    assert ti.extra == {"engines": 12}
+    assert ti.observable_key == ""
+    assert len(ti.taxonomies) == 1
+    assert ti.taxonomies[0].name == "VT"
+
+
+def test_threat_intel_from_report_invalid_type() -> None:
+    """Non-dict input raises TypeError."""
+    cv = Cyvest()
+    with pytest.raises(TypeError, match="report must be a dict"):
+        cv.io_load_threat_intel_draft("not a dict")  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="report must be a dict"):
+        cv.io_load_threat_intel_draft(42)  # type: ignore[arg-type]
+
+
+def test_threat_intel_from_report_validation_error() -> None:
+    """Missing required score raises ValidationError."""
+    from pydantic import ValidationError
+
+    cv = Cyvest()
+    with pytest.raises(ValidationError):
+        cv.io_load_threat_intel_draft({"source": "test"})
+
+
+def test_threat_intel_from_report_preprocessor() -> None:
+    """Preprocessor callback can modify data before validation."""
+    cv = Cyvest()
+
+    def force_safe(data: dict) -> dict:
+        data["level"] = "SAFE"
+        data["score"] = 0.0
+        return data
+
+    ti = cv.io_load_threat_intel_draft(
+        {"source": "misp", "score": 7.5, "level": "MALICIOUS"},
+        preprocessor=force_safe,
+    )
+    assert ti.level.value == "SAFE"
+    assert ti.score == Decimal("0.00")
+
+
+def test_threat_intel_from_report_does_not_mutate_input() -> None:
+    """Original report dict is not modified."""
+    cv = Cyvest()
+    report = {"source": "test", "score": 3.0}
+    original = dict(report)
+
+    def mutating_preprocessor(data: dict) -> dict:
+        data["level"] = "MALICIOUS"
+        return data
+
+    cv.io_load_threat_intel_draft(report, preprocessor=mutating_preprocessor)
+    assert report == original
+
+
+def test_threat_intel_from_report_attach_to_observable() -> None:
+    """Round-trip: from_report → observable_with_ti_draft → TI attached and scored."""
+    cv = Cyvest()
+    obs = cv.observable_create("domain", "evil.example.com")
+    ti = cv.io_load_threat_intel_draft({"source": "abuse.ch", "score": 8.0})
+
+    bound = cv.observable_with_ti_draft(obs, ti)
+    assert bound.source == "abuse.ch"
+    assert bound.score == Decimal("8.00")
+
+    refreshed = cv.observable_get(obs.key)
+    assert refreshed is not None
+    assert refreshed.score >= Decimal("8.00")

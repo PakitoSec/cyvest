@@ -39,7 +39,7 @@ from cyvest.io_serialization import (
 )
 from cyvest.io_visualization import generate_network_graph
 from cyvest.levels import Level
-from cyvest.model import Check, Enrichment, Observable, Tag, Taxonomy, ThreatIntel
+from cyvest.model import Check, Enrichment, Observable, Tag, Taxonomy, ThreatIntel, round_score_decimal
 from cyvest.model_enums import ObservableType, PropagationMode, RelationshipDirection, RelationshipType
 from cyvest.model_schema import InvestigationSchema, StatisticsSchema
 from cyvest.proxies import CheckProxy, EnrichmentProxy, ObservableProxy, TagProxy, ThreatIntelProxy
@@ -1062,6 +1062,83 @@ class Cyvest:
             >>> cv = Cyvest.io_load_dict(data)
         """
         return load_investigation_dict(data)
+
+    def io_load_threat_intel_draft(
+        self,
+        report: dict[str, Any],
+        *,
+        preprocessor: Callable[[dict[str, Any]], dict[str, Any]] | None = None,
+    ) -> ThreatIntel:
+        """
+        Load a ThreatIntel draft from an external API report dict.
+
+        Extracts standard threat-intel fields (source, score, level, comment,
+        extra, taxonomies) from *report*, rounds the score to two decimal
+        places, and returns a validated :class:`ThreatIntel` instance that is
+        **not yet bound** to any observable.  Attach it afterwards with
+        :meth:`observable_with_ti_draft` or
+        :meth:`ObservableProxy.with_ti_draft`.
+
+        Args:
+            report: Dictionary with threat-intel fields coming from an
+                external service (e.g. a SOAR/TIP API response).
+            preprocessor: Optional callback that receives a **shallow copy**
+                of *report* and returns a (possibly modified) dict before
+                validation.  Useful for source-specific normalisation such
+                as overriding the level for warning-list entries.
+
+        Returns:
+            Unbound ThreatIntel instance (observable_key is empty).
+
+        Raises:
+            TypeError: If *report* is not a dict.
+            pydantic.ValidationError: If the extracted payload fails
+                ThreatIntel model validation.
+
+        Examples:
+            Basic usage::
+
+                report = {"source": "virustotal", "score": 4.256, "level": "SUSPICIOUS"}
+                ti = cv.io_load_threat_intel_draft(report)
+                obs.with_ti_draft(ti)
+
+            With a preprocessor that forces MISP warning-list reports to SAFE::
+
+                def misp_warning_list_preprocessor(data: dict) -> dict:
+                    extra = data.get("extra")
+                    task_name = str(extra.get("task_name", "")) if isinstance(extra, dict) else ""
+                    warning_list_tasks = {"MISP.analyzer.DBWarningList", "MISP.analyzer.SearchWarningList"}
+                    if task_name in warning_list_tasks and data.get("level") not in ("INFO", "SAFE"):
+                        data["level"] = "SAFE"
+                        data["score"] = 0.0
+                    return data
+
+                ti = cv.io_load_threat_intel_draft(report, preprocessor=misp_warning_list_preprocessor)
+        """
+        if not isinstance(report, dict):
+            raise TypeError(f"report must be a dict, got {type(report).__name__}")
+
+        data: dict[str, Any] = dict(report)  # shallow copy
+        if preprocessor is not None:
+            data = preprocessor(data)
+
+        raw_score = data.get("score")
+        if raw_score is not None:
+            rounded = round_score_decimal(Decimal(str(raw_score)))
+        else:
+            rounded = None  # let ThreatIntel validators decide
+
+        ti_payload: dict[str, Any] = {
+            "source": str(data.get("source", "")),
+            "observable_key": "",
+            "comment": str(data.get("comment", "") or ""),
+            "extra": data.get("extra"),
+            "score": rounded,
+            "level": data.get("level"),
+            "taxonomies": data.get("taxonomies", []),
+        }
+
+        return ThreatIntel.model_validate(ti_payload)
 
     # Shared context, investigation merging, finalization, comparison
 

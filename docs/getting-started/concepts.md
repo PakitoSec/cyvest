@@ -133,9 +133,30 @@ obs.with_ti_draft(draft)
 
 Drafts are plain `ThreatIntel` objects without an `observable_key`; the key is generated on attach.
 
-### Tags
+To load a draft from an external API response dict (e.g. a SOAR/TIP report), use `io_load_threat_intel_draft`:
 
-**Tags** organize checks with automatic hierarchy based on `:` delimiter:
+```python
+report = {"source": "virustotal", "score": 4.256, "level": "SUSPICIOUS"}
+ti = Cyvest.io_load_threat_intel_draft(report)
+obs.with_ti_draft(ti)
+```
+
+An optional `preprocessor` callback lets you normalise source-specific data before validation:
+
+```python
+def misp_warning_list_preprocessor(data: dict) -> dict:
+    extra = data.get("extra")
+    task_name = str(extra.get("task_name", "")) if isinstance(extra, dict) else ""
+    warning_list_tasks = {"MISP.analyzer.DBWarningList", "MISP.analyzer.SearchWarningList"}
+    if task_name in warning_list_tasks and data.get("level") not in ("INFO", "SAFE"):
+        data["level"] = "SAFE"
+        data["score"] = 0.0
+    return data
+
+ti = Cyvest.io_load_threat_intel_draft(report, preprocessor=misp_warning_list_preprocessor)
+```
+
+### Tags
 - Group related checks together
 - Create logical investigation sections
 - Auto-create ancestor tags (e.g., `header:auth:dkim` creates `header` and `header:auth`)

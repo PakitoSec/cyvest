@@ -1063,8 +1063,8 @@ class Cyvest:
         """
         return load_investigation_dict(data)
 
+    @staticmethod
     def io_load_threat_intel_draft(
-        self,
         report: dict[str, Any],
         *,
         preprocessor: Callable[[dict[str, Any]], dict[str, Any]] | None = None,

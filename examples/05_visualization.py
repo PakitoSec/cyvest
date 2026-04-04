@@ -12,16 +12,16 @@ The visualization uses the Rich color scheme:
 - Edge labels show the relationship type
 """
 
+import logging
 import tempfile
 from pathlib import Path
 
 import click
-from logurich import logger
 from logurich.opt_click import click_logger_params
 
 from cyvest import Cyvest
 
-logger.enable("cyvest")
+logger = logging.getLogger(__name__)
 
 
 @click.command()
@@ -160,7 +160,7 @@ def main(no_audit_log: bool = False, output: Path | None = None) -> None:
     output_path = output or (Path(tempfile.gettempdir()) / "cyvest_investigation.json")
     json_path = cv.io_save_json(output_path, include_audit_log=not no_audit_log)
     size_kb = Path(json_path).stat().st_size / 1024
-    logger.info("[green]✓ Full json saved to: {} ({:.2f} KB)[/green]", json_path, size_kb)
+    logger.info("[green]✓ Full json saved to: %s (%.2f KB)[/green]", json_path, size_kb)
 
     # Generate and open network visualization
     logger.info("[bold cyan]Generating Network Visualization...[/bold cyan]")

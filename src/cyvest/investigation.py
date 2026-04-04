@@ -7,12 +7,11 @@ Provides automatic merge-on-create for all object types.
 
 from __future__ import annotations
 
+import logging
 from copy import deepcopy
 from datetime import datetime, timezone
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, Literal
-
-from logurich import logger
 
 from cyvest import keys
 from cyvest.level_score_rules import recalculate_level_for_score
@@ -37,6 +36,8 @@ from cyvest.ulid import generate_ulid
 
 if TYPE_CHECKING:
     from cyvest.model_schema import StatisticsSchema
+
+logger = logging.getLogger(__name__)
 
 
 class Investigation:
@@ -1561,7 +1562,7 @@ class Investigation:
             else:
                 # Genuine error - target still doesn't exist after Pass 2
                 logger.critical(
-                    "Relationship target '{}' not found after merge completion for observable '{}'. "
+                    "Relationship target '%s' not found after merge completion for observable '%s'. "
                     "This indicates corrupted data or a bug in the merge logic.",
                     rel.target_key,
                     source_key,

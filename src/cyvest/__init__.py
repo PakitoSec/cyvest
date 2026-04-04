@@ -5,8 +5,6 @@ A Python framework for building, analyzing, and structuring cybersecurity invest
 programmatically with automatic scoring, level calculation, and rich reporting capabilities.
 """
 
-from logurich import logger
-
 from cyvest.compare import (
     DiffItem,
     DiffStatus,
@@ -21,9 +19,7 @@ from cyvest.model import Check, Enrichment, InvestigationWhitelist, Observable, 
 from cyvest.model_enums import ObservableType, RelationshipDirection, RelationshipType
 from cyvest.proxies import CheckProxy, EnrichmentProxy, ObservableProxy, TagProxy, ThreatIntelProxy
 
-__version__ = "5.3.3"
-
-logger.disable("cyvest")
+__version__ = "5.4.0"
 
 __all__ = [
     # Core class

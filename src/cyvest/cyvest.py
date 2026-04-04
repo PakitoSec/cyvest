@@ -10,13 +10,14 @@ and investigation export (io_to_invest, io_to_dict, io_to_markdown) methods.
 
 from __future__ import annotations
 
+import logging
 import threading
 from collections.abc import Callable, Iterable
 from decimal import Decimal
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Final, Literal, overload
 
-from logurich import logger
+import logurich  # noqa: F401
 
 from cyvest import keys
 from cyvest.compare import compare_investigations
@@ -47,6 +48,8 @@ from cyvest.score import ScoreMode
 
 if TYPE_CHECKING:
     from cyvest.shared import SharedInvestigationContext
+
+logger = logging.getLogger(__name__)
 
 
 class Cyvest:

@@ -5,20 +5,19 @@ Demonstrates using ThreadPoolExecutor to run investigation tasks in parallel,
 with each task building a Cyvest fragment that merges into the main investigation.
 """
 
+import logging
 from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any
 
 import click
-from logurich import logger
 from logurich.opt_click import click_logger_params
 
 from cyvest import Cyvest
 from cyvest.shared import SharedInvestigationContext
 
-logger.enable("cyvest")
-
+logger = logging.getLogger(__name__)
 
 # ============================================================================
 # Task Framework
@@ -282,10 +281,10 @@ class BodiesUrlTask(BaseRule):
                 .tagged(tag)
             )
 
-            logger.info("[bold red]Check Score: {}[/bold red]", chk.score)
+            logger.info("[bold red]Check Score: %s[/bold red]", chk.score)
 
         logger.info(f"Bodies URLs analysis complete: {len(urls_with_scores)} URLs processed")
-        logger.info("[bold red]Tag Score: {}[/bold red]", tag.get_aggregated_score())
+        logger.info("[bold red]Tag Score: %s[/bold red]", tag.get_aggregated_score())
 
 
 class BodiesDomainTask(BaseRule):
@@ -337,10 +336,10 @@ class BodiesDomainTask(BaseRule):
                 .tagged(tag)
             )
 
-            logger.info("[bold red]Check Score: {}[/bold red]", chk.score)
+            logger.info("[bold red]Check Score: %s[/bold red]", chk.score)
 
         logger.info(f"Bodies DOMAINS analysis complete: {len(domains_with_scores)} DOMAINS processed")
-        logger.info("[bold red]Tag Score: {}[/bold red]", tag.get_aggregated_score())
+        logger.info("[bold red]Tag Score: %s[/bold red]", tag.get_aggregated_score())
 
 
 class AttachmentTask(BaseRule):
@@ -580,7 +579,7 @@ def main(workers, browser, stats, audit, no_audit_log, output):
         logger.info("[bold cyan]Generating json...[/bold cyan]")
         json_path = cy.io_save_json(output, include_audit_log=not no_audit_log)
         size_kb = Path(json_path).stat().st_size / 1024
-        logger.info("[green]✓ Full json saved to: {} ({:.2f} KB)[/green]", json_path, size_kb)
+        logger.info("[green]✓ Full json saved to: %s (%.2f KB)[/green]", json_path, size_kb)
 
 
 if __name__ == "__main__":

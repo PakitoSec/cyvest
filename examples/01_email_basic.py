@@ -4,15 +4,16 @@ Example 1: Basic Email Investigation
 Demonstrates basic usage of Cyvest for analyzing a suspicious email.
 """
 
+import logging
 import tempfile
 from decimal import Decimal
 from pathlib import Path
 
-from logurich import logger
+from logurich import init_logger
 
 from cyvest import Cyvest
 
-logger.enable("cyvest")
+logger = logging.getLogger(__name__)
 
 
 def main() -> None:
@@ -89,9 +90,10 @@ def main() -> None:
     cv.io_save_json(str(json_path))
     cv.io_save_markdown(str(md_path))
 
-    logger.info("✓ Investigation saved to {} and {}", json_path, md_path)
-    logger.info("Temporary output directory: {}", output_dir)
+    logger.info("✓ Investigation saved to %s and %s", json_path, md_path)
+    logger.info("Temporary output directory: %s", output_dir)
 
 
 if __name__ == "__main__":
+    init_logger("INFO")
     main()

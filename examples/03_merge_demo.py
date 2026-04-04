@@ -5,16 +5,17 @@ Demonstrates how to build investigation fragments in parallel processes
 and merge them together.
 """
 
+import logging
 import multiprocessing as mp
 import tempfile
 from decimal import Decimal
 from pathlib import Path
 
-from logurich import logger
+from logurich import init_logger
 
 from cyvest import Cyvest
 
-logger.enable("cyvest")
+logger = logging.getLogger(__name__)
 
 
 def analyze_network_traffic() -> Cyvest:
@@ -62,7 +63,6 @@ def analyze_endpoint_logs() -> Cyvest:
     endpoint_check = cv.check_create(
         "malware_execution",
         "endpoint",
-        "Detected malware execution",
         comment="Ransomware executed with SYSTEM privileges",
         score=Decimal("9.5"),
         level=cv.LVL.MALICIOUS,
@@ -135,7 +135,7 @@ def main() -> None:
     incident_tag = main_investigation.tag_create("incident:findings", "Consolidated findings from all data sources")
 
     # Add all checks to the tag
-    for check in main_investigation.get_all_checks().values():
+    for check in main_investigation.check_get_all().values():
         main_investigation.tag_add_check(incident_tag.key, check.key)
 
     # Finalize relationships
@@ -151,11 +151,12 @@ def main() -> None:
     output_dir = Path(tempfile.mkdtemp(prefix="cyvest_example_03_"))
     json_path = output_dir / "merged_investigation.json"
     main_investigation.io_save_json(str(json_path))
-    logger.info("✓ Merged investigation saved to {}", json_path)
-    logger.info("Temporary output directory: {}", output_dir)
+    logger.info("✓ Merged investigation saved to %s", json_path)
+    logger.info("Temporary output directory: %s", output_dir)
 
 
 if __name__ == "__main__":
     # Required for multiprocessing on some platforms
     mp.freeze_support()
+    init_logger("INFO")
     main()

@@ -8,11 +8,11 @@ and generating simple reports from serialized investigations.
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from typing import Any
 
 import click
-from logurich import logger
 from logurich.opt_click import click_logger_params
 from rich.console import Console
 
@@ -34,6 +34,7 @@ from cyvest.model_enums import ObservableType
 
 CONTEXT_SETTINGS = {"help_option_names": ["-h", "--help"]}
 console = Console()
+logger = logging.getLogger(__name__)
 
 
 def _load_investigation(input_path: Path) -> dict[str, Any]:
@@ -51,7 +52,7 @@ def _print_stats_overview(stats: dict[str, Any]) -> None:
     for key, value in stats.items():
         if isinstance(value, dict):
             continue
-        logger.info("  {}: {}", key, value)
+        logger.info("  %s: %s", key, value)
 
 
 def _write_markdown(data: dict[str, Any], output_path: Path) -> None:
@@ -86,7 +87,6 @@ def _write_markdown(data: dict[str, Any], output_path: Path) -> None:
 @click.version_option(__version__, prog_name="Cyvest")
 def cli() -> None:
     """Cyvest - Cybersecurity Investigation Framework."""
-    logger.enable("cyvest")
     logger.info("> [green bold]CYVEST[/green bold]")
 
 
@@ -122,8 +122,8 @@ def stats(input: Path, detailed: bool) -> None:
     cv = load_investigation_json(input)
     logger.info(f"[cyan]Statistics for: {input}[/cyan]")
     logger.info("[bold]Overview:[/bold]")
-    logger.info("  Global Score: {}", f"{cv.get_global_score():.2f}")
-    logger.info("  Global Level: {}", cv.get_global_level())
+    logger.info("  Global Score: %s", f"{cv.get_global_score():.2f}")
+    logger.info("  Global Level: %s", cv.get_global_level())
 
     if detailed:
         logger.info("")

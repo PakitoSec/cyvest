@@ -5,15 +5,16 @@ Demonstrates investigating multiple URLs and their associated IP addresses
 with relationship tracking.
 """
 
+import logging
 import tempfile
 from decimal import Decimal
 from pathlib import Path
 
-from logurich import logger
+from logurich import init_logger
 
 from cyvest import Cyvest
 
-logger.enable("cyvest")
+logger = logging.getLogger(__name__)
 
 
 def main() -> None:
@@ -97,9 +98,10 @@ def main() -> None:
     output_dir = Path(tempfile.mkdtemp(prefix="cyvest_example_02_"))
     json_path = output_dir / "urls_and_ips_investigation.json"
     cv.io_save_json(str(json_path))
-    logger.info("✓ Investigation saved to {}", json_path)
-    logger.info("Temporary output directory: {}", output_dir)
+    logger.info("✓ Investigation saved to %s", json_path)
+    logger.info("Temporary output directory: %s", output_dir)
 
 
 if __name__ == "__main__":
+    init_logger("INFO")
     main()

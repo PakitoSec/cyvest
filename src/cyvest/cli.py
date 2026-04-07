@@ -8,11 +8,11 @@ and generating simple reports from serialized investigations.
 from __future__ import annotations
 
 import json
-import logging
 from pathlib import Path
 from typing import Any
 
 import click
+from logurich import get_logger
 from logurich.opt_click import click_logger_params
 from rich.console import Console
 
@@ -34,7 +34,7 @@ from cyvest.model_enums import ObservableType
 
 CONTEXT_SETTINGS = {"help_option_names": ["-h", "--help"]}
 console = Console()
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def _load_investigation(input_path: Path) -> dict[str, Any]:

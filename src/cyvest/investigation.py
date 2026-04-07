@@ -7,11 +7,12 @@ Provides automatic merge-on-create for all object types.
 
 from __future__ import annotations
 
-import logging
 from copy import deepcopy
 from datetime import datetime, timezone
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, Literal
+
+from logurich import get_logger
 
 from cyvest import keys
 from cyvest.level_score_rules import recalculate_level_for_score
@@ -37,7 +38,7 @@ from cyvest.ulid import generate_ulid
 if TYPE_CHECKING:
     from cyvest.model_schema import StatisticsSchema
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class Investigation:

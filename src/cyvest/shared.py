@@ -14,12 +14,13 @@ Key design goals:
 from __future__ import annotations
 
 import asyncio
-import logging
 import threading
 from copy import deepcopy
 from decimal import Decimal
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
+
+from logurich import get_logger
 
 from cyvest import keys
 from cyvest.cyvest import Cyvest
@@ -36,7 +37,7 @@ if TYPE_CHECKING:
     from cyvest.investigation import Investigation
     from cyvest.model_schema import InvestigationSchema
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class _SharedLock:

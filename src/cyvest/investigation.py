@@ -933,7 +933,11 @@ class Investigation:
 
         # Check if target is a copy from shared context (anti-pattern)
         if isinstance(target, Observable) and getattr(target, "_from_shared_context", False):
-            obs_type_name = target.obs_type.name
+            obs_type_expr = (
+                f"ObservableType.{target.obs_type.name}"
+                if isinstance(target.obs_type, ObservableType)
+                else repr(str(target.obs_type))
+            )
             raise ValueError(
                 f"Cannot use observable from shared_context.observable_get() directly in relationships.\n"
                 f"Observable '{target_key}' is a read-only copy not registered in this investigation.\n\n"
@@ -942,7 +946,7 @@ class Investigation:
                 f"Correct pattern (and use reconcile or merge):\n"
                 f"  # Use cy.observable() to create/get observable in local investigation\n"
                 f"  source.relate_to(\n"
-                f"      cy.observable(ObservableType.{obs_type_name}, '{target.value}'),\n"
+                f"      cy.observable({obs_type_expr}, {target.value!r}),\n"
                 f"      RelationshipType.{relationship_type}\n"
                 f"  )"
             )

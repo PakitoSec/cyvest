@@ -555,7 +555,8 @@ def _format_observables(
         # Text format: one per line, with type prefix
         lines = []
         for obs in observables:
-            lines.append(f"{obs.obs_type.value}\t{obs.value}")
+            obs_type_str = obs.obs_type.value if isinstance(obs.obs_type, ObservableType) else str(obs.obs_type)
+            lines.append(f"{obs_type_str}\t{obs.value}")
         return "\n".join(lines)
 
 

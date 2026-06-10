@@ -10,17 +10,17 @@
   "dependencies": {
     "@cyvest/cyvest-js": "workspace:*",
     "@cyvest/cyvest-vis": "workspace:*",
-    "react": "^19.2.3",
-    "react-dom": "^19.2.3"
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
   },
   "devDependencies": {
-    "@types/react": "^19.2.7",
+    "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react-swc": "^4.2.2",
-    "typescript": "^5.9.3",
-    "vite": "^7.3.0"
+    "@vitejs/plugin-react-swc": "^4.3.1",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.16"
   },
   "engines": {
-    "node": ">=20"
+    "node": "^20.19.0 || >=22.12.0"
   }
 }

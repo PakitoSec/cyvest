@@ -3,7 +3,7 @@ Tests for SharedInvestigationContext - thread-safe cross-task observable sharing
 
 This test module validates the SharedInvestigationContext feature that enables:
 - Thread-safe parallel task execution
-- Cross-task observable and check sharing
+- Cross-task observable and finding sharing
 - Auto-reconcile pattern via context manager
 - Deep copying for concurrent modification safety
 - Manual and automatic reconciliation
@@ -12,7 +12,7 @@ Test coverage:
 - Initialization and configuration inheritance
 - Auto-reconcile on context manager exit
 - Manual reconciliation
-- Observable/check retrieval and lookup
+- Observable/finding retrieval and lookup
 - Thread-safe parallel execution
 - Exception handling (auto-reconcile skipped on error)
 - Deep copy semantics
@@ -39,7 +39,7 @@ def test_shared_context_initialization():
     assert shared._main_investigation is inv
     assert shared._root_type == Cyvest.OBS.ARTIFACT
     assert len(shared._observable_registry) == 1  # root observable is present
-    assert len(shared._check_registry) == 0
+    assert len(shared._finding_registry) == 0
 
 
 def test_shared_context_from_cyvest_helper():
@@ -74,11 +74,11 @@ def test_auto_reconcile_on_context_exit():
 
     with shared.create_cyvest() as cy:
         cy.observable(Cyvest.OBS.EMAIL, "user@domain.com")
-        cy.check("email_check", "Test check")
+        cy.finding("email_finding", "Test finding")
 
     # After exiting context, observable should be in registry
     assert "obs:email:user@domain.com" in shared._observable_registry
-    assert "chk:email_check" in shared._check_registry
+    assert "fnd:email_finding" in shared._finding_registry
 
 
 def test_manual_reconcile():
@@ -89,14 +89,14 @@ def test_manual_reconcile():
     # Create Cyvest without auto-reconcile
     cy = Cyvest({"test": "data"}, root_type=Cyvest.OBS.ARTIFACT)
     cy.observable(Cyvest.OBS.DOMAIN, "example.com")
-    cy.check("domain_check", "Test")
+    cy.finding("domain_finding", "Test")
 
     # Manually reconcile
     shared.reconcile(cy)
 
     # Should be in registry
     assert "obs:domain:example.com" in shared._observable_registry
-    assert "chk:domain_check" in shared._check_registry
+    assert "fnd:domain_finding" in shared._finding_registry
 
 
 def test_get_observable():
@@ -127,22 +127,22 @@ def test_get_nonexistent_observable():
     assert result is None
 
 
-def test_get_check():
-    """Test retrieving check from shared context."""
+def test_get_finding():
+    """Test retrieving finding from shared context."""
     root_cy = Cyvest({"test": "data"}, root_type=Cyvest.OBS.ARTIFACT)
     shared = SharedInvestigationContext(root_cy)
 
     with shared.create_cyvest() as cy:
-        original = cy.check("test_check", "Description")
-        original_check = cy._investigation.get_check(original.key)
+        original = cy.finding("test_finding", "Description")
+        original_finding = cy._investigation.get_finding(original.key)
 
-    # Retrieve check
-    retrieved = shared.check_get("test_check")
+    # Retrieve finding
+    retrieved = shared.finding_get("test_finding")
 
     assert retrieved is not None
-    assert retrieved.check_name == "test_check"
+    assert retrieved.finding_name == "test_finding"
     # Should be a deep copy
-    assert retrieved is not original_check
+    assert retrieved is not original_finding
 
 
 def test_has_observable():
@@ -157,16 +157,16 @@ def test_has_observable():
     assert shared.observable_get(Cyvest.OBS.URL, "https://other.com") is None
 
 
-def test_has_check():
-    """Test checking if check exists via check_get()."""
+def test_has_finding():
+    """Test checking if finding exists via finding_get()."""
     root_cy = Cyvest({"test": "data"}, root_type=Cyvest.OBS.ARTIFACT)
     shared = SharedInvestigationContext(root_cy)
 
     with shared.create_cyvest() as cy:
-        cy.check("my_check", "Description")
+        cy.finding("my_finding", "Description")
 
-    assert shared.check_get("my_check") is not None
-    assert shared.check_get("other_check") is None
+    assert shared.finding_get("my_finding") is not None
+    assert shared.finding_get("other_finding") is None
 
 
 def test_list_observables():
@@ -185,17 +185,17 @@ def test_list_observables():
     assert shared.observable_get(Cyvest.OBS.DOMAIN, "example.com") is not None
 
 
-def test_list_checks():
-    """Checks listing API removed; validate via direct getter."""
+def test_list_findings():
+    """Findings listing API removed; validate via direct getter."""
     root_cy = Cyvest({"test": "data"}, root_type=Cyvest.OBS.ARTIFACT)
     shared = SharedInvestigationContext(root_cy)
 
     with shared.create_cyvest() as cy:
-        cy.check("check1", "Description 1")
-        cy.check("check2", "Description 2")
+        cy.finding("finding1", "Description 1")
+        cy.finding("finding2", "Description 2")
 
-    assert shared.check_get("check1") is not None
-    assert shared.check_get("check2") is not None
+    assert shared.finding_get("finding1") is not None
+    assert shared.finding_get("finding2") is not None
 
 
 def test_observable_get_and_list_observables():
@@ -311,22 +311,22 @@ def test_concurrent_reconciliation():
     root_cy = Cyvest({"test": "data"}, root_type=Cyvest.OBS.ARTIFACT)
     shared = SharedInvestigationContext(root_cy)
 
-    def create_check(check_id: str, category: str):
-        """Task that creates a check."""
+    def create_finding(finding_id: str, category: str):
+        """Task that creates a finding."""
         with shared.create_cyvest() as cy:
-            cy.check(check_id, category, f"Check {check_id}")
+            cy.finding(finding_id, category, f"Finding {finding_id}")
 
-    # Create many checks concurrently
+    # Create many findings concurrently
     with ThreadPoolExecutor(max_workers=10) as executor:
         futures = []
         for i in range(50):
-            futures.append(executor.submit(create_check, f"check_{i}", f"cat_{i % 5}"))
+            futures.append(executor.submit(create_finding, f"finding_{i}", f"cat_{i % 5}"))
 
         for future in as_completed(futures):
             future.result()
 
-    # Verify all checks were registered
-    assert len(shared._check_registry) == 50
+    # Verify all findings were registered
+    assert len(shared._finding_registry) == 50
 
 
 def test_reconcile_with_investigation_object():
@@ -375,8 +375,8 @@ def test_override_data_in_create_cyvest():
         assert cy.root().extra == {"override": "data"}
 
 
-def test_shared_context_with_checks_and_observables():
-    """Test that both checks and observables are properly shared."""
+def test_shared_context_with_findings_and_observables():
+    """Test that both findings and observables are properly shared."""
     root_cy = Cyvest(
         {"email": "phishing@malicious.com", "url": "https://malicious.com/payload"}, root_type=Cyvest.OBS.ARTIFACT
     )
@@ -388,30 +388,30 @@ def test_shared_context_with_checks_and_observables():
         email_obs = cy.observable(Cyvest.OBS.EMAIL, data["email"])
         email_obs.with_ti("EmailRep", Decimal("7.0"))
 
-        check = cy.check("email_analysis", "Analyze sender")
-        check.link_observable(email_obs)
+        finding = cy.finding("email_analysis", "Analyze sender")
+        finding.link_observable(email_obs)
 
-    # Task 2: Analyze URL, reference email check
+    # Task 2: Analyze URL, reference email finding
     with shared.create_cyvest() as cy:
         data = cy.root().extra
         url_obs = cy.observable(Cyvest.OBS.URL, data["url"])
         url_obs.with_ti("VT", Decimal("9.0"))
 
-        # Verify we can see the email check
-        email_check = shared.check_get("email_analysis")
-        assert email_check is not None
-        assert email_check.check_name == "email_analysis"
+        # Verify we can see the email finding
+        email_finding = shared.finding_get("email_analysis")
+        assert email_finding is not None
+        assert email_finding.finding_name == "email_analysis"
 
-        check = cy.check("url_analysis", "Analyze malicious URL")
-        check.link_observable(url_obs)
+        finding = cy.finding("url_analysis", "Analyze malicious URL")
+        finding.link_observable(url_obs)
 
     # Verify final state
     assert len(shared._observable_registry) == 3  # 2 created + 1 root
-    assert len(shared._check_registry) == 2
+    assert len(shared._finding_registry) == 2
     assert shared.observable_get(Cyvest.OBS.EMAIL, "phishing@malicious.com") is not None
     assert shared.observable_get(Cyvest.OBS.URL, "https://malicious.com/payload") is not None
-    assert shared.check_get("email_analysis") is not None
-    assert shared.check_get("url_analysis") is not None
+    assert shared.finding_get("email_analysis") is not None
+    assert shared.finding_get("url_analysis") is not None
 
 
 def test_deep_copy_prevents_modification():
@@ -452,33 +452,33 @@ def test_observable_get_with_parameters():
     assert obs.value == "user@example.com"
 
 
-def test_check_get_with_parameters():
-    """Test check_get using check_name parameter."""
+def test_finding_get_with_parameters():
+    """Test finding_get using finding_name parameter."""
     root_cy = Cyvest({"test": "data"}, root_type=Cyvest.OBS.ARTIFACT)
     shared = SharedInvestigationContext(root_cy)
 
     with shared.create_cyvest() as cy:
-        cy.check("malware_scan", "Scan for malware")
+        cy.finding("malware_scan", "Scan for malware")
 
     # Test parameter-based lookup
-    check = shared.check_get("malware_scan")
-    assert check is not None
-    assert check.check_name == "malware_scan"
+    finding = shared.finding_get("malware_scan")
+    assert finding is not None
+    assert finding.finding_name == "malware_scan"
 
 
-def test_existence_checks_via_getters():
+def test_existence_findings_via_getters():
     """Use get_* returning None/non-None instead of has_* helpers."""
     root_cy = Cyvest({"test": "data"}, root_type=Cyvest.OBS.ARTIFACT)
     shared = SharedInvestigationContext(root_cy)
 
     with shared.create_cyvest() as cy:
         cy.observable(Cyvest.OBS.DOMAIN, "malicious.com")
-        cy.check("url_reputation", "Check URL reputation")
+        cy.finding("url_reputation", "Finding URL reputation")
 
     assert shared.observable_get(Cyvest.OBS.DOMAIN, "malicious.com") is not None
     assert shared.observable_get(Cyvest.OBS.DOMAIN, "safe.com") is None
-    assert shared.check_get("url_reputation") is not None
-    assert shared.check_get("email_reputation") is None
+    assert shared.finding_get("url_reputation") is not None
+    assert shared.finding_get("email_reputation") is None
 
 
 def test_cyvest_get_observable_with_parameters():
@@ -495,19 +495,19 @@ def test_cyvest_get_observable_with_parameters():
     assert obs_key is not None
 
 
-def test_cyvest_get_check_with_parameters():
-    """Test Cyvest.check_get using key for lookup."""
+def test_cyvest_get_finding_with_parameters():
+    """Test Cyvest.finding_get using key for lookup."""
     cy = Cyvest({"test": "data"}, root_type=Cyvest.OBS.ARTIFACT)
-    check_proxy = cy.check("dns_lookup", "DNS reputation check")
+    finding_proxy = cy.finding("dns_lookup", "DNS reputation finding")
 
     # Test key-based lookup
-    check = cy.check_get(check_proxy.key)
-    assert check is not None
-    assert check.check_name == "dns_lookup"
+    finding = cy.finding_get(finding_proxy.key)
+    assert finding is not None
+    assert finding.finding_name == "dns_lookup"
 
     # Test key-based lookup (same method)
-    check_key = cy.check_get(check_proxy.key)
-    assert check_key is not None
+    finding_key = cy.finding_get(finding_proxy.key)
+    assert finding_key is not None
 
 
 def test_observable_type_enum_conversion():
@@ -539,10 +539,10 @@ def test_getters_invalid_arguments_raise_typeerror():
     import pytest
 
     with pytest.raises(TypeError):
-        shared.observable_get("type", "value", "extra")  # type: ignore[arg-type]
+        shared.observable_get("type", "value", "subtype", "namespace", "extra")  # type: ignore[call-arg]
 
     with pytest.raises(TypeError):
-        shared.check_get("id", "extra")  # type: ignore[arg-type]
+        shared.finding_get("id", "extra")  # type: ignore[arg-type]
 
 
 def test_parameter_based_api_in_parallel_tasks():
@@ -553,14 +553,14 @@ def test_parameter_based_api_in_parallel_tasks():
     def task1(shared_ctx):
         with shared_ctx.create_cyvest() as cy:
             cy.observable(Cyvest.OBS.EMAIL, "sender@malicious.com").with_ti("EmailRep", Decimal("8.0"))
-            cy.check("sender_check", "Analyze sender")
+            cy.finding("sender_finding", "Analyze sender")
 
     def task2(shared_ctx):
         with shared_ctx.create_cyvest() as cy:
             # Use parameter-based lookup to get observable from task1
             sender = shared_ctx.observable_get(Cyvest.OBS.EMAIL, "sender@malicious.com")
             if sender and sender.score > 5:
-                cy.check("high_risk_sender", "High risk detected").with_score(Decimal("9.0"))
+                cy.finding("high_risk_sender", "High risk detected").with_score(Decimal("9.0"))
 
     # Execute tasks in parallel
     with ThreadPoolExecutor(max_workers=2) as executor:
@@ -571,8 +571,8 @@ def test_parameter_based_api_in_parallel_tasks():
 
     # Verify both tasks completed and parameter-based lookups worked
     assert shared.observable_get(Cyvest.OBS.EMAIL, "sender@malicious.com") is not None
-    assert shared.check_get("sender_check") is not None
-    assert shared.check_get("high_risk_sender") is not None
+    assert shared.finding_get("sender_finding") is not None
+    assert shared.finding_get("high_risk_sender") is not None
 
     sender_obs = shared.observable_get(Cyvest.OBS.EMAIL, "sender@malicious.com")
     assert sender_obs.score >= Decimal("8.0")
@@ -700,12 +700,12 @@ def test_async_context_manager_auto_reconcile():
     async def run():
         async with shared.create_cyvest() as cy:
             cy.observable(Cyvest.OBS.EMAIL, "async@domain.com")
-            cy.check("async_check", "Async check")
+            cy.finding("async_finding", "Async finding")
 
     asyncio.run(run())
 
     assert shared.observable_get(Cyvest.OBS.EMAIL, "async@domain.com") is not None
-    assert shared.check_get("async_check") is not None
+    assert shared.finding_get("async_finding") is not None
 
 
 def test_areconcile_and_observable_aget():
@@ -960,14 +960,14 @@ def test_get_global_score():
     assert initial_score == Decimal("0")
 
     with shared.create_cyvest() as cy:
-        cy.check("test", description="test").link_observable(cy.root(), propagation_mode="GLOBAL")
+        cy.finding("test", description="test").link_observable(cy.root(), propagation_mode="GLOBAL")
 
     # Directly add threat to main investigation's root
     root = inv.get_root()
     ti = ThreatIntel(source="DirectThreat", observable_key=root.key, score=Decimal("7"))
     inv.add_threat_intel(ti, root)
 
-    # Score should be updated (root propagates to checks)
+    # Score should be updated (root propagates to findings)
     score = shared.get_global_score()
     assert isinstance(score, Decimal)
     assert score >= Decimal("7")
@@ -993,7 +993,7 @@ def test_get_global_level_reflects_main_investigation():
     assert shared.get_global_level() == Cyvest.LVL.INFO
 
     with shared.create_cyvest() as cy:
-        cy.check("c1", "desc").with_score(Decimal("10"))
+        cy.finding("c1", "desc").with_score(Decimal("10"))
 
     assert shared.get_global_level() == Cyvest.LVL.MALICIOUS
 
@@ -1029,7 +1029,7 @@ def test_io_to_markdown_basic(tmp_path):
     with shared.create_cyvest() as cy:
         obs = cy.observable(Cyvest.OBS.EMAIL, "malicious@evil.com")
         obs.with_ti("VT", Decimal("8.5"))
-        cy.check("email_reputation", "header", "Check sender reputation").link_observable(obs).with_score(
+        cy.finding("email_reputation", "header", "Finding sender reputation").link_observable(obs).with_score(
             Decimal("7.0")
         )
 
@@ -1068,7 +1068,7 @@ def test_io_save_markdown_relative_path(tmp_path, monkeypatch):
     shared = SharedInvestigationContext(root_cy)
 
     with shared.create_cyvest() as cy:
-        cy.check("test", "scope", "desc")
+        cy.finding("test", "scope", "desc")
 
     # Change to temp directory
     monkeypatch.chdir(tmp_path)
@@ -1087,7 +1087,7 @@ def test_io_to_invest_basic():
 
     with shared.create_cyvest() as cy:
         cy.observable(Cyvest.OBS.IPV4, "192.168.1.1").with_ti("SEKOIA", Decimal("6.0"))
-        cy.check("ip_reputation", "Check IP reputation").with_score(Decimal("5.0"))
+        cy.finding("ip_reputation", "IP reputation finding").with_score(Decimal("5.0"))
 
     schema = shared.io_to_invest()
 
@@ -1096,10 +1096,10 @@ def test_io_to_invest_basic():
     assert hasattr(schema, "score")
     assert hasattr(schema, "level")
     assert hasattr(schema, "observables")
-    assert hasattr(schema, "checks")
+    assert hasattr(schema, "findings")
     assert hasattr(schema, "stats")
     assert "obs:ipv4:192.168.1.1" in schema.observables
-    assert "chk:ip_reputation" in schema.checks  # checks keyed by key
+    assert "fnd:ip_reputation" in schema.findings  # findings keyed by key
 
 
 def test_io_save_json_creates_file(tmp_path):
@@ -1109,7 +1109,7 @@ def test_io_save_json_creates_file(tmp_path):
 
     with shared.create_cyvest() as cy:
         cy.observable(Cyvest.OBS.URL, "https://malicious.com/payload").with_ti("VT", Decimal("10.0"))
-        cy.check("url_check", "Analyze URL")
+        cy.finding("url_finding", "Analyze URL")
 
     filepath = tmp_path / "shared_investigation.json"
     result_path = shared.io_save_json(filepath)
@@ -1135,7 +1135,7 @@ def test_io_save_json_relative_path(tmp_path, monkeypatch):
     shared = SharedInvestigationContext(root_cy)
 
     with shared.create_cyvest() as cy:
-        cy.check("test", "scope", "desc")
+        cy.finding("test", "scope", "desc")
 
     monkeypatch.chdir(tmp_path)
 
@@ -1153,7 +1153,7 @@ def test_export_methods_thread_safe():
 
     with shared.create_cyvest() as cy:
         cy.observable(Cyvest.OBS.DOMAIN, "test.com")
-        cy.check("test", "scope", "desc")
+        cy.finding("test", "scope", "desc")
 
     # Multiple threads calling export methods concurrently
     def export_markdown():
@@ -1297,9 +1297,13 @@ def test_export_comprehensive_investigation(tmp_path):
         email_obs.relate_to(domain_obs, Cyvest.REL.RELATED_TO)
         url_obs.relate_to(domain_obs, Cyvest.REL.RELATED_TO)
 
-        # Checks
-        cy.check("sender_reputation", "High risk sender detected").link_observable(email_obs).with_score(Decimal("8.5"))
-        cy.check("url_analysis", "Malicious URL detected").link_observable(url_obs).with_score(Decimal("9.0"))
+        # Findings
+        (
+            cy.finding("sender_reputation", "High risk sender detected")
+            .link_observable(email_obs)
+            .with_score(Decimal("8.5"))
+        )
+        cy.finding("url_analysis", "Malicious URL detected").link_observable(url_obs).with_score(Decimal("9.0"))
 
         # Enrichments
         cy.enrichment_create("whois", {"registrar": "Evil Registrar", "created": "2024-01-01"}, context="evil.com")
@@ -1327,8 +1331,8 @@ def test_export_comprehensive_investigation(tmp_path):
 
     # Verify schema structure
     assert len(schema.observables) >= 4  # 3 created + 1 root
-    assert "chk:sender_reputation" in schema.checks  # checks keyed by key
-    assert "chk:url_analysis" in schema.checks
+    assert "fnd:sender_reputation" in schema.findings  # findings keyed by key
+    assert "fnd:url_analysis" in schema.findings
     assert len(schema.enrichments) == 2
 
     # Verify files exist and are valid
@@ -1377,17 +1381,17 @@ def test_export_parallel_updates(tmp_path):
     def create_observable(index: int):
         with shared.create_cyvest() as cy:
             cy.observable(Cyvest.OBS.IPV4, f"10.0.0.{index}")
-            cy.check(f"check_{index}", f"Check {index}")
+            cy.finding(f"finding_{index}", f"Finding {index}")
 
     with ThreadPoolExecutor(max_workers=5) as executor:
         futures = [executor.submit(create_observable, i) for i in range(10)]
         for f in futures:
             f.result()
 
-    # Export should capture all observables and checks
+    # Export should capture all observables and findings
     schema = shared.io_to_invest()
     assert len(schema.observables) == 11  # 10 created + 1 root
-    assert schema.stats.total_checks == 10
+    assert schema.stats.total_findings == 10
 
     # Save and verify
     json_path = tmp_path / "parallel.json"

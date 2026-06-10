@@ -19,8 +19,10 @@ from cyvest.level_score_rules import recalculate_level_for_score
 from cyvest.levels import Level, normalize_level
 from cyvest.model import (
     AuditEvent,
-    Check,
     Enrichment,
+    Evidence,
+    EvidenceLink,
+    Finding,
     InvestigationWhitelist,
     Observable,
     ObservableLink,
@@ -45,7 +47,7 @@ class Investigation:
     """
     Core investigation state and operations.
 
-    Manages all investigation objects (observables, checks, threat intel, etc.),
+    Manages all investigation objects (observables, findings, threat intel, etc.),
     handles automatic merging on creation, score propagation, and statistics tracking.
     """
 
@@ -54,8 +56,12 @@ class Investigation:
             "fields": {"comment", "extra", "internal", "whitelisted"},
             "dict_fields": {"extra"},
         },
-        "check": {
+        "finding": {
             "fields": {"comment", "extra", "description"},
+            "dict_fields": {"extra"},
+        },
+        "evidence": {
+            "fields": {"title", "description", "extra"},
             "dict_fields": {"extra"},
         },
         "threat_intel": {
@@ -104,7 +110,8 @@ class Investigation:
 
         # Object collections
         self._observables: dict[str, Observable] = {}
-        self._checks: dict[str, Check] = {}
+        self._findings: dict[str, Finding] = {}
+        self._evidences: dict[str, Evidence] = {}
         self._threat_intels: dict[str, ThreatIntel] = {}
         self._enrichments: dict[str, Enrichment] = {}
         self._tags: dict[str, Tag] = {}
@@ -193,27 +200,35 @@ class Investigation:
         if rel_tuple not in existing_rels:
             source_obs.relationships.append(rel)
 
-    def _link_check_to_observable(self, check: Check, link: ObservableLink) -> bool:
+    def _link_finding_to_observable(self, finding: Finding, link: ObservableLink) -> bool:
         existing: dict[tuple[str, PropagationMode], int] = {}
-        for idx, existing_link in enumerate(check.observable_links):
+        for idx, existing_link in enumerate(finding.observable_links):
             existing[(existing_link.observable_key, existing_link.propagation_mode)] = idx
         link_tuple = (link.observable_key, link.propagation_mode)
         if link_tuple in existing:
             return False
 
-        check.observable_links.append(link)
+        finding.observable_links.append(link)
         return True
 
-    def _link_check_to_tag(self, tag: Tag, check: Check) -> None:
-        if any(existing.key == check.key for existing in tag.checks):
+    def _link_finding_to_evidence(self, finding: Finding, link: EvidenceLink) -> bool:
+        if any(existing.evidence_key == link.evidence_key for existing in finding.evidence_links):
+            return False
+        finding.evidence_links.append(link)
+        return True
+
+    def _link_finding_to_tag(self, tag: Tag, finding: Finding) -> None:
+        if any(existing.key == finding.key for existing in tag.findings):
             return
-        tag.checks.append(check)
+        tag.findings.append(finding)
 
     def _get_object_type(self, obj: Any) -> str | None:
         if isinstance(obj, Observable):
             return "observable"
-        if isinstance(obj, Check):
-            return "check"
+        if isinstance(obj, Finding):
+            return "finding"
+        if isinstance(obj, Evidence):
+            return "evidence"
         if isinstance(obj, ThreatIntel):
             return "threat_intel"
         if isinstance(obj, Enrichment):
@@ -313,16 +328,30 @@ class Investigation:
         )
         return True
 
-    def _update_observable_check_links(self, observable_key: str) -> None:
+    def _update_observable_finding_links(self, observable_key: str) -> None:
         obs = self._observables.get(observable_key)
         if not obs:
             return
-        check_keys = self._score_engine.get_check_links_for_observable(observable_key)
-        obs._check_links = check_keys
+        finding_keys = self._score_engine.get_finding_links_for_observable(observable_key)
+        obs._finding_links = finding_keys
 
-    def _rebuild_all_check_links(self) -> None:
+    def _rebuild_all_finding_links(self) -> None:
         for observable_key in self._observables:
-            self._update_observable_check_links(observable_key)
+            self._update_observable_finding_links(observable_key)
+
+    def _update_evidence_finding_links(self, evidence_key: str) -> None:
+        evidence = self._evidences.get(evidence_key)
+        if evidence is None:
+            return
+        evidence._finding_links = sorted(
+            finding.key
+            for finding in self._findings.values()
+            if any(link.evidence_key == evidence_key for link in finding.evidence_links)
+        )
+
+    def _rebuild_all_evidence_finding_links(self) -> None:
+        for evidence_key in self._evidences:
+            self._update_evidence_finding_links(evidence_key)
 
     def get_audit_log(self) -> list[AuditEvent]:
         """Return a deep copy of the audit log."""
@@ -428,9 +457,9 @@ class Investigation:
 
         return existing, deferred_relationships
 
-    def _merge_check(self, existing: Check, incoming: Check) -> Check:
+    def _merge_finding(self, existing: Finding, incoming: Finding) -> Finding:
         """
-        Merge an incoming check into an existing check.
+        Merge an incoming finding into an existing finding.
 
         Strategy:
         - Update score (take maximum)
@@ -441,11 +470,11 @@ class Investigation:
         - Merge observable links (tuple-based deduplication, provenance-preserving)
 
         Args:
-            existing: The existing check
-            incoming: The incoming check to merge
+            existing: The existing finding
+            incoming: The incoming finding to merge
 
         Returns:
-            The merged check (existing is modified in place)
+            The merged finding (existing is modified in place)
         """
         if not incoming.origin_investigation_id:
             incoming.origin_investigation_id = self.investigation_id
@@ -486,6 +515,25 @@ class Investigation:
                 existing_by_tuple[link_tuple] = len(existing.observable_links) - 1
                 continue
 
+        existing_evidence_keys = {link.evidence_key for link in existing.evidence_links}
+        for incoming_link in incoming.evidence_links:
+            if incoming_link.evidence_key not in existing_evidence_keys:
+                existing.evidence_links.append(incoming_link)
+                existing_evidence_keys.add(incoming_link.evidence_key)
+
+        return existing
+
+    def _merge_evidence(self, existing: Evidence, incoming: Evidence) -> Evidence:
+        immutable_fields = ("evidence_type", "source", "external_id", "content", "uri")
+        conflicts = [field for field in immutable_fields if getattr(existing, field) != getattr(incoming, field)]
+        if conflicts:
+            raise ValueError(f"Evidence conflict for '{existing.key}': differing {', '.join(conflicts)}")
+        if incoming.title:
+            existing.title = incoming.title
+        if incoming.description:
+            existing.description = incoming.description
+        existing.extra.update(incoming.extra)
+        existing.captured_at = min(existing.captured_at, incoming.captured_at)
         return existing
 
     def _merge_threat_intel(self, existing: ThreatIntel, incoming: ThreatIntel) -> ThreatIntel:
@@ -578,7 +626,7 @@ class Investigation:
         Merge an incoming tag into an existing tag.
 
         Strategy:
-        - Merge checks (dict-based lookup for efficiency)
+        - Merge findings (dict-based lookup for efficiency)
 
         Args:
             existing: The existing tag
@@ -591,16 +639,16 @@ class Investigation:
         if incoming.description:
             existing.description = incoming.description
 
-        # Merge checks using dict-based lookup (more efficient)
-        existing_checks_dict = {check.key: check for check in existing.checks}
+        # Merge findings using dict-based lookup (more efficient)
+        existing_findings_dict = {finding.key: finding for finding in existing.findings}
 
-        for incoming_check in incoming.checks:
-            if incoming_check.key in existing_checks_dict:
-                # Merge existing check
-                self._merge_check(existing_checks_dict[incoming_check.key], incoming_check)
+        for incoming_finding in incoming.findings:
+            if incoming_finding.key in existing_findings_dict:
+                # Merge existing finding
+                self._merge_finding(existing_findings_dict[incoming_finding.key], incoming_finding)
             else:
-                # Add new check
-                self._link_check_to_tag(existing, incoming_check)
+                # Add new finding
+                self._link_finding_to_tag(existing, incoming_finding)
 
         return existing
 
@@ -609,13 +657,15 @@ class Investigation:
     ) -> tuple[
         dict[str, Observable],
         dict[str, ThreatIntel],
-        dict[str, Check],
+        dict[str, Finding],
+        dict[str, Evidence],
         dict[str, Enrichment],
         dict[str, Tag],
     ]:
         """Clone incoming models while preserving shared object references."""
         incoming_threat_intels = {key: ti.model_copy(deep=True) for key, ti in other._threat_intels.items()}
-        incoming_checks = {key: check.model_copy(deep=True) for key, check in other._checks.items()}
+        incoming_findings = {key: finding.model_copy(deep=True) for key, finding in other._findings.items()}
+        incoming_evidences = {key: evidence.model_copy(deep=True) for key, evidence in other._evidences.items()}
         incoming_enrichments = {key: enrichment.model_copy(deep=True) for key, enrichment in other._enrichments.items()}
 
         orphan_threat_intels: dict[str, ThreatIntel] = {}
@@ -637,16 +687,16 @@ class Investigation:
                 copied_obs.threat_intels = [_copy_threat_intel(ti) for ti in obs.threat_intels]
             incoming_observables[obs.key] = copied_obs
 
-        orphan_checks: dict[str, Check] = {}
+        orphan_findings: dict[str, Finding] = {}
 
-        def _copy_check(check: Check) -> Check:
-            if check.key in incoming_checks:
-                return incoming_checks[check.key]
-            existing = orphan_checks.get(check.key)
+        def _copy_finding(finding: Finding) -> Finding:
+            if finding.key in incoming_findings:
+                return incoming_findings[finding.key]
+            existing = orphan_findings.get(finding.key)
             if existing:
                 return existing
-            copied = check.model_copy(deep=True)
-            orphan_checks[check.key] = copied
+            copied = finding.model_copy(deep=True)
+            orphan_findings[finding.key] = copied
             return copied
 
         incoming_tags: dict[str, Tag] = {}
@@ -658,7 +708,7 @@ class Investigation:
             copied = Tag(
                 name=tag.name,
                 description=tag.description,
-                checks=[_copy_check(check) for check in tag.checks],
+                findings=[_copy_finding(finding) for finding in tag.findings],
                 key=tag.key,
             )
             incoming_tags[tag.key] = copied
@@ -670,7 +720,8 @@ class Investigation:
         return (
             incoming_observables,
             incoming_threat_intels,
-            incoming_checks,
+            incoming_findings,
+            incoming_evidences,
             incoming_enrichments,
             incoming_tags,
         )
@@ -694,7 +745,7 @@ class Investigation:
         self._observables[obs.key] = obs
         self._score_engine.register_observable(obs)
         self._stats.register_observable(obs)
-        self._update_observable_check_links(obs.key)
+        self._update_observable_finding_links(obs.key)
         self._record_event(
             event_type="OBSERVABLE_CREATED",
             object_type="observable",
@@ -702,39 +753,57 @@ class Investigation:
         )
         return obs, []
 
-    def add_check(self, check: Check) -> Check:
+    def add_finding(self, finding: Finding) -> Finding:
         """
-        Add or merge a check.
+        Add or merge a finding.
 
         Args:
-            check: Check to add or merge
+            finding: Finding to add or merge
 
         Returns:
-            The resulting check (either new or merged)
+            The resulting finding (either new or merged)
         """
-        if check.key in self._checks:
-            r = self._merge_check(self._checks[check.key], check)
+        if finding.key in self._findings:
+            r = self._merge_finding(self._findings[finding.key], finding)
             self._score_engine.rebuild_link_index()
             self._score_engine.recalculate_all()
             for link in r.observable_links:
-                self._update_observable_check_links(link.observable_key)
+                self._update_observable_finding_links(link.observable_key)
+            for link in r.evidence_links:
+                self._update_evidence_finding_links(link.evidence_key)
             return r
 
-        if not getattr(check, "origin_investigation_id", None):
-            check.origin_investigation_id = self.investigation_id
+        if not getattr(finding, "origin_investigation_id", None):
+            finding.origin_investigation_id = self.investigation_id
 
-        # Register new check
-        self._checks[check.key] = check
-        self._score_engine.register_check(check)
-        self._stats.register_check(check)
-        for link in check.observable_links:
-            self._update_observable_check_links(link.observable_key)
+        # Register new finding
+        self._findings[finding.key] = finding
+        self._score_engine.register_finding(finding)
+        self._stats.register_finding(finding)
+        for link in finding.observable_links:
+            self._update_observable_finding_links(link.observable_key)
+        for link in finding.evidence_links:
+            self._update_evidence_finding_links(link.evidence_key)
         self._record_event(
-            event_type="CHECK_CREATED",
-            object_type="check",
-            object_key=check.key,
+            event_type="FINDING_CREATED",
+            object_type="finding",
+            object_key=finding.key,
         )
-        return check
+        return finding
+
+    def add_evidence(self, evidence: Evidence) -> Evidence:
+        """Add or merge structured evidence."""
+        if evidence.key in self._evidences:
+            return self._merge_evidence(self._evidences[evidence.key], evidence)
+        self._evidences[evidence.key] = evidence
+        self._stats.register_evidence(evidence)
+        self._update_evidence_finding_links(evidence.key)
+        self._record_event(
+            event_type="EVIDENCE_CREATED",
+            object_type="evidence",
+            object_key=evidence.key,
+        )
+        return evidence
 
     def add_threat_intel(self, ti: ThreatIntel, observable: Observable) -> ThreatIntel:
         """
@@ -980,92 +1049,115 @@ class Investigation:
 
         return source_obs
 
-    def link_check_observable(
+    def link_finding_observable(
         self,
-        check_key: str,
+        finding_key: str,
         observable_key: str,
         propagation_mode: PropagationMode | str = PropagationMode.LOCAL_ONLY,
-    ) -> Check:
+    ) -> Finding:
         """
-        Link an observable to a check.
+        Link an observable to a finding.
 
         Args:
-            check_key: Key of the check
+            finding_key: Key of the finding
             observable_key: Key of the observable
             propagation_mode: Propagation behavior for this link
 
         Returns:
-            The check
+            The finding
 
         Raises:
-            KeyError: If the check or observable does not exist
+            KeyError: If the finding or observable does not exist
         """
-        check = self._checks.get(check_key)
+        finding = self._findings.get(finding_key)
         observable = self._observables.get(observable_key)
 
-        if check is None:
-            raise KeyError(f"check '{check_key}' not found in investigation.")
+        if finding is None:
+            raise KeyError(f"finding '{finding_key}' not found in investigation.")
         if observable is None:
             raise KeyError(f"observable '{observable_key}' not found in investigation.")
 
-        if check and observable:
+        if finding and observable:
             propagation_mode = PropagationMode(propagation_mode)
             link = ObservableLink(
                 observable_key=observable_key,
                 propagation_mode=propagation_mode,
             )
-            created = self._link_check_to_observable(check, link)
+            created = self._link_finding_to_observable(finding, link)
             if created:
-                self._score_engine.register_check_observable_link(check_key=check.key, observable_key=observable_key)
-                self._update_observable_check_links(observable_key)
+                self._score_engine.register_finding_observable_link(
+                    finding_key=finding.key,
+                    observable_key=observable_key,
+                )
+                self._update_observable_finding_links(observable_key)
                 self._record_event(
-                    event_type="CHECK_LINKED_TO_OBSERVABLE",
-                    object_type="check",
-                    object_key=check.key,
+                    event_type="FINDING_LINKED_TO_OBSERVABLE",
+                    object_type="finding",
+                    object_key=finding.key,
                     details={
                         "observable_key": observable_key,
                         "propagation_mode": propagation_mode.value,
                     },
                 )
                 is_effective = (
-                    propagation_mode == PropagationMode.GLOBAL or self.investigation_id == check.origin_investigation_id
+                    propagation_mode == PropagationMode.GLOBAL
+                    or self.investigation_id == finding.origin_investigation_id
                 )
-                if is_effective and check.level == Level.NONE:
-                    self.apply_level_change(check, Level.INFO, reason="Effective link added")
+                if is_effective and finding.level == Level.NONE:
+                    self.apply_level_change(finding, Level.INFO, reason="Effective link added")
 
-            self._score_engine._propagate_observable_to_checks(observable_key)
+            self._score_engine._propagate_observable_to_findings(observable_key)
 
-        return check
+        return finding
 
-    def add_check_to_tag(self, tag_key: str, check_key: str) -> Tag:
+    def link_finding_evidence(self, finding_key: str, evidence_key: str) -> Finding:
+        """Link existing evidence to an existing finding."""
+        finding = self._findings.get(finding_key)
+        evidence = self._evidences.get(evidence_key)
+        if finding is None:
+            raise KeyError(f"finding '{finding_key}' not found in investigation.")
+        if evidence is None:
+            raise KeyError(f"evidence '{evidence_key}' not found in investigation.")
+
+        if self._link_finding_to_evidence(finding, EvidenceLink(evidence_key=evidence_key)):
+            self._update_evidence_finding_links(evidence_key)
+            self._record_event(
+                event_type="FINDING_LINKED_TO_EVIDENCE",
+                object_type="finding",
+                object_key=finding.key,
+                details={"evidence_key": evidence_key},
+            )
+        return finding
+
+    def add_finding_to_tag(self, tag_key: str, finding_key: str) -> Tag:
         """
-        Add a check to a tag.
+        Add a finding to a tag.
 
         Args:
             tag_key: Key of the tag
-            check_key: Key of the check
+            finding_key: Key of the finding
 
         Returns:
             The tag
 
         Raises:
-            KeyError: If the tag or check does not exist
+            KeyError: If the tag or finding does not exist
         """
         tag = self._tags.get(tag_key)
-        check = self._checks.get(check_key)
+        finding = self._findings.get(finding_key)
 
         if tag is None:
             raise KeyError(f"tag '{tag_key}' not found in investigation.")
-        if check is None:
-            raise KeyError(f"check '{check_key}' not found in investigation.")
+        if finding is None:
+            raise KeyError(f"finding '{finding_key}' not found in investigation.")
 
-        if tag and check:
-            self._link_check_to_tag(tag, check)
+        if tag and finding:
+            self._link_finding_to_tag(tag, finding)
             self._record_event(
-                event_type="TAG_CHECK_ADDED",
+                event_type="TAG_FINDING_ADDED",
                 object_type="tag",
                 object_key=tag.key,
-                details={"check_key": check.key},
+                details={"finding_key": finding.key},
             )
 
         return tag
@@ -1078,9 +1170,13 @@ class Investigation:
         """Get observable by full key string."""
         return self._observables.get(key)
 
-    def get_check(self, key: str) -> Check | None:
-        """Get check by full key string."""
-        return self._checks.get(key)
+    def get_finding(self, key: str) -> Finding | None:
+        """Get finding by full key string."""
+        return self._findings.get(key)
+
+    def get_evidence(self, key: str) -> Evidence | None:
+        """Get evidence by full key string."""
+        return self._evidences.get(key)
 
     def get_tag(self, key: str) -> Tag | None:
         """Get a tag by key."""
@@ -1136,7 +1232,7 @@ class Investigation:
             tag_name: Name of the tag
 
         Returns:
-            Total score from direct checks and all descendant tag checks
+            Total score from direct findings and all descendant tag findings
         """
         tag_key = keys.generate_tag_key(tag_name)
         tag = self._tags.get(tag_key)
@@ -1175,7 +1271,7 @@ class Investigation:
 
     def update_model_metadata(
         self,
-        model_type: Literal["observable", "check", "threat_intel", "enrichment", "tag"],
+        model_type: Literal["observable", "finding", "threat_intel", "enrichment", "tag"],
         key: str,
         updates: dict[str, Any],
         *,
@@ -1200,7 +1296,8 @@ class Investigation:
         """
         store_lookup: dict[str, dict[str, Any]] = {
             "observable": self._observables,
-            "check": self._checks,
+            "finding": self._findings,
+            "evidence": self._evidences,
             "threat_intel": self._threat_intels,
             "enrichment": self._enrichments,
             "tag": self._tags,
@@ -1260,9 +1357,13 @@ class Investigation:
         """Get all observables."""
         return self._observables.copy()
 
-    def get_all_checks(self) -> dict[str, Check]:
-        """Get all checks."""
-        return self._checks.copy()
+    def get_all_findings(self) -> dict[str, Finding]:
+        """Get all findings."""
+        return self._findings.copy()
+
+    def get_all_evidences(self) -> dict[str, Evidence]:
+        """Get all evidences."""
+        return self._evidences.copy()
 
     def get_all_threat_intels(self) -> dict[str, ThreatIntel]:
         """Get all threat intels."""
@@ -1392,7 +1493,7 @@ class Investigation:
 
             while queue:
                 current = queue.pop(0)
-                # Check both outgoing and incoming edges for connectivity
+                # Finding both outgoing and incoming edges for connectivity
                 neighbors = graph[current] | incoming[current]
                 for neighbor in neighbors:
                     if neighbor not in component:
@@ -1480,22 +1581,31 @@ class Investigation:
                 "relationships": sorted(relationships),
             }
 
-        def _snapshot_check(check: Check) -> dict[str, Any]:
+        def _snapshot_finding(finding: Finding) -> dict[str, Any]:
             links = [
                 (
                     link.observable_key,
                     link.propagation_mode.value,
                 )
-                for link in check.observable_links
+                for link in finding.observable_links
             ]
             return {
-                "score": check.score,
-                "level": check.level,
-                "comment": check.comment,
-                "description": check.description,
-                "extra": deepcopy(check.extra),
-                "origin_investigation_id": check.origin_investigation_id,
+                "score": finding.score,
+                "level": finding.level,
+                "comment": finding.comment,
+                "description": finding.description,
+                "extra": deepcopy(finding.extra),
+                "origin_investigation_id": finding.origin_investigation_id,
                 "observable_links": sorted(links),
+                "evidence_links": sorted(link.evidence_key for link in finding.evidence_links),
+            }
+
+        def _snapshot_evidence(evidence: Evidence) -> dict[str, Any]:
+            return {
+                "title": evidence.title,
+                "description": evidence.description,
+                "extra": deepcopy(evidence.extra),
+                "captured_at": evidence.captured_at,
             }
 
         def _snapshot_threat_intel(ti: ThreatIntel) -> dict[str, Any]:
@@ -1516,7 +1626,7 @@ class Investigation:
         def _snapshot_tag(tag: Tag) -> dict[str, Any]:
             return {
                 "description": tag.description,
-                "checks": sorted(check.key for check in tag.checks),
+                "findings": sorted(finding.key for finding in tag.findings),
             }
 
         merge_summary: list[dict[str, Any]] = []
@@ -1524,7 +1634,8 @@ class Investigation:
         (
             incoming_observables,
             incoming_threat_intels,
-            incoming_checks,
+            incoming_findings,
+            incoming_evidences,
             incoming_enrichments,
             incoming_tags,
         ) = self._clone_for_merge(other)
@@ -1597,13 +1708,13 @@ class Investigation:
                 }
             )
 
-        # Merge checks
-        for check in incoming_checks.values():
-            existing_check = self._checks.get(check.key)
-            before = _snapshot_check(existing_check) if existing_check else None
-            self.add_check(check)
-            if existing_check:
-                after = _snapshot_check(existing_check)
+        # Merge evidences before findings so all links have valid targets.
+        for evidence in incoming_evidences.values():
+            existing_evidence = self._evidences.get(evidence.key)
+            before = _snapshot_evidence(existing_evidence) if existing_evidence else None
+            self.add_evidence(evidence)
+            if existing_evidence:
+                after = _snapshot_evidence(existing_evidence)
                 changed_fields = _diff_fields(before, after) if before else []
                 action = "merged" if changed_fields else "skipped"
             else:
@@ -1611,8 +1722,29 @@ class Investigation:
                 action = "created"
             merge_summary.append(
                 {
-                    "object_type": "check",
-                    "object_key": check.key,
+                    "object_type": "evidence",
+                    "object_key": evidence.key,
+                    "action": action,
+                    "changed_fields": changed_fields,
+                }
+            )
+
+        # Merge findings
+        for finding in incoming_findings.values():
+            existing_finding = self._findings.get(finding.key)
+            before = _snapshot_finding(existing_finding) if existing_finding else None
+            self.add_finding(finding)
+            if existing_finding:
+                after = _snapshot_finding(existing_finding)
+                changed_fields = _diff_fields(before, after) if before else []
+                action = "merged" if changed_fields else "skipped"
+            else:
+                changed_fields = []
+                action = "created"
+            merge_summary.append(
+                {
+                    "object_type": "finding",
+                    "object_key": finding.key,
                     "action": action,
                     "changed_fields": changed_fields,
                 }
@@ -1666,7 +1798,8 @@ class Investigation:
 
         # Rebuild link index after merges
         self._score_engine.rebuild_link_index()
-        self._rebuild_all_check_links()
+        self._rebuild_all_finding_links()
+        self._rebuild_all_evidence_finding_links()
 
         # Final score recalculation
         self._score_engine.recalculate_all()

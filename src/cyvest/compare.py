@@ -2,7 +2,7 @@
 Comparison module for Cyvest investigations.
 
 Provides functionality to compare two investigations with optional tolerance rules,
-identifying differences in checks, observables, and threat intelligence.
+identifying differences in findings, observables, and threat intelligence.
 """
 
 from __future__ import annotations
@@ -14,12 +14,12 @@ from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, Field, model_validator
 
-from cyvest.keys import generate_check_key
+from cyvest.keys import generate_finding_key
 from cyvest.levels import Level
 
 if TYPE_CHECKING:
     from cyvest.cyvest import Cyvest
-    from cyvest.proxies import CheckProxy
+    from cyvest.proxies import FindingProxy
 
 
 class DiffStatus(str, Enum):
@@ -31,9 +31,9 @@ class DiffStatus(str, Enum):
 
 
 class ExpectedResult(BaseModel):
-    """Tolerance rule for a specific check."""
+    """Tolerance rule for a specific finding."""
 
-    check_name: str | None = None
+    finding_name: str | None = None
     key: str | None = None
     level: Level | None = None
     score: str | None = None  # Tolerance rule: ">= 0.01", "< 3", "== 1.0"
@@ -41,11 +41,11 @@ class ExpectedResult(BaseModel):
 
     @model_validator(mode="after")
     def validate_key_or_name(self) -> ExpectedResult:
-        if not self.check_name and not self.key:
-            raise ValueError("Either check_name or key must be provided")
-        # Derive key from check_name if not provided
-        if self.check_name and not self.key:
-            self.key = generate_check_key(self.check_name)
+        if not self.finding_name and not self.key:
+            raise ValueError("Either finding_name or key must be provided")
+        # Derive key from finding_name if not provided
+        if self.finding_name and not self.key:
+            self.key = generate_finding_key(self.finding_name)
         return self
 
     model_config = {"extra": "forbid"}
@@ -62,7 +62,7 @@ class ThreatIntelDiff(BaseModel):
 
 
 class ObservableDiff(BaseModel):
-    """Diff info for an observable linked to a check."""
+    """Diff info for an observable linked to a finding."""
 
     observable_key: str
     obs_type: str
@@ -79,7 +79,7 @@ class DiffItem(BaseModel):
 
     status: DiffStatus
     key: str
-    check_name: str
+    finding_name: str
     # Expected values (from expected investigation or rule)
     expected_level: Level | None = None
     expected_score: Decimal | None = None
@@ -144,7 +144,7 @@ def compare_investigations(
     Args:
         actual: The investigation to validate (actual results)
         expected: The reference investigation (expected results), optional
-        result_expected: Tolerance rules for specific checks
+        result_expected: Tolerance rules for specific findings
 
     Returns:
         List of DiffItem for all differences found
@@ -152,51 +152,51 @@ def compare_investigations(
     diffs: list[DiffItem] = []
     rules = {r.key: r for r in (result_expected or [])}
 
-    actual_checks = actual.check_get_all()
-    expected_checks = expected.check_get_all() if expected else {}
+    actual_findings = actual.finding_get_all()
+    expected_findings = expected.finding_get_all() if expected else {}
 
-    all_keys = set(actual_checks.keys()) | set(expected_checks.keys())
+    all_keys = set(actual_findings.keys()) | set(expected_findings.keys())
 
     for key in sorted(all_keys):
-        actual_check = actual_checks.get(key)
-        expected_check = expected_checks.get(key)
+        actual_finding = actual_findings.get(key)
+        expected_finding = expected_findings.get(key)
         rule = rules.get(key)
 
-        if actual_check and not expected_check:
-            # Check added in actual - skip if rule ignores ADDED
+        if actual_finding and not expected_finding:
+            # Finding added in actual - skip if rule ignores ADDED
             if rule and rule.ignore and DiffStatus.ADDED in rule.ignore:
                 continue
             diffs.append(
                 _create_diff_item(
                     status=DiffStatus.ADDED,
-                    actual_check=actual_check,
+                    actual_finding=actual_finding,
                     actual_cv=actual,
                     expected_cv=expected,
                 )
             )
-        elif expected_check and not actual_check:
-            # Check removed from actual - skip if rule ignores REMOVED
+        elif expected_finding and not actual_finding:
+            # Finding removed from actual - skip if rule ignores REMOVED
             if rule and rule.ignore and DiffStatus.REMOVED in rule.ignore:
                 continue
             diffs.append(
                 _create_diff_item(
                     status=DiffStatus.REMOVED,
-                    expected_check=expected_check,
+                    expected_finding=expected_finding,
                     rule=rule,
                     expected_cv=expected,
                 )
             )
         else:
-            # Check exists in both - compare values
-            if _is_mismatch(expected_check, actual_check, rule):
+            # Finding exists in both - compare values
+            if _is_mismatch(expected_finding, actual_finding, rule):
                 # Skip if rule ignores MISMATCH
                 if rule and rule.ignore and DiffStatus.MISMATCH in rule.ignore:
                     continue
                 diffs.append(
                     _create_diff_item(
                         status=DiffStatus.MISMATCH,
-                        expected_check=expected_check,
-                        actual_check=actual_check,
+                        expected_finding=expected_finding,
+                        actual_finding=actual_finding,
                         rule=rule,
                         actual_cv=actual,
                         expected_cv=expected,
@@ -207,8 +207,8 @@ def compare_investigations(
 
 
 def _is_mismatch(
-    expected: CheckProxy,
-    actual: CheckProxy,
+    expected: FindingProxy,
+    actual: FindingProxy,
     rule: ExpectedResult | None,
 ) -> bool:
     """Check if there's a mismatch, considering tolerance rules."""
@@ -228,24 +228,24 @@ def _is_mismatch(
 
 def _create_diff_item(
     status: DiffStatus,
-    actual_check: CheckProxy | None = None,
-    expected_check: CheckProxy | None = None,
+    actual_finding: FindingProxy | None = None,
+    expected_finding: FindingProxy | None = None,
     rule: ExpectedResult | None = None,
     actual_cv: Cyvest | None = None,
     expected_cv: Cyvest | None = None,
 ) -> DiffItem:
     """Create a DiffItem with observable and threat intel context."""
-    check = actual_check or expected_check
+    finding = actual_finding or expected_finding
 
     # Build observable diffs from linked observables
     observable_diffs: list[ObservableDiff] = []
 
-    # Collect observable keys from both checks
+    # Collect observable keys from both findings
     obs_keys: set[str] = set()
-    if actual_check:
-        obs_keys.update(link.observable_key for link in actual_check.observable_links)
-    if expected_check:
-        obs_keys.update(link.observable_key for link in expected_check.observable_links)
+    if actual_finding:
+        obs_keys.update(link.observable_key for link in actual_finding.observable_links)
+    if expected_finding:
+        obs_keys.update(link.observable_key for link in expected_finding.observable_links)
 
     for obs_key in sorted(obs_keys):
         actual_obs = actual_cv.observable_get(obs_key) if actual_cv else None
@@ -307,12 +307,12 @@ def _create_diff_item(
 
     return DiffItem(
         status=status,
-        key=check.key,
-        check_name=check.check_name,
-        expected_level=expected_check.level if expected_check else (rule.level if rule else None),
-        expected_score=expected_check.score if expected_check else None,
+        key=finding.key,
+        finding_name=finding.finding_name,
+        expected_level=expected_finding.level if expected_finding else (rule.level if rule else None),
+        expected_score=expected_finding.score if expected_finding else None,
         expected_score_rule=rule.score if rule else None,
-        actual_level=actual_check.level if actual_check else None,
-        actual_score=actual_check.score if actual_check else None,
+        actual_level=actual_finding.level if actual_finding else None,
+        actual_score=actual_finding.score if actual_finding else None,
         observable_diffs=observable_diffs,
     )

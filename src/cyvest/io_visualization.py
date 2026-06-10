@@ -62,6 +62,11 @@ OBSERVABLE_SHAPES = {
     ObservableType.HASH: "square",
     ObservableType.FILE: "square",
     ObservableType.ARTIFACT: "square",
+    ObservableType.HOST: "dot",
+    ObservableType.PROCESS: "dot",
+    ObservableType.USER: "diamond",
+    ObservableType.COMMAND_LINE: "box",
+    ObservableType.CLOUD_RESOURCE: "square",
 }
 
 
@@ -272,6 +277,11 @@ def generate_network_graph(
             f"Score: {obs.score_display}",
             f"Key: {key}",
         ]
+        if obs.subtype:
+            subtype = obs.subtype.value if hasattr(obs.subtype, "value") else obs.subtype
+            title_parts.append(f"Subtype: {subtype}")
+        if obs.namespace:
+            title_parts.append(f"Namespace: {obs.namespace}")
 
         if obs.internal:
             title_parts.append("Internal: Yes")
@@ -279,8 +289,8 @@ def generate_network_graph(
             title_parts.append("Whitelisted: Yes")
         if obs.threat_intels:
             title_parts.append(f"Threat Intel Sources: {len(obs.threat_intels)}")
-        if obs.check_links:
-            title_parts.append(f"Linked checks: {len(obs.check_links)}")
+        if obs.finding_links:
+            title_parts.append(f"Linked findings: {len(obs.finding_links)}")
 
         title_text = "\n".join(title_parts)
 

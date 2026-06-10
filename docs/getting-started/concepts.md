@@ -42,7 +42,7 @@ Each observable has:
 - **Relationships**: Links to other observables (use `cv.REL.*` and `cv.DIR.*`)
 - **Threat Intelligence**: Verdicts from external sources
 
-> **Model proxies:** All public Cyvest APIs return `ObservableProxy` (and `CheckProxy`, `ThreatIntelProxy`, …)
+> **Model proxies:** All public Cyvest APIs return `ObservableProxy` (and `FindingProxy`, `ThreatIntelProxy`, …)
 > instances rather than raw dataclasses. These proxies provide live scores/levels but raise an error if you
 > attempt to assign attributes. All mutations flow through the Investigation layer, so use the facade helpers
 > (`cv.observable_add_threat_intel`, `cv.observable_set_level`, …) or the fluent methods on the proxies themselves
@@ -52,8 +52,8 @@ Each observable has:
 >
 > ```python
 > url_obs.update_metadata(comment="triaged", extra={"ticket": "INC-4242"})
-> check.update_metadata(description="Updated scope")
-> check.set_level(cv.LVL.SAFE, reason="Verified clean")
+> finding.update_metadata(description="Updated scope")
+> finding.set_level(cv.LVL.SAFE, reason="Verified clean")
 > ```
 >
 > Dictionary fields are merged by default; pass `merge_extra=False` (or `merge_data=False`) to overwrite them completely.
@@ -86,20 +86,20 @@ Use the facade namespace for autocomplete:
 obs = cv.observable(cv.OBS.URL, "https://example.com")
 ```
 
-### Checks
+### Findings
 
-**Checks** represent verification steps in your investigation:
+**Findings** represent verification steps in your investigation:
 - Pattern matching
 - Reputation lookups
 - Behavioral analysis
 - Any validation logic
 
-Each check has:
-- **Check Name**: Identifier for the verification
-- **Description**: What the check does
+Each finding has:
+- **Finding Name**: Identifier for the verification
+- **Description**: What the finding does
 - **Score**: Contribution to overall severity
 - **Level**: Result classification
-- **Linked Observables**: Artifacts verified by this check
+- **Linked Observables**: Artifacts verified by this finding
 
 ### Threat Intelligence
 
@@ -155,7 +155,7 @@ ti = Cyvest.io_load_threat_intel_draft(
 When `safe_getter(report)` matches any entry in `safe_values` and the level is not already INFO or SAFE, the score is set to `0.0` and the level to `SAFE`.
 
 ### Tags
-- Group related checks together
+- Group related findings together
 - Create logical investigation sections
 - Auto-create ancestor tags (e.g., `header:auth:dkim` creates `header` and `header:auth`)
 - Provide direct and aggregated scores/levels
@@ -176,25 +176,25 @@ Scores are **Decimal** values with automatic propagation:
 
 1. **Threat Intel → Observable**: Observable score = **max** of all threat intel scores (not sum)
 2. **Child Observable → Parent**: Child scores aggregate to parents based on scoring mode
-3. **Observable → Check (provenance-aware)**: Check score/level only considers observables reachable through *effective* links (`observable_links`)
-   - A link is effective when `propagation_mode="GLOBAL"` or when the check's `origin_investigation_id` matches the current investigation id
-4. **All Checks → Global**: Check scores sum to global score
+3. **Observable → Finding (provenance-aware)**: Finding score/level only considers observables reachable through *effective* links (`observable_links`)
+   - A link is effective when `propagation_mode="GLOBAL"` or when the finding's `origin_investigation_id` matches the current investigation id
+4. **All Findings → Global**: Finding scores sum to global score
 
 To override the default local-only behavior for a single link:
 
 ```python
-cy.check_link_observable(check.key, observable.key, propagation_mode="GLOBAL")
+cy.finding_link_observable(finding.key, observable.key, propagation_mode="GLOBAL")
 ```
 
-### Provenance (checks)
+### Provenance (findings)
 
-Checks carry a **canonical origin** (`origin_investigation_id`) used by scoring/propagation to decide whether a `LOCAL_ONLY` link is effective in the current investigation.
+Findings carry a **canonical origin** (`origin_investigation_id`) used by scoring/propagation to decide whether a `LOCAL_ONLY` link is effective in the current investigation.
 
-Exports include `investigation_id` so check origins remain meaningful after serialization.
+Exports include `investigation_id` so finding origins remain meaningful after serialization.
 
 ### Reverse Links (navigation)
 
-Observables expose `check_links`, derived from `Check.observable_links`, to show which checks currently link to them. These reverse links are non-authoritative and never drive propagation decisions.
+Observables expose `finding_links`, derived from `Finding.observable_links`, to show which findings currently link to them. These reverse links are non-authoritative and never drive propagation decisions.
 
 ### Scoring Modes
 
@@ -336,8 +336,8 @@ Root's propagation behavior is asymmetric:
   - Prevents upstream contamination beyond root
   - Updates flow TO root but not THROUGH root
 
-- **Root DOES propagate to checks**: Root propagates to linked checks normally
-  - Checks can reflect root's aggregated investigation score
+- **Root DOES propagate to findings**: Root propagates to linked findings normally
+  - Findings can reflect root's aggregated investigation score
 
 **Why the Barrier?**
 
@@ -346,7 +346,7 @@ The root barrier design enables:
 - **Aggregation**: Root still collects overall investigation severity
 - **Flexibility**: You can link arbitrary observables to root without contamination
 - **Clarity**: Parent observables only reflect their direct threat landscape
-  - Checks referencing the root observable receive root's final score
+  - Findings referencing the root observable receive root's final score
   - Maintains expected behavior for verification steps
 
 This barrier ensures that observables linked through the root remain isolated from each other while the root itself properly aggregates threat intelligence from its investigation tree.
@@ -469,7 +469,7 @@ Levels are automatically calculated from scores:
 
 Special cases:
 - **SAFE**: Explicitly set for whitelisted/trusted items with downgrade protection
-- **NONE**: Default for new checks (no classification)
+- **NONE**: Default for new findings (no classification)
 
 ### Explicit vs. Calculated Levels
 
@@ -580,15 +580,15 @@ print(f"Score: {uncertain.score}, Level: {uncertain.level}")
 
 The SAFE protection **only applies to the SAFE level itself**. Other explicit levels (set via `cv.observable_set_level()` or explicit threat intel `level=`) don't have the same protection and can be overridden by higher calculated levels according to the normal rules.
 
-**SAFE Propagation to Checks:**
+**SAFE Propagation to Findings:**
 
-Checks automatically inherit the SAFE level from their linked observables under specific conditions:
+Findings automatically inherit the SAFE level from their linked observables under specific conditions:
 
 1. **At least one** linked observable has `Cyvest.LVL.SAFE`
 2. **All** other linked observables have levels ≤ SAFE (NONE, TRUSTED, INFO, or SAFE)
-3. The check's current level is < SAFE
+3. The finding's current level is < SAFE
 
-When these conditions are met, the check is automatically set to SAFE level, overriding any previous level assignment.
+When these conditions are met, the finding is automatically set to SAFE level, overriding any previous level assignment.
 
 ```python
 from decimal import Decimal
@@ -596,29 +596,29 @@ from cyvest import Cyvest
 
 cv = Cyvest()
 
-# Create a check
-check = cv.check_create("domain_check", "Analyze domain reputation")
+# Create a finding
+finding = cv.finding_create("domain_finding", "Analyze domain reputation")
 
 # Link a SAFE observable
 safe_domain = cv.observable_create(cv.OBS.DOMAIN, "trusted.example.com", level=cv.LVL.SAFE)
-cv.check_link_observable(check.key, safe_domain.key)
+cv.finding_link_observable(finding.key, safe_domain.key)
 
-# Check inherits SAFE level from the observable
-print(f"Check level: {check.level}")  # Output: Check level: SAFE
+# Finding inherits SAFE level from the observable
+print(f"Finding level: {finding.level}")  # Output: Finding level: SAFE
 
-# Add INFO-level observables - check remains SAFE
+# Add INFO-level observables - finding remains SAFE
 info_ip = cv.observable_create(cv.OBS.IPV4, "192.0.2.1")
-cv.check_link_observable(check.key, info_ip.key)
-print(f"Check level: {check.level}")  # Output: Check level: SAFE
+cv.finding_link_observable(finding.key, info_ip.key)
+print(f"Finding level: {finding.level}")  # Output: Finding level: SAFE
 
-# Add MALICIOUS observable - check upgrades to MALICIOUS
+# Add MALICIOUS observable - finding upgrades to MALICIOUS
 malicious_url = cv.observable_create(cv.OBS.URL, "http://malware.example")
 cv.observable_add_threat_intel(malicious_url.key, "virustotal", score=Decimal("8.0"))
-cv.check_link_observable(check.key, malicious_url.key)
-print(f"Check level: {check.level}")  # Output: Check level: MALICIOUS
+cv.finding_link_observable(finding.key, malicious_url.key)
+print(f"Finding level: {finding.level}")  # Output: Finding level: MALICIOUS
 ```
 
-This propagation ensures that checks analyzing whitelisted/trusted assets are properly marked as SAFE, while still allowing upgrades when actual threats are discovered.
+This propagation ensures that findings analyzing whitelisted/trusted assets are properly marked as SAFE, while still allowing upgrades when actual threats are discovered.
 
 ## Relationships
 
@@ -654,8 +654,10 @@ cv.observable_add_relationship(
 
 Every object has a unique, deterministic key:
 
-- **Observable**: `obs:{type}:{normalized_value}`
-- **Check**: `chk:{check_name}`
+- **Observable without subtype**: `obs:{type}:{normalized_value}`
+- **Scoped observable**: `obs:{type}:{subtype}:{namespace}:{normalized_value}`
+- **Finding**: `fnd:{finding_name}`
+- **Evidence**: `evd:{source}:{external_id}` or a content SHA-256 key
 - **Threat Intel**: `ti:{source}:{observable_key}`
 - **Enrichment**: `enr:{name}[:{context_hash}]`
 - **Tag**: `tag:{name}`
@@ -671,8 +673,12 @@ The facade getters accept either keys or component parameters:
 obs = cv.observable_get(cv.OBS.URL, "https://malicious.com")
 obs_by_key = cv.observable_get("obs:url:https://malicious.com")
 
-check = cv.check_get("chk:malware_detection")
+finding = cv.finding_get("fnd:malware_detection")
 ```
+
+`COMMAND_LINE` and identities longer than 128 bytes use deterministic SHA-256 keys. `EMAIL` represents an address,
+while `USER/email` represents a user account identifier. Paths identifying executables use `FILE/path` and can be
+related to a `PROCESS/pid` observable.
 
 Low-level `Investigation` getters accept keys only; use the facade for component-based lookups.
 
@@ -700,13 +706,13 @@ The root observable has special scoring behavior to isolate investigation branch
 1. Root's score is calculated **normally** using MAX or SUM mode algorithm
 2. Root DOES aggregate scores from child observables (like any other observable)
 3. Root does NOT propagate its score to parent observables (barrier blocks upward)
-4. Root DOES propagate normally to linked checks
+4. Root DOES propagate normally to linked findings
 
 **Why this matters:**
 - Root properly aggregates all threat intelligence from the investigation tree
 - Observables linked through root remain isolated from each other
 - Prevents root's aggregated score from contaminating unrelated parent observables
-- Maintains proper check scoring for root verification steps
+- Maintains proper finding scoring for root verification steps
 
 **Example:**
 ```python
@@ -721,14 +727,14 @@ child = cv.observable_create(cv.OBS.URL, "https://example.com")
 cv.observable_add_threat_intel(child.key, "urlscan", score=Decimal("5.0"))
 cv.relationship_add(root.key, child.key, cv.REL.RELATED_TO, direction=cv.DIR.OUTBOUND)
 
-# Create check for root
-check = cv.check_create("root-check", "Validation check")
-cv.check_link_observable(check.key, root.key)
+# Create finding for root
+finding = cv.finding_create("root-finding", "Validation finding")
+cv.finding_link_observable(finding.key, root.key)
 
 # Results (MAX mode):
 # - root.score = max(9.0 TI, 5.0 child) = 9.0
 # - child.score = 5.0 (NOT affected by root TI due to barrier)
-# - check.score = 9.0 (receives root score)
+# - finding.score = 9.0 (receives root score)
 # - If root had a parent, parent.score would NOT include root's 9.0 (barrier blocks upward)
 ```
 
@@ -747,7 +753,7 @@ stats = cv.get_statistics()
 stats['total_observables']
 stats['observables_by_type']
 stats['observables_by_level']
-stats['checks_by_level']
+stats['findings_by_level']
 stats['total_threat_intel']
 ```
 
@@ -771,7 +777,7 @@ Cyvest uses a clean, layered architecture with automatic merge-on-create:
 
 ### Automatic Merge-on-Create
 
-When you add any object (observable, check, threat intel, etc.), Cyvest automatically:
+When you add any object (observable, finding, threat intel, etc.), Cyvest automatically:
 1. Checks if an object with the same key exists
 2. If yes: merges the new data into the existing object
 3. If no: registers it as a new object
@@ -813,10 +819,10 @@ inv1.merge_investigation(inv2)
 
 **Merge strategies:**
 - **Observables**: Higher score/level wins, comments overwrite (if incoming non-empty), relationships and threat intel merge
-- **Checks**: Higher score/level wins, description/comment overwrite (if incoming non-empty), observables merge by key (not identity)
+- **Findings**: Higher score/level wins, description/comment overwrite (if incoming non-empty), observables merge by key (not identity)
 - **Threat Intel**: Higher score/level wins, taxonomies merge by name (incoming replaces same name)
 - **Enrichments**: Deep merge of data dictionaries
-- **Tags**: Merge of checks, hierarchy auto-reconstructed from names
+- **Tags**: Merge of findings, hierarchy auto-reconstructed from names
 
 ## Next Steps
 

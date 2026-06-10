@@ -1,20 +1,21 @@
 /**
  * Getter utilities for retrieving entities from a Cyvest Investigation.
  *
- * These functions provide type-safe access to observables, checks, threat intel,
+ * These functions provide type-safe access to observables, findings, threat intel,
  * enrichments, and tags by their keys.
  */
 
 import type {
   CyvestInvestigation,
   Observable,
-  Check,
+  Finding,
+  Evidence,
   ThreatIntel,
   Enrichment,
   Tag,
   Level,
 } from "./types.generated";
-import { generateObservableKey, generateCheckKey, generateTagKey, isTagChildOf } from "./keys";
+import { generateObservableKey, generateFindingKey, generateTagKey, isTagChildOf } from "./keys";
 import { getLevelFromScore } from "./levels";
 
 /**
@@ -55,20 +56,11 @@ export function getObservable(
 export function getObservableByTypeValue(
   inv: CyvestInvestigation,
   type: string,
-  value: string
+  value: string,
+  subtype?: string,
+  namespace?: string
 ): Observable | undefined {
-  const normalizedType = type.trim().toLowerCase();
-  const normalizedValue = value.trim().toLowerCase();
-
-  for (const obs of Object.values(inv.observables)) {
-    if (
-      obs.type.toLowerCase() === normalizedType &&
-      obs.value.toLowerCase() === normalizedValue
-    ) {
-      return obs;
-    }
-  }
-  return undefined;
+  return inv.observables[generateObservableKey(type, value, subtype, namespace)];
 }
 
 /**
@@ -98,58 +90,69 @@ export function getRootObservable(inv: CyvestInvestigation): Observable | undefi
 }
 
 /**
- * Get a check by its key.
+ * Get a finding by its key.
  *
  * @param inv - The investigation to search
- * @param key - Check key (e.g., "chk:sender_verification:email_headers")
- * @returns The check or undefined if not found
+ * @param key - Finding key (e.g., "fnd:sender_verification:email_headers")
+ * @returns The finding or undefined if not found
  *
  * @example
  * ```ts
- * const check = getCheck(investigation, "chk:sender_verification:email_headers");
+ * const finding = getFinding(investigation, "fnd:sender_verification:email_headers");
  * ```
  */
-export function getCheck(
+export function getFinding(
   inv: CyvestInvestigation,
   key: string
-): Check | undefined {
-  return inv.checks[key];
+): Finding | undefined {
+  return inv.findings[key];
 }
 
 /**
- * Get a check by its name.
+ * Get a finding by its name.
  *
  * @param inv - The investigation to search
- * @param checkName - Check name
- * @returns The check or undefined if not found
+ * @param findingName - Finding name
+ * @returns The finding or undefined if not found
  *
  * @example
  * ```ts
- * const check = getCheckByName(investigation, "sender_verification");
+ * const finding = getFindingByName(investigation, "sender_verification");
  * ```
  */
-export function getCheckByName(
+export function getFindingByName(
   inv: CyvestInvestigation,
-  checkName: string
-): Check | undefined {
-  const key = generateCheckKey(checkName);
-  return inv.checks[key];
+  findingName: string
+): Finding | undefined {
+  const key = generateFindingKey(findingName);
+  return inv.findings[key];
 }
 
 /**
- * Get all checks as an array.
+ * Get all findings as an array.
  *
  * @param inv - The investigation
- * @returns Array of all checks
+ * @returns Array of all findings
  *
  * @example
  * ```ts
- * const allChecks = getAllChecks(investigation);
- * console.log(`Total checks: ${allChecks.length}`);
+ * const allFindings = getAllFindings(investigation);
+ * console.log(`Total findings: ${allFindings.length}`);
  * ```
  */
-export function getAllChecks(inv: CyvestInvestigation): Check[] {
-  return Object.values(inv.checks);
+export function getAllFindings(inv: CyvestInvestigation): Finding[] {
+  return Object.values(inv.findings);
+}
+
+export function getEvidence(
+  inv: CyvestInvestigation,
+  key: string
+): Evidence | undefined {
+  return inv.evidences[key];
+}
+
+export function getAllEvidences(inv: CyvestInvestigation): Evidence[] {
+  return Object.values(inv.evidences);
 }
 
 /**
@@ -350,7 +353,8 @@ export function getDataExtraction(inv: CyvestInvestigation) {
  */
 export interface InvestigationCounts {
   observables: number;
-  checks: number;
+  findings: number;
+  evidences: number;
   threatIntels: number;
   enrichments: number;
   tags: number;
@@ -366,7 +370,8 @@ export interface InvestigationCounts {
 export function getCounts(inv: CyvestInvestigation): InvestigationCounts {
   return {
     observables: Object.keys(inv.observables).length,
-    checks: getAllChecks(inv).length,
+    findings: getAllFindings(inv).length,
+    evidences: getAllEvidences(inv).length,
     threatIntels: Object.keys(inv.threat_intels).length,
     enrichments: Object.keys(inv.enrichments).length,
     tags: getAllTags(inv).length,
@@ -440,7 +445,7 @@ export function getTagDescendants(inv: CyvestInvestigation, tagName: string): Ta
  * Get the aggregated score for a tag including all descendant tags.
  *
  * The aggregated score includes:
- * - The tag's direct_score (from its direct checks)
+ * - The tag's direct_score (from its direct findings)
  * - Recursively, the aggregated scores of all child tags
  *
  * @param inv - The investigation

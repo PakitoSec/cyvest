@@ -4,6 +4,7 @@ Tests for the Click-based CLI.
 
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 
@@ -28,7 +29,7 @@ def _write_sample(tmp_path: Path) -> Path:
     observable = cv.observable(Cyvest.OBS.URL, "https://example.com", internal=False).with_ti(
         "virustotal", score=Decimal("6.0"), level=Cyvest.LVL.MALICIOUS
     )
-    cv.check("url_check", "network", "Validate URL").link_observable(observable).with_score(Decimal("6.0"))
+    cv.finding("url_finding", "network", "Validate URL").link_observable(observable).with_score(Decimal("6.0"))
 
     sample_path = tmp_path / "sample.json"
     cv.io_save_json(sample_path)
@@ -69,6 +70,41 @@ def test_cli_export_writes_files(tmp_path: Path) -> None:
     assert json_output.exists()
 
 
+def test_cli_migrate_writes_v6_document(tmp_path: Path) -> None:
+    """CLI 'migrate' rewrites a v5 document to the strict v6 schema."""
+    sample = _write_sample(tmp_path)
+    source = json.loads(sample.read_text(encoding="utf-8"))
+    source["schema_version"] = "5.4.1"
+
+    source["checks"] = {}
+    finding_key_map: dict[str, str] = {}
+    for finding_key, finding in source.pop("findings").items():
+        check_key = finding_key.replace("fnd:", "chk:", 1)
+        finding_key_map[finding_key] = check_key
+        finding["check_name"] = finding.pop("finding_name")
+        finding["key"] = check_key
+        finding.pop("evidence_links", None)
+        source["checks"][check_key] = finding
+    source.pop("evidences", None)
+
+    for tag in source.get("tags", {}).values():
+        tag["checks"] = [finding_key_map.get(key, key) for key in tag.pop("findings", [])]
+
+    v5_path = tmp_path / "v5.json"
+    output_path = tmp_path / "v6.json"
+    v5_path.write_text(json.dumps(source), encoding="utf-8")
+
+    result = CliRunner().invoke(cli, ["migrate", str(v5_path), "-o", str(output_path)])
+
+    assert result.exit_code == 0
+    migrated = json.loads(output_path.read_text(encoding="utf-8"))
+    assert migrated["schema_version"] == "6.0.0"
+    assert migrated["evidences"] == {}
+    assert "checks" not in migrated
+    assert migrated["findings"]
+    assert all(key.startswith("fnd:") for key in migrated["findings"])
+
+
 def test_cli_merge_requires_multiple_inputs(tmp_path: Path) -> None:
     """CLI 'merge' command validates the number of inputs."""
     sample = _write_sample(tmp_path)
@@ -102,22 +138,22 @@ def test_display_summary_exclude_levels() -> None:
 
     cv = Cyvest()
 
-    # Create observables and checks at different levels
+    # Create observables and findings at different levels
     # Score ranges: MALICIOUS >= 5.0, SUSPICIOUS 3.0-5.0, NOTABLE < 3.0, INFO = 0.0
-    # Note: Checks with observables are now automatically upgraded from NONE to INFO
+    # Note: Findings with observables are now automatically upgraded from NONE to INFO
     obs_malicious = cv.observable(Cyvest.OBS.URL, "https://malicious.com", internal=False)
     obs_suspicious = cv.observable(Cyvest.OBS.URL, "https://suspicious.com", internal=False)
     obs_info = cv.observable(Cyvest.OBS.URL, "https://info.com", internal=False)
 
-    cv.check("malicious_check", "network", "Malicious URL").link_observable(obs_malicious).with_score(
+    cv.finding("malicious_finding", "network", "Malicious URL").link_observable(obs_malicious).with_score(
         Decimal("6.0")
     )  # MALICIOUS
-    cv.check("suspicious_check", "network", "Suspicious URL").link_observable(obs_suspicious).with_score(
+    cv.finding("suspicious_finding", "network", "Suspicious URL").link_observable(obs_suspicious).with_score(
         Decimal("4.0")
     )  # SUSPICIOUS
-    cv.check("info_check", "network", "Info URL").link_observable(obs_info).with_score(Decimal("0.0"))  # INFO
-    # Create a check without observable (Cyvest.LVL.NONE - no auto-upgrade without observable)
-    cv.check("none_check", "network", "None check without observable")
+    cv.finding("info_finding", "network", "Info URL").link_observable(obs_info).with_score(Decimal("0.0"))  # INFO
+    # Create a finding without observable (Cyvest.LVL.NONE - no auto-upgrade without observable)
+    cv.finding("none_finding", "network", "None finding without observable")
 
     # Default excludes Cyvest.LVL.NONE
     output = StringIO()
@@ -125,10 +161,10 @@ def test_display_summary_exclude_levels() -> None:
     display_summary(cv, console.print, show_graph=False)
     output_default = output.getvalue()
 
-    assert "malicious_check" in output_default
-    assert "suspicious_check" in output_default
-    assert "info_check" in output_default
-    assert "none_check" not in output_default
+    assert "malicious_finding" in output_default
+    assert "suspicious_finding" in output_default
+    assert "info_finding" in output_default
+    assert "none_finding" not in output_default
     assert "excluding: NONE" in output_default
 
     # Exclude INFO and SUSPICIOUS along with NONE
@@ -137,21 +173,21 @@ def test_display_summary_exclude_levels() -> None:
     display_summary(cv, console.print, show_graph=False, exclude_levels=[Cyvest.LVL.INFO, Cyvest.LVL.SUSPICIOUS])
     output_excluding_info = output.getvalue()
 
-    assert "malicious_check" in output_excluding_info
-    assert "suspicious_check" not in output_excluding_info
-    assert "info_check" not in output_excluding_info
-    assert "none_check" not in output_excluding_info
+    assert "malicious_finding" in output_excluding_info
+    assert "suspicious_finding" not in output_excluding_info
+    assert "info_finding" not in output_excluding_info
+    assert "none_finding" not in output_excluding_info
 
-    # Allow displaying all checks when exclusions are cleared
+    # Allow displaying all findings when exclusions are cleared
     output = StringIO()
     console = Console(file=output, width=120)
     display_summary(cv, console.print, show_graph=False, exclude_levels=[])
     output_all = output.getvalue()
 
-    assert "malicious_check" in output_all
-    assert "suspicious_check" in output_all
-    assert "info_check" in output_all
-    assert "none_check" in output_all
+    assert "malicious_finding" in output_all
+    assert "suspicious_finding" in output_all
+    assert "info_finding" in output_all
+    assert "none_finding" in output_all
 
 
 def test_display_summary_audit_log_table() -> None:
@@ -166,7 +202,7 @@ def test_display_summary_audit_log_table() -> None:
     cv = Cyvest()
     obs = cv.observable(Cyvest.OBS.URL, "https://example.com", internal=False)
     obs.with_ti("virustotal", score=Decimal("6.0"), level=Cyvest.LVL.MALICIOUS)
-    cv.check("score-check", "test", "Score check").with_score(Decimal("1.0"), reason="initial").with_score(
+    cv.finding("score-finding", "test", "Score finding").with_score(Decimal("1.0"), reason="initial").with_score(
         Decimal("2.0"), reason="bump"
     )
 
@@ -184,7 +220,7 @@ def test_cli_diff_no_differences(tmp_path: Path) -> None:
     from decimal import Decimal
 
     cv = Cyvest()
-    cv.check("test-check", "test", "Test check").with_score(Decimal("1.0"))
+    cv.finding("test-finding", "test", "Test finding").with_score(Decimal("1.0"))
 
     file1 = tmp_path / "inv1.json"
     file2 = tmp_path / "inv2.json"
@@ -205,13 +241,13 @@ def test_cli_diff_with_differences(tmp_path: Path) -> None:
 
     # Create actual investigation
     actual = Cyvest(investigation_name="actual")
-    actual.check("check-a", "test", "Check A").with_score(Decimal("2.0"))
-    actual.check("check-new", "test", "New check").with_score(Decimal("1.0"))
+    actual.finding("finding-a", "test", "Finding A").with_score(Decimal("2.0"))
+    actual.finding("finding-new", "test", "New finding").with_score(Decimal("1.0"))
 
     # Create expected investigation
     expected = Cyvest(investigation_name="expected")
-    expected.check("check-a", "test", "Check A").with_score(Decimal("1.0"))
-    expected.check("check-old", "test", "Old check").with_score(Decimal("1.0"))
+    expected.finding("finding-a", "test", "Finding A").with_score(Decimal("1.0"))
+    expected.finding("finding-old", "test", "Old finding").with_score(Decimal("1.0"))
 
     actual_file = tmp_path / "actual.json"
     expected_file = tmp_path / "expected.json"
@@ -227,9 +263,9 @@ def test_cli_diff_with_differences(tmp_path: Path) -> None:
     diffs = compare_investigations(actual, expected)
     assert len(diffs) == 3  # Added, Removed, Mismatch
     diff_keys = {d.key for d in diffs}
-    assert "chk:check-new" in diff_keys
-    assert "chk:check-old" in diff_keys
-    assert "chk:check-a" in diff_keys
+    assert "fnd:finding-new" in diff_keys
+    assert "fnd:finding-old" in diff_keys
+    assert "fnd:finding-a" in diff_keys
 
 
 def test_cli_diff_with_rules_file(tmp_path: Path) -> None:
@@ -241,10 +277,10 @@ def test_cli_diff_with_rules_file(tmp_path: Path) -> None:
 
     # Create investigations with different scores
     actual = Cyvest(investigation_name="actual")
-    actual.check("tolerant-check", "test", "Tolerant check").with_score(Decimal("1.5"))
+    actual.finding("tolerant-finding", "test", "Tolerant finding").with_score(Decimal("1.5"))
 
     expected = Cyvest(investigation_name="expected")
-    expected.check("tolerant-check", "test", "Tolerant check").with_score(Decimal("1.0"))
+    expected.finding("tolerant-finding", "test", "Tolerant finding").with_score(Decimal("1.0"))
 
     actual_file = tmp_path / "actual.json"
     expected_file = tmp_path / "expected.json"
@@ -254,7 +290,7 @@ def test_cli_diff_with_rules_file(tmp_path: Path) -> None:
     # Create rules file that tolerates the difference
     rules_file = tmp_path / "rules.json"
     rules_file.write_text(
-        json.dumps([{"check_name": "tolerant-check", "score": ">= 1.0"}]),
+        json.dumps([{"finding_name": "tolerant-finding", "score": ">= 1.0"}]),
         encoding="utf-8",
     )
 
@@ -264,7 +300,7 @@ def test_cli_diff_with_rules_file(tmp_path: Path) -> None:
     assert result.exit_code == 0
 
     # Verify tolerance rules work
-    rules = [ExpectedResult(check_name="tolerant-check", score=">= 1.0")]
+    rules = [ExpectedResult(finding_name="tolerant-finding", score=">= 1.0")]
     diffs = compare_investigations(actual, expected, result_expected=rules)
     assert len(diffs) == 0  # No differences with tolerance
 
@@ -298,22 +334,22 @@ def _write_detailed_sample(tmp_path: Path) -> Path:
     # Add relationship
     domain_obs.relate_to(ip_obs, Cyvest.REL.RELATED_TO, Cyvest.DIR.OUTBOUND)
 
-    # Create check linked to domain
-    check = cv.check("domain-check", "network", "Domain validation check")
-    check.link_observable(domain_obs)
-    check.with_score(Decimal("6.0"))
+    # Create finding linked to domain
+    finding = cv.finding("domain-finding", "network", "Domain validation finding")
+    finding.link_observable(domain_obs)
+    finding.with_score(Decimal("6.0"))
 
     sample_path = tmp_path / "detailed_sample.json"
     cv.io_save_json(sample_path)
     return sample_path
 
 
-def test_cli_query_check(tmp_path: Path) -> None:
-    """CLI 'query' command displays check information."""
+def test_cli_query_finding(tmp_path: Path) -> None:
+    """CLI 'query' command displays finding information."""
     sample = _write_detailed_sample(tmp_path)
     runner = CliRunner()
 
-    result = runner.invoke(cli, ["query", str(sample), "--key", "chk:domain-check"])
+    result = runner.invoke(cli, ["query", str(sample), "--key", "fnd:domain-finding"])
     assert result.exit_code == 0
 
 
@@ -359,7 +395,7 @@ def test_cli_query_not_found(tmp_path: Path) -> None:
     sample = _write_detailed_sample(tmp_path)
     runner = CliRunner()
 
-    result = runner.invoke(cli, ["query", str(sample), "-k", "chk:nonexistent"])
+    result = runner.invoke(cli, ["query", str(sample), "-k", "fnd:nonexistent"])
     assert result.exit_code != 0
     assert "not found" in result.output
 

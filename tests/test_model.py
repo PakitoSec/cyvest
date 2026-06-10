@@ -9,8 +9,8 @@ import pytest
 from cyvest.investigation import Investigation
 from cyvest.levels import Level
 from cyvest.model import (
-    Check,
     Enrichment,
+    Finding,
     Observable,
     RelationshipDirection,
     Tag,
@@ -75,92 +75,92 @@ def test_observable_relationships() -> None:
     assert obs1.relationships[0].relationship_type == "related-to"
 
 
-def test_check_creation() -> None:
-    """Test creating a check."""
-    check = Check(
-        check_name="test_check",
+def test_finding_creation() -> None:
+    """Test creating a finding."""
+    finding = Finding(
+        finding_name="test_finding",
         description="Test description",
         origin_investigation_id=_ORIGIN,
     )
-    assert check.check_name == "test_check"
-    assert check.description == "Test description"
-    assert check.score == Decimal("0")
-    assert check.level == Level.NONE
-    assert check.key.startswith("chk:")
+    assert finding.finding_name == "test_finding"
+    assert finding.description == "Test description"
+    assert finding.score == Decimal("0")
+    assert finding.level == Level.NONE
+    assert finding.key.startswith("fnd:")
 
 
-def test_check_creation_with_score() -> None:
-    """Test creating a check."""
-    check = Check(
-        check_name="test_check",
+def test_finding_creation_with_score() -> None:
+    """Test creating a finding."""
+    finding = Finding(
+        finding_name="test_finding",
         description="Test description",
         score=0.3,
         origin_investigation_id=_ORIGIN,
     )
-    assert check.check_name == "test_check"
-    assert check.description == "Test description"
-    assert check.score == Decimal("0.3")
-    assert check.level == Level.NOTABLE
-    assert check.key.startswith("chk:")
+    assert finding.finding_name == "test_finding"
+    assert finding.description == "Test description"
+    assert finding.score == Decimal("0.3")
+    assert finding.level == Level.NOTABLE
+    assert finding.key.startswith("fnd:")
 
 
-def test_check_score_update() -> None:
-    """Test updating check score."""
+def test_finding_score_update() -> None:
+    """Test updating finding score."""
     inv = Investigation(root_data={})
-    check = Check(check_name="test", description="desc", origin_investigation_id=inv.investigation_id)
-    inv.add_check(check)
-    inv.apply_score_change(check, Decimal("3.5"), reason="Update reason")
-    assert check.score == Decimal("3.5")
-    assert check.level == Level.SUSPICIOUS  # 3.5 is in range [3.0, 5.0) -> SUSPICIOUS
+    finding = Finding(finding_name="test", description="desc", origin_investigation_id=inv.investigation_id)
+    inv.add_finding(finding)
+    inv.apply_score_change(finding, Decimal("3.5"), reason="Update reason")
+    assert finding.score == Decimal("3.5")
+    assert finding.level == Level.SUSPICIOUS  # 3.5 is in range [3.0, 5.0) -> SUSPICIOUS
 
 
-def test_check_add_observable_link_upgrades_level() -> None:
-    """Test that adding an effective observable link to a check with level NONE upgrades it to INFO."""
+def test_finding_add_observable_link_upgrades_level() -> None:
+    """Test that adding an effective observable link to a finding with level NONE upgrades it to INFO."""
     inv = Investigation(root_data={})
-    check = Check(check_name="test", description="desc", origin_investigation_id=inv.investigation_id)
-    inv.add_check(check)
-    assert check.level == Level.NONE  # Default level for new checks
+    finding = Finding(finding_name="test", description="desc", origin_investigation_id=inv.investigation_id)
+    inv.add_finding(finding)
+    assert finding.level == Level.NONE  # Default level for new findings
 
     obs = Observable(obs_type="url", value="https://example.com")
     inv.add_observable(obs)
-    inv.link_check_observable(check.key, obs.key)
+    inv.link_finding_observable(finding.key, obs.key)
 
-    assert check.level == Level.INFO  # Should auto-upgrade from NONE to INFO
-    assert len(check.observable_links) == 1
-    assert check.observable_links[0].observable_key == obs.key
+    assert finding.level == Level.INFO  # Should auto-upgrade from NONE to INFO
+    assert len(finding.observable_links) == 1
+    assert finding.observable_links[0].observable_key == obs.key
 
 
-def test_check_add_observable_link_preserves_higher_level() -> None:
+def test_finding_add_observable_link_preserves_higher_level() -> None:
     """Test that adding an observable link doesn't downgrade an existing higher level."""
     inv = Investigation(root_data={})
-    check = Check(
-        check_name="test",
+    finding = Finding(
+        finding_name="test",
         description="desc",
         level=Level.SUSPICIOUS,
         origin_investigation_id=inv.investigation_id,
     )
-    inv.add_check(check)
+    inv.add_finding(finding)
 
     obs = Observable(obs_type="url", value="https://example.com")
     inv.add_observable(obs)
-    inv.link_check_observable(check.key, obs.key)
+    inv.link_finding_observable(finding.key, obs.key)
 
-    assert check.level == Level.SUSPICIOUS  # Should preserve existing higher level
-    assert len(check.observable_links) == 1
+    assert finding.level == Level.SUSPICIOUS  # Should preserve existing higher level
+    assert len(finding.observable_links) == 1
 
 
-def test_check_add_observable_link_no_duplicate() -> None:
+def test_finding_add_observable_link_no_duplicate() -> None:
     """Test that adding the same observable link twice doesn't create duplicates."""
     inv = Investigation(root_data={})
-    check = Check(check_name="test", description="desc", origin_investigation_id=inv.investigation_id)
-    inv.add_check(check)
+    finding = Finding(finding_name="test", description="desc", origin_investigation_id=inv.investigation_id)
+    inv.add_finding(finding)
     obs = Observable(obs_type="url", value="https://example.com")
     inv.add_observable(obs)
-    inv.link_check_observable(check.key, obs.key)
-    inv.link_check_observable(check.key, obs.key)  # Add same link again
+    inv.link_finding_observable(finding.key, obs.key)
+    inv.link_finding_observable(finding.key, obs.key)  # Add same link again
 
-    assert len(check.observable_links) == 1  # Should only have one instance
-    assert check.level == Level.INFO  # Level should still be INFO
+    assert len(finding.observable_links) == 1  # Should only have one instance
+    assert finding.level == Level.INFO  # Level should still be INFO
 
 
 def test_threat_intel_creation() -> None:
@@ -209,29 +209,29 @@ def test_tag_creation() -> None:
     assert tag.name == "network:analysis"
     assert tag.description == "Network analysis tag"
     assert tag.key.startswith("tag:")
-    assert len(tag.checks) == 0
+    assert len(tag.findings) == 0
 
 
 def test_tag_direct_score() -> None:
     """Test tag direct score calculation."""
     inv = Investigation(root_data={})
     tag = inv.add_tag(Tag(name="test"))
-    check1 = Check(
-        check_name="c1",
+    finding1 = Finding(
+        finding_name="c1",
         description="d1",
         score=Decimal("3.0"),
         origin_investigation_id=inv.investigation_id,
     )
-    check2 = Check(
-        check_name="c2",
+    finding2 = Finding(
+        finding_name="c2",
         description="d2",
         score=Decimal("5.0"),
         origin_investigation_id=inv.investigation_id,
     )
-    inv.add_check(check1)
-    inv.add_check(check2)
-    inv.add_check_to_tag(tag.key, check1.key)
-    inv.add_check_to_tag(tag.key, check2.key)
+    inv.add_finding(finding1)
+    inv.add_finding(finding2)
+    inv.add_finding_to_tag(tag.key, finding1.key)
+    inv.add_finding_to_tag(tag.key, finding2.key)
     assert tag.get_direct_score() == Decimal("8.0")
     assert tag.get_direct_level() == Level.MALICIOUS
 
@@ -244,25 +244,25 @@ def test_tag_hierarchical_aggregation() -> None:
     parent = inv.get_tag("tag:parent")
     assert parent is not None
 
-    check1 = Check(
-        check_name="c1",
+    finding1 = Finding(
+        finding_name="c1",
         description="d",
         score=Decimal("2.0"),
         origin_investigation_id=inv.investigation_id,
     )
-    check2 = Check(
-        check_name="c2",
+    finding2 = Finding(
+        finding_name="c2",
         description="d",
         score=Decimal("3.0"),
         origin_investigation_id=inv.investigation_id,
     )
-    inv.add_check(check1)
-    inv.add_check(check2)
-    inv.add_check_to_tag(parent.key, check1.key)
-    inv.add_check_to_tag(child.key, check2.key)
-    # Aggregated should sum parent + child checks
+    inv.add_finding(finding1)
+    inv.add_finding(finding2)
+    inv.add_finding_to_tag(parent.key, finding1.key)
+    inv.add_finding_to_tag(child.key, finding2.key)
+    # Aggregated should sum parent + child findings
     assert inv.get_tag_aggregated_score("parent") == Decimal("5.0")
-    # Direct should only be parent's checks
+    # Direct should only be parent's findings
     assert parent.get_direct_score() == Decimal("2.0")
 
 
@@ -287,16 +287,16 @@ def test_string_level_inputs_are_normalized() -> None:
     inv.apply_level_change(obs, "malicious")
     assert obs.level == Level.MALICIOUS
 
-    check = Check(
-        check_name="string_level",
+    finding = Finding(
+        finding_name="string_level",
         description="desc",
         level="notable",
         origin_investigation_id=inv.investigation_id,
     )
-    assert check.level == Level.NOTABLE
-    inv.add_check(check)
-    inv.apply_level_change(check, "trusted")
-    assert check.level == Level.TRUSTED
+    assert finding.level == Level.NOTABLE
+    inv.add_finding(finding)
+    inv.apply_level_change(finding, "trusted")
+    assert finding.level == Level.TRUSTED
 
     ti = ThreatIntel(source="src", observable_key="obs:test", score=Decimal("0"), level="safe")
     assert ti.level == Level.SAFE

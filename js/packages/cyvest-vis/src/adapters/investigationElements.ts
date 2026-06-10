@@ -1,7 +1,7 @@
 import {
   getRootObservable,
   getTagAncestors,
-  type Check,
+  type Finding,
   type CyvestInvestigation,
   type Level,
   type Tag,
@@ -37,7 +37,8 @@ function createNodeData(
   const sizeByType: Record<InvestigationCyNodeType, { width: number; height: number }> = {
     root: { width: 190, height: 52 },
     tag: { width: 156, height: 46 },
-    check: { width: 174, height: 52 },
+    finding: { width: 174, height: 52 },
+    evidence: { width: 174, height: 46 },
   };
 
   const dimensions = sizeByType[nodeType];
@@ -150,37 +151,67 @@ export function buildInvestigationElements(
     ),
   });
 
-  const checks = Object.values(investigation.checks);
+  const findings = Object.values(investigation.findings);
+  const evidences = Object.values(investigation.evidences);
   const allTags = Object.values(investigation.tags);
   const tagByName = getTagMap(investigation.tags);
 
-  const checksInTags = new Set<string>();
+  const findingsInTags = new Set<string>();
   for (const tag of allTags) {
-    for (const checkKey of tag.checks) {
-      checksInTags.add(checkKey);
+    for (const findingKey of tag.findings) {
+      findingsInTags.add(findingKey);
     }
   }
 
-  for (const check of checks) {
-    const checkNodeId = `inv-check:${check.key}`;
+  for (const finding of findings) {
+    const findingNodeId = `inv-finding:${finding.key}`;
     const nodeData = createNodeData(
-      checkNodeId,
-      "check",
-      check.check_name,
-      check.level,
-      check.score,
+      findingNodeId,
+      "finding",
+      finding.finding_name,
+      finding.level,
+      finding.score,
       maxLabelLength
     );
 
     nodes.push({ group: "nodes", data: nodeData });
 
-    if (!checksInTags.has(check.key)) {
+    if (!findingsInTags.has(finding.key)) {
       edges.push(
         createEdge(
-          `inv-edge-root-check:${check.key}`,
+          `inv-edge-root-finding:${finding.key}`,
           ROOT_NODE_ID,
-          checkNodeId,
-          "contains-check",
+          findingNodeId,
+          "contains-finding",
+          edgeColor
+        )
+      );
+    }
+  }
+
+  for (const evidence of evidences) {
+    nodes.push({
+      group: "nodes",
+      data: createNodeData(
+        `inv-evidence:${evidence.key}`,
+        "evidence",
+        evidence.title,
+        "INFO",
+        0,
+        maxLabelLength
+      ),
+    });
+  }
+
+  for (const finding of findings) {
+    for (const link of finding.evidence_links) {
+      if (!investigation.evidences[link.evidence_key]) continue;
+      edges.push(
+        createEdge(
+          `inv-edge-finding-evidence:${finding.key}->${link.evidence_key}`,
+          `inv-finding:${finding.key}`,
+          `inv-evidence:${link.evidence_key}`,
+          "supported-by",
           edgeColor
         )
       );
@@ -242,22 +273,22 @@ export function buildInvestigationElements(
     );
   }
 
-  const checksByKey = new Map<string, Check>(
-    checks.map((check) => [check.key, check])
+  const findingsByKey = new Map<string, Finding>(
+    findings.map((finding) => [finding.key, finding])
   );
 
   for (const tag of allTags) {
-    for (const checkKey of tag.checks) {
-      if (!checksByKey.has(checkKey)) {
+    for (const findingKey of tag.findings) {
+      if (!findingsByKey.has(findingKey)) {
         continue;
       }
 
       edges.push(
         createEdge(
-          `inv-edge-tag-check:${tag.name}->${checkKey}`,
+          `inv-edge-tag-finding:${tag.name}->${findingKey}`,
           `inv-tag:${tag.name}`,
-          `inv-check:${checkKey}`,
-          "tag-check",
+          `inv-finding:${findingKey}`,
+          "tag-finding",
           edgeColor
         )
       );

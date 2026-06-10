@@ -1,7 +1,7 @@
 """
 ULID generator for stable investigation identities.
 
-Cyvest uses ULIDs to tag investigations and to stamp provenance on Check↔Observable
+Cyvest uses ULIDs to tag investigations and to stamp provenance on Finding↔Observable
 links. This implementation is dependency-free and follows the 26-char Crockford
 Base32 ULID encoding.
 """

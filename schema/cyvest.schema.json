@@ -91,69 +91,6 @@
       "title": "AuditEvent",
       "type": "object"
     },
-    "Check": {
-      "description": "Represents a verification step in the investigation.\n\nA check validates a specific aspect of the data under investigation\nand contributes to the overall investigation score.",
-      "properties": {
-        "check_name": {
-          "title": "Check Name",
-          "type": "string"
-        },
-        "description": {
-          "title": "Description",
-          "type": "string"
-        },
-        "comment": {
-          "title": "Comment",
-          "type": "string"
-        },
-        "extra": {
-          "additionalProperties": true,
-          "title": "Extra",
-          "type": "object"
-        },
-        "score": {
-          "title": "Score",
-          "type": "number"
-        },
-        "level": {
-          "$ref": "#/$defs/Level"
-        },
-        "origin_investigation_id": {
-          "title": "Origin Investigation Id",
-          "type": "string"
-        },
-        "observable_links": {
-          "items": {
-            "$ref": "#/$defs/ObservableLink"
-          },
-          "title": "Observable Links",
-          "type": "array"
-        },
-        "key": {
-          "title": "Key",
-          "type": "string"
-        },
-        "score_display": {
-          "readOnly": true,
-          "title": "Score Display",
-          "type": "string"
-        }
-      },
-      "required": [
-        "check_name",
-        "description",
-        "comment",
-        "extra",
-        "score",
-        "level",
-        "origin_investigation_id",
-        "observable_links",
-        "key",
-        "score_display"
-      ],
-      "title": "Check",
-      "type": "object"
-    },
     "DataExtractionSchema": {
       "additionalProperties": false,
       "description": "Schema for data extraction metadata.",
@@ -214,6 +151,182 @@
       "title": "Enrichment",
       "type": "object"
     },
+    "Evidence": {
+      "description": "Structured material supporting one or more findings.",
+      "properties": {
+        "type": {
+          "title": "Type",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "source": {
+          "title": "Source",
+          "type": "string"
+        },
+        "external_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "External Id"
+        },
+        "content": {
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Content"
+        },
+        "uri": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Uri"
+        },
+        "captured_at": {
+          "format": "date-time",
+          "title": "Captured At",
+          "type": "string"
+        },
+        "extra": {
+          "additionalProperties": true,
+          "title": "Extra",
+          "type": "object"
+        },
+        "key": {
+          "title": "Key",
+          "type": "string"
+        },
+        "finding_links": {
+          "description": "Findings that currently link to this evidence (navigation-only).",
+          "items": {
+            "type": "string"
+          },
+          "readOnly": true,
+          "title": "Finding Links",
+          "type": "array"
+        }
+      },
+      "required": [
+        "type",
+        "title",
+        "description",
+        "source",
+        "external_id",
+        "content",
+        "uri",
+        "captured_at",
+        "extra",
+        "key",
+        "finding_links"
+      ],
+      "title": "Evidence",
+      "type": "object"
+    },
+    "EvidenceLink": {
+      "additionalProperties": false,
+      "description": "Edge metadata for a Finding\u2194Evidence association.",
+      "properties": {
+        "evidence_key": {
+          "title": "Evidence Key",
+          "type": "string"
+        }
+      },
+      "required": [
+        "evidence_key"
+      ],
+      "title": "EvidenceLink",
+      "type": "object"
+    },
+    "Finding": {
+      "description": "Represents a verification step in the investigation.\n\nA finding validates a specific aspect of the data under investigation\nand contributes to the overall investigation score.",
+      "properties": {
+        "finding_name": {
+          "title": "Finding Name",
+          "type": "string"
+        },
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "comment": {
+          "title": "Comment",
+          "type": "string"
+        },
+        "extra": {
+          "additionalProperties": true,
+          "title": "Extra",
+          "type": "object"
+        },
+        "score": {
+          "title": "Score",
+          "type": "number"
+        },
+        "level": {
+          "$ref": "#/$defs/Level"
+        },
+        "origin_investigation_id": {
+          "title": "Origin Investigation Id",
+          "type": "string"
+        },
+        "observable_links": {
+          "items": {
+            "$ref": "#/$defs/ObservableLink"
+          },
+          "title": "Observable Links",
+          "type": "array"
+        },
+        "evidence_links": {
+          "items": {
+            "$ref": "#/$defs/EvidenceLink"
+          },
+          "title": "Evidence Links",
+          "type": "array"
+        },
+        "key": {
+          "title": "Key",
+          "type": "string"
+        },
+        "score_display": {
+          "readOnly": true,
+          "title": "Score Display",
+          "type": "string"
+        }
+      },
+      "required": [
+        "finding_name",
+        "description",
+        "comment",
+        "extra",
+        "score",
+        "level",
+        "origin_investigation_id",
+        "observable_links",
+        "evidence_links",
+        "key",
+        "score_display"
+      ],
+      "title": "Finding",
+      "type": "object"
+    },
     "InvestigationWhitelist": {
       "description": "Represents a whitelist entry on an investigation.",
       "properties": {
@@ -248,7 +361,7 @@
       "type": "object"
     },
     "Level": {
-      "description": "Security level classification for checks, observables, and threat intelligence.\n\nLevels are ordered from lowest (NONE) to highest (MALICIOUS) severity.",
+      "description": "Security level classification for findings, observables, and threat intelligence.\n\nLevels are ordered from lowest (NONE) to highest (MALICIOUS) severity.",
       "enum": [
         "NONE",
         "TRUSTED",
@@ -262,11 +375,34 @@
       "type": "string"
     },
     "Observable": {
-      "description": "Represents a cyber observable (IP, URL, domain, hash, etc.).\n\nObservables can be linked to threat intelligence, checks, and other observables\nthrough relationships.",
+      "description": "Represents a cyber observable (IP, URL, domain, hash, etc.).\n\nObservables can be linked to threat intelligence, findings, and other observables\nthrough relationships.",
       "properties": {
         "type": {
           "title": "Type",
           "type": "string"
+        },
+        "subtype": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Subtype"
+        },
+        "namespace": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Namespace"
         },
         "value": {
           "title": "Value",
@@ -314,13 +450,13 @@
           "title": "Key",
           "type": "string"
         },
-        "check_links": {
-          "description": "Checks that currently link to this observable (navigation-only).",
+        "finding_links": {
+          "description": "Findings that currently link to this observable (navigation-only).",
           "items": {
             "type": "string"
           },
           "readOnly": true,
-          "title": "Check Links",
+          "title": "Finding Links",
           "type": "array"
         },
         "score_display": {
@@ -341,7 +477,7 @@
         "threat_intels",
         "relationships",
         "key",
-        "check_links",
+        "finding_links",
         "score_display"
       ],
       "title": "Observable",
@@ -349,7 +485,7 @@
     },
     "ObservableLink": {
       "additionalProperties": false,
-      "description": "Edge metadata for a Check\u2194Observable association.",
+      "description": "Edge metadata for a Finding\u2194Observable association.",
       "properties": {
         "observable_key": {
           "title": "Observable Key",
@@ -367,7 +503,7 @@
       "type": "object"
     },
     "PropagationMode": {
-      "description": "Controls how a Check\u2194Observable link propagates across merged investigations.",
+      "description": "Controls how a Finding\u2194Observable link propagates across merged investigations.",
       "enum": [
         "LOCAL_ONLY",
         "GLOBAL"
@@ -468,24 +604,45 @@
           "title": "Observables By Type And Level",
           "type": "object"
         },
-        "total_checks": {
+        "total_findings": {
           "minimum": 0,
-          "title": "Total Checks",
+          "title": "Total Findings",
           "type": "integer"
         },
-        "applied_checks": {
+        "applied_findings": {
           "minimum": 0,
-          "title": "Applied Checks",
+          "title": "Applied Findings",
           "type": "integer"
         },
-        "checks_by_level": {
+        "findings_by_level": {
           "additionalProperties": {
             "items": {
               "type": "string"
             },
             "type": "array"
           },
-          "title": "Checks By Level",
+          "title": "Findings By Level",
+          "type": "object"
+        },
+        "total_evidences": {
+          "minimum": 0,
+          "title": "Total Evidences",
+          "type": "integer"
+        },
+        "evidences_by_type": {
+          "additionalProperties": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "title": "Evidences By Type",
+          "type": "object"
+        },
+        "evidences_by_source": {
+          "additionalProperties": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "title": "Evidences By Source",
           "type": "object"
         },
         "total_threat_intel": {
@@ -520,8 +677,9 @@
         "internal_observables",
         "external_observables",
         "whitelisted_observables",
-        "total_checks",
-        "applied_checks",
+        "total_findings",
+        "applied_findings",
+        "total_evidences",
         "total_threat_intel",
         "total_tags"
       ],
@@ -530,7 +688,7 @@
     },
     "Tag": {
       "additionalProperties": false,
-      "description": "Groups checks for categorical organization.\n\nTags allow structuring the investigation into logical sections\nwith aggregated scores and levels. Hierarchy is automatic based on\nthe \":\" delimiter in tag names (e.g., \"header:auth:dkim\").",
+      "description": "Groups findings for categorical organization.\n\nTags allow structuring the investigation into logical sections\nwith aggregated scores and levels. Hierarchy is automatic based on\nthe \":\" delimiter in tag names (e.g., \"header:auth:dkim\").",
       "properties": {
         "name": {
           "title": "Name",
@@ -541,11 +699,11 @@
           "title": "Description",
           "type": "string"
         },
-        "checks": {
+        "findings": {
           "items": {
             "type": "string"
           },
-          "title": "Checks",
+          "title": "Findings",
           "type": "array"
         },
         "key": {
@@ -553,20 +711,20 @@
           "type": "string"
         },
         "direct_score": {
-          "description": "Calculate the score from direct checks only (no hierarchy).\n\nFor hierarchical aggregation (including descendant tags), use\nInvestigation.get_tag_aggregated_score() or TagProxy.get_aggregated_score().\n\nReturns:\n    Total score from direct checks",
+          "description": "Calculate the score from direct findings only (no hierarchy).\n\nFor hierarchical aggregation (including descendant tags), use\nInvestigation.get_tag_aggregated_score() or TagProxy.get_aggregated_score().\n\nReturns:\n    Total score from direct findings",
           "readOnly": true,
           "title": "Direct Score",
           "type": "number"
         },
         "direct_level": {
           "$ref": "#/$defs/Level",
-          "description": "Calculate the level from direct checks only (no hierarchy).\n\nFor hierarchical aggregation (including descendant tags), use\nInvestigation.get_tag_aggregated_level() or TagProxy.get_aggregated_level().\n\nReturns:\n    Level based on direct score",
+          "description": "Calculate the level from direct findings only (no hierarchy).\n\nFor hierarchical aggregation (including descendant tags), use\nInvestigation.get_tag_aggregated_level() or TagProxy.get_aggregated_level().\n\nReturns:\n    Level based on direct score",
           "readOnly": true
         }
       },
       "required": [
         "name",
-        "checks",
+        "findings",
         "key",
         "direct_score",
         "direct_level"
@@ -662,6 +820,12 @@
   "additionalProperties": false,
   "description": "Schema for a complete serialized investigation.\n\nThis model describes the output of `serialize_investigation()` from\n`cyvest.io_serialization`. It is the top-level schema for exported investigations.\n\nEntity types reference the runtime models directly. When generating schemas with\n`mode='serialization'`, Pydantic respects field_serializer decorators and produces\nschemas matching the actual model_dump() output.",
   "properties": {
+    "schema_version": {
+      "const": "6.0.0",
+      "default": "6.0.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
     "investigation_id": {
       "description": "Stable investigation identity (ULID).",
       "title": "Investigation Id",
@@ -725,12 +889,20 @@
       "title": "Observables",
       "type": "object"
     },
-    "checks": {
+    "findings": {
       "additionalProperties": {
-        "$ref": "#/$defs/Check"
+        "$ref": "#/$defs/Finding"
       },
-      "description": "Checks keyed by their unique key.",
-      "title": "Checks",
+      "description": "Findings keyed by their unique key.",
+      "title": "Findings",
+      "type": "object"
+    },
+    "evidences": {
+      "additionalProperties": {
+        "$ref": "#/$defs/Evidence"
+      },
+      "description": "Evidence objects keyed by their unique key.",
+      "title": "Evidences",
       "type": "object"
     },
     "threat_intels": {
@@ -779,7 +951,8 @@
     "whitelisted",
     "whitelists",
     "observables",
-    "checks",
+    "findings",
+    "evidences",
     "threat_intels",
     "enrichments",
     "tags",

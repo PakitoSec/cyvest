@@ -435,6 +435,6 @@ cv.io_save_json("investigation.json")
 
 1. **Use type filtering** when you know what you're looking for to reduce false positives
 2. **Keep refanging enabled** (default) for normalized, searchable values
-3. **Check the `defanged` flag** to identify indicators that were obfuscated in the source
+3. **Finding the `defanged` flag** to identify indicators that were obfuscated in the source
 4. **Use `extract_from_url`** with caution - set appropriate timeouts and consider rate limiting
 5. **Validate extracted hashes** against known-good patterns if precision is critical

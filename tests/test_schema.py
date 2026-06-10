@@ -8,7 +8,7 @@ import pytest
 
 from cyvest import Cyvest
 from cyvest.io_schema import get_investigation_schema
-from cyvest.model import Check, Observable, Tag, ThreatIntel
+from cyvest.model import Finding, Observable, Tag, ThreatIntel
 from cyvest.model_schema import InvestigationSchema
 
 
@@ -16,7 +16,7 @@ def _sample_investigation() -> Cyvest:
     """Create a minimal investigation for schema validation."""
     cv = Cyvest()
     obs = cv.observable(Cyvest.OBS.DOMAIN, "example.com", internal=False)
-    cv.check("domain_check", "network", "Validate domain").link_observable(obs)
+    cv.finding("domain_finding", "network", "Validate domain").link_observable(obs)
     return cv
 
 
@@ -41,13 +41,13 @@ def test_level_required_in_serialization_schema() -> None:
             return schema["$defs"][name]
         return schema
 
-    for model in (Observable, Check, ThreatIntel):
+    for model in (Observable, Finding, ThreatIntel):
         schema = _resolve_root(model.model_json_schema(mode="serialization"))
         required = set(schema.get("required", []))
         assert {"level", "key", "comment", "extra"} <= required
         if model is Observable:
             assert {"score", "threat_intels", "relationships", "internal", "whitelisted"} <= required
-        if model is Check:
+        if model is Finding:
             assert {"origin_investigation_id", "observable_links", "score"} <= required
 
 
@@ -63,8 +63,8 @@ def test_tag_direct_level_schema() -> None:
 
     direct_level_schema = schema["properties"]["direct_level"]
 
-    assert {"direct_level", "checks", "key"} <= set(schema["properties"])
-    assert {"checks", "key"} <= set(schema.get("required", []))
+    assert {"direct_level", "findings", "key"} <= set(schema["properties"])
+    assert {"findings", "key"} <= set(schema.get("required", []))
 
     def _has_level(subschema: dict[str, object]) -> bool:
         if "$ref" in subschema:
@@ -92,7 +92,8 @@ def test_investigation_schema_level_required_and_defaults() -> None:
         "level",
         "whitelists",
         "observables",
-        "checks",
+        "findings",
+        "evidences",
         "threat_intels",
         "enrichments",
         "tags",
@@ -111,9 +112,12 @@ def test_investigation_schema_level_required_and_defaults() -> None:
                 "observables_by_type": {},
                 "observables_by_level": {},
                 "observables_by_type_and_level": {},
-                "total_checks": 0,
-                "applied_checks": 0,
-                "checks_by_level": {},
+                "total_findings": 0,
+                "applied_findings": 0,
+                "findings_by_level": {},
+                "total_evidences": 0,
+                "evidences_by_type": {},
+                "evidences_by_source": {},
                 "total_threat_intel": 0,
                 "threat_intel_by_source": {},
                 "threat_intel_by_level": {},
@@ -125,7 +129,8 @@ def test_investigation_schema_level_required_and_defaults() -> None:
     assert inst.level == Cyvest.LVL.NONE
     assert inst.whitelists == []
     assert inst.observables == {}
-    assert inst.checks == {}
+    assert inst.findings == {}
+    assert inst.evidences == {}
     assert inst.threat_intels == {}
     assert inst.enrichments == {}
     assert inst.tags == {}

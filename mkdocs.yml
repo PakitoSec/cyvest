@@ -52,6 +52,8 @@ nav:
       - Installation: getting-started/installation.md
       - Quickstart: getting-started/quickstart.md
       - Concepts: getting-started/concepts.md
+  - Migration:
+      - Version 5.x to 6.0: migration-v5-to-v6.md
   - Shared Investigation Context: shared-investigation-context.md
   - Comparing Investigations: comparing-investigations.md
   - Observable Extraction: observable-extraction.md

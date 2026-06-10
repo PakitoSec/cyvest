@@ -4,7 +4,7 @@ Cyvest ships a small JavaScript/TypeScript workspace alongside the Python API. U
 
 The JS packages follow the generated schema. Serialized investigations should include the
 schema-required fields such as `investigation_id`, `investigation_name`, `audit_log`,
-`score_display`, `check_links`, and `observable_links`. The investigation start time is
+`score_display`, `finding_links`, and `observable_links`. The investigation start time is
 recorded as an `INVESTIGATION_STARTED` event in the `audit_log`.
 
 ## Packages
@@ -20,7 +20,7 @@ Interactive graph visualization for Cyvest investigations with a clean v2 API.
 ### Features
 
 - **Observables Graph**: ELK `stress` layout showing all observables and relationships
-- **Investigation Graph**: Dagre `LR` layout showing root → tags → checks
+- **Investigation Graph**: Dagre `LR` layout showing root → tags → findings
 - **Professional icons**: SVG icons for all observable types (IPs, domains, emails, files, etc.)
 - **Interactive controls**: Pan/zoom, fit, and re-run layout
 - **Level-aware colors**: Nodes styled by security level (SAFE → MALICIOUS)
@@ -45,7 +45,7 @@ import "@cyvest/cyvest-vis/styles.css";
 |-----------|-------------|
 | `CyvestGraph` | Combined view with toggle between Observables and Investigation |
 | `CyvestObservablesView` | ELK-based graph of observables and relationships |
-| `CyvestInvestigationView` | Dagre-based graph of root, checks, and tags |
+| `CyvestInvestigationView` | Dagre-based graph of root, findings, and tags |
 
 See `js/packages/cyvest-vis/README.md` for full v2 API and theming details.
 

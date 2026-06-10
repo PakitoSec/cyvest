@@ -1,6 +1,6 @@
 # Comparing Investigations
 
-Cyvest provides tools to compare two investigations and identify differences in checks, observables, and threat intelligence. This is useful for regression testing, validating detection rules, and tracking changes between investigation runs.
+Cyvest provides tools to compare two investigations and identify differences in findings, observables, and threat intelligence. This is useful for regression testing, validating detection rules, and tracking changes between investigation runs.
 
 ---
 
@@ -14,12 +14,12 @@ from cyvest import Cyvest, compare_investigations
 
 # Create expected (baseline) investigation
 expected = Cyvest(investigation_name="expected")
-expected.check_create("domain-check", "Verify domain", score=Decimal("1.0"))
+expected.finding_create("domain-finding", "Verify domain", score=Decimal("1.0"))
 
 # Create actual investigation
 actual = Cyvest(investigation_name="actual")
-actual.check_create("domain-check", "Verify domain", score=Decimal("2.0"))
-actual.check_create("new-check", "New detection", score=Decimal("1.5"))
+actual.finding_create("domain-finding", "Verify domain", score=Decimal("2.0"))
+actual.finding_create("new-finding", "New detection", score=Decimal("1.5"))
 
 # Compare
 diffs = compare_investigations(actual, expected)
@@ -29,9 +29,9 @@ The function returns a list of `DiffItem` objects representing:
 
 | Status | Symbol | Description |
 |--------|--------|-------------|
-| ADDED | `+` | Check exists in actual but not in expected |
-| REMOVED | `-` | Check exists in expected but not in actual |
-| MISMATCH | `✗` | Check exists in both but score/level differs |
+| ADDED | `+` | Finding exists in actual but not in expected |
+| REMOVED | `-` | Finding exists in expected but not in actual |
+| MISMATCH | `✗` | Finding exists in both but score/level differs |
 
 ---
 
@@ -43,14 +43,14 @@ Use `ExpectedResult` rules to define acceptable score variations. When the actua
 from cyvest import ExpectedResult, Level
 
 rules = [
-    # Accept any score >= 1.0 for this check
-    ExpectedResult(check_name="domain-check", score=">= 1.0"),
+    # Accept any score >= 1.0 for this finding
+    ExpectedResult(finding_name="domain-finding", score=">= 1.0"),
 
     # Accept any score < 3.0 for roger-ai
-    ExpectedResult(key="chk:roger-ai", level=Level.SUSPICIOUS, score="< 3.0"),
+    ExpectedResult(key="fnd:roger-ai", level=Level.SUSPICIOUS, score="< 3.0"),
 
     # Exact match required
-    ExpectedResult(check_name="critical-check", score="== 5.0"),
+    ExpectedResult(finding_name="critical-finding", score="== 5.0"),
 ]
 
 diffs = compare_investigations(actual, expected, result_expected=rules)
@@ -71,8 +71,8 @@ diffs = compare_investigations(actual, expected, result_expected=rules)
 
 | Field | Required | Description |
 |-------|----------|-------------|
-| `check_name` | One of `check_name` or `key` | Check name (key will be derived) |
-| `key` | One of `check_name` or `key` | Full check key (e.g., `chk:my-check`) |
+| `finding_name` | One of `finding_name` or `key` | Finding name (key will be derived) |
+| `key` | One of `finding_name` or `key` | Full finding key (e.g., `fnd:my-finding`) |
 | `level` | No | Expected level (informational) |
 | `score` | No | Tolerance rule string |
 
@@ -95,17 +95,17 @@ Output:
 ╭────────────────────────────────────────────────┬────────────────────┬─────────────────┬────────╮
 │ Key                                            │      Expected      │     Actual      │ Status │
 ├────────────────────────────────────────────────┼────────────────────┼─────────────────┼────────┤
-│ chk:new-check                                  │         -          │  NOTABLE 1.50   │   +    │
+│ fnd:new-finding                                  │         -          │  NOTABLE 1.50   │   +    │
 │ └── domain: example.com                        │         -          │   INFO 0.00     │        │
 │     └── VirusTotal                             │         -          │   INFO 0.00     │        │
 ├────────────────────────────────────────────────┼────────────────────┼─────────────────┼────────┤
-│ chk:domain-check                               │   NOTABLE 1.00     │  NOTABLE 2.00   │   ✗    │
+│ fnd:domain-finding                               │   NOTABLE 1.00     │  NOTABLE 2.00   │   ✗    │
 ╰────────────────────────────────────────────────┴────────────────────┴─────────────────┴────────╯
 ```
 
 The table shows:
 
-- **Key**: Check key with linked observables and threat intel as a tree
+- **Key**: Finding key with linked observables and threat intel as a tree
 - **Expected**: Level and score from expected investigation (or tolerance rule)
 - **Actual**: Level and score from actual investigation
 - **Status**: Diff status symbol
@@ -133,8 +133,8 @@ Each `DiffItem` contains:
 ```python
 class DiffItem:
     status: DiffStatus          # ADDED, REMOVED, or MISMATCH
-    key: str                    # Check key
-    check_name: str             # Check name
+    key: str                    # Finding key
+    finding_name: str             # Finding name
     expected_level: Level       # Expected level
     expected_score: Decimal     # Expected score
     expected_score_rule: str    # Tolerance rule (if any)
@@ -204,9 +204,9 @@ Define expected outcomes with acceptable variations:
 ```python
 # Expected results for test case
 expected_results = [
-    ExpectedResult(check_name="spam-score", score=">= 5.0"),
-    ExpectedResult(check_name="phishing-score", score=">= 7.0"),
-    ExpectedResult(check_name="ai-analysis", score=">= 1.0"),  # Allow variation
+    ExpectedResult(finding_name="spam-score", score=">= 5.0"),
+    ExpectedResult(finding_name="phishing-score", score=">= 7.0"),
+    ExpectedResult(finding_name="ai-analysis", score=">= 1.0"),  # Allow variation
 ]
 
 diffs = compare_investigations(actual, expected, result_expected=expected_results)

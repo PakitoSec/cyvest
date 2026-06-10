@@ -75,8 +75,8 @@ def test_facade_getters_accept_component_parameters() -> None:
     assert cv.observable_get(cv.OBS.URL, "https://example.com") is not None
     assert cv.observable_get(obs.key) is not None
 
-    check = cv.check_create("check_id", "desc")
-    assert cv.check_get(check.key) is not None
+    finding = cv.finding_create("finding_id", "desc")
+    assert cv.finding_get(finding.key) is not None
 
     tag = cv.tag_create("path:to:tag")
     assert cv.tag_get("path:to:tag") is not None
@@ -121,8 +121,8 @@ def test_string_levels_are_accepted_by_api() -> None:
     obs = cv.observable_create(Cyvest.OBS.DOMAIN, "example.com", level="safe")
     assert obs.level == Cyvest.LVL.SAFE
 
-    check = cv.check_create("string_level", "desc", level="notable")
-    assert check.level == Cyvest.LVL.NOTABLE
+    finding = cv.finding_create("string_level", "desc", level="notable")
+    assert finding.level == Cyvest.LVL.NOTABLE
 
     ti = cv.observable_add_threat_intel(obs.key, source="vt", score=Decimal("5.0"), level="malicious")
     assert ti is not None
@@ -132,22 +132,22 @@ def test_string_levels_are_accepted_by_api() -> None:
     assert cv.observable_get_all()[obs.key].level == Cyvest.LVL.TRUSTED
 
 
-def test_check_creation() -> None:
-    """Test creating checks."""
+def test_finding_creation() -> None:
+    """Test creating findings."""
     cv = Cyvest()
-    check = cv.check_create("test_check", "Test description", score=Decimal("5.0"))
-    assert check.check_name == "test_check"
-    assert check.score == Decimal("5.0")
-    assert cv.check_get(check.key) is not None
+    finding = cv.finding_create("test_finding", "Test description", score=Decimal("5.0"))
+    assert finding.finding_name == "test_finding"
+    assert finding.score == Decimal("5.0")
+    assert cv.finding_get(finding.key) is not None
 
 
-def test_check_observable_linking() -> None:
-    """Test linking observables to checks."""
+def test_finding_observable_linking() -> None:
+    """Test linking observables to findings."""
     cv = Cyvest()
     obs = cv.observable_create(Cyvest.OBS.URL, "https://bad.com")
-    check = cv.check_create("url_check", "Check URL")
-    cv.check_link_observable(check.key, obs.key)
-    assert any(link.observable_key == obs.key for link in check.observable_links)
+    finding = cv.finding_create("url_finding", "Finding URL")
+    cv.finding_link_observable(finding.key, obs.key)
+    assert any(link.observable_key == obs.key for link in finding.observable_links)
 
 
 def test_tag_creation() -> None:
@@ -158,13 +158,13 @@ def test_tag_creation() -> None:
     assert cv.tag_get(tag.key) is not None
 
 
-def test_tag_check_addition() -> None:
-    """Test adding checks to tags."""
+def test_tag_finding_addition() -> None:
+    """Test adding findings to tags."""
     cv = Cyvest()
-    check = cv.check_create("c1", "d1")
+    finding = cv.finding_create("c1", "d1")
     tag = cv.tag_create("test_tag")
-    cv.tag_add_check(tag.key, check.key)
-    assert any(c.key == check.key for c in tag.checks)
+    cv.tag_add_finding(tag.key, finding.key)
+    assert any(c.key == finding.key for c in tag.findings)
 
 
 def test_enrichment_creation() -> None:
@@ -179,8 +179,8 @@ def test_enrichment_creation() -> None:
 def test_global_score_calculation() -> None:
     """Test global score calculation."""
     cv = Cyvest()
-    cv.check_create("c1", "s1", "d1", score=Decimal("3.0"))
-    cv.check_create("c2", "s2", "d2", score=Decimal("5.0"))
+    cv.finding_create("c1", "s1", "d1", score=Decimal("3.0"))
+    cv.finding_create("c2", "s2", "d2", score=Decimal("5.0"))
     assert cv.get_global_score() == Decimal("8.0")
     assert cv.get_global_level() == Cyvest.LVL.MALICIOUS
 
@@ -190,10 +190,10 @@ def test_statistics() -> None:
     cv = Cyvest()
     cv.observable_create(Cyvest.OBS.URL, "https://example.com")
     cv.observable_create(Cyvest.OBS.IPV4, "192.168.1.1")
-    cv.check_create("c1", "network", "desc")
+    cv.finding_create("c1", "network", "desc")
     stats = cv.get_statistics()
     assert stats.total_observables >= 2  # Plus root
-    assert stats.total_checks == 1
+    assert stats.total_findings == 1
 
 
 def test_investigation_whitelisting_flag() -> None:
@@ -223,11 +223,11 @@ def test_investigation_merge() -> None:
     """Test merging investigations."""
     cv1 = Cyvest()
     cv1.observable_create(Cyvest.OBS.URL, "https://example.com")
-    cv1.check_create("c1", "s1", "d1", score=Decimal("3.0"))
+    cv1.finding_create("c1", "s1", "d1", score=Decimal("3.0"))
 
     cv2 = Cyvest()
     cv2.observable_create(Cyvest.OBS.IPV4, "192.168.1.1")
-    cv2.check_create("c2", "s2", "d2", score=Decimal("2.0"))
+    cv2.finding_create("c2", "s2", "d2", score=Decimal("2.0"))
 
     # Merge cv2 into cv1
     cv1.merge_investigation(cv2)
@@ -235,8 +235,8 @@ def test_investigation_merge() -> None:
     # Should have observables from both (plus roots)
     all_obs = cv1.observable_get_all()
     assert len(all_obs) >= 3
-    all_checks = cv1.check_get_all()
-    assert len(all_checks) == 2
+    all_findings = cv1.finding_get_all()
+    assert len(all_findings) == 2
     assert cv1.get_global_score() == Decimal("5.0")
 
 
@@ -552,16 +552,16 @@ def test_observable_proxy_is_read_only() -> None:
     assert obs.score == Decimal("4.0")
 
 
-def test_check_proxy_is_read_only() -> None:
-    """Check proxies should only change through Cyvest services."""
+def test_finding_proxy_is_read_only() -> None:
+    """Finding proxies should only change through Cyvest services."""
     cv = Cyvest()
-    check_proxy = cv.check("chk-1", "scoped", "desc").with_score(Decimal("2.0"))
+    finding_proxy = cv.finding("chk-1", "scoped", "desc").with_score(Decimal("2.0"))
 
     with pytest.raises(AttributeError):
-        check_proxy.score = Decimal("3.0")  # type: ignore[misc]
+        finding_proxy.score = Decimal("3.0")  # type: ignore[misc]
 
-    cv.check_update_score(check_proxy.key, Decimal("3.0"))
-    assert check_proxy.score == Decimal("3.0")
+    cv.finding_update_score(finding_proxy.key, Decimal("3.0"))
+    assert finding_proxy.score == Decimal("3.0")
 
 
 def test_io_save_load_json_roundtrip() -> None:
@@ -576,8 +576,8 @@ def test_io_save_load_json_roundtrip() -> None:
 
     cv.observable_add_relationship(obs1.key, obs2.key, "related-to")
 
-    check = cv.check_create("malware_check", "Detected malware communication", score=Decimal("9.0"))
-    cv.check_link_observable(check.key, obs1.key)
+    finding = cv.finding_create("malware_finding", "Detected malware communication", score=Decimal("9.0"))
+    cv.finding_link_observable(finding.key, obs1.key)
 
     cv.enrichment_create("whois", {"registrar": "Evil Corp"}, context="Domain registration")
 
@@ -602,12 +602,12 @@ def test_io_save_load_json_roundtrip() -> None:
         # Verify threat intel
         assert len(loaded_cv.threat_intel_get_all()) == len(cv.threat_intel_get_all())
 
-        # Verify checks
-        assert len(loaded_cv.check_get_all()) == len(cv.check_get_all())
-        loaded_check = loaded_cv.check_get(check.key)
-        assert loaded_check is not None
-        assert loaded_check.check_name == "malware_check"
-        assert any(link.observable_key == obs1.key for link in loaded_check.observable_links)
+        # Verify findings
+        assert len(loaded_cv.finding_get_all()) == len(cv.finding_get_all())
+        loaded_finding = loaded_cv.finding_get(finding.key)
+        assert loaded_finding is not None
+        assert loaded_finding.finding_name == "malware_finding"
+        assert any(link.observable_key == obs1.key for link in loaded_finding.observable_links)
 
         # Verify enrichments
         assert len(loaded_cv.enrichment_get_all()) == len(cv.enrichment_get_all())
@@ -668,7 +668,7 @@ def test_io_to_invest_serialization() -> None:
     cv = Cyvest()
     obs = cv.observable_create(Cyvest.OBS.URL, "https://malicious.com")
     cv.observable_add_threat_intel(obs.key, source="virustotal", score=Decimal("6.0"))
-    cv.check_create("url_check", "network", "URL analysis")
+    cv.finding_create("url_finding", "network", "URL analysis")
 
     schema = cv.io_to_invest()
 
@@ -677,7 +677,7 @@ def test_io_to_invest_serialization() -> None:
     assert hasattr(schema, "score")
     assert hasattr(schema, "level")
     assert hasattr(schema, "observables")
-    assert hasattr(schema, "checks")
+    assert hasattr(schema, "findings")
     assert hasattr(schema, "threat_intels")
     assert hasattr(schema, "enrichments")
     assert hasattr(schema, "tags")
@@ -696,7 +696,7 @@ def test_io_to_invest_serialization() -> None:
 
     # Verify data structure
     assert isinstance(data["observables"], dict)
-    assert isinstance(data["checks"], dict)
+    assert isinstance(data["findings"], dict)
     assert isinstance(data["threat_intels"], dict)
     assert isinstance(data["whitelists"], list)
 
@@ -778,8 +778,8 @@ def test_io_to_markdown_generates_report() -> None:
     cv = Cyvest()
     obs = cv.observable_create(Cyvest.OBS.DOMAIN, "test.com", internal=False)
     cv.observable_add_threat_intel(obs.key, source="abuse.ch", score=Decimal("5.0"))
-    check = cv.check_create("domain_check", "DNS analysis", score=Decimal("4.0"), level=Cyvest.LVL.SUSPICIOUS)
-    cv.check_link_observable(check.key, obs.key)
+    finding = cv.finding_create("domain_finding", "DNS analysis", score=Decimal("4.0"), level=Cyvest.LVL.SUSPICIOUS)
+    cv.finding_link_observable(finding.key, obs.key)
 
     markdown = cv.io_to_markdown()
 
@@ -787,13 +787,13 @@ def test_io_to_markdown_generates_report() -> None:
     assert "# Cybersecurity Investigation Report" in markdown
     assert "## Statistics" in markdown
     assert "## Observables" in markdown
-    assert "## Checks" in markdown
+    assert "## Findings" in markdown
 
     # Verify content
     assert "test.com" in markdown
     assert "abuse.ch" in markdown
     assert "DNS analysis" in markdown
-    assert "domain_check" in markdown
+    assert "domain_finding" in markdown
 
 
 def test_io_load_json_with_nonexistent_file() -> None:

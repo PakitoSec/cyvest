@@ -21,8 +21,9 @@ from cyvest.levels import Level
 from cyvest.model import (
     AliasDumpModel,
     AuditEvent,
-    Check,
     Enrichment,
+    Evidence,
+    Finding,
     InvestigationWhitelist,
     Observable,
     Tag,
@@ -49,9 +50,12 @@ class StatisticsSchema(BaseModel):
     observables_by_type: dict[str, Annotated[int, Field(ge=0)]] = Field(default_factory=dict)
     observables_by_level: dict[str, Annotated[int, Field(ge=0)]] = Field(default_factory=dict)
     observables_by_type_and_level: dict[str, dict[str, Annotated[int, Field(ge=0)]]] = Field(default_factory=dict)
-    total_checks: Annotated[int, Field(ge=0)]
-    applied_checks: Annotated[int, Field(ge=0)]
-    checks_by_level: dict[str, list[str]] = Field(default_factory=dict)
+    total_findings: Annotated[int, Field(ge=0)]
+    applied_findings: Annotated[int, Field(ge=0)]
+    findings_by_level: dict[str, list[str]] = Field(default_factory=dict)
+    total_evidences: Annotated[int, Field(ge=0)]
+    evidences_by_type: dict[str, Annotated[int, Field(ge=0)]] = Field(default_factory=dict)
+    evidences_by_source: dict[str, Annotated[int, Field(ge=0)]] = Field(default_factory=dict)
     total_threat_intel: Annotated[int, Field(ge=0)]
     threat_intel_by_source: dict[str, Annotated[int, Field(ge=0)]] = Field(default_factory=dict)
     threat_intel_by_level: dict[str, Annotated[int, Field(ge=0)]] = Field(default_factory=dict)
@@ -94,6 +98,7 @@ class InvestigationSchema(AliasDumpModel):
         },
     )
 
+    schema_version: Literal["6.0.0"] = "6.0.0"
     investigation_id: str = Field(..., description="Stable investigation identity (ULID).")
     investigation_name: str | None = Field(
         default=None,
@@ -117,9 +122,13 @@ class InvestigationSchema(AliasDumpModel):
         ...,
         description="Observables keyed by their unique key.",
     )
-    checks: dict[str, Check] = Field(
+    findings: dict[str, Finding] = Field(
         ...,
-        description="Checks keyed by their unique key.",
+        description="Findings keyed by their unique key.",
+    )
+    evidences: dict[str, Evidence] = Field(
+        ...,
+        description="Evidence objects keyed by their unique key.",
     )
     threat_intels: dict[str, ThreatIntel] = Field(
         ...,
@@ -156,7 +165,8 @@ class InvestigationSchema(AliasDumpModel):
         v.setdefault("whitelists", [])
         v.setdefault("audit_log", [])
         v.setdefault("observables", {})
-        v.setdefault("checks", {})
+        v.setdefault("findings", {})
+        v.setdefault("evidences", {})
         v.setdefault("threat_intels", {})
         v.setdefault("enrichments", {})
         v.setdefault("tags", {})

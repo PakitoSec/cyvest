@@ -2,7 +2,7 @@
 Example 6: Compare Investigations
 
 Demonstrates how to compare two Cyvest investigations with optional tolerance rules.
-Shows differences in checks, observables, and threat intelligence between investigations.
+Shows differences in findings, observables, and threat intelligence between investigations.
 """
 
 import logging
@@ -29,24 +29,24 @@ def create_expected_investigation() -> Cyvest:
     ip.with_ti("VirusTotal", score=Decimal("0.0"), level=Level.INFO)
     ip.with_ti("SEKOIA", score=Decimal("0.0"), level=Level.INFO)
 
-    # Create checks
-    domain_check = cv.check_create(
+    # Create findings
+    domain_finding = cv.finding_create(
         "domain-reputation",
-        "Domain reputation check",
+        "Domain reputation finding",
         score=Decimal("0.5"),
         level=Level.NOTABLE,
     )
-    domain_check.link_observable(domain)
+    domain_finding.link_observable(domain)
 
-    ip_check = cv.check_create(
+    ip_finding = cv.finding_create(
         "ip-reputation",
-        "IP reputation check",
+        "IP reputation finding",
         score=Decimal("0.0"),
         level=Level.INFO,
     )
-    ip_check.link_observable(ip)
+    ip_finding.link_observable(ip)
 
-    cv.check_create(
+    cv.finding_create(
         "roger-ai",
         "AI-based analysis",
         score=Decimal("1.11"),
@@ -74,38 +74,38 @@ def create_actual_investigation() -> Cyvest:
     malicious_domain.with_ti("VirusTotal", score=Decimal("8.5"), level=Level.MALICIOUS)
     malicious_domain.with_ti("MISP", score=Decimal("7.0"), level=Level.MALICIOUS)
 
-    # Create checks - with some differences
-    domain_check = cv.check_create(
+    # Create findings - with some differences
+    domain_finding = cv.finding_create(
         "domain-reputation",
-        "Domain reputation check",
+        "Domain reputation finding",
         score=Decimal("1.0"),  # Higher score than expected
         level=Level.NOTABLE,
     )
-    domain_check.link_observable(domain)
+    domain_finding.link_observable(domain)
 
-    ip_check = cv.check_create(
+    ip_finding = cv.finding_create(
         "ip-reputation",
-        "IP reputation check",
+        "IP reputation finding",
         score=Decimal("0.0"),  # Same as expected
         level=Level.INFO,
     )
-    ip_check.link_observable(ip)
+    ip_finding.link_observable(ip)
 
-    cv.check_create(
+    cv.finding_create(
         "roger-ai",
         "AI-based analysis",
         score=Decimal("1.07"),  # Slightly different score
         level=Level.SUSPICIOUS,
     )
 
-    # New check not in expected
-    new_check = cv.check_create(
+    # New finding not in expected
+    new_finding = cv.finding_create(
         "new-detection",
         "Newly added detection rule",
         score=Decimal("2.5"),
         level=Level.NOTABLE,
     )
-    new_check.link_observable(malicious_domain)
+    new_finding.link_observable(malicious_domain)
 
     return cv
 
@@ -136,9 +136,9 @@ def main() -> None:
 
     tolerance_rules = [
         # Allow roger-ai score to be >= 1.0
-        ExpectedResult(check_name="roger-ai", level=Level.SUSPICIOUS, score=">= 1.0"),
+        ExpectedResult(finding_name="roger-ai", level=Level.SUSPICIOUS, score=">= 1.0"),
         # Allow domain-reputation score to be < 2.0
-        ExpectedResult(key="chk:domain-reputation", score="< 2.0"),
+        ExpectedResult(key="fnd:domain-reputation", score="< 2.0"),
     ]
 
     diffs_with_rules = compare_investigations(actual, expected, result_expected=tolerance_rules)

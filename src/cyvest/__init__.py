@@ -15,11 +15,11 @@ from cyvest.compare import (
 )
 from cyvest.cyvest import Cyvest
 from cyvest.levels import Level
-from cyvest.model import Check, Enrichment, InvestigationWhitelist, Observable, Tag, Taxonomy, ThreatIntel
-from cyvest.model_enums import ObservableType, RelationshipDirection, RelationshipType
-from cyvest.proxies import CheckProxy, EnrichmentProxy, ObservableProxy, TagProxy, ThreatIntelProxy
+from cyvest.model import Enrichment, Evidence, Finding, InvestigationWhitelist, Observable, Tag, Taxonomy, ThreatIntel
+from cyvest.model_enums import ObservableSubtype, ObservableType, RelationshipDirection, RelationshipType
+from cyvest.proxies import EnrichmentProxy, EvidenceProxy, FindingProxy, ObservableProxy, TagProxy, ThreatIntelProxy
 
-__version__ = "5.4.1"
+__version__ = "6.0.0"
 
 __all__ = [
     # Core class
@@ -27,10 +27,12 @@ __all__ = [
     # Enums
     "Level",
     "ObservableType",
+    "ObservableSubtype",
     "RelationshipDirection",
     "RelationshipType",
     # Proxies
-    "CheckProxy",
+    "FindingProxy",
+    "EvidenceProxy",
     "ObservableProxy",
     "ThreatIntelProxy",
     "EnrichmentProxy",
@@ -39,7 +41,8 @@ __all__ = [
     "Tag",
     "Enrichment",
     "InvestigationWhitelist",
-    "Check",
+    "Finding",
+    "Evidence",
     "Observable",
     "ThreatIntel",
     "Taxonomy",

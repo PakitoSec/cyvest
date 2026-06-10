@@ -128,7 +128,7 @@ export interface ObservableCyEdgeData extends Record<string, unknown> {
   targetArrowShape: "none" | "triangle";
 }
 
-export type InvestigationCyNodeType = "root" | "tag" | "check";
+export type InvestigationCyNodeType = "root" | "tag" | "finding" | "evidence";
 
 export interface InvestigationCyNodeData extends Record<string, unknown> {
   id: string;

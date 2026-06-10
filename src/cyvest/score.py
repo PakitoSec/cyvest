@@ -2,7 +2,7 @@
 Scoring and propagation engine for Cyvest.
 
 Handles automatic score calculation and propagation between threat intelligence,
-observables, and checks based on relationships and hierarchies.
+observables, and findings based on relationships and hierarchies.
 
 Score Calculation:
     - MAX mode: Score = max(all TI scores, all child observable scores)
@@ -21,7 +21,7 @@ Root Observable Barrier:
     Propagation Phase:
         - Root CAN be updated when its children's scores change (normal parent update)
         - Root does NOT propagate upward beyond itself (stops recursive propagation)
-        - Root DOES propagate to linked checks (normal check propagation)
+        - Root DOES propagate to linked findings (normal finding propagation)
 
     Example:
         domain -> root <- ip  (domain and ip both have root as child)
@@ -68,7 +68,7 @@ class ScoreMode(Enum):
 
 
 if TYPE_CHECKING:
-    from cyvest.model import Check, Observable, ThreatIntel
+    from cyvest.model import Finding, Observable, ThreatIntel
 
 
 class ScoreChangeSink(Protocol):
@@ -103,7 +103,7 @@ class ScoreEngine:
     Handles:
     - Threat intel scores propagating to observables
     - Observable scores propagating through relationships based on direction
-    - Observable scores propagating to checks
+    - Observable scores propagating to findings
 
     Hierarchical relationships:
     - OUTBOUND (→): source → target, target is a child of source
@@ -123,9 +123,9 @@ class ScoreEngine:
        - Root does NOT propagate beyond itself (stops upward recursive propagation)
        - Maintains root as aggregation point while preventing upward flow
 
-    3. In Check Propagation (_propagate_observable_to_checks):
-       - Root propagates to checks normally (no special handling)
-       - Ensures checks linked to root receive updated scores
+    3. In Finding Propagation (_propagate_observable_to_findings):
+       - Root propagates to findings normally (no special handling)
+       - Ensures findings linked to root receive updated scores
     """
 
     def __init__(
@@ -141,8 +141,8 @@ class ScoreEngine:
             sink: Sink used to apply score/level changes
         """
         self._observables: dict[str, Observable] = {}
-        self._checks: dict[str, Check] = {}
-        self._check_keys_by_observable_key: dict[str, set[str]] = {}
+        self._findings: dict[str, Finding] = {}
+        self._finding_keys_by_observable_key: dict[str, set[str]] = {}
         self._score_mode_obs = ScoreMode.normalize(score_mode_obs)
         self._sink = sink
         self._investigation_id = sink.investigation_id
@@ -156,31 +156,31 @@ class ScoreEngine:
         """
         self._observables[observable.key] = observable
 
-    def register_check(self, check: Check) -> None:
+    def register_finding(self, finding: Finding) -> None:
         """
-        Register a check for score tracking.
+        Register a finding for score tracking.
 
         Args:
-            check: Check to register
+            finding: Finding to register
         """
-        self._checks[check.key] = check
-        for link in getattr(check, "observable_links", []):
-            self._check_keys_by_observable_key.setdefault(link.observable_key, set()).add(check.key)
+        self._findings[finding.key] = finding
+        for link in getattr(finding, "observable_links", []):
+            self._finding_keys_by_observable_key.setdefault(link.observable_key, set()).add(finding.key)
 
     def rebuild_link_index(self) -> None:
-        """Rebuild the check↔observable link index from scratch."""
-        self._check_keys_by_observable_key.clear()
-        for check in self._checks.values():
-            for link in getattr(check, "observable_links", []):
-                self._check_keys_by_observable_key.setdefault(link.observable_key, set()).add(check.key)
+        """Rebuild the finding↔observable link index from scratch."""
+        self._finding_keys_by_observable_key.clear()
+        for finding in self._findings.values():
+            for link in getattr(finding, "observable_links", []):
+                self._finding_keys_by_observable_key.setdefault(link.observable_key, set()).add(finding.key)
 
-    def register_check_observable_link(self, *, check_key: str, observable_key: str) -> None:
-        """Register a newly created check↔observable link in the propagation index."""
-        self._check_keys_by_observable_key.setdefault(observable_key, set()).add(check_key)
+    def register_finding_observable_link(self, *, finding_key: str, observable_key: str) -> None:
+        """Register a newly created finding↔observable link in the propagation index."""
+        self._finding_keys_by_observable_key.setdefault(observable_key, set()).add(finding_key)
 
-    def get_check_links_for_observable(self, observable_key: str) -> list[str]:
-        """Return sorted check keys that currently link to the observable."""
-        return sorted(self._check_keys_by_observable_key.get(observable_key, set()))
+    def get_finding_links_for_observable(self, observable_key: str) -> list[str]:
+        """Return sorted finding keys that currently link to the observable."""
+        return sorted(self._finding_keys_by_observable_key.get(observable_key, set()))
 
     def propagate_threat_intel_to_observable(self, ti: ThreatIntel, observable: Observable) -> None:
         """
@@ -210,17 +210,17 @@ class ScoreEngine:
             )
 
             # Root observable barrier: stop upward propagation at root level
-            # Root does NOT propagate to parent observables, but DOES propagate to checks
+            # Root does NOT propagate to parent observables, but DOES propagate to findings
             if observable.value == "root":
-                # Allow root to propagate to checks only
-                self._propagate_observable_to_checks(observable.key)
+                # Allow root to propagate to findings only
+                self._propagate_observable_to_findings(observable.key)
                 return
 
             # Propagate to parent observables
             self._propagate_to_parent_observables(observable)
 
-            # Propagate to linked checks
-            self._propagate_observable_to_checks(observable.key)
+            # Propagate to linked findings
+            self._propagate_observable_to_findings(observable.key)
 
     def _calculate_observable_score(self, observable: Observable, visited: set[str] | None = None) -> Decimal:
         """
@@ -356,8 +356,8 @@ class ScoreEngine:
                     new_parent_score,
                     reason=f"Child observable {observable.key} updated",
                 )
-                # Propagate to checks even for root; root barrier only stops upward flow
-                self._propagate_observable_to_checks(parent_obs.key)
+                # Propagate to findings even for root; root barrier only stops upward flow
+                self._propagate_observable_to_findings(parent_obs.key)
 
                 # Stop upward propagation at root (value="root")
                 if parent_obs.value != "root":
@@ -382,25 +382,25 @@ class ScoreEngine:
                 if rel.direction == RelationshipDirection.OUTBOUND and rel.target_key == observable.key:
                     _update_parent(parent_obs)
 
-    def _propagate_observable_to_checks(self, observable_key: str) -> None:
+    def _propagate_observable_to_findings(self, observable_key: str) -> None:
         """
-        Propagate observable score to linked checks.
+        Propagate observable score to linked findings.
 
         Args:
             observable_key: Key of the observable that changed
         """
-        candidate_check_keys = self._check_keys_by_observable_key.get(observable_key, set())
-        for check_key in candidate_check_keys:
-            check = self._checks.get(check_key)
-            if check is None:
+        candidate_finding_keys = self._finding_keys_by_observable_key.get(observable_key, set())
+        for finding_key in candidate_finding_keys:
+            finding = self._findings.get(finding_key)
+            if finding is None:
                 continue
 
             eligible_observables: list[Observable] = []
-            for link in getattr(check, "observable_links", []):
+            for link in getattr(finding, "observable_links", []):
                 if link.propagation_mode == PropagationMode.GLOBAL:
                     is_effective = True
                 else:
-                    is_effective = check.origin_investigation_id == self._investigation_id
+                    is_effective = finding.origin_investigation_id == self._investigation_id
                 if not is_effective:
                     continue
                 obs = self._observables.get(link.observable_key)
@@ -411,20 +411,20 @@ class ScoreEngine:
                 continue
 
             max_obs_score = max(obs.score for obs in eligible_observables)
-            max_obs_level = max((obs.level for obs in eligible_observables), default=check.level)
+            max_obs_level = max((obs.level for obs in eligible_observables), default=finding.level)
 
-            new_score = max(check.score, max_obs_score)
-            if new_score != check.score:
+            new_score = max(finding.score, max_obs_score)
+            if new_score != finding.score:
                 self._sink.apply_score_change(
-                    check,
+                    finding,
                     new_score,
                     reason=f"Linked observable {observable_key} updated",
                 )
 
-            new_level = max(check.level, max_obs_level)
-            if new_level != check.level:
+            new_level = max(finding.level, max_obs_level)
+            if new_level != finding.level:
                 self._sink.apply_level_change(
-                    check,
+                    finding,
                     new_level,
                     reason=f"Linked observable {observable_key} updated",
                 )
@@ -446,20 +446,20 @@ class ScoreEngine:
                     event_type="SCORE_RECALCULATED",
                 )
 
-        # Then propagate to all checks (not just MALICIOUS observables)
+        # Then propagate to all findings (not just MALICIOUS observables)
         for obs in self._observables.values():
-            self._propagate_observable_to_checks(obs.key)
+            self._propagate_observable_to_findings(obs.key)
 
     def get_global_score(self) -> Decimal:
         """
         Calculate the global investigation score.
 
-        The global score is the sum of all check scores.
+        The global score is the sum of all finding scores.
 
         Returns:
             Total investigation score
         """
-        return sum((check.score for check in self._checks.values()), Decimal("0"))
+        return sum((finding.score for finding in self._findings.values()), Decimal("0"))
 
     def get_global_level(self) -> Level:
         """

@@ -4,9 +4,9 @@ import {
   // Getters
   getObservable,
   getObservableByTypeValue,
-  getCheck,
-  getCheckByName,
-  getAllChecks,
+  getFinding,
+  getFindingByName,
+  getAllFindings,
   getThreatIntel,
   getThreatIntelBySourceObservable,
   getAllThreatIntels,
@@ -30,15 +30,15 @@ import {
   findObservablesByValue,
   findInternalObservables,
   findWhitelistedObservables,
-  findChecksByLevel,
-  findChecksAtLeast,
+  findFindingsByLevel,
+  findFindingsAtLeast,
   findThreatIntelBySource,
-  findChecksForObservable,
+  findFindingsForObservable,
   findThreatIntelsForObservable,
-  findObservablesForCheck,
+  findObservablesForFinding,
   findHighestScoringObservables,
   findMaliciousObservables,
-  getAllCheckKeys,
+  getAllFindingKeys,
   getAllObservableTypes,
 } from "../src";
 
@@ -87,7 +87,7 @@ function createTestInvestigation(): CyvestInvestigation {
           },
         ],
         threat_intels: [],
-        check_links: ["chk:ip_check:network"],
+        finding_links: ["fnd:ip_finding:network"],
       },
       "obs:ipv4:8.8.8.8": {
         key: "obs:ipv4:8.8.8.8",
@@ -102,7 +102,7 @@ function createTestInvestigation(): CyvestInvestigation {
         level: "TRUSTED",
         relationships: [],
         threat_intels: [],
-        check_links: [],
+        finding_links: [],
       },
       "obs:domain:example.com": {
         key: "obs:domain:example.com",
@@ -117,7 +117,7 @@ function createTestInvestigation(): CyvestInvestigation {
         level: "MALICIOUS",
         relationships: [],
         threat_intels: ["ti:virustotal:obs:domain:example.com"],
-        check_links: ["chk:domain_check:dns"],
+        finding_links: ["fnd:domain_finding:dns"],
       },
       "obs:url:http://malware.com/bad": {
         key: "obs:url:http://malware.com/bad",
@@ -132,14 +132,14 @@ function createTestInvestigation(): CyvestInvestigation {
         level: "MALICIOUS",
         relationships: [],
         threat_intels: [],
-        check_links: [],
+        finding_links: [],
       },
     },
-    checks: {
-      "chk:ip_check": {
-        key: "chk:ip_check",
-        check_name: "ip_check",
-        description: "IP address check",
+    findings: {
+      "fnd:ip_finding": {
+        key: "fnd:ip_finding",
+        finding_name: "ip_finding",
+        description: "IP address finding",
         comment: "",
         extra: {},
         score: 0,
@@ -152,10 +152,10 @@ function createTestInvestigation(): CyvestInvestigation {
           },
         ],
       },
-      "chk:domain_check": {
-        key: "chk:domain_check",
-        check_name: "domain_check",
-        description: "Domain reputation check",
+      "fnd:domain_finding": {
+        key: "fnd:domain_finding",
+        finding_name: "domain_finding",
+        description: "Domain reputation finding",
         comment: "",
         extra: {},
         score: 5,
@@ -168,9 +168,9 @@ function createTestInvestigation(): CyvestInvestigation {
           },
         ],
       },
-      "chk:dns_lookup": {
-        key: "chk:dns_lookup",
-        check_name: "dns_lookup",
+      "fnd:dns_lookup": {
+        key: "fnd:dns_lookup",
+        finding_name: "dns_lookup",
         description: "DNS lookup",
         comment: "",
         extra: {},
@@ -181,6 +181,7 @@ function createTestInvestigation(): CyvestInvestigation {
         observable_links: [],
       },
     },
+    evidences: {},
     threat_intels: {
       "ti:virustotal:obs:domain:example.com": {
         key: "ti:virustotal:obs:domain:example.com",
@@ -207,7 +208,7 @@ function createTestInvestigation(): CyvestInvestigation {
         key: "tag:email",
         name: "email",
         description: "Email tag",
-        checks: [],
+        findings: [],
         direct_score: 1.5,
         direct_level: "NOTABLE",
       },
@@ -215,7 +216,7 @@ function createTestInvestigation(): CyvestInvestigation {
         key: "tag:email:headers",
         name: "email:headers",
         description: "Email headers",
-        checks: ["chk:ip_check"],
+        findings: ["fnd:ip_finding"],
         direct_score: 2.0,
         direct_level: "NOTABLE",
       },
@@ -223,7 +224,7 @@ function createTestInvestigation(): CyvestInvestigation {
         key: "tag:email:headers:auth",
         name: "email:headers:auth",
         description: "Auth headers",
-        checks: [],
+        findings: [],
         direct_score: 3.5,
         direct_level: "SUSPICIOUS",
       },
@@ -231,7 +232,7 @@ function createTestInvestigation(): CyvestInvestigation {
         key: "tag:email:body",
         name: "email:body",
         description: "Email body",
-        checks: [],
+        findings: [],
         direct_score: 1.0,
         direct_level: "NOTABLE",
       },
@@ -244,9 +245,9 @@ function createTestInvestigation(): CyvestInvestigation {
       observables_by_type: { "ipv4": 2, "domain": 1, url: 1 },
       observables_by_level: { INFO: 1, TRUSTED: 1, MALICIOUS: 2 },
       observables_by_type_and_level: {},
-      total_checks: 3,
-      applied_checks: 2,
-      checks_by_level: { INFO: ["chk:ip_check", "chk:dns_lookup"], MALICIOUS: ["chk:domain_check"] },
+      total_findings: 3,
+      applied_findings: 2,
+      findings_by_level: { INFO: ["fnd:ip_finding", "fnd:dns_lookup"], MALICIOUS: ["fnd:domain_finding"] },
       total_threat_intel: 1,
       threat_intel_by_source: { virustotal: 1 },
       threat_intel_by_level: { MALICIOUS: 1 },
@@ -291,26 +292,26 @@ describe("Getters", () => {
     });
   });
 
-  describe("getCheck", () => {
-    it("returns check by key", () => {
-      const check = getCheck(inv, "chk:domain_check");
-      expect(check).toBeDefined();
-      expect(check?.check_name).toBe("domain_check");
+  describe("getFinding", () => {
+    it("returns finding by key", () => {
+      const finding = getFinding(inv, "fnd:domain_finding");
+      expect(finding).toBeDefined();
+      expect(finding?.finding_name).toBe("domain_finding");
     });
   });
 
-  describe("getCheckByName", () => {
-    it("finds check by name", () => {
-      const check = getCheckByName(inv, "domain_check");
-      expect(check).toBeDefined();
-      expect(check?.key).toBe("chk:domain_check");
+  describe("getFindingByName", () => {
+    it("finds finding by name", () => {
+      const finding = getFindingByName(inv, "domain_finding");
+      expect(finding).toBeDefined();
+      expect(finding?.key).toBe("fnd:domain_finding");
     });
   });
 
-  describe("getAllChecks", () => {
-    it("returns all checks as flat array", () => {
-      const checks = getAllChecks(inv);
-      expect(checks).toHaveLength(3);
+  describe("getAllFindings", () => {
+    it("returns all findings as flat array", () => {
+      const findings = getAllFindings(inv);
+      expect(findings).toHaveLength(3);
     });
   });
 
@@ -350,7 +351,7 @@ describe("Getters", () => {
     it("returns correct counts", () => {
       const counts = getCounts(inv);
       expect(counts.observables).toBe(4);
-      expect(counts.checks).toBe(3);
+      expect(counts.findings).toBe(3);
       expect(counts.threatIntels).toBe(1);
       expect(counts.enrichments).toBe(1);
       expect(counts.tags).toBe(4);
@@ -427,9 +428,9 @@ describe("Finders", () => {
     });
   });
 
-  describe("findChecksByLevel", () => {
-    it("finds checks at level", () => {
-      const malicious = findChecksByLevel(inv, "MALICIOUS");
+  describe("findFindingsByLevel", () => {
+    it("finds findings at level", () => {
+      const malicious = findFindingsByLevel(inv, "MALICIOUS");
       expect(malicious).toHaveLength(1);
     });
   });
@@ -441,11 +442,11 @@ describe("Finders", () => {
     });
   });
 
-  describe("findChecksForObservable", () => {
-    it("finds checks that reference observable", () => {
-      const checks = findChecksForObservable(inv, "obs:ipv4:192.168.1.1");
-      expect(checks).toHaveLength(1);
-      expect(checks[0].check_name).toBe("ip_check");
+  describe("findFindingsForObservable", () => {
+    it("finds findings that reference observable", () => {
+      const findings = findFindingsForObservable(inv, "obs:ipv4:192.168.1.1");
+      expect(findings).toHaveLength(1);
+      expect(findings[0].finding_name).toBe("ip_finding");
     });
   });
 
@@ -460,9 +461,9 @@ describe("Finders", () => {
     });
   });
 
-  describe("findObservablesForCheck", () => {
-    it("finds observables referenced by check", () => {
-      const obs = findObservablesForCheck(inv, "chk:ip_check");
+  describe("findObservablesForFinding", () => {
+    it("finds observables referenced by finding", () => {
+      const obs = findObservablesForFinding(inv, "fnd:ip_finding");
       expect(obs).toHaveLength(1);
       expect(obs[0].value).toBe("192.168.1.1");
     });
@@ -483,11 +484,11 @@ describe("Finders", () => {
     });
   });
 
-  describe("getAllCheckKeys", () => {
-    it("returns all check keys", () => {
-      const keys = getAllCheckKeys(inv);
-      expect(keys).toContain("chk:ip_check");
-      expect(keys).toContain("chk:domain_check");
+  describe("getAllFindingKeys", () => {
+    it("returns all finding keys", () => {
+      const keys = getAllFindingKeys(inv);
+      expect(keys).toContain("fnd:ip_finding");
+      expect(keys).toContain("fnd:domain_finding");
     });
   });
 

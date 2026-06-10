@@ -14,6 +14,7 @@ Build, score, and narrate cybersecurity investigations with a single fluent Pyth
 
 !!! info "Need help choosing the right entry point?"
     - Automating SOC workflows? Jump straight to [Quick Start](getting-started/quickstart.md#using-the-fluent-api).
+    - Upgrading from Cyvest 5.x? Follow the [v5 to v6 migration guide](migration-v5-to-v6.md).
     - Running multi-threaded tasks? See [Shared Investigation Context](shared-investigation-context.md).
     - Contributing or extending the fluent helpers? Review the [Contributing guide](contributing.md#architecture-overview).
 
@@ -23,7 +24,7 @@ Build, score, and narrate cybersecurity investigations with a single fluent Pyth
 
 | Area | Why it matters | What to look at |
 | --- | --- | --- |
-| **Structured objects** | Model observables, checks, TI, tags, and enrichments with typed helpers | `cyvest.model`, [Concepts](getting-started/concepts.md#observables) |
+| **Structured objects** | Model observables, findings, TI, tags, and enrichments with typed helpers | `cyvest.model`, [Concepts](getting-started/concepts.md#observables) |
 | **Deterministic scoring** | MAX/SUM propagation, centralized audit log, and automatic level classification | `cyvest.score`, [Scoring System](getting-started/concepts.md#scoring-system) |
 | **Fluent helpers** | Builder-style methods with deterministic keys and safe merges | `cyvest.cyvest`, [Quick Start](getting-started/quickstart.md#using-the-fluent-api) |
 | **Shared context** | Thread-safe fragments that can reconcile into a single story | `cyvest.shared.SharedInvestigationContext`, [Guide](shared-investigation-context.md) |
@@ -47,7 +48,7 @@ phishing_url = (
 )
 
 (
-    cv.check("email_url_check", "Analyze embedded URL")
+    cv.finding("email_url_finding", "Analyze embedded URL")
     .link_observable(phishing_url)
     .with_score(Decimal("8.5"))
 )
@@ -59,7 +60,7 @@ print(cv.get_global_score(), cv.get_global_level())
     Store investigation metadata (request ID, analyst, ticket link) in the root observable's `extra` field by passing `root_data` to `Cyvest(...)`.
 
 !!! note "Immutable proxies"
-    The objects returned by `cv.observable_*`/`cv.check_*` are read-only `*Proxy` wrappers. Use the facade or their fluent helper methods to apply changes so scoring stays consistent.
+    The objects returned by `cv.observable_*`/`cv.finding_*` are read-only `*Proxy` wrappers. Use the facade or their fluent helper methods to apply changes so scoring stays consistent.
 
 ---
 
@@ -69,7 +70,7 @@ print(cv.get_global_score(), cv.get_global_level())
 Cyvest (facade + fluent proxies)
 └─ Investigation (core state)
    ├─ Observables & relationships
-   ├─ Checks and tags (workflow context)
+   ├─ Findings and tags (workflow context)
    ├─ Threat intelligence (source, score, taxonomies)
    ├─ ScoreEngine (MAX/SUM propagation, history)
    ├─ InvestigationStats (live metrics)
@@ -89,7 +90,8 @@ Cyvest (facade + fluent proxies)
 | Goal | Recommended Path |
 | --- | --- |
 | Evaluate Cyvest in <10 minutes | [Getting Started](getting-started/quickstart.md) |
-| Understand observables vs. checks | [Core Concepts](getting-started/concepts.md#investigation-structure) |
+| Upgrade an existing Cyvest 5.x integration | [Migration from v5 to v6](migration-v5-to-v6.md) |
+| Understand observables vs. findings | [Core Concepts](getting-started/concepts.md#investigation-structure) |
 | Share state across threads | [Shared Investigation Context](shared-investigation-context.md) |
 | Compare investigations or regression test | [Comparing Investigations](comparing-investigations.md) |
 | Extract IOCs from text or URLs | [Observable Extraction](observable-extraction.md) |

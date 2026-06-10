@@ -58,11 +58,11 @@ class BaseRule(ABC):
         Execute the task and return a Cyvest investigation fragment.
 
         Args:
-            shared_context: Shared context for cross-task observable/check sharing
+            shared_context: Shared context for cross-task observable/finding sharing
                           (access data via cy.root().extra)
 
         Returns:
-            Cyvest instance containing observables, checks, and tags
+            Cyvest instance containing observables, findings, and tags
         """
         pass
 
@@ -171,8 +171,8 @@ class EmailFrom(BaseRule):
             .with_ti("VT", 0, "> test")
         )
 
-        # Create check for header analysis
-        cy.check("from", "test email vt 10", "> ok boys").link_observable(obs).tagged("emails")
+        # Create finding for header analysis
+        cy.finding("from", "test email vt 10", "> ok boys").link_observable(obs).tagged("emails")
 
         logger.info(f"Email header analysis complete: {obs.key}")
 
@@ -197,8 +197,8 @@ class EmailFromBIS(BaseRule):
         # Build observable chain with threat intel
         obs = cy.observable(cy.OBS.EMAIL, from_addr).with_ti("PROOFPOINT", 5, "> test")
 
-        # Create check for header analysis
-        (cy.check("from-proofpoint", "test email vt 10", "> ok boys").link_observable(obs).tagged("emails"))
+        # Create finding for header analysis
+        (cy.finding("from-proofpoint", "test email vt 10", "> ok boys").link_observable(obs).tagged("emails"))
 
         logger.info(f"Email header analysis complete: {obs.key}")
 
@@ -207,7 +207,7 @@ class EmailReciever(BaseRule):
     """
     Analyzes email body content.
 
-    Creates checks for body HTML content.
+    Creates findings for body HTML content.
     """
 
     _scope = "body"
@@ -218,7 +218,7 @@ class EmailReciever(BaseRule):
         logger.info("Analyzing email receiver")
 
         cy.enrichment_create("receiver", {"receiver": ["ok"]}, context="from splunk")
-        cy.check("receiver", "description", "> receiver").with_score(0.1).link_observable(
+        cy.finding("receiver", "description", "> receiver").with_score(0.1).link_observable(
             cy.observable(cy.OBS.EMAIL, "user@company.com").relate_to(
                 cy.root(), cy.REL.RELATED_TO, direction=cy.DIR.INBOUND
             )
@@ -233,7 +233,7 @@ class BodiesUrlTask(BaseRule):
     """
     Analyzes URLs found in email bodies.
 
-    Similar to CortexBodiesURL - extracts URLs, performs threat intel checks,
+    Similar to CortexBodiesURL - extracts URLs, performs threat intel findings,
     and builds observable relationships.
     """
 
@@ -250,7 +250,7 @@ class BodiesUrlTask(BaseRule):
 
         logger.info(f"Checking BODIES URLs: {len(urls_with_scores)}")
 
-        # Create tag for URL checks
+        # Create tag for URL findings
         tag = cy.tag("bodies:urls", "Bodies URLs Analysis")
 
         # Analyze each URL
@@ -274,14 +274,14 @@ class BodiesUrlTask(BaseRule):
                     direction=cy.DIR.INBOUND,
                 )
 
-            # Create check and link to tag
+            # Create finding and link to tag
             chk = (
-                cy.check(f"body-url-{url}", f"URL analysis {url}", comment=f"> score: {score}")
+                cy.finding(f"body-url-{url}", f"URL analysis {url}", comment=f"> score: {score}")
                 .link_observable(url_obs)
                 .tagged(tag)
             )
 
-            logger.info("[bold red]Check Score: %s[/bold red]", chk.score)
+            logger.info("[bold red]Finding Score: %s[/bold red]", chk.score)
 
         logger.info(f"Bodies URLs analysis complete: {len(urls_with_scores)} URLs processed")
         logger.info("[bold red]Tag Score: %s[/bold red]", tag.get_aggregated_score())
@@ -291,7 +291,7 @@ class BodiesDomainTask(BaseRule):
     """
     Analyzes URLs found in email bodies.
 
-    Similar to CortexBodiesURL - extracts URLs, performs threat intel checks,
+    Similar to CortexBodiesURL - extracts URLs, performs threat intel findings,
     and builds observable relationships.
     """
 
@@ -306,7 +306,7 @@ class BodiesDomainTask(BaseRule):
 
         logger.info(f"Checking BODIES DOMAINS: {len(domains_with_scores)}")
 
-        # Create tag for domain checks
+        # Create tag for domain findings
         tag = cy.tag("bodies:domains", "Bodies Domains Analysis")
 
         # Analyze each domain
@@ -329,14 +329,14 @@ class BodiesDomainTask(BaseRule):
                 )
             )
 
-            # Create check and link to tag
+            # Create finding and link to tag
             chk = (
-                cy.check(f"body-domain-{domain}", f"Domain analysis {domain}", comment=f"> score: {score}")
+                cy.finding(f"body-domain-{domain}", f"Domain analysis {domain}", comment=f"> score: {score}")
                 .link_observable(domain_obs, propagation_mode=cy.PROP.GLOBAL)
                 .tagged(tag)
             )
 
-            logger.info("[bold red]Check Score: %s[/bold red]", chk.score)
+            logger.info("[bold red]Finding Score: %s[/bold red]", chk.score)
 
         logger.info(f"Bodies DOMAINS analysis complete: {len(domains_with_scores)} DOMAINS processed")
         logger.info("[bold red]Tag Score: %s[/bold red]", tag.get_aggregated_score())
@@ -359,7 +359,7 @@ class AttachmentTask(BaseRule):
 
         logger.info(f"Checking ATTACHMENTS: {len(attachments)}")
 
-        # Create tag for attachment checks
+        # Create tag for attachment findings
         tag = cy.tag("attachments", "Email Attachments Analysis")
 
         # Analyze each attachment
@@ -386,11 +386,11 @@ class AttachmentTask(BaseRule):
             if score >= 5:
                 file_obs = file_obs.with_ti("MALWAREBAZAAR", score, f"Known malware: {filename}")
 
-            # Create check and link to tag
-            check_desc = f"File: {filename} ({size} bytes)"
-            cy.check(
+            # Create finding and link to tag
+            finding_desc = f"File: {filename} ({size} bytes)"
+            cy.finding(
                 f"attachment-{filename}",
-                check_desc,
+                finding_desc,
                 comment=f"> MD5: {md5_hash}\n> SHA256: {sha256_hash}\n> Threat score: {score}",
             ).link_observable(file_obs).tagged(tag)
 
@@ -401,8 +401,8 @@ class AggregatedRiskTask(BaseRule):
     """
     Aggregated risk assessment task.
 
-    This task demonstrates creating an aggregated check that:
-    - References checks created by other tasks
+    This task demonstrates creating an aggregated finding that:
+    - References findings created by other tasks
     - References observables created by other tasks
     - Calculates a composite risk score based on multiple indicators
     - Uses shared context to access cross-task data
@@ -410,7 +410,7 @@ class AggregatedRiskTask(BaseRule):
     This runs last (order=300) to ensure other tasks have completed.
 
     Note: Due to parallel execution, some tasks may still be running when this
-    executes. The aggregated check will use whatever data is available at the
+    executes. The aggregated finding will use whatever data is available at the
     time it runs. For guaranteed sequential execution, use order values with
     larger gaps or run tasks sequentially.
     """
@@ -419,41 +419,41 @@ class AggregatedRiskTask(BaseRule):
     order = 300
 
     def run(self, cy: Cyvest) -> None:
-        """Calculate aggregated risk score based on all previous checks."""
+        """Calculate aggregated risk score based on all previous findings."""
         from decimal import Decimal
 
         logger.info("Starting aggregated risk assessment")
 
-        # Access checks from other tasks using parameter-based API
-        from_check = self.shared_context.check_get("from")
-        receiver_check = self.shared_context.check_get("receiver")
+        # Access findings from other tasks using parameter-based API
+        from_finding = self.shared_context.finding_get("from")
+        receiver_finding = self.shared_context.finding_get("receiver")
 
         # Access observables from other tasks using parameter-based API
         sender_email = self.shared_context.observable_get(Cyvest.OBS.EMAIL, "noreply@domainmalicious.com")
         malicious_domain = self.shared_context.observable_get(Cyvest.OBS.DOMAIN, "domainmalicious.com")
 
-        url_checks = self.shared_context.observables_list_by_type(Cyvest.OBS.URL)
-        attachment_checks = self.shared_context.observables_list_by_type(Cyvest.OBS.FILE)
+        url_findings = self.shared_context.observables_list_by_type(Cyvest.OBS.URL)
+        attachment_findings = self.shared_context.observables_list_by_type(Cyvest.OBS.FILE)
 
         # Calculate composite risk score
         risk_score = Decimal("0")
         risk_indicators = []
 
         # Factor 3: URL threats (medium weight)
-        if url_checks:
-            max_url_score = max((check.score for check in url_checks), default=Decimal("0"))
+        if url_findings:
+            max_url_score = max((finding.score for finding in url_findings), default=Decimal("0"))
             if max_url_score > 0:
                 risk_score += max_url_score * Decimal("0.2")  # 20% weight
                 risk_indicators.append(f"Suspicious URLs detected (max score: {max_url_score})")
 
         # Factor 4: Attachment threats (high weight)
-        if attachment_checks:
-            max_attachment_score = max((check.score for check in attachment_checks), default=Decimal("0"))
+        if attachment_findings:
+            max_attachment_score = max((finding.score for finding in attachment_findings), default=Decimal("0"))
             if max_attachment_score >= 5:
                 risk_score += max_attachment_score * Decimal("0.5")  # 50% weight
                 risk_indicators.append(f"Malicious attachment detected (score: {max_attachment_score})")
 
-        # Build aggregated check comment
+        # Build aggregated finding comment
         comment = "> **Aggregated Risk Assessment**\n"
         comment += f"> Total risk score: {risk_score}\n"
         comment += f"> Indicators analyzed: {len(risk_indicators)}\n"
@@ -463,23 +463,23 @@ class AggregatedRiskTask(BaseRule):
             comment += f"> - {indicator}\n"
         comment += ">\n"
         comment += "> **Component Analysis:**\n"
-        comment += f"> - Header checks: {len([c for c in [from_check, receiver_check] if c])}\n"
-        comment += f"> - URL checks: {len(url_checks)}\n"
-        comment += f"> - Attachment checks: {len(attachment_checks)}\n"
+        comment += f"> - Header findings: {len([c for c in [from_finding, receiver_finding] if c])}\n"
+        comment += f"> - URL findings: {len(url_findings)}\n"
+        comment += f"> - Attachment findings: {len(attachment_findings)}\n"
 
-        # Create aggregated check
-        aggregated_check = cy.check(
+        # Create aggregated finding
+        aggregated_finding = cy.finding(
             "email_risk_aggregated", "Aggregated Email Risk Assessment", comment=comment
         ).with_score(risk_score)
 
-        # Link all relevant observables to the aggregated check
+        # Link all relevant observables to the aggregated finding
         if sender_email:
-            aggregated_check.link_observable(sender_email)
+            aggregated_finding.link_observable(sender_email)
         if malicious_domain:
-            aggregated_check.link_observable(malicious_domain)
+            aggregated_finding.link_observable(malicious_domain)
 
         # Put in a dedicated tag
-        aggregated_check.tagged(cy.tag("risk_assessment", "Aggregated Risk Analysis"))
+        aggregated_finding.tagged(cy.tag("risk_assessment", "Aggregated Risk Analysis"))
 
         logger.info(f"Aggregated risk assessment complete: score={risk_score}")
         logger.info(f"Risk indicators: {len(risk_indicators)}")
@@ -490,8 +490,8 @@ class AI(BaseRule):
     order = 1000
 
     def run(self, cy: Cyvest) -> None:
-        """Calculate aggregated risk score based on all previous checks."""
-        cy.check("ai", "AI Analysis", score=0, level=cy.LVL.MALICIOUS).tagged(
+        """Calculate aggregated risk score based on all previous findings."""
+        cy.finding("ai", "AI Analysis", score=0, level=cy.LVL.MALICIOUS).tagged(
             cy.tag("risk_assessment:ai", "AI Analysis Tag")
         )
 
@@ -563,7 +563,7 @@ def main(workers, browser, stats, audit, no_audit_log, output):
     cy.finalize_relationships()
     cy._investigation._score_engine.recalculate_all()
 
-    c = cy.check_get("chk:email_risk_aggregated")
+    c = cy.finding_get("fnd:email_risk_aggregated")
     if c is not None:
         logger.info(c.comment)
 

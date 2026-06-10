@@ -8,13 +8,134 @@
 /**
  * Key type prefixes used in Cyvest.
  */
-export type KeyType = "obs" | "chk" | "ti" | "enr" | "tag";
+export type KeyType = "obs" | "fnd" | "evd" | "ti" | "enr" | "tag";
 
 /**
  * Normalize a string value for consistent key generation.
  */
 function normalizeValue(value: string): string {
   return value.trim().toLowerCase();
+}
+
+function normalizeObservableValue(
+  obsType: string,
+  value: string,
+  subtype?: string
+): string {
+  const normalizedType = normalizeValue(obsType);
+  const normalizedSubtype = subtype ? normalizeValue(subtype) : undefined;
+  const stripped = value.trim();
+
+  if (normalizedType === "command_line") return stripped;
+  if (normalizedType === "email" || normalizedType === "host") {
+    return stripped.toLowerCase();
+  }
+  if (
+    normalizedType === "user" &&
+    (normalizedSubtype === "email" || normalizedSubtype === "upn")
+  ) {
+    return stripped.toLowerCase();
+  }
+  if (normalizedSubtype === "uid" || normalizedSubtype === "pid") {
+    if (!/^[+-]?\d+$/.test(stripped)) {
+      throw new Error(`${normalizedSubtype} observable values must be base-10 integers`);
+    }
+    return BigInt(stripped).toString(10);
+  }
+  return stripped;
+}
+
+function sha256(content: string): string {
+  const bytes = new TextEncoder().encode(content);
+  const words: number[] = [];
+  const bitLength = bytes.length * 8;
+  for (const byte of bytes) {
+    words.push(byte);
+  }
+  words.push(0x80);
+  while ((words.length % 64) !== 56) words.push(0);
+  for (let i = 7; i >= 0; i--) {
+    words.push(Math.floor(bitLength / 2 ** (i * 8)) & 0xff);
+  }
+
+  const h = [
+    0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
+    0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19,
+  ];
+  const k = Array.from({ length: 64 }, (_, index) => {
+    let primeCount = 0;
+    let candidate = 2;
+    while (true) {
+      let prime = true;
+      for (let divisor = 2; divisor * divisor <= candidate; divisor++) {
+        if (candidate % divisor === 0) {
+          prime = false;
+          break;
+        }
+      }
+      if (prime && primeCount++ === index) {
+        return Math.floor((Math.cbrt(candidate) % 1) * 2 ** 32) >>> 0;
+      }
+      candidate++;
+    }
+  });
+  const rotateRight = (value: number, amount: number) =>
+    (value >>> amount) | (value << (32 - amount));
+
+  for (let offset = 0; offset < words.length; offset += 64) {
+    const schedule = new Array<number>(64);
+    for (let i = 0; i < 16; i++) {
+      const base = offset + i * 4;
+      schedule[i] =
+        ((words[base] << 24) |
+          (words[base + 1] << 16) |
+          (words[base + 2] << 8) |
+          words[base + 3]) >>>
+        0;
+    }
+    for (let i = 16; i < 64; i++) {
+      const s0 =
+        rotateRight(schedule[i - 15], 7) ^
+        rotateRight(schedule[i - 15], 18) ^
+        (schedule[i - 15] >>> 3);
+      const s1 =
+        rotateRight(schedule[i - 2], 17) ^
+        rotateRight(schedule[i - 2], 19) ^
+        (schedule[i - 2] >>> 10);
+      schedule[i] = (schedule[i - 16] + s0 + schedule[i - 7] + s1) >>> 0;
+    }
+
+    let [a, b, c, d, e, f, g, hh] = h;
+    for (let i = 0; i < 64; i++) {
+      const s1 = rotateRight(e, 6) ^ rotateRight(e, 11) ^ rotateRight(e, 25);
+      const choice = (e & f) ^ (~e & g);
+      const temp1 = (hh + s1 + choice + k[i] + schedule[i]) >>> 0;
+      const s0 = rotateRight(a, 2) ^ rotateRight(a, 13) ^ rotateRight(a, 22);
+      const majority = (a & b) ^ (a & c) ^ (b & c);
+      const temp2 = (s0 + majority) >>> 0;
+      hh = g;
+      g = f;
+      f = e;
+      e = (d + temp1) >>> 0;
+      d = c;
+      c = b;
+      b = a;
+      a = (temp1 + temp2) >>> 0;
+    }
+    [a, b, c, d, e, f, g, hh].forEach((value, index) => {
+      h[index] = (h[index] + value) >>> 0;
+    });
+  }
+  return h.map((value) => value.toString(16).padStart(8, "0")).join("");
+}
+
+function encodeKeyPart(value: string, keepSlash = false): string {
+  let encoded = encodeURIComponent(value).replace(/[!'()*]/g, (char) =>
+    `%${char.charCodeAt(0).toString(16).toUpperCase()}`
+  );
+  encoded = encoded.replace(/%40/gi, "@");
+  if (keepSlash) encoded = encoded.replace(/%2F/gi, "/").replace(/%5C/gi, "\\");
+  return encoded;
 }
 
 /**
@@ -49,29 +170,60 @@ function hashString(content: string, length: number = 16): string {
  * // => "obs:ipv4:192.168.1.1"
  * ```
  */
-export function generateObservableKey(obsType: string, value: string): string {
+export function generateObservableKey(
+  obsType: string,
+  value: string,
+  subtype?: string,
+  namespace?: string
+): string {
   const normalizedType = normalizeValue(obsType);
-  const normalizedValue = normalizeValue(value);
-  return `obs:${normalizedType}:${normalizedValue}`;
+  const normalizedSubtype = subtype ? normalizeValue(subtype) : undefined;
+  const normalizedNamespace = namespace?.trim().toLowerCase() || undefined;
+  const normalizedValue = normalizeObservableValue(
+    normalizedType,
+    value,
+    normalizedSubtype
+  );
+  const identity = JSON.stringify({
+    namespace: normalizedNamespace ?? null,
+    subtype: normalizedSubtype ?? null,
+    type: normalizedType,
+    value: normalizedValue,
+  });
+
+  if (
+    normalizedType === "command_line" ||
+    new TextEncoder().encode(identity).length > 128
+  ) {
+    return `obs:${normalizedType}:sha256:${sha256(identity)}`;
+  }
+  if (!normalizedSubtype && !normalizedNamespace) {
+    return `obs:${normalizedType}:${normalizedValue.toLowerCase()}`;
+  }
+
+  const parts = ["obs", encodeKeyPart(normalizedType), normalizedSubtype ? encodeKeyPart(normalizedSubtype) : "_"];
+  if (normalizedNamespace) parts.push(encodeKeyPart(normalizedNamespace));
+  parts.push(encodeKeyPart(normalizedValue, true));
+  return parts.join(":");
 }
 
 /**
- * Generate a unique key for a check.
+ * Generate a unique key for a finding.
  *
- * Format: chk:{check_name}
+ * Format: fnd:{finding_name}
  *
- * @param checkName - Name of the check
- * @returns Unique check key
+ * @param findingName - Name of the finding
+ * @returns Unique finding key
  *
  * @example
  * ```ts
- * generateCheckKey("sender_verification")
- * // => "chk:sender_verification"
+ * generateFindingKey("sender_verification")
+ * // => "fnd:sender_verification"
  * ```
  */
-export function generateCheckKey(checkName: string): string {
-  const normalizedName = normalizeValue(checkName);
-  return `chk:${normalizedName}`;
+export function generateFindingKey(findingName: string): string {
+  const normalizedName = normalizeValue(findingName);
+  return `fnd:${normalizedName}`;
 }
 
 /**
@@ -206,7 +358,7 @@ export function isTagDescendantOf(descendantName: string, ancestorName: string):
  * Extract the type prefix from a key.
  *
  * @param key - The key to parse
- * @returns Type prefix (obs, chk, ti, enr, tag) or null if invalid
+ * @returns Type prefix (obs, fnd, evd, ti, enr, tag) or null if invalid
  *
  * @example
  * ```ts
@@ -217,7 +369,7 @@ export function isTagDescendantOf(descendantName: string, ancestorName: string):
 export function parseKeyType(key: string): KeyType | null {
   if (key.includes(":")) {
     const prefix = key.split(":", 1)[0] as KeyType;
-    if (["obs", "chk", "ti", "enr", "tag"].includes(prefix)) {
+    if (["obs", "fnd", "evd", "ti", "enr", "tag"].includes(prefix)) {
       return prefix;
     }
   }
@@ -225,7 +377,7 @@ export function parseKeyType(key: string): KeyType | null {
 }
 
 /**
- * Validate a key format and optionally check its type.
+ * Validate a key format and optionally finding its type.
  *
  * @param key - The key to validate
  * @param expectedType - Optional expected type prefix
@@ -285,27 +437,27 @@ export function parseObservableKey(
 }
 
 /**
- * Extract components from a check key.
+ * Extract components from a finding key.
  *
- * @param key - Check key to parse
- * @returns Object with checkName, or null if invalid
+ * @param key - Finding key to parse
+ * @returns Object with findingName, or null if invalid
  *
  * @example
  * ```ts
- * parseCheckKey("chk:sender_verification")
- * // => { checkName: "sender_verification" }
+ * parseFindingKey("fnd:sender_verification")
+ * // => { findingName: "sender_verification" }
  * ```
  */
-export function parseCheckKey(
+export function parseFindingKey(
   key: string
-): { checkName: string } | null {
-  if (!validateKey(key, "chk")) {
+): { findingName: string } | null {
+  if (!validateKey(key, "fnd")) {
     return null;
   }
   const parts = key.split(":");
   if (parts.length >= 2) {
     return {
-      checkName: parts.slice(1).join(":"),
+      findingName: parts.slice(1).join(":"),
     };
   }
   return null;

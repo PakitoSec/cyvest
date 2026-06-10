@@ -5,7 +5,7 @@
  */
 export type InvestigationName = string | null;
 /**
- * Security level classification for checks, observables, and threat intelligence.
+ * Security level classification for findings, observables, and threat intelligence.
  *
  * Levels are ordered from lowest (NONE) to highest (MALICIOUS) severity.
  */
@@ -24,6 +24,8 @@ export type Reason = string | null;
 export type Tool = string | null;
 export type ObjectType = string | null;
 export type ObjectKey = string | null;
+export type Subtype = string | null;
+export type Namespace = string | null;
 export type ThreatIntels = string[];
 /**
  * Direction of a relationship between observables.
@@ -31,16 +33,23 @@ export type ThreatIntels = string[];
 export type RelationshipDirection = "outbound" | "inbound" | "bidirectional";
 export type Relationships = Relationship[];
 /**
- * Checks that currently link to this observable (navigation-only).
+ * Findings that currently link to this observable (navigation-only).
  */
-export type CheckLinks = string[];
+export type FindingLinks = string[];
 /**
- * Controls how a Check↔Observable link propagates across merged investigations.
+ * Controls how a Finding↔Observable link propagates across merged investigations.
  */
 export type PropagationMode = "LOCAL_ONLY" | "GLOBAL";
 export type ObservableLinks = ObservableLink[];
+export type EvidenceLinks = EvidenceLink[];
+export type ExternalId = string | null;
+export type Uri = string | null;
+/**
+ * Findings that currently link to this evidence (navigation-only).
+ */
+export type FindingLinks1 = string[];
 export type Taxonomies = Taxonomy[];
-export type Checks1 = string[];
+export type Findings1 = string[];
 /**
  * Root observable type used during data extraction.
  */
@@ -61,6 +70,7 @@ export type ScoreMode = "max" | "sum";
  * schemas matching the actual model_dump() output.
  */
 export interface CyvestInvestigation {
+  schema_version?: "6.0.0";
   /**
    * Stable investigation identity (ULID).
    */
@@ -78,7 +88,8 @@ export interface CyvestInvestigation {
   whitelists: Whitelists;
   audit_log?: AuditLog;
   observables: Observables;
-  checks: Checks;
+  findings: Findings;
+  evidences: Evidences;
   threat_intels: ThreatIntels1;
   enrichments: Enrichments;
   tags: Tags;
@@ -125,11 +136,13 @@ export interface Observables {
 /**
  * Represents a cyber observable (IP, URL, domain, hash, etc.).
  *
- * Observables can be linked to threat intelligence, checks, and other observables
+ * Observables can be linked to threat intelligence, findings, and other observables
  * through relationships.
  */
 export interface Observable {
   type: string;
+  subtype?: Subtype;
+  namespace?: Namespace;
   value: string;
   internal: boolean;
   whitelisted: boolean;
@@ -140,7 +153,7 @@ export interface Observable {
   threat_intels: ThreatIntels;
   relationships: Relationships;
   key: string;
-  check_links: CheckLinks;
+  finding_links: FindingLinks;
   score_display: string;
   [k: string]: unknown;
 }
@@ -157,19 +170,19 @@ export interface Relationship {
   [k: string]: unknown;
 }
 /**
- * Checks keyed by their unique key.
+ * Findings keyed by their unique key.
  */
-export interface Checks {
-  [k: string]: Check;
+export interface Findings {
+  [k: string]: Finding;
 }
 /**
  * Represents a verification step in the investigation.
  *
- * A check validates a specific aspect of the data under investigation
+ * A finding validates a specific aspect of the data under investigation
  * and contributes to the overall investigation score.
  */
-export interface Check {
-  check_name: string;
+export interface Finding {
+  finding_name: string;
   description: string;
   comment: string;
   extra: Extra1;
@@ -177,6 +190,7 @@ export interface Check {
   level: Level;
   origin_investigation_id: string;
   observable_links: ObservableLinks;
+  evidence_links: EvidenceLinks;
   key: string;
   score_display: string;
   [k: string]: unknown;
@@ -185,11 +199,43 @@ export interface Extra1 {
   [k: string]: unknown;
 }
 /**
- * Edge metadata for a Check↔Observable association.
+ * Edge metadata for a Finding↔Observable association.
  */
 export interface ObservableLink {
   observable_key: string;
   propagation_mode?: PropagationMode;
+}
+/**
+ * Edge metadata for a Finding↔Evidence association.
+ */
+export interface EvidenceLink {
+  evidence_key: string;
+}
+/**
+ * Evidence objects keyed by their unique key.
+ */
+export interface Evidences {
+  [k: string]: Evidence;
+}
+/**
+ * Structured material supporting one or more findings.
+ */
+export interface Evidence {
+  type: string;
+  title: string;
+  description: string;
+  source: string;
+  external_id: ExternalId;
+  content: unknown;
+  uri: Uri;
+  captured_at: string;
+  extra: Extra2;
+  key: string;
+  finding_links: FindingLinks1;
+  [k: string]: unknown;
+}
+export interface Extra2 {
+  [k: string]: unknown;
 }
 /**
  * Threat intelligence entries keyed by their unique key.
@@ -207,7 +253,7 @@ export interface ThreatIntel {
   source: string;
   observable_key: string;
   comment: string;
-  extra: Extra2;
+  extra: Extra3;
   score: number;
   level: Level;
   taxonomies: Taxonomies;
@@ -215,7 +261,7 @@ export interface ThreatIntel {
   score_display: string;
   [k: string]: unknown;
 }
-export interface Extra2 {
+export interface Extra3 {
   [k: string]: unknown;
 }
 /**
@@ -255,7 +301,7 @@ export interface Tags {
   [k: string]: Tag;
 }
 /**
- * Groups checks for categorical organization.
+ * Groups findings for categorical organization.
  *
  * Tags allow structuring the investigation into logical sections
  * with aggregated scores and levels. Hierarchy is automatic based on
@@ -264,16 +310,16 @@ export interface Tags {
 export interface Tag {
   name: string;
   description?: string;
-  checks: Checks1;
+  findings: Findings1;
   key: string;
   /**
-   * Calculate the score from direct checks only (no hierarchy).
+   * Calculate the score from direct findings only (no hierarchy).
    *
    * For hierarchical aggregation (including descendant tags), use
    * Investigation.get_tag_aggregated_score() or TagProxy.get_aggregated_score().
    *
    * Returns:
-   *     Total score from direct checks
+   *     Total score from direct findings
    */
   direct_score: number;
   direct_level: Level;
@@ -291,9 +337,12 @@ export interface StatisticsSchema {
   observables_by_type?: ObservablesByType;
   observables_by_level?: ObservablesByLevel;
   observables_by_type_and_level?: ObservablesByTypeAndLevel;
-  total_checks: number;
-  applied_checks: number;
-  checks_by_level?: ChecksByLevel;
+  total_findings: number;
+  applied_findings: number;
+  findings_by_level?: FindingsByLevel;
+  total_evidences: number;
+  evidences_by_type?: EvidencesByType;
+  evidences_by_source?: EvidencesBySource;
   total_threat_intel: number;
   threat_intel_by_source?: ThreatIntelBySource;
   threat_intel_by_level?: ThreatIntelByLevel;
@@ -310,8 +359,14 @@ export interface ObservablesByTypeAndLevel {
     [k: string]: number;
   };
 }
-export interface ChecksByLevel {
+export interface FindingsByLevel {
   [k: string]: string[];
+}
+export interface EvidencesByType {
+  [k: string]: number;
+}
+export interface EvidencesBySource {
+  [k: string]: number;
 }
 export interface ThreatIntelBySource {
   [k: string]: number;

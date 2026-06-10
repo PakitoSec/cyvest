@@ -31,7 +31,8 @@ from cyvest.io_serialization import (
     serialize_investigation,
 )
 from cyvest.levels import Level
-from cyvest.model import Check, Enrichment, Observable, ObservableType
+from cyvest.model import Enrichment, Evidence, Finding, Observable, ObservableType
+from cyvest.model_enums import ObservableSubtype
 
 if TYPE_CHECKING:
     from cyvest.investigation import Investigation
@@ -84,7 +85,7 @@ class _SharedLock:
 
 class SharedInvestigationContext:
     """
-    Shared context for cross-task observable/check/enrichment sharing.
+    Shared context for cross-task observable/finding/enrichment sharing.
 
     Initialize with a Cyvest instance; the canonical state is its investigation.
 
@@ -116,7 +117,8 @@ class SharedInvestigationContext:
         self._score_mode_obs = self._main_investigation._score_engine._score_mode_obs
 
         self._observable_registry: dict[str, Observable] = {}
-        self._check_registry: dict[str, Check] = {}
+        self._finding_registry: dict[str, Finding] = {}
+        self._evidence_registry: dict[str, Evidence] = {}
         self._enrichment_registry: dict[str, Enrichment] = {}
 
         # Initialize registries from the provided canonical investigation so lookups
@@ -264,9 +266,9 @@ class SharedInvestigationContext:
         self._main_investigation.merge_investigation(task_investigation)
         self._refresh_registries_unlocked()
         logger.debug(
-            "Reconciliation complete. Registry: %d observables, %d checks, %d enrichments",
+            "Reconciliation complete. Registry: %d observables, %d findings, %d enrichments",
             len(self._observable_registry),
-            len(self._check_registry),
+            len(self._finding_registry),
             len(self._enrichment_registry),
         )
 
@@ -276,27 +278,45 @@ class SharedInvestigationContext:
             copy = obs.model_copy(deep=True)
             copy._from_shared_context = True
             observable_registry[obs.key] = copy
-        check_registry = {
-            check.key: check.model_copy(deep=True) for check in self._main_investigation.get_all_checks().values()
+        finding_registry = {
+            finding.key: finding.model_copy(deep=True)
+            for finding in self._main_investigation.get_all_findings().values()
+        }
+        evidence_registry = {
+            evidence.key: evidence.model_copy(deep=True)
+            for evidence in self._main_investigation.get_all_evidences().values()
         }
         enrichment_registry = {
             enrichment.key: enrichment.model_copy(deep=True)
             for enrichment in self._main_investigation.get_all_enrichments().values()
         }
         self._observable_registry = observable_registry
-        self._check_registry = check_registry
+        self._finding_registry = finding_registry
+        self._evidence_registry = evidence_registry
         self._enrichment_registry = enrichment_registry
 
     # ---------------------------------------------------------------------
     # Lookups (deep-copied snapshots only)
     # ---------------------------------------------------------------------
 
-    def observable_get(self, obs_type: ObservableType, value: str) -> Observable | None:
-        key = self._observable_key(obs_type, value)
+    def observable_get(
+        self,
+        obs_type: ObservableType | str,
+        value: str,
+        subtype: ObservableSubtype | str | None = None,
+        namespace: str | None = None,
+    ) -> Observable | None:
+        key = self._observable_key(obs_type, value, subtype, namespace)
         return self._lock.run(self._get_observable_by_key_unlocked, key)
 
-    async def observable_aget(self, obs_type: ObservableType, value: str) -> Observable | None:
-        key = self._observable_key(obs_type, value)
+    async def observable_aget(
+        self,
+        obs_type: ObservableType | str,
+        value: str,
+        subtype: ObservableSubtype | str | None = None,
+        namespace: str | None = None,
+    ) -> Observable | None:
+        key = self._observable_key(obs_type, value, subtype, namespace)
         return await self._lock.arun(self._get_observable_by_key_unlocked, key)
 
     def _get_observable_by_key_unlocked(self, key: str) -> Observable | None:
@@ -307,29 +327,50 @@ class SharedInvestigationContext:
         copy._from_shared_context = True
         return copy
 
-    def _observable_key(self, obs_type: ObservableType, value: str) -> str:
+    def _observable_key(
+        self,
+        obs_type: ObservableType | str,
+        value: str,
+        subtype: ObservableSubtype | str | None = None,
+        namespace: str | None = None,
+    ) -> str:
         try:
-            return keys.generate_observable_key(obs_type.value, value)
+            obs_type_value = obs_type.value if isinstance(obs_type, ObservableType) else str(obs_type)
+            subtype_value = subtype.value if isinstance(subtype, ObservableSubtype) else subtype
+            return keys.generate_observable_key(
+                obs_type_value,
+                value,
+                subtype=subtype_value,
+                namespace=namespace,
+            )
         except Exception as e:
             raise ValueError(f"Failed to generate observable key for type='{obs_type}', value='{value}': {e}") from e
 
-    def check_get(self, check_name: str) -> Check | None:
-        key = self._check_key(check_name)
-        return self._lock.run(self._get_check_by_key_unlocked, key)
+    def finding_get(self, finding_name: str) -> Finding | None:
+        key = self._finding_key(finding_name)
+        return self._lock.run(self._get_finding_by_key_unlocked, key)
 
-    async def check_aget(self, check_name: str) -> Check | None:
-        key = self._check_key(check_name)
-        return await self._lock.arun(self._get_check_by_key_unlocked, key)
+    async def finding_aget(self, finding_name: str) -> Finding | None:
+        key = self._finding_key(finding_name)
+        return await self._lock.arun(self._get_finding_by_key_unlocked, key)
 
-    def _get_check_by_key_unlocked(self, key: str) -> Check | None:
-        check = self._check_registry.get(key)
-        return check.model_copy(deep=True) if check else None
+    def _get_finding_by_key_unlocked(self, key: str) -> Finding | None:
+        finding = self._finding_registry.get(key)
+        return finding.model_copy(deep=True) if finding else None
 
-    def _check_key(self, check_name: str) -> str:
+    def _finding_key(self, finding_name: str) -> str:
         try:
-            return keys.generate_check_key(check_name)
+            return keys.generate_finding_key(finding_name)
         except Exception as e:
-            raise ValueError(f"Failed to generate check key for check_name='{check_name}': {e}") from e
+            raise ValueError(f"Failed to generate finding key for finding_name='{finding_name}': {e}") from e
+
+    def evidence_get(self, key: str) -> Evidence | None:
+        evidence = self._lock.run(self._evidence_registry.get, key)
+        return evidence.model_copy(deep=True) if evidence else None
+
+    async def evidence_aget(self, key: str) -> Evidence | None:
+        evidence = await self._lock.arun(self._evidence_registry.get, key)
+        return evidence.model_copy(deep=True) if evidence else None
 
     def enrichment_get(self, name: str, context: str = "") -> Enrichment | None:
         key = self._enrichment_key(name, context)
@@ -387,7 +428,7 @@ class SharedInvestigationContext:
             results.append(copy)
         return results
 
-    # Intentionally minimal: prefer `observable_get()` / `check_get()` and user-side filtering.
+    # Intentionally minimal: prefer `observable_get()` / `finding_get()` and user-side filtering.
 
     # ---------------------------------------------------------------------
     # Serialization helpers (sync + async wrappers)

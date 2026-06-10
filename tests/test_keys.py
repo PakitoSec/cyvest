@@ -3,8 +3,8 @@ Tests for the keys module.
 """
 
 from cyvest.keys import (
-    generate_check_key,
     generate_enrichment_key,
+    generate_finding_key,
     generate_observable_key,
     generate_tag_key,
     generate_threat_intel_key,
@@ -30,11 +30,11 @@ def test_generate_observable_key() -> None:
     assert key != key3
 
 
-def test_generate_check_key() -> None:
-    """Test check key generation."""
-    key = generate_check_key("malware_check")
-    assert key.startswith("chk:")
-    assert "malware_check" in key
+def test_generate_finding_key() -> None:
+    """Test finding key generation."""
+    key = generate_finding_key("malware_finding")
+    assert key.startswith("fnd:")
+    assert "malware_finding" in key
 
 
 def test_generate_threat_intel_key() -> None:
@@ -67,7 +67,7 @@ def test_generate_tag_key() -> None:
 def test_parse_key_type() -> None:
     """Test key type parsing."""
     assert parse_key_type("obs:url:example.com") == "obs"
-    assert parse_key_type("chk:test") == "chk"
+    assert parse_key_type("fnd:test") == "fnd"
     assert parse_key_type("ti:vt:obs_key") == "ti"
     assert parse_key_type("enr:name") == "enr"
     assert parse_key_type("tag:header") == "tag"
@@ -79,18 +79,18 @@ def test_parse_observable_key() -> None:
     assert parse_observable_key("obs:url:example.com") == ("url", "example.com")
     assert parse_observable_key("obs:url:https://example.com/path") == ("url", "https://example.com/path")
     assert parse_observable_key("obs:url:") is None
-    assert parse_observable_key("chk:test") is None
+    assert parse_observable_key("fnd:test") is None
     assert parse_observable_key("invalid") is None
 
 
 def test_validate_key() -> None:
     """Test key validation."""
     assert validate_key("obs:url:example.com") is True
-    assert validate_key("chk:test") is True
+    assert validate_key("fnd:test") is True
     assert validate_key("ti:vt:obs_key") is True
     assert validate_key("invalid") is False
     assert validate_key("obs:url:example.com", "obs") is True
-    assert validate_key("obs:url:example.com", "chk") is False
+    assert validate_key("obs:url:example.com", "fnd") is False
 
 
 def test_key_determinism() -> None:
@@ -98,7 +98,7 @@ def test_key_determinism() -> None:
     # Same inputs should always produce same keys
     for _ in range(10):
         assert generate_observable_key("ipv4", "192.168.1.1") == "obs:ipv4:192.168.1.1"
-        assert generate_check_key("test") == "chk:test"
+        assert generate_finding_key("test") == "fnd:test"
 
 
 def test_get_tag_ancestors() -> None:
@@ -114,7 +114,7 @@ def test_get_tag_ancestors() -> None:
 
 
 def test_is_tag_child_of() -> None:
-    """Test direct child relationship check."""
+    """Test direct child relationship finding."""
     # Direct child
     assert is_tag_child_of("header:auth", "header") is True
     # Not a child (same tag)
@@ -128,7 +128,7 @@ def test_is_tag_child_of() -> None:
 
 
 def test_is_tag_descendant_of() -> None:
-    """Test descendant relationship check (any depth)."""
+    """Test descendant relationship finding (any depth)."""
     # Direct child is a descendant
     assert is_tag_descendant_of("header:auth", "header") is True
     # Grandchild is a descendant

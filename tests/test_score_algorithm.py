@@ -1,7 +1,7 @@
 """
 Tests for the reworked score algorithm.
 
-Tests MAX vs SUM modes, check score calculation, hierarchical propagation,
+Tests MAX vs SUM modes, finding score calculation, hierarchical propagation,
 and audit log access.
 """
 
@@ -146,34 +146,34 @@ def test_sum_mode_multiple_children() -> None:
     assert parent.level == Cyvest.LVL.MALICIOUS
 
 
-def test_check_score_from_single_observable() -> None:
-    """Test check score calculation from a single linked observable."""
+def test_finding_score_from_single_observable() -> None:
+    """Test finding score calculation from a single linked observable."""
     cv = Cyvest()
 
-    # Create check with initial score 0
-    check = cv.check_create("check1", "test", "Test check")
-    assert check.score == Decimal("0")
-    assert check.level == Cyvest.LVL.NONE
+    # Create finding with initial score 0
+    finding = cv.finding_create("finding1", "test", "Test finding")
+    assert finding.score == Decimal("0")
+    assert finding.level == Cyvest.LVL.NONE
 
     # Create observable and add TI
     obs = cv.observable_create(Cyvest.OBS.IPV4, "10.0.0.1")
     cv.observable_add_threat_intel(obs.key, source="source1", score=Decimal("5.0"))
 
-    # Link observable to check
-    cv.check_link_observable(check.key, obs.key)
+    # Link observable to finding
+    cv.finding_link_observable(finding.key, obs.key)
 
-    # Check score should be max of linked observable scores and check's current score
+    # Finding score should be max of linked observable scores and finding's current score
     # max([5.0, 0.0]) = 5.0
-    assert check.score == Decimal("5.0")
-    assert check.level == Cyvest.LVL.MALICIOUS
+    assert finding.score == Decimal("5.0")
+    assert finding.level == Cyvest.LVL.MALICIOUS
 
 
-def test_check_score_from_multiple_observables() -> None:
-    """Test check score calculation from multiple linked observables."""
+def test_finding_score_from_multiple_observables() -> None:
+    """Test finding score calculation from multiple linked observables."""
     cv = Cyvest()
 
-    # Create check
-    check = cv.check_create("check1", "test", "Test check")
+    # Create finding
+    finding = cv.finding_create("finding1", "test", "Test finding")
 
     # Create multiple observables with different scores
     obs1 = cv.observable_create(Cyvest.OBS.IPV4, "10.0.0.1")
@@ -185,43 +185,43 @@ def test_check_score_from_multiple_observables() -> None:
     obs3 = cv.observable_create(Cyvest.OBS.IPV4, "10.0.0.3")
     cv.observable_add_threat_intel(obs3.key, source="source3", score=Decimal("2.0"))
 
-    # Link all observables to check
-    cv.check_link_observable(check.key, obs1.key)
-    cv.check_link_observable(check.key, obs2.key)
-    cv.check_link_observable(check.key, obs3.key)
+    # Link all observables to finding
+    cv.finding_link_observable(finding.key, obs1.key)
+    cv.finding_link_observable(finding.key, obs2.key)
+    cv.finding_link_observable(finding.key, obs3.key)
 
-    # Check score should be max of all linked observable scores
+    # Finding score should be max of all linked observable scores
     # max([3.0, 7.0, 2.0, 0.0]) = 7.0
-    assert check.score == Decimal("7.0")
-    assert check.level == Cyvest.LVL.MALICIOUS
+    assert finding.score == Decimal("7.0")
+    assert finding.level == Cyvest.LVL.MALICIOUS
 
 
-def test_check_score_preserves_higher_current_score() -> None:
-    """Test that check score includes its current score in max calculation."""
+def test_finding_score_preserves_higher_current_score() -> None:
+    """Test that finding score includes its current score in max calculation."""
     cv = Cyvest()
 
-    # Create check with initial score 5.0
-    check = cv.check_create("check1", "test", "Test check", score=Decimal("5.0"))
-    assert check.score == Decimal("5.0")
+    # Create finding with initial score 5.0
+    finding = cv.finding_create("finding1", "test", "Test finding", score=Decimal("5.0"))
+    assert finding.score == Decimal("5.0")
 
     # Create observable with lower score
     obs = cv.observable_create(Cyvest.OBS.IPV4, "10.0.0.1")
     cv.observable_add_threat_intel(obs.key, source="source1", score=Decimal("3.0"))
 
-    # Link observable to check
-    cv.check_link_observable(check.key, obs.key)
+    # Link observable to finding
+    cv.finding_link_observable(finding.key, obs.key)
 
-    # Check score should remain at max([3.0, 5.0]) = 5.0 (no change)
-    assert check.score == Decimal("5.0")
+    # Finding score should remain at max([3.0, 5.0]) = 5.0 (no change)
+    assert finding.score == Decimal("5.0")
 
     # Now add a higher scoring observable
     obs2 = cv.observable_create(Cyvest.OBS.IPV4, "10.0.0.2")
     cv.observable_add_threat_intel(obs2.key, source="source2", score=Decimal("8.0"))
-    cv.check_link_observable(check.key, obs2.key)
+    cv.finding_link_observable(finding.key, obs2.key)
 
-    # Check score should now be max([3.0, 8.0, 5.0]) = 8.0
-    assert check.score == Decimal("8.0")
-    assert check.level == Cyvest.LVL.MALICIOUS
+    # Finding score should now be max([3.0, 8.0, 5.0]) = 8.0
+    assert finding.score == Decimal("8.0")
+    assert finding.level == Cyvest.LVL.MALICIOUS
 
 
 def test_observable_score_audit_events() -> None:
@@ -270,30 +270,30 @@ def test_observable_score_audit_events() -> None:
     assert "source2" in (events[1].reason or "")
 
 
-def test_check_score_audit_events() -> None:
-    """Check score changes should appear in the audit log."""
+def test_finding_score_audit_events() -> None:
+    """Finding score changes should appear in the audit log."""
     cv = Cyvest()
 
-    # Create check
-    check = cv.check_create("check1", "test", "Test check")
+    # Create finding
+    finding = cv.finding_create("finding1", "test", "Test finding")
 
     events = [
         event
         for event in cv.investigation_get_audit_log()
-        if event.object_key == check.key and event.event_type.startswith("SCORE")
+        if event.object_key == finding.key and event.event_type.startswith("SCORE")
     ]
     assert len(events) == 0
 
-    # Create observable and link to check
+    # Create observable and link to finding
     obs = cv.observable_create(Cyvest.OBS.IPV4, "10.0.0.1")
     cv.observable_add_threat_intel(obs.key, source="source1", score=Decimal("5.0"))
-    cv.check_link_observable(check.key, obs.key)
+    cv.finding_link_observable(finding.key, obs.key)
 
     # Audit log should now have entries from score updates
     events = [
         event
         for event in cv.investigation_get_audit_log()
-        if event.object_key == check.key and event.event_type.startswith("SCORE")
+        if event.object_key == finding.key and event.event_type.startswith("SCORE")
     ]
     assert len(events) >= 1
     assert any(entry.details.get("new_score") == 5.0 for entry in events)
@@ -708,9 +708,9 @@ def test_threat_intel_safe_level_with_none_observable() -> None:
     """Test that threat intel with SAFE level upgrades NONE level observable."""
     cv = Cyvest()
 
-    # Create a check with NONE level
-    check = cv.check_create("test_check", "scope", "description")
-    assert check.level == Cyvest.LVL.NONE
+    # Create a finding with NONE level
+    finding = cv.finding_create("test_finding", "scope", "description")
+    assert finding.level == Cyvest.LVL.NONE
 
     # Create observable starting at INFO
     obs = cv.observable_create(Cyvest.OBS.IPV4, "192.168.1.1")
@@ -723,28 +723,28 @@ def test_threat_intel_safe_level_with_none_observable() -> None:
     assert obs.level == Cyvest.LVL.SAFE
 
 
-def test_check_inherits_safe_from_single_observable() -> None:
-    """Test that a check inherits SAFE level from a single SAFE observable."""
+def test_finding_inherits_safe_from_single_observable() -> None:
+    """Test that a finding inherits SAFE level from a single SAFE observable."""
     cv = Cyvest()
 
-    # Create check
-    check = cv.check_create("safe_check", "test", "Test SAFE inheritance")
-    assert check.level == Cyvest.LVL.NONE
+    # Create finding
+    finding = cv.finding_create("safe_finding", "test", "Test SAFE inheritance")
+    assert finding.level == Cyvest.LVL.NONE
 
-    # Create SAFE observable and link to check
+    # Create SAFE observable and link to finding
     safe_obs = cv.observable_create(Cyvest.OBS.DOMAIN, "trusted.example.com", level=Cyvest.LVL.SAFE)
-    cv.check_link_observable(check.key, safe_obs.key)
+    cv.finding_link_observable(finding.key, safe_obs.key)
 
-    # Check should inherit SAFE level
-    assert check.level == Cyvest.LVL.SAFE
+    # Finding should inherit SAFE level
+    assert finding.level == Cyvest.LVL.SAFE
 
 
-def test_check_inherits_safe_from_multiple_observables_all_lower() -> None:
-    """Test that a check inherits SAFE when has SAFE observable and others are lower."""
+def test_finding_inherits_safe_from_multiple_observables_all_lower() -> None:
+    """Test that a finding inherits SAFE when has SAFE observable and others are lower."""
     cv = Cyvest()
 
-    # Create check
-    check = cv.check_create("safe_check", "test", "Test SAFE inheritance")
+    # Create finding
+    finding = cv.finding_create("safe_finding", "test", "Test SAFE inheritance")
 
     # Create mixed observables: SAFE, INFO, TRUSTED
     safe_obs = cv.observable_create(Cyvest.OBS.DOMAIN, "trusted.example.com", level=Cyvest.LVL.SAFE)
@@ -752,93 +752,93 @@ def test_check_inherits_safe_from_multiple_observables_all_lower() -> None:
     trusted_obs = cv.observable_create(Cyvest.OBS.IPV4, "10.0.0.2")
     cv.observable_add_threat_intel(trusted_obs.key, "source", score=Decimal("-1.0"))  # TRUSTED level
 
-    # Link all to check
-    cv.check_link_observable(check.key, safe_obs.key)
-    cv.check_link_observable(check.key, info_obs.key)
-    cv.check_link_observable(check.key, trusted_obs.key)
+    # Link all to finding
+    cv.finding_link_observable(finding.key, safe_obs.key)
+    cv.finding_link_observable(finding.key, info_obs.key)
+    cv.finding_link_observable(finding.key, trusted_obs.key)
 
-    # Check should inherit SAFE level (all observables <= SAFE)
-    assert check.level == Cyvest.LVL.SAFE
+    # Finding should inherit SAFE level (all observables <= SAFE)
+    assert finding.level == Cyvest.LVL.SAFE
 
 
-def test_check_does_not_inherit_safe_when_notable_present() -> None:
-    """Test that a check does NOT inherit SAFE when any observable is NOTABLE or higher."""
+def test_finding_does_not_inherit_safe_when_notable_present() -> None:
+    """Test that a finding does NOT inherit SAFE when any observable is NOTABLE or higher."""
     cv = Cyvest()
 
-    # Create check
-    check = cv.check_create("check1", "test", "Test check")
+    # Create finding
+    finding = cv.finding_create("finding1", "test", "Test finding")
 
     # Create mixed observables: SAFE and NOTABLE
     safe_obs = cv.observable_create(Cyvest.OBS.DOMAIN, "trusted.example.com", level=Cyvest.LVL.SAFE)
     notable_obs = cv.observable_create(Cyvest.OBS.IPV4, "10.0.0.1")
     cv.observable_add_threat_intel(notable_obs.key, "source", score=Decimal("2.0"))  # NOTABLE level
 
-    # Link both to check
-    cv.check_link_observable(check.key, safe_obs.key)
-    cv.check_link_observable(check.key, notable_obs.key)
+    # Link both to finding
+    cv.finding_link_observable(finding.key, safe_obs.key)
+    cv.finding_link_observable(finding.key, notable_obs.key)
 
-    # Check should be NOTABLE (not SAFE) because one observable is NOTABLE
-    assert check.level == Cyvest.LVL.NOTABLE
+    # Finding should be NOTABLE (not SAFE) because one observable is NOTABLE
+    assert finding.level == Cyvest.LVL.NOTABLE
 
 
-def test_check_safe_preserved_when_adding_low_level_observables() -> None:
-    """Test that check SAFE level is preserved when adding INFO/TRUSTED observables."""
+def test_finding_safe_preserved_when_adding_low_level_observables() -> None:
+    """Test that finding SAFE level is preserved when adding INFO/TRUSTED observables."""
     cv = Cyvest()
 
-    # Create check with SAFE observable
-    check = cv.check_create("safe_check", "test", "Test SAFE preservation")
+    # Create finding with SAFE observable
+    finding = cv.finding_create("safe_finding", "test", "Test SAFE preservation")
     safe_obs = cv.observable_create(Cyvest.OBS.DOMAIN, "trusted.example.com", level=Cyvest.LVL.SAFE)
-    cv.check_link_observable(check.key, safe_obs.key)
+    cv.finding_link_observable(finding.key, safe_obs.key)
 
-    # Check should be SAFE
-    assert check.level == Cyvest.LVL.SAFE
+    # Finding should be SAFE
+    assert finding.level == Cyvest.LVL.SAFE
 
     # Add INFO observable
     info_obs = cv.observable_create(Cyvest.OBS.IPV4, "10.0.0.1")
-    cv.check_link_observable(check.key, info_obs.key)
+    cv.finding_link_observable(finding.key, info_obs.key)
 
-    # Check should remain SAFE
-    assert check.level == Cyvest.LVL.SAFE
+    # Finding should remain SAFE
+    assert finding.level == Cyvest.LVL.SAFE
 
 
-def test_check_safe_upgrades_to_malicious_when_malicious_observable_added() -> None:
-    """Test that check can upgrade from SAFE to MALICIOUS when MALICIOUS observable is linked."""
+def test_finding_safe_upgrades_to_malicious_when_malicious_observable_added() -> None:
+    """Test that finding can upgrade from SAFE to MALICIOUS when MALICIOUS observable is linked."""
     cv = Cyvest()
 
-    # Create check with SAFE observable
-    check = cv.check_create("check1", "test", "Test SAFE upgrade")
+    # Create finding with SAFE observable
+    finding = cv.finding_create("finding1", "test", "Test SAFE upgrade")
     safe_obs = cv.observable_create(Cyvest.OBS.DOMAIN, "trusted.example.com", level=Cyvest.LVL.SAFE)
-    cv.check_link_observable(check.key, safe_obs.key)
+    cv.finding_link_observable(finding.key, safe_obs.key)
 
-    # Check should be SAFE
-    assert check.level == Cyvest.LVL.SAFE
+    # Finding should be SAFE
+    assert finding.level == Cyvest.LVL.SAFE
 
     # Add MALICIOUS observable
     malicious_obs = cv.observable_create(Cyvest.OBS.IPV4, "10.0.0.1")
     cv.observable_add_threat_intel(malicious_obs.key, "source", score=Decimal("6.0"))  # MALICIOUS
-    cv.check_link_observable(check.key, malicious_obs.key)
+    cv.finding_link_observable(finding.key, malicious_obs.key)
 
-    # Check should upgrade to MALICIOUS
-    assert check.level == Cyvest.LVL.MALICIOUS
+    # Finding should upgrade to MALICIOUS
+    assert finding.level == Cyvest.LVL.MALICIOUS
 
 
-def test_check_safe_with_multiple_safe_observables() -> None:
-    """Test that check inherits SAFE when multiple observables are all SAFE."""
+def test_finding_safe_with_multiple_safe_observables() -> None:
+    """Test that finding inherits SAFE when multiple observables are all SAFE."""
     cv = Cyvest()
 
-    # Create check
-    check = cv.check_create("safe_check", "test", "Test multiple SAFE")
+    # Create finding
+    finding = cv.finding_create("safe_finding", "test", "Test multiple SAFE")
 
     # Create multiple SAFE observables
     safe_obs1 = cv.observable_create(Cyvest.OBS.DOMAIN, "trusted1.example.com", level=Cyvest.LVL.SAFE)
     safe_obs2 = cv.observable_create(Cyvest.OBS.DOMAIN, "trusted2.example.com", level=Cyvest.LVL.SAFE)
 
-    # Link all to check
-    cv.check_link_observable(check.key, safe_obs1.key)
-    cv.check_link_observable(check.key, safe_obs2.key)
+    # Link all to finding
+    cv.finding_link_observable(finding.key, safe_obs1.key)
+    cv.finding_link_observable(finding.key, safe_obs2.key)
 
-    # Check should be SAFE
-    assert check.level == Cyvest.LVL.SAFE
+    # Finding should be SAFE
+    assert finding.level == Cyvest.LVL.SAFE
 
 
 def test_max_mode_hierarchical_root_barrier_scoring() -> None:
@@ -981,15 +981,15 @@ def test_root_barrier_with_multiple_levels() -> None:
     assert root.level == Cyvest.LVL.MALICIOUS
 
 
-def test_root_propagates_to_checks_not_parents() -> None:
-    """Test that root observable score DOES propagate to checks, but NOT to parent observables."""
+def test_root_propagates_to_findings_not_parents() -> None:
+    """Test that root observable score DOES propagate to findings, but NOT to parent observables."""
     cv = Cyvest(score_mode_obs=ScoreMode.MAX)
 
     root = cv.root()
 
-    # Create a check and link root to it
-    check = cv.check_create("root_check", "test", "Test root check")
-    cv.check_link_observable(check.key, root.key)
+    # Create a finding and link root to it
+    finding = cv.finding_create("root_finding", "test", "Test root finding")
+    cv.finding_link_observable(finding.key, root.key)
 
     # Add threat intel to root
     cv.observable_add_threat_intel(root.key, source="root_ti", score=Decimal("8.0"))
@@ -998,15 +998,15 @@ def test_root_propagates_to_checks_not_parents() -> None:
     assert root.score == Decimal("8.0")
     assert root.level == Cyvest.LVL.MALICIOUS
 
-    # Verify check DOES get root's score (root propagates to checks)
-    assert check.score == Decimal("8.0")
-    assert check.level == Cyvest.LVL.MALICIOUS
+    # Verify finding DOES get root's score (root propagates to findings)
+    assert finding.score == Decimal("8.0")
+    assert finding.level == Cyvest.LVL.MALICIOUS
 
-    # Now create a non-root observable and link to the same check
+    # Now create a non-root observable and link to the same finding
     obs = cv.observable_create(Cyvest.OBS.IPV4, "10.0.0.1")
     cv.observable_add_threat_intel(obs.key, source="ip_ti", score=Decimal("5.0"))
-    cv.check_link_observable(check.key, obs.key)
+    cv.finding_link_observable(finding.key, obs.key)
 
-    # Check should now get max of both observables (root=8.0, ip=5.0)
-    assert check.score == Decimal("8.0")
-    assert check.level == Cyvest.LVL.MALICIOUS
+    # Finding should now get max of both observables (root=8.0, ip=5.0)
+    assert finding.score == Decimal("8.0")
+    assert finding.level == Cyvest.LVL.MALICIOUS

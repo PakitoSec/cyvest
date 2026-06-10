@@ -25,18 +25,18 @@ cv.observable_add_threat_intel(
     comment="Known phishing site",
 )
 
-url_check = cv.check_create(
+url_finding = cv.finding_create(
     "url_analysis",
     "Analyze URLs in email",
     score=Decimal("8.5"),
 )
-cv.check_link_observable(url_check.key, phishing_url.key)
+cv.finding_link_observable(url_finding.key, phishing_url.key)
 
 print(cv.get_global_score(), cv.get_global_level())
 ```
 
 !!! tip "Context-first mindset"
-    Pass incident metadata through `Cyvest(root_data={...})`. Every tag, check, and export inherits it so you never lose analyst intent.
+    Pass incident metadata through `Cyvest(root_data={...})`. Every tag, finding, and export inherits it so you never lose analyst intent.
 
 !!! tip "Deterministic investigation IDs"
     For reproducible reports that enable diffing between runs, pass a custom `investigation_id`:
@@ -46,7 +46,7 @@ print(cv.get_global_score(), cv.get_global_level())
     Without this parameter, a unique ULID is auto-generated for each run.
 
 !!! note "Immutable proxies"
-    `observable_create`, `check_create`, and the fluent helpers return read-only proxies (`ObservableProxy`, `CheckProxy`, …). Inspect their attributes freely, but use the Cyvest facade or the proxy helper methods for any updates so the score engine runs automatically.
+    `observable_create`, `finding_create`, and the fluent helpers return read-only proxies (`ObservableProxy`, `FindingProxy`, …). Inspect their attributes freely, but use the Cyvest facade or the proxy helper methods for any updates so the score engine runs automatically.
 
 ---
 
@@ -64,7 +64,7 @@ url = (
 )
 
 (
-    cv.check("url_check", "Check suspicious URL")
+    cv.finding("url_finding", "Finding suspicious URL")
     .link_observable(url)
     .with_score(Decimal("8.5"))
 )
@@ -120,14 +120,14 @@ cv = Cyvest()
 
 # Simple: pass tag names directly (auto-creates tags)
 (
-    cv.check("c2_detection", "Detect C2 communication")
+    cv.finding("c2_detection", "Detect C2 communication")
     .tagged("network", "suspicious")  # multiple tags at once
 )
 
 # With description: create tag first
 network_tag = cv.tag("network:analysis", "Network telemetry")
 (
-    cv.check("ids_east", "IDS signals from east DC")
+    cv.finding("ids_east", "IDS signals from east DC")
     .tagged(network_tag, "network:analysis:east_dc")  # mix TagProxy and strings
 )
 
@@ -135,7 +135,7 @@ network_tag = cv.tag("network:analysis", "Network telemetry")
 children = cv.tag_get_children("network:analysis")  # Returns east_dc tag
 ```
 
-Tags organize checks with automatic hierarchy. Creating `header:auth:dkim` auto-creates `header` and `header:auth` tags.
+Tags organize findings with automatic hierarchy. Creating `header:auth:dkim` auto-creates `header` and `header:auth` tags.
 
 ---
 
@@ -152,10 +152,10 @@ cv = Cyvest()
 console = Console()
 display_summary(cv, console)
 
-# Hide unscored and INFO-level checks
+# Hide unscored and INFO-level findings
 display_summary(cv, console, exclude_levels=[cv.LVL.NONE, cv.LVL.INFO])
 
-# Show only high-severity checks (SUSPICIOUS and above)
+# Show only high-severity findings (SUSPICIOUS and above)
 display_summary(
     cv,
     console,
@@ -171,17 +171,17 @@ cv.io_save_markdown("redacted_report.md", include_observables=False)
 cv.io_save_json("deterministic.json", include_audit_log=False)
 ```
 
-!!! tip "Filtering checks by severity"
+!!! tip "Filtering findings by severity"
     Use `exclude_levels` to hide noise tiers. By default, `Cyvest.LVL.NONE` is excluded to skip
-    unscored checks; add `Cyvest.LVL.INFO` or `Cyvest.LVL.NOTABLE` to focus on actionable findings in
-    larger investigations. Pass an empty list (`exclude_levels=[]`) to show every check,
+    unscored findings; add `Cyvest.LVL.INFO` or `Cyvest.LVL.NOTABLE` to focus on actionable findings in
+    larger investigations. Pass an empty list (`exclude_levels=[]`) to show every finding,
     including unscored ones.
 
 !!! question "Where do exports live?"
     The docs assume you write to the project root, but automation pipelines typically point to `dist/` (JSON) and `reports/` (Markdown/PDF). Adjust paths to match your workflow.
 
 !!! note "Provenance fields in JSON"
-    Exports include `investigation_id`, optional `investigation_name`, and the investigation-level `audit_log`, plus check origins (`origin_investigation_id`) and link fields (`observable_links`, `check_links`) needed for scoring after merges.
+    Exports include `investigation_id`, optional `investigation_name`, and the investigation-level `audit_log`, plus finding origins (`origin_investigation_id`) and link fields (`observable_links`, `finding_links`) needed for scoring after merges.
 
 ---
 

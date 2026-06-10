@@ -35,18 +35,18 @@ def test_observable_proxy_update_metadata() -> None:
     assert obs.extra == {"only": "new"}
 
 
-def test_check_proxy_update_metadata() -> None:
-    """CheckProxy.update_metadata should allow comment/description/extra updates."""
+def test_finding_proxy_update_metadata() -> None:
+    """FindingProxy.update_metadata should allow comment/description/extra updates."""
     cv = Cyvest()
-    check = cv.check_create("check-id", "scope", "Initial description")
+    finding = cv.finding_create("finding-id", "scope", "Initial description")
 
-    check.update_metadata(comment="Updated comment", description="New description", extra={"k": "v"})
-    assert check.comment == "Updated comment"
-    assert check.description == "New description"
-    assert check.extra == {"k": "v"}
+    finding.update_metadata(comment="Updated comment", description="New description", extra={"k": "v"})
+    assert finding.comment == "Updated comment"
+    assert finding.description == "New description"
+    assert finding.extra == {"k": "v"}
 
-    check.update_metadata(extra={"k": "override"}, merge_extra=False)
-    assert check.extra == {"k": "override"}
+    finding.update_metadata(extra={"k": "override"}, merge_extra=False)
+    assert finding.extra == {"k": "override"}
 
 
 def test_threat_intel_proxy_update_metadata() -> None:
@@ -132,7 +132,7 @@ def test_proxy_dir_exposes_public_fields() -> None:
     """Proxies should list readable dataclass fields for IDE auto-completion."""
     cv = Cyvest()
     obs = cv.observable_create(Cyvest.OBS.URL, "https://example.com")
-    check = cv.check_create("check-id", "scope", "desc")
+    finding = cv.finding_create("finding-id", "scope", "desc")
     tag = cv.tag_create("root")
     ti = cv.observable_add_threat_intel(obs.key, source="vt", score=Decimal("1"), comment="c")
     enrichment = cv.enrichment_create("metadata", {"k": "v"}, context="ctx")
@@ -148,11 +148,11 @@ def test_proxy_dir_exposes_public_fields() -> None:
             "extra",
             "score",
             "level",
-            "check_links",
+            "finding_links",
             "key",
         },
-        check: {
-            "check_name",
+        finding: {
+            "finding_name",
             "description",
             "comment",
             "extra",
@@ -165,7 +165,7 @@ def test_proxy_dir_exposes_public_fields() -> None:
         tag: {
             "name",
             "description",
-            "checks",
+            "findings",
             "key",
         },
         ti: {
@@ -194,12 +194,12 @@ def test_proxy_public_fields_are_deep_copied() -> None:
     """Mutable model data exposed through proxies should be defensive copies."""
     cv = Cyvest()
     obs = cv.observable_create(Cyvest.OBS.DOMAIN, "example.com")
-    check = cv.check_create("check-id", "scope", "desc")
-    linked_check = cv.check_link_observable(check.key, obs.key)
-    assert linked_check is not None
+    finding = cv.finding_create("finding-id", "scope", "desc")
+    linked_finding = cv.finding_link_observable(finding.key, obs.key)
+    assert linked_finding is not None
 
     tag = cv.tag_create("root")
-    tag.add_check(check)
+    tag.add_finding(finding)
 
     ti = cv.observable_add_threat_intel(
         obs.key,
@@ -215,14 +215,14 @@ def test_proxy_public_fields_are_deep_copied() -> None:
     extra_copy["owner"] = "secops"
     assert "owner" not in obs.extra
 
-    links_copy = check.observable_links
+    links_copy = finding.observable_links
     assert len(links_copy) == 1
     links_copy.clear()
-    assert len(check.observable_links) == 1
+    assert len(finding.observable_links) == 1
 
-    checks_copy = tag.checks
-    checks_copy.clear()
-    assert len(tag.checks) == 1
+    findings_copy = tag.findings
+    findings_copy.clear()
+    assert len(tag.findings) == 1
 
     taxonomies_copy = ti.taxonomies
     taxonomies_copy.append({"level": Cyvest.LVL.SUSPICIOUS, "name": "confidence", "value": "low"})
@@ -233,31 +233,31 @@ def test_proxy_public_fields_are_deep_copied() -> None:
     data_copy["host"]["ip"] = "10.0.0.2"
     assert enrichment.data["host"]["ip"] == "10.0.0.1"
 
-    linked_copy = obs.check_links
-    assert check.key in linked_copy
-    linked_copy.append("another-check")
-    assert obs.check_links == [check.key]
+    linked_copy = obs.finding_links
+    assert finding.key in linked_copy
+    linked_copy.append("another-finding")
+    assert obs.finding_links == [finding.key]
 
 
-def test_check_proxy_tagged_with_string_auto_creates() -> None:
-    """CheckProxy.tagged should auto-create tags from strings."""
+def test_finding_proxy_tagged_with_string_auto_creates() -> None:
+    """FindingProxy.tagged should auto-create tags from strings."""
     cv = Cyvest()
-    check = cv.check_create("check-id", "scope", "desc")
+    finding = cv.finding_create("finding-id", "scope", "desc")
 
-    check.tagged("network")
+    finding.tagged("network")
 
     tag = cv.tag_get("network")
     assert tag is not None
     assert tag.name == "network"
-    assert check.key in [c.key for c in tag.checks]
+    assert finding.key in [c.key for c in tag.findings]
 
 
-def test_check_proxy_tagged_with_multiple_strings() -> None:
-    """CheckProxy.tagged should accept multiple string tags."""
+def test_finding_proxy_tagged_with_multiple_strings() -> None:
+    """FindingProxy.tagged should accept multiple string tags."""
     cv = Cyvest()
-    check = cv.check_create("check-id", "scope", "desc")
+    finding = cv.finding_create("finding-id", "scope", "desc")
 
-    check.tagged("network", "suspicious", "c2:detection")
+    finding.tagged("network", "suspicious", "c2:detection")
 
     assert cv.tag_get("network") is not None
     assert cv.tag_get("suspicious") is not None
@@ -266,45 +266,45 @@ def test_check_proxy_tagged_with_multiple_strings() -> None:
     assert cv.tag_get("c2") is not None
 
 
-def test_check_proxy_tagged_with_tag_proxy() -> None:
-    """CheckProxy.tagged should accept TagProxy objects."""
+def test_finding_proxy_tagged_with_tag_proxy() -> None:
+    """FindingProxy.tagged should accept TagProxy objects."""
     cv = Cyvest()
-    check = cv.check_create("check-id", "scope", "desc")
+    finding = cv.finding_create("finding-id", "scope", "desc")
     tag = cv.tag_create("analysis", "Analysis tag")
 
-    check.tagged(tag)
+    finding.tagged(tag)
 
-    assert check.key in [c.key for c in tag.checks]
+    assert finding.key in [c.key for c in tag.findings]
 
 
-def test_check_proxy_tagged_mixed_types() -> None:
-    """CheckProxy.tagged should accept a mix of strings and TagProxy."""
+def test_finding_proxy_tagged_mixed_types() -> None:
+    """FindingProxy.tagged should accept a mix of strings and TagProxy."""
     cv = Cyvest()
-    check = cv.check_create("check-id", "scope", "desc")
+    finding = cv.finding_create("finding-id", "scope", "desc")
     existing_tag = cv.tag_create("existing", "Existing tag")
 
-    check.tagged(existing_tag, "new_tag", "another:nested")
+    finding.tagged(existing_tag, "new_tag", "another:nested")
 
-    assert check.key in [c.key for c in existing_tag.checks]
+    assert finding.key in [c.key for c in existing_tag.findings]
     assert cv.tag_get("new_tag") is not None
     assert cv.tag_get("another:nested") is not None
     assert cv.tag_get("another") is not None
 
 
-def test_check_proxy_tagged_returns_self() -> None:
-    """CheckProxy.tagged should return self for chaining."""
+def test_finding_proxy_tagged_returns_self() -> None:
+    """FindingProxy.tagged should return self for chaining."""
     cv = Cyvest()
-    check = cv.check_create("check-id", "scope", "desc")
+    finding = cv.finding_create("finding-id", "scope", "desc")
 
-    result = check.tagged("network").tagged("suspicious")
+    result = finding.tagged("network").tagged("suspicious")
 
-    assert result is check
+    assert result is finding
 
 
-def test_check_proxy_tagged_invalid_type_raises() -> None:
-    """CheckProxy.tagged should raise TypeError for invalid input."""
+def test_finding_proxy_tagged_invalid_type_raises() -> None:
+    """FindingProxy.tagged should raise TypeError for invalid input."""
     cv = Cyvest()
-    check = cv.check_create("check-id", "scope", "desc")
+    finding = cv.finding_create("finding-id", "scope", "desc")
 
     with pytest.raises(TypeError, match="Tag must provide a key"):
-        check.tagged(123)  # type: ignore[arg-type]
+        finding.tagged(123)  # type: ignore[arg-type]

@@ -14,7 +14,8 @@ type IconName =
   | "flask"
   | "question"
   | "crosshair"
-  | "check"
+  | "finding"
+  | "evidence"
   | "tag";
 
 const ICON_PATHS: Record<IconName, string> = {
@@ -36,8 +37,10 @@ const ICON_PATHS: Record<IconName, string> = {
     '<circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><path d="M12 17h.01"/>',
   crosshair:
     '<circle cx="12" cy="12" r="10"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/>',
-  check:
+  finding:
     '<rect x="7" y="3" width="10" height="4" rx="1.5"/><rect x="5" y="5" width="14" height="16" rx="2"/><path d="m9 14 2.5 2.5L16 12"/>',
+  evidence:
+    '<path d="M4 4h16v16H4z"/><path d="M8 9h8M8 13h8M8 17h5"/>',
   tag:
     '<path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3.4 13.4a2 2 0 0 1 0-2.8l7.2-7.2a2 2 0 0 1 2.8 0l7.2 7.2a2 2 0 0 1 0 2.8z"/><circle cx="9" cy="9" r="1.2"/>',
 };
@@ -51,11 +54,17 @@ export const OBSERVABLE_ICON_NAME_MAP: Record<string, IconName> = {
   hash: "hash",
   file: "file",
   artifact: "flask",
+  host: "domain",
+  process: "finding",
+  user: "mail",
+  command_line: "link",
+  cloud_resource: "globe",
 };
 
 export const INVESTIGATION_ICON_NAME_MAP: Record<InvestigationCyNodeType, IconName> = {
   root: "crosshair",
-  check: "check",
+  finding: "finding",
+  evidence: "evidence",
   tag: "tag",
 };
 

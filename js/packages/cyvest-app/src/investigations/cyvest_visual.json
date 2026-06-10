@@ -1,4 +1,5 @@
 {
+  "schema_version": "6.0.0",
   "investigation_id": "cyvest-visual-example",
   "investigation_name": "Visualization Example",
   "score": 39.5,
@@ -9,6 +10,8 @@
   "observables": {
     "obs:file:root": {
       "type": "file",
+      "subtype": null,
+      "namespace": null,
       "value": "root",
       "internal": false,
       "whitelisted": false,
@@ -40,11 +43,13 @@
         }
       ],
       "key": "obs:file:root",
-      "check_links": [],
+      "finding_links": [],
       "score_display": "0.00"
     },
     "obs:domain:evil-phishing.com": {
       "type": "domain",
+      "subtype": null,
+      "namespace": null,
       "value": "evil-phishing.com",
       "internal": false,
       "whitelisted": false,
@@ -58,13 +63,15 @@
       ],
       "relationships": [],
       "key": "obs:domain:evil-phishing.com",
-      "check_links": [
-        "chk:infrastructure"
+      "finding_links": [
+        "fnd:infrastructure"
       ],
       "score_display": "9.00"
     },
     "obs:ipv4:185.220.101.50": {
       "type": "ipv4",
+      "subtype": null,
+      "namespace": null,
       "value": "185.220.101.50",
       "internal": false,
       "whitelisted": false,
@@ -83,13 +90,15 @@
         }
       ],
       "key": "obs:ipv4:185.220.101.50",
-      "check_links": [
-        "chk:infrastructure"
+      "finding_links": [
+        "fnd:infrastructure"
       ],
       "score_display": "9.50"
     },
     "obs:domain:sketchy-site.net": {
       "type": "domain",
+      "subtype": null,
+      "namespace": null,
       "value": "sketchy-site.net",
       "internal": false,
       "whitelisted": false,
@@ -108,11 +117,13 @@
         }
       ],
       "key": "obs:domain:sketchy-site.net",
-      "check_links": [],
+      "finding_links": [],
       "score_display": "4.50"
     },
     "obs:ipv4:192.168.100.5": {
       "type": "ipv4",
+      "subtype": null,
+      "namespace": null,
       "value": "192.168.100.5",
       "internal": false,
       "whitelisted": false,
@@ -125,11 +136,13 @@
       ],
       "relationships": [],
       "key": "obs:ipv4:192.168.100.5",
-      "check_links": [],
+      "finding_links": [],
       "score_display": "3.00"
     },
     "obs:email:attacker@evil-phishing.com": {
       "type": "email",
+      "subtype": null,
+      "namespace": null,
       "value": "attacker@evil-phishing.com",
       "internal": false,
       "whitelisted": false,
@@ -148,13 +161,15 @@
         }
       ],
       "key": "obs:email:attacker@evil-phishing.com",
-      "check_links": [
-        "chk:email_analysis"
+      "finding_links": [
+        "fnd:email_analysis"
       ],
       "score_display": "8.00"
     },
     "obs:email:victim@company.com": {
       "type": "email",
+      "subtype": null,
+      "namespace": null,
       "value": "victim@company.com",
       "internal": true,
       "whitelisted": false,
@@ -167,13 +182,15 @@
       ],
       "relationships": [],
       "key": "obs:email:victim@company.com",
-      "check_links": [
-        "chk:email_analysis"
+      "finding_links": [
+        "fnd:email_analysis"
       ],
       "score_display": "-1.00"
     },
     "obs:artifact:phishing email - invoice #12345": {
       "type": "artifact",
+      "subtype": null,
+      "namespace": null,
       "value": "Phishing Email - Invoice #12345",
       "internal": false,
       "whitelisted": false,
@@ -207,13 +224,15 @@
         }
       ],
       "key": "obs:artifact:phishing email - invoice #12345",
-      "check_links": [
-        "chk:email_analysis"
+      "finding_links": [
+        "fnd:email_analysis"
       ],
       "score_display": "10.00"
     },
     "obs:url:https://evil-phishing.com/login": {
       "type": "url",
+      "subtype": null,
+      "namespace": null,
       "value": "https://evil-phishing.com/login",
       "internal": false,
       "whitelisted": false,
@@ -232,13 +251,15 @@
         }
       ],
       "key": "obs:url:https://evil-phishing.com/login",
-      "check_links": [
-        "chk:url_analysis"
+      "finding_links": [
+        "fnd:url_analysis"
       ],
       "score_display": "10.00"
     },
     "obs:url:https://evil-phishing.com/verify": {
       "type": "url",
+      "subtype": null,
+      "namespace": null,
       "value": "https://evil-phishing.com/verify",
       "internal": false,
       "whitelisted": false,
@@ -257,13 +278,15 @@
         }
       ],
       "key": "obs:url:https://evil-phishing.com/verify",
-      "check_links": [
-        "chk:url_analysis"
+      "finding_links": [
+        "fnd:url_analysis"
       ],
       "score_display": "9.00"
     },
     "obs:file:invoice.exe": {
       "type": "file",
+      "subtype": null,
+      "namespace": null,
       "value": "invoice.exe",
       "internal": false,
       "whitelisted": false,
@@ -287,13 +310,15 @@
         }
       ],
       "key": "obs:file:invoice.exe",
-      "check_links": [
-        "chk:malware_detection"
+      "finding_links": [
+        "fnd:malware_detection"
       ],
       "score_display": "10.00"
     },
     "obs:domain:google.com": {
       "type": "domain",
+      "subtype": null,
+      "namespace": null,
       "value": "google.com",
       "internal": false,
       "whitelisted": true,
@@ -306,11 +331,13 @@
       ],
       "relationships": [],
       "key": "obs:domain:google.com",
-      "check_links": [],
+      "finding_links": [],
       "score_display": "-2.00"
     },
     "obs:domain:new-service.cloud": {
       "type": "domain",
+      "subtype": null,
+      "namespace": null,
       "value": "new-service.cloud",
       "internal": false,
       "whitelisted": false,
@@ -323,13 +350,13 @@
       ],
       "relationships": [],
       "key": "obs:domain:new-service.cloud",
-      "check_links": [],
+      "finding_links": [],
       "score_display": "2.00"
     }
   },
-  "checks": {
-    "chk:email_analysis": {
-      "check_name": "email_analysis",
+  "findings": {
+    "fnd:email_analysis": {
+      "finding_name": "email_analysis",
       "description": "Phishing email analysis",
       "comment": "",
       "extra": {},
@@ -350,11 +377,12 @@
           "propagation_mode": "LOCAL_ONLY"
         }
       ],
-      "key": "chk:email_analysis",
+      "evidence_links": [],
+      "key": "fnd:email_analysis",
       "score_display": "10.00"
     },
-    "chk:url_analysis": {
-      "check_name": "url_analysis",
+    "fnd:url_analysis": {
+      "finding_name": "url_analysis",
       "description": "Malicious URLs found in email",
       "comment": "",
       "extra": {},
@@ -371,11 +399,12 @@
           "propagation_mode": "LOCAL_ONLY"
         }
       ],
-      "key": "chk:url_analysis",
+      "evidence_links": [],
+      "key": "fnd:url_analysis",
       "score_display": "10.00"
     },
-    "chk:infrastructure": {
-      "check_name": "infrastructure",
+    "fnd:infrastructure": {
+      "finding_name": "infrastructure",
       "description": "Malicious infrastructure identified",
       "comment": "",
       "extra": {},
@@ -392,11 +421,12 @@
           "propagation_mode": "LOCAL_ONLY"
         }
       ],
-      "key": "chk:infrastructure",
+      "evidence_links": [],
+      "key": "fnd:infrastructure",
       "score_display": "9.50"
     },
-    "chk:malware_detection": {
-      "check_name": "malware_detection",
+    "fnd:malware_detection": {
+      "finding_name": "malware_detection",
       "description": "Malware file analysis",
       "comment": "",
       "extra": {},
@@ -409,10 +439,12 @@
           "propagation_mode": "LOCAL_ONLY"
         }
       ],
-      "key": "chk:malware_detection",
+      "evidence_links": [],
+      "key": "fnd:malware_detection",
       "score_display": "10.00"
     }
   },
+  "evidences": {},
   "threat_intels": {
     "ti:virustotal:obs:domain:evil-phishing.com": {
       "source": "VirusTotal",
@@ -563,7 +595,7 @@
     "tag:phishing": {
       "name": "phishing",
       "description": "",
-      "checks": [],
+      "findings": [],
       "key": "tag:phishing",
       "direct_score": 0.0,
       "direct_level": "INFO"
@@ -571,7 +603,7 @@
     "tag:phishing:investigation": {
       "name": "phishing:investigation",
       "description": "",
-      "checks": [],
+      "findings": [],
       "key": "tag:phishing:investigation",
       "direct_score": 0.0,
       "direct_level": "INFO"
@@ -579,8 +611,8 @@
     "tag:phishing:investigation:email": {
       "name": "phishing:investigation:email",
       "description": "",
-      "checks": [
-        "chk:email_analysis"
+      "findings": [
+        "fnd:email_analysis"
       ],
       "key": "tag:phishing:investigation:email",
       "direct_score": 10.0,
@@ -589,9 +621,9 @@
     "tag:phishing:investigation:network": {
       "name": "phishing:investigation:network",
       "description": "",
-      "checks": [
-        "chk:url_analysis",
-        "chk:infrastructure"
+      "findings": [
+        "fnd:url_analysis",
+        "fnd:infrastructure"
       ],
       "key": "tag:phishing:investigation:network",
       "direct_score": 19.5,
@@ -600,8 +632,8 @@
     "tag:phishing:investigation:malware": {
       "name": "phishing:investigation:malware",
       "description": "",
-      "checks": [
-        "chk:malware_detection"
+      "findings": [
+        "fnd:malware_detection"
       ],
       "key": "tag:phishing:investigation:malware",
       "direct_score": 10.0,
@@ -654,16 +686,19 @@
         "MALICIOUS": 2
       }
     },
-    "total_checks": 4,
-    "applied_checks": 4,
-    "checks_by_level": {
+    "total_findings": 4,
+    "applied_findings": 4,
+    "findings_by_level": {
       "MALICIOUS": [
-        "chk:email_analysis",
-        "chk:url_analysis",
-        "chk:infrastructure",
-        "chk:malware_detection"
+        "fnd:email_analysis",
+        "fnd:url_analysis",
+        "fnd:infrastructure",
+        "fnd:malware_detection"
       ]
     },
+    "total_evidences": 0,
+    "evidences_by_type": {},
+    "evidences_by_source": {},
     "total_threat_intel": 13,
     "threat_intel_by_source": {
       "VirusTotal": 3,

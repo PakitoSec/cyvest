@@ -461,7 +461,7 @@ class TestExtractDomains:
 
     def test_extract_domains_deduplicates(self):
         # Deduplication happens in extract_all, not in extract_domains
-        text = "Check example.com and example.com"
+        text = "Finding example.com and example.com"
         domains = list(extract_domains(text))
         assert len(domains) == 2  # extract_domains yields all matches
         # extract_all deduplicates and counts
@@ -591,7 +591,7 @@ class TestExtractCLI:
         assert result.exit_code == 0
         assert "192.168.1.1" in result.output
         # URL should not be in output since we only asked for IPs
-        # (but it may appear in logs, so we check the data lines)
+        # (but it may appear in logs, so we finding the data lines)
         lines = [line for line in result.output.split("\n") if "\t" in line]
         assert all("ipv4" in line or "ipv6" in line for line in lines)
 

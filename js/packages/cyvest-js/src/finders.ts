@@ -2,13 +2,13 @@
  * Finder utilities for querying and filtering Cyvest Investigation data.
  *
  * These functions provide filtering, searching, and cross-referencing
- * capabilities for observables, checks, and threat intel.
+ * capabilities for observables, findings, and threat intel.
  */
 
 import type {
   CyvestInvestigation,
   Observable,
-  Check,
+  Finding,
   ThreatIntel,
   Tag,
   Level,
@@ -184,53 +184,53 @@ export function findObservablesWithThreatIntel(
 }
 
 // ============================================================================
-// Check Finders
+// Finding Finders
 // ============================================================================
 
 /**
- * Find all checks at a specific level.
+ * Find all findings at a specific level.
  *
  * @param inv - The investigation to search
  * @param level - Security level to filter by
- * @returns Array of matching checks
+ * @returns Array of matching findings
  */
-export function findChecksByLevel(
+export function findFindingsByLevel(
   inv: CyvestInvestigation,
   level: Level
-): Check[] {
-  return Object.values(inv.checks).filter((check) => check.level === level);
+): Finding[] {
+  return Object.values(inv.findings).filter((finding) => finding.level === level);
 }
 
 /**
- * Find all checks at or above a minimum level.
+ * Find all findings at or above a minimum level.
  *
  * @param inv - The investigation to search
  * @param minLevel - Minimum security level
- * @returns Array of matching checks
+ * @returns Array of matching findings
  */
-export function findChecksAtLeast(
+export function findFindingsAtLeast(
   inv: CyvestInvestigation,
   minLevel: Level
-): Check[] {
-  return Object.values(inv.checks).filter((check) =>
-    isLevelAtLeast(check.level, minLevel)
+): Finding[] {
+  return Object.values(inv.findings).filter((finding) =>
+    isLevelAtLeast(finding.level, minLevel)
   );
 }
 
 /**
- * Find checks by check name.
+ * Find findings by finding name.
  *
  * @param inv - The investigation to search
- * @param checkName - Check name to search for
- * @returns The matching check or undefined
+ * @param findingName - Finding name to search for
+ * @returns The matching finding or undefined
  */
-export function findCheckByName(
+export function findFindingByName(
   inv: CyvestInvestigation,
-  checkName: string
-): Check | undefined {
-  const normalizedName = checkName.trim().toLowerCase();
-  return Object.values(inv.checks).find(
-    (check) => check.check_name.toLowerCase() === normalizedName
+  findingName: string
+): Finding | undefined {
+  const normalizedName = findingName.trim().toLowerCase();
+  return Object.values(inv.findings).find(
+    (finding) => finding.finding_name.toLowerCase() === normalizedName
   );
 }
 
@@ -338,43 +338,43 @@ export function findTagsByNamePattern(
 // ============================================================================
 
 /**
- * Find all checks that generated or reference a specific observable.
+ * Find all findings that generated or reference a specific observable.
  *
  * @param inv - The investigation to search
  * @param observableKey - Key of the observable
- * @returns Array of checks that reference this observable
+ * @returns Array of findings that reference this observable
  *
  * @example
  * ```ts
- * const checks = findChecksForObservable(investigation, "obs:ipv4:192.168.1.1");
+ * const findings = findFindingsForObservable(investigation, "obs:ipv4:192.168.1.1");
  * ```
  */
-export function findChecksForObservable(
+export function findFindingsForObservable(
   inv: CyvestInvestigation,
   observableKey: string
-): Check[] {
-  const result: Check[] = [];
+): Finding[] {
+  const result: Finding[] = [];
   const seen = new Set<string>();
 
   const observable = inv.observables[observableKey];
   if (observable) {
-    for (const checkKey of observable.check_links) {
-      const check = inv.checks[checkKey];
-      if (check && !seen.has(check.key)) {
-        result.push(check);
-        seen.add(check.key);
+    for (const findingKey of observable.finding_links) {
+      const finding = inv.findings[findingKey];
+      if (finding && !seen.has(finding.key)) {
+        result.push(finding);
+        seen.add(finding.key);
       }
     }
   }
 
-  for (const check of Object.values(inv.checks)) {
-    if (seen.has(check.key)) {
+  for (const finding of Object.values(inv.findings)) {
+    if (seen.has(finding.key)) {
       continue;
     }
 
-    if (check.observable_links.some((link) => link.observable_key === observableKey)) {
-      result.push(check);
-      seen.add(check.key);
+    if (finding.observable_links.some((link) => link.observable_key === observableKey)) {
+      result.push(finding);
+      seen.add(finding.key);
     }
   }
 
@@ -407,20 +407,20 @@ export function findThreatIntelsForObservable(
 }
 
 /**
- * Find all observables referenced by a specific check.
+ * Find all observables referenced by a specific finding.
  *
  * @param inv - The investigation to search
- * @param checkKey - Key of the check
- * @returns Array of observables referenced by this check
+ * @param findingKey - Key of the finding
+ * @returns Array of observables referenced by this finding
  */
-export function findObservablesForCheck(
+export function findObservablesForFinding(
   inv: CyvestInvestigation,
-  checkKey: string
+  findingKey: string
 ): Observable[] {
-  const check = inv.checks[checkKey];
-  if (check) {
+  const finding = inv.findings[findingKey];
+  if (finding) {
     const keys = new Set<string>();
-    for (const link of check.observable_links) {
+    for (const link of finding.observable_links) {
       keys.add(link.observable_key);
     }
 
@@ -432,42 +432,42 @@ export function findObservablesForCheck(
 }
 
 /**
- * Find all checks for a specific tag.
+ * Find all findings for a specific tag.
  *
  * @param inv - The investigation to search
  * @param tagKey - Key of the tag
- * @param recursive - Include checks from descendant tags (default: false)
- * @returns Array of checks in the tag
+ * @param recursive - Include findings from descendant tags (default: false)
+ * @returns Array of findings in the tag
  */
-export function findChecksForTag(
+export function findFindingsForTag(
   inv: CyvestInvestigation,
   tagKey: string,
   recursive = false
-): Check[] {
-  const result: Check[] = [];
+): Finding[] {
+  const result: Finding[] = [];
   const tag = inv.tags[tagKey];
 
   if (!tag) {
     return result;
   }
 
-  // Get direct checks
-  for (const checkKey of tag.checks) {
-    const check = inv.checks[checkKey];
-    if (check) {
-      result.push(check);
+  // Get direct findings
+  for (const findingKey of tag.findings) {
+    const finding = inv.findings[findingKey];
+    if (finding) {
+      result.push(finding);
     }
   }
 
-  // If recursive, get checks from descendant tags
+  // If recursive, get findings from descendant tags
   if (recursive) {
     const prefix = tag.name + ":";
     for (const otherTag of Object.values(inv.tags)) {
       if (otherTag.name.startsWith(prefix)) {
-        for (const checkKey of otherTag.checks) {
-          const check = inv.checks[checkKey];
-          if (check) {
-            result.push(check);
+        for (const findingKey of otherTag.findings) {
+          const finding = inv.findings[findingKey];
+          if (finding) {
+            result.push(finding);
           }
         }
       }
@@ -492,13 +492,13 @@ export function sortObservablesByScore(observables: Observable[]): Observable[] 
 }
 
 /**
- * Sort checks by score (descending - highest first).
+ * Sort findings by score (descending - highest first).
  *
- * @param checks - Array of checks to sort
+ * @param findings - Array of findings to sort
  * @returns Sorted array (new array, doesn't mutate input)
  */
-export function sortChecksByScore(checks: Check[]): Check[] {
-  return [...checks].sort((a, b) => b.score - a.score);
+export function sortFindingsByScore(findings: Finding[]): Finding[] {
+  return [...findings].sort((a, b) => b.score - a.score);
 }
 
 /**
@@ -514,13 +514,13 @@ export function sortObservablesByLevel(observables: Observable[]): Observable[] 
 }
 
 /**
- * Sort checks by level (descending - most severe first).
+ * Sort findings by level (descending - most severe first).
  *
- * @param checks - Array of checks to sort
+ * @param findings - Array of findings to sort
  * @returns Sorted array (new array, doesn't mutate input)
  */
-export function sortChecksByLevel(checks: Check[]): Check[] {
-  return [...checks].sort(
+export function sortFindingsByLevel(findings: Finding[]): Finding[] {
+  return [...findings].sort(
     (a, b) => LEVEL_VALUES[b.level] - LEVEL_VALUES[a.level]
   );
 }
@@ -544,17 +544,17 @@ export function findHighestScoringObservables(
 }
 
 /**
- * Find the highest scoring checks.
+ * Find the highest scoring findings.
  *
  * @param inv - The investigation to search
  * @param n - Number of results to return (default: 10)
- * @returns Array of highest scoring checks
+ * @returns Array of highest scoring findings
  */
-export function findHighestScoringChecks(
+export function findHighestScoringFindings(
   inv: CyvestInvestigation,
   n = 10
-): Check[] {
-  return sortChecksByScore(Object.values(inv.checks)).slice(0, n);
+): Finding[] {
+  return sortFindingsByScore(Object.values(inv.findings)).slice(0, n);
 }
 
 /**
@@ -578,33 +578,33 @@ export function findSuspiciousObservables(inv: CyvestInvestigation): Observable[
 }
 
 /**
- * Find all malicious checks (convenience function).
+ * Find all malicious findings (convenience function).
  *
  * @param inv - The investigation to search
- * @returns Array of malicious checks
+ * @returns Array of malicious findings
  */
-export function findMaliciousChecks(inv: CyvestInvestigation): Check[] {
-  return findChecksByLevel(inv, "MALICIOUS");
+export function findMaliciousFindings(inv: CyvestInvestigation): Finding[] {
+  return findFindingsByLevel(inv, "MALICIOUS");
 }
 
 /**
- * Find all suspicious checks (convenience function).
+ * Find all suspicious findings (convenience function).
  *
  * @param inv - The investigation to search
- * @returns Array of suspicious checks
+ * @returns Array of suspicious findings
  */
-export function findSuspiciousChecks(inv: CyvestInvestigation): Check[] {
-  return findChecksByLevel(inv, "SUSPICIOUS");
+export function findSuspiciousFindings(inv: CyvestInvestigation): Finding[] {
+  return findFindingsByLevel(inv, "SUSPICIOUS");
 }
 
 /**
- * Get all check keys in the investigation.
+ * Get all finding keys in the investigation.
  *
  * @param inv - The investigation
- * @returns Array of check keys
+ * @returns Array of finding keys
  */
-export function getAllCheckKeys(inv: CyvestInvestigation): string[] {
-  return Object.keys(inv.checks);
+export function getAllFindingKeys(inv: CyvestInvestigation): string[] {
+  return Object.keys(inv.findings);
 }
 
 /**

@@ -1,13 +1,14 @@
 """
 Core data models for Cyvest investigation framework.
 
-Defines the base classes for Check, Observable, ThreatIntel, Enrichment, Tag,
+Defines the base classes for Finding, Observable, ThreatIntel, Enrichment, Tag,
 and InvestigationWhitelist using Pydantic BaseModel.
 """
 
 from __future__ import annotations
 
-from datetime import datetime
+import json
+from datetime import datetime, timezone
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from typing import Annotated, Any
 
@@ -28,6 +29,7 @@ from cyvest import keys
 from cyvest.level_score_rules import apply_creation_score_level_defaults
 from cyvest.levels import Level, get_level_from_score, normalize_level
 from cyvest.model_enums import (
+    ObservableSubtype,
     ObservableType,
     PropagationMode,
     RelationshipDirection,
@@ -278,13 +280,15 @@ class Observable(AliasDumpModel):
     """
     Represents a cyber observable (IP, URL, domain, hash, etc.).
 
-    Observables can be linked to threat intelligence, checks, and other observables
+    Observables can be linked to threat intelligence, findings, and other observables
     through relationships.
     """
 
     model_config = ConfigDict(arbitrary_types_allowed=True, populate_by_name=True)
 
     obs_type: ObservableType | str = Field(..., alias="type")
+    subtype: ObservableSubtype | str | None = Field(default=None)
+    namespace: str | None = Field(default=None)
     value: str = Field(...)
     internal: bool = Field(...)
     whitelisted: bool = Field(...)
@@ -295,7 +299,7 @@ class Observable(AliasDumpModel):
     threat_intels: list[ThreatIntel] = Field(...)
     relationships: list[Relationship] = Field(...)
     key: str = Field(...)
-    _check_links: list[str] = PrivateAttr(default_factory=list)
+    _finding_links: list[str] = PrivateAttr(default_factory=list)
     _from_shared_context: bool = PrivateAttr(default=False)
 
     @field_validator("obs_type", mode="before")
@@ -311,6 +315,27 @@ class Observable(AliasDumpModel):
                 # Keep as string if not a recognized observable type
                 return v
         return v
+
+    @field_validator("subtype", mode="before")
+    @classmethod
+    def coerce_subtype(cls, v: Any) -> ObservableSubtype | str | None:
+        if v is None or isinstance(v, ObservableSubtype):
+            return v
+        if isinstance(v, str):
+            normalized = v.strip().lower()
+            try:
+                return ObservableSubtype(normalized)
+            except ValueError:
+                return normalized
+        return v
+
+    @field_validator("namespace", mode="before")
+    @classmethod
+    def coerce_namespace(cls, v: Any) -> str | None:
+        if v is None:
+            return None
+        normalized = str(v).strip()
+        return normalized or None
 
     @field_validator("extra", mode="before")
     @classmethod
@@ -355,18 +380,67 @@ class Observable(AliasDumpModel):
         return values
 
     @model_validator(mode="after")
-    def generate_key(self) -> Self:
-        """Generate key."""
+    def validate_identity_and_generate_key(self) -> Self:
+        """Validate type-specific identity fields and generate the key."""
+        obs_type = self.obs_type.value if isinstance(self.obs_type, ObservableType) else str(self.obs_type).lower()
+        subtype = self.subtype.value if isinstance(self.subtype, ObservableSubtype) else self.subtype
+        allowed_subtypes = {
+            ObservableType.USER.value: {"email", "sid", "upn", "okta_id", "username", "uid"},
+            ObservableType.HOST.value: {"hostname", "fqdn", "netbios", "device_id"},
+            ObservableType.PROCESS.value: {"pid", "process_guid"},
+            ObservableType.FILE.value: {"path"},
+            ObservableType.CLOUD_RESOURCE.value: {
+                "aws_arn",
+                "azure_resource_id",
+                "gcp_resource_name",
+            },
+        }
+        if (
+            obs_type
+            in {
+                ObservableType.USER.value,
+                ObservableType.HOST.value,
+                ObservableType.PROCESS.value,
+                ObservableType.CLOUD_RESOURCE.value,
+            }
+            and not subtype
+        ):
+            raise ValueError(f"Observable type '{obs_type}' requires a subtype")
+        if obs_type == ObservableType.COMMAND_LINE.value and subtype is not None:
+            raise ValueError("COMMAND_LINE observables do not accept a subtype")
+        if isinstance(self.subtype, ObservableSubtype) and subtype not in allowed_subtypes.get(obs_type, set()):
+            raise ValueError(f"Subtype '{subtype}' is not valid for observable type '{obs_type}'")
+
+        namespace_required = {
+            (ObservableType.USER.value, "okta_id"),
+            (ObservableType.USER.value, "username"),
+            (ObservableType.USER.value, "uid"),
+            (ObservableType.HOST.value, "hostname"),
+            (ObservableType.HOST.value, "netbios"),
+            (ObservableType.HOST.value, "device_id"),
+            (ObservableType.PROCESS.value, "pid"),
+            (ObservableType.FILE.value, "path"),
+        }
+        if (obs_type, subtype) in namespace_required and not self.namespace:
+            raise ValueError(f"Observable {obs_type}/{subtype} requires a namespace")
+
         if not self.key:
-            # Use string value of obs_type for key generation
-            obs_type_str = self.obs_type.value if isinstance(self.obs_type, ObservableType) else self.obs_type
-            self.key = keys.generate_observable_key(obs_type_str, self.value)
+            self.key = keys.generate_observable_key(
+                obs_type,
+                self.value,
+                subtype=subtype,
+                namespace=self.namespace,
+            )
 
         return self
 
     @field_serializer("obs_type")
     def serialize_obs_type(self, v: ObservableType | str) -> str:
         return v.value if isinstance(v, ObservableType) else v
+
+    @field_serializer("subtype")
+    def serialize_subtype(self, v: ObservableSubtype | str | None) -> str | None:
+        return v.value if isinstance(v, ObservableSubtype) else v
 
     @field_serializer("score")
     def serialize_score(self, v: Decimal) -> float:
@@ -379,9 +453,9 @@ class Observable(AliasDumpModel):
 
     @computed_field
     @property
-    def check_links(self) -> list[str]:
-        """Checks that currently link to this observable (navigation-only)."""
-        return list(self._check_links)
+    def finding_links(self) -> list[str]:
+        """Findings that currently link to this observable (navigation-only)."""
+        return list(self._finding_links)
 
     @computed_field(return_type=str)
     @property
@@ -390,7 +464,7 @@ class Observable(AliasDumpModel):
 
 
 class ObservableLink(BaseModel):
-    """Edge metadata for a Check↔Observable association."""
+    """Edge metadata for a Finding↔Observable association."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -398,17 +472,89 @@ class ObservableLink(BaseModel):
     propagation_mode: PropagationMode = PropagationMode.LOCAL_ONLY
 
 
-class Check(BaseModel):
+class EvidenceLink(BaseModel):
+    """Edge metadata for a Finding↔Evidence association."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    evidence_key: str = Field(...)
+
+
+class Evidence(AliasDumpModel):
+    """Structured material supporting one or more findings."""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True, populate_by_name=True)
+
+    evidence_type: str = Field(..., alias="type")
+    title: str = Field(...)
+    description: str = Field(...)
+    source: str = Field(...)
+    external_id: str | None = Field(...)
+    content: Any | None = Field(...)
+    uri: str | None = Field(...)
+    captured_at: datetime = Field(...)
+    extra: dict[str, Any] = Field(...)
+    key: str = Field(...)
+    _finding_links: list[str] = PrivateAttr(default_factory=list)
+
+    @model_validator(mode="before")
+    @classmethod
+    def ensure_defaults(cls, values: Any) -> Any:
+        if not isinstance(values, dict):
+            return values
+        values.setdefault("description", "")
+        values.setdefault("external_id", None)
+        values.setdefault("content", None)
+        values.setdefault("uri", None)
+        values.setdefault("captured_at", datetime.now(timezone.utc))
+        values.setdefault("extra", {})
+        values.setdefault("key", "")
+        return values
+
+    @field_validator("captured_at")
+    @classmethod
+    def require_timezone(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("captured_at must include timezone information")
+        return value
+
+    @model_validator(mode="after")
+    def validate_payload_and_generate_key(self) -> Self:
+        if self.content is None and not self.uri:
+            raise ValueError("Evidence requires at least one of content or uri")
+        try:
+            json.dumps(self.content, ensure_ascii=False)
+            json.dumps(self.extra, ensure_ascii=False)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("Evidence content and extra must be JSON-compatible") from exc
+        if not self.key:
+            self.key = keys.generate_evidence_key(
+                source=self.source,
+                external_id=self.external_id,
+                evidence_type=self.evidence_type,
+                content=self.content,
+                uri=self.uri,
+            )
+        return self
+
+    @computed_field
+    @property
+    def finding_links(self) -> list[str]:
+        """Findings that currently link to this evidence (navigation-only)."""
+        return list(self._finding_links)
+
+
+class Finding(BaseModel):
     """
     Represents a verification step in the investigation.
 
-    A check validates a specific aspect of the data under investigation
+    A finding validates a specific aspect of the data under investigation
     and contributes to the overall investigation score.
     """
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    check_name: str = Field(...)
+    finding_name: str = Field(...)
     description: str = Field(...)
     comment: str = Field(...)
     extra: dict[str, Any] = Field(...)
@@ -416,6 +562,7 @@ class Check(BaseModel):
     level: Level = Field(...)
     origin_investigation_id: str = Field(...)
     observable_links: list[ObservableLink] = Field(...)
+    evidence_links: list[EvidenceLink] = Field(...)
     key: str = Field(...)
 
     @field_validator("extra", mode="before")
@@ -450,6 +597,8 @@ class Check(BaseModel):
             values["comment"] = ""
         if "observable_links" not in values:
             values["observable_links"] = []
+        if "evidence_links" not in values:
+            values["evidence_links"] = []
         if "key" not in values:
             values["key"] = ""
         return values
@@ -458,7 +607,7 @@ class Check(BaseModel):
     def generate_key(self) -> Self:
         """Generate key."""
         if not self.key:
-            self.key = keys.generate_check_key(self.check_name)
+            self.key = keys.generate_finding_key(self.finding_name)
         return self
 
     @field_serializer("score")
@@ -509,7 +658,7 @@ class Enrichment(BaseModel):
 
 class Tag(BaseModel):
     """
-    Groups checks for categorical organization.
+    Groups findings for categorical organization.
 
     Tags allow structuring the investigation into logical sections
     with aggregated scores and levels. Hierarchy is automatic based on
@@ -520,7 +669,7 @@ class Tag(BaseModel):
 
     name: str
     description: str = ""
-    checks: list[Check] = Field(...)
+    findings: list[Finding] = Field(...)
     key: str = Field(...)
 
     @model_validator(mode="after")
@@ -535,28 +684,28 @@ class Tag(BaseModel):
     def ensure_defaults(cls, values: Any) -> Any:
         if not isinstance(values, dict):
             return values
-        if "checks" not in values:
-            values["checks"] = []
+        if "findings" not in values:
+            values["findings"] = []
         if "key" not in values:
             values["key"] = ""
         return values
 
-    @field_serializer("checks")
-    def serialize_checks(self, value: list[Check]) -> list[str]:
-        """Serialize checks as keys only."""
-        return [check.key for check in value]
+    @field_serializer("findings")
+    def serialize_findings(self, value: list[Finding]) -> list[str]:
+        """Serialize findings as keys only."""
+        return [finding.key for finding in value]
 
     @computed_field(return_type=Decimal)
     @property
     def direct_score(self) -> Decimal:
         """
-        Calculate the score from direct checks only (no hierarchy).
+        Calculate the score from direct findings only (no hierarchy).
 
         For hierarchical aggregation (including descendant tags), use
         Investigation.get_tag_aggregated_score() or TagProxy.get_aggregated_score().
 
         Returns:
-            Total score from direct checks
+            Total score from direct findings
         """
         return self.get_direct_score()
 
@@ -566,21 +715,21 @@ class Tag(BaseModel):
 
     def get_direct_score(self) -> Decimal:
         """
-        Calculate the score from direct checks only.
+        Calculate the score from direct findings only.
 
         Returns:
-            Total score from direct checks
+            Total score from direct findings
         """
         total = Decimal("0")
-        for check in self.checks:
-            total += check.score
+        for finding in self.findings:
+            total += finding.score
         return total
 
     @computed_field(return_type=Level)
     @property
     def direct_level(self) -> Level:
         """
-        Calculate the level from direct checks only (no hierarchy).
+        Calculate the level from direct findings only (no hierarchy).
 
         For hierarchical aggregation (including descendant tags), use
         Investigation.get_tag_aggregated_level() or TagProxy.get_aggregated_level().

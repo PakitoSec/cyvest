@@ -2,14 +2,14 @@ import { describe, it, expect } from "vitest";
 import {
   // Keys
   generateObservableKey,
-  generateCheckKey,
+  generateFindingKey,
   generateThreatIntelKey,
   generateEnrichmentKey,
   generateTagKey,
   parseKeyType,
   validateKey,
   parseObservableKey,
-  parseCheckKey,
+  parseFindingKey,
   parseThreatIntelKey,
   // Levels
   normalizeLevel,
@@ -43,12 +43,29 @@ describe("Key Generation", () => {
         "obs:ipv4:192.168.1.1"
       );
     });
+
+    it("includes subtype and namespace in scoped identities", () => {
+      expect(generateObservableKey("process", "0042", "pid", "HOST-01")).toBe(
+        "obs:process:pid:host-01:42"
+      );
+    });
+
+    it("uses the same SHA-256 command-line key as Python", () => {
+      expect(
+        generateObservableKey(
+          "command_line",
+          "powershell.exe -EncodedCommand AAAA"
+        )
+      ).toBe(
+        "obs:command_line:sha256:bf05d19f63ca9b8c7c1cff6fdf16fa1cef159d2fdb882c3181cc12686bfce95d"
+      );
+    });
   });
 
-  describe("generateCheckKey", () => {
-    it("generates correct check key", () => {
-      expect(generateCheckKey("sender_verification")).toBe(
-        "chk:sender_verification"
+  describe("generateFindingKey", () => {
+    it("generates correct finding key", () => {
+      expect(generateFindingKey("sender_verification")).toBe(
+        "fnd:sender_verification"
       );
     });
   });
@@ -91,8 +108,8 @@ describe("Key Generation", () => {
       expect(parseKeyType("obs:ipv4:192.168.1.1")).toBe("obs");
     });
 
-    it("parses check key type", () => {
-      expect(parseKeyType("chk:sender:email")).toBe("chk");
+    it("parses finding key type", () => {
+      expect(parseKeyType("fnd:sender:email")).toBe("fnd");
     });
 
     it("parses threat intel key type", () => {
@@ -116,12 +133,12 @@ describe("Key Generation", () => {
   describe("validateKey", () => {
     it("validates correct keys", () => {
       expect(validateKey("obs:ipv4:192.168.1.1")).toBe(true);
-      expect(validateKey("chk:sender:email")).toBe(true);
+      expect(validateKey("fnd:sender:email")).toBe(true);
     });
 
     it("validates key type", () => {
       expect(validateKey("obs:ipv4:192.168.1.1", "obs")).toBe(true);
-      expect(validateKey("obs:ipv4:192.168.1.1", "chk")).toBe(false);
+      expect(validateKey("obs:ipv4:192.168.1.1", "fnd")).toBe(false);
     });
 
     it("rejects invalid keys", () => {
@@ -147,14 +164,14 @@ describe("Key Generation", () => {
     });
 
     it("returns null for invalid key", () => {
-      expect(parseObservableKey("chk:sender:email")).toBeNull();
+      expect(parseObservableKey("fnd:sender:email")).toBeNull();
     });
   });
 
-  describe("parseCheckKey", () => {
-    it("parses check key components", () => {
-      expect(parseCheckKey("chk:sender_verification")).toEqual({
-        checkName: "sender_verification",
+  describe("parseFindingKey", () => {
+    it("parses finding key components", () => {
+      expect(parseFindingKey("fnd:sender_verification")).toEqual({
+        findingName: "sender_verification",
       });
     });
   });

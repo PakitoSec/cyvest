@@ -4,7 +4,7 @@
 
 ## Overview
 
-The `SharedInvestigationContext` enables safe sharing of observables and checks across concurrent tasks (threads or asyncio). This allows tasks to reuse and reference observables created by other tasks, preventing duplication and enabling aggregated checks.
+The `SharedInvestigationContext` enables safe sharing of observables and findings across concurrent tasks (threads or asyncio). This allows tasks to reuse and reference observables created by other tasks, preventing duplication and enabling aggregated findings.
 
 **Usage**: Create from a Cyvest instance or import directly from the shared module:
 ```python
@@ -18,7 +18,7 @@ from cyvest.shared import SharedInvestigationContext
 - **Single Lock**: Canonical state is protected by one `threading.RLock`
 - **Async-safe**: Async APIs run the entire critical section in a worker thread via `asyncio.to_thread(...)` (no event-loop blocking)
 - **Auto-Reconcile**: Works with both `with` and `async with`
-- **Cross-Task Sharing**: Tasks can access observables/checks created by other tasks
+- **Cross-Task Sharing**: Tasks can access observables/findings created by other tasks
 - **Deep Copying**: Prevents concurrent modification issues
 
 ## Basic Usage
@@ -94,7 +94,7 @@ with shared_context.create_cyvest() as cy:
 ```
 
 ##### `reconcile(source: Cyvest | Investigation) -> None`
-Manually merges observables and checks from a source into the shared context.
+Manually merges observables and findings from a source into the shared context.
 
 **Parameters:**
 - `source`: Cyvest or Investigation instance to merge
@@ -128,22 +128,22 @@ if domain:
     )
 ```
 
-##### `check_get(check_name: str) -> Check | None`
-Retrieves a shared check by name.
+##### `finding_get(finding_name: str) -> Finding | None`
+Retrieves a shared finding by name.
 
 **Parameters:**
-- `check_name`: Check name
+- `finding_name`: Finding name
 
-**Returns:** Deep copy of the check, or `None` if not found
+**Returns:** Deep copy of the finding, or `None` if not found
 
 **Examples:**
 ```python
-from_check = shared_context.check_get("from_verification")
-malware_check = shared_context.check_get("malware_scan")
+from_finding = shared_context.finding_get("from_verification")
+malware_finding = shared_context.finding_get("malware_scan")
 ```
 
-##### Existence checks
-Use `observable_get(...)` / `check_get(...)` and check for `None`.
+##### Existence findings
+Use `observable_get(...)` / `finding_get(...)` and finding for `None`.
 
 ##### `is_whitelisted() -> bool`
 Returns whether the underlying investigation has whitelist entries.
@@ -160,7 +160,7 @@ Thread-safe: Uses lock to ensure consistent read of investigation state.
 - `include_tags`: Include tags section in the report (default: `False`)
 - `include_enrichments`: Include enrichments section in the report (default: `False`)
 - `include_observables`: Include observables section in the report (default: `True`)
-- `exclude_levels`: Set of levels to exclude from checks section (default: `{Level.NONE}`)
+- `exclude_levels`: Set of levels to exclude from findings section (default: `{Level.NONE}`)
 
 **Returns:** Markdown formatted report as a string
 
@@ -170,7 +170,7 @@ shared = main_cy.shared_context()
 markdown = shared.io_to_markdown()
 print(markdown)
 
-# Include all check levels (no exclusion)
+# Include all finding levels (no exclusion)
 markdown_all = shared.io_to_markdown(exclude_levels=set())
 ```
 
@@ -184,7 +184,7 @@ Thread-safe: Uses lock to ensure consistent read. Relative paths are converted t
 - `include_tags`: Include tags section in the report (default: `False`)
 - `include_enrichments`: Include enrichments section in the report (default: `False`)
 - `include_observables`: Include observables section in the report (default: `True`)
-- `exclude_levels`: Set of levels to exclude from checks section (default: `{Level.NONE}`)
+- `exclude_levels`: Set of levels to exclude from findings section (default: `{Level.NONE}`)
 
 **Returns:** Absolute path to the saved file as a string
 
@@ -231,16 +231,16 @@ print(path)  # /absolute/path/to/investigation.json
 > Access merged results by reusing the original `Cyvest` instance you passed to `SharedInvestigationContext`; reconciliation mutates it in place.
 
 !!! note "Provenance-aware reconciliation"
-    `investigation_id` is serialized and checks carry canonical provenance (`origin_investigation_id`) for LOCAL_ONLY propagation.
+    `investigation_id` is serialized and findings carry canonical provenance (`origin_investigation_id`) for LOCAL_ONLY propagation.
 
 ## Thread Safety
 
 The implementation uses several strategies to ensure safe concurrency:
 
 1. **Single lock**: Canonical state is protected by one `threading.RLock`
-2. **Deep Copying**: All returned observables/checks are deep copies
+2. **Deep Copying**: All returned observables/findings are deep copies
 3. **Async-safe access**: Async APIs run the entire critical section in a worker thread (never on the event loop)
-4. **Immutable Keys**: Observable/check keys are immutable strings
+4. **Immutable Keys**: Observable/finding keys are immutable strings
 
 ## Async Usage
 
@@ -259,7 +259,7 @@ asyncio.run(worker(shared_context))
 
 - **Deep Copying Overhead**: Each access creates a deep copy (safe but slower)
 - **Lock Contention**: Heavy concurrent access may cause some blocking
-- **Memory Usage**: Shared context maintains references to all observables/checks
+- **Memory Usage**: Shared context maintains references to all observables/findings
 
 ## Example: Multi-Threaded Email Investigation
 
@@ -267,20 +267,20 @@ See `examples/04_email.py` for a complete working example demonstrating:
 - Parallel task execution with `ThreadPoolExecutor`
 - Auto-reconcile pattern for clean code
 - Cross-task observable sharing between `EmailFrom` and `BodiesUrlTask`
-- Aggregated checks across multiple concurrent tasks
+- Aggregated findings across multiple concurrent tasks
 
 ## Best Practices
 
 1. **Always use context manager**: `with shared_context.create_cyvest() as cy:`
 2. **Access data from root**: `data = cy.root().extra` to get the investigation data
-3. **Check for None**: Always check if `observable_get()` returns None
+3. **Checking for None**: Always check if `observable_get()` returns None
 4. **Meaningful keys**: Use descriptive observable keys for easy lookup
 5. **Task ordering**: Consider task dependencies when designing workflows
 6. **Error handling**: Wrap task execution in try/except for robustness
 
 ## Limitations
 
-- Observable/check keys must be unique across the investigation
+- Observable/finding keys must be unique across the investigation
 - Deep copying may impact performance for very large investigations
 - Lock contention possible with high concurrency (>10-20 threads)
 - No built-in task dependency management (use task ordering)

@@ -109,31 +109,31 @@ class TestExpectedResult:
     """Tests for ExpectedResult model validation."""
 
     def test_create_with_key(self) -> None:
-        rule = ExpectedResult(key="chk:test-check", level=Level.NOTABLE, score=">= 1.0")
-        assert rule.key == "chk:test-check"
+        rule = ExpectedResult(key="fnd:test-finding", level=Level.NOTABLE, score=">= 1.0")
+        assert rule.key == "fnd:test-finding"
         assert rule.level == Level.NOTABLE
         assert rule.score == ">= 1.0"
 
-    def test_create_with_check_name(self) -> None:
-        rule = ExpectedResult(check_name="test-check", score=">= 1.0")
-        assert rule.check_name == "test-check"
-        assert rule.key == "chk:test-check"  # Derived from check_name
+    def test_create_with_finding_name(self) -> None:
+        rule = ExpectedResult(finding_name="test-finding", score=">= 1.0")
+        assert rule.finding_name == "test-finding"
+        assert rule.key == "fnd:test-finding"  # Derived from finding_name
 
     def test_create_without_key_or_name_fails(self) -> None:
-        with pytest.raises(ValueError, match="Either check_name or key must be provided"):
+        with pytest.raises(ValueError, match="Either finding_name or key must be provided"):
             ExpectedResult(level=Level.NOTABLE, score=">= 1.0")
 
     def test_create_with_both_key_and_name(self) -> None:
-        rule = ExpectedResult(check_name="my-check", key="chk:custom-key", score=">= 1.0")
-        assert rule.check_name == "my-check"
-        assert rule.key == "chk:custom-key"  # Provided key takes precedence
+        rule = ExpectedResult(finding_name="my-finding", key="fnd:custom-key", score=">= 1.0")
+        assert rule.finding_name == "my-finding"
+        assert rule.key == "fnd:custom-key"  # Provided key takes precedence
 
     def test_create_with_ignore(self) -> None:
-        rule = ExpectedResult(check_name="test-check", ignore={DiffStatus.ADDED, DiffStatus.REMOVED})
+        rule = ExpectedResult(finding_name="test-finding", ignore={DiffStatus.ADDED, DiffStatus.REMOVED})
         assert rule.ignore == {DiffStatus.ADDED, DiffStatus.REMOVED}
 
     def test_create_with_ignore_single_status(self) -> None:
-        rule = ExpectedResult(check_name="test-check", ignore={DiffStatus.MISMATCH})
+        rule = ExpectedResult(finding_name="test-finding", ignore={DiffStatus.MISMATCH})
         assert rule.ignore == {DiffStatus.MISMATCH}
 
 
@@ -142,42 +142,42 @@ class TestCompareInvestigations:
 
     def test_no_differences_same_investigation(self) -> None:
         cv1 = Cyvest()
-        cv1.check_create("test-check", "Test description", score=Decimal("1.0"), level=Level.NOTABLE)
+        cv1.finding_create("test-finding", "Test description", score=Decimal("1.0"), level=Level.NOTABLE)
 
         cv2 = Cyvest()
-        cv2.check_create("test-check", "Test description", score=Decimal("1.0"), level=Level.NOTABLE)
+        cv2.finding_create("test-finding", "Test description", score=Decimal("1.0"), level=Level.NOTABLE)
 
         diffs = compare_investigations(cv1, cv2)
         assert len(diffs) == 0
 
-    def test_check_added(self) -> None:
+    def test_finding_added(self) -> None:
         expected = Cyvest()
 
         actual = Cyvest()
-        actual.check_create("new-check", "New check", score=Decimal("1.0"), level=Level.NOTABLE)
+        actual.finding_create("new-finding", "New finding", score=Decimal("1.0"), level=Level.NOTABLE)
 
         diffs = compare_investigations(actual, expected)
         assert len(diffs) == 1
         assert diffs[0].status == DiffStatus.ADDED
-        assert diffs[0].key == "chk:new-check"
+        assert diffs[0].key == "fnd:new-finding"
 
-    def test_check_removed(self) -> None:
+    def test_finding_removed(self) -> None:
         expected = Cyvest()
-        expected.check_create("old-check", "Old check", score=Decimal("1.0"), level=Level.NOTABLE)
+        expected.finding_create("old-finding", "Old finding", score=Decimal("1.0"), level=Level.NOTABLE)
 
         actual = Cyvest()
 
         diffs = compare_investigations(actual, expected)
         assert len(diffs) == 1
         assert diffs[0].status == DiffStatus.REMOVED
-        assert diffs[0].key == "chk:old-check"
+        assert diffs[0].key == "fnd:old-finding"
 
-    def test_check_mismatch_score(self) -> None:
+    def test_finding_mismatch_score(self) -> None:
         expected = Cyvest()
-        expected.check_create("test-check", "Test", score=Decimal("1.0"), level=Level.NOTABLE)
+        expected.finding_create("test-finding", "Test", score=Decimal("1.0"), level=Level.NOTABLE)
 
         actual = Cyvest()
-        actual.check_create("test-check", "Test", score=Decimal("2.0"), level=Level.NOTABLE)
+        actual.finding_create("test-finding", "Test", score=Decimal("2.0"), level=Level.NOTABLE)
 
         diffs = compare_investigations(actual, expected)
         assert len(diffs) == 1
@@ -185,12 +185,12 @@ class TestCompareInvestigations:
         assert diffs[0].expected_score == Decimal("1.0")
         assert diffs[0].actual_score == Decimal("2.0")
 
-    def test_check_mismatch_level(self) -> None:
+    def test_finding_mismatch_level(self) -> None:
         expected = Cyvest()
-        expected.check_create("test-check", "Test", score=Decimal("1.0"), level=Level.NOTABLE)
+        expected.finding_create("test-finding", "Test", score=Decimal("1.0"), level=Level.NOTABLE)
 
         actual = Cyvest()
-        actual.check_create("test-check", "Test", score=Decimal("1.0"), level=Level.SUSPICIOUS)
+        actual.finding_create("test-finding", "Test", score=Decimal("1.0"), level=Level.SUSPICIOUS)
 
         diffs = compare_investigations(actual, expected)
         assert len(diffs) == 1
@@ -201,10 +201,10 @@ class TestCompareInvestigations:
     def test_tolerance_rule_satisfied(self) -> None:
         """Test that tolerance rules can mark differences as OK."""
         expected = Cyvest()
-        expected.check_create("test-check", "Test", score=Decimal("1.11"), level=Level.NOTABLE)
+        expected.finding_create("test-finding", "Test", score=Decimal("1.11"), level=Level.NOTABLE)
 
         actual = Cyvest()
-        actual.check_create("test-check", "Test", score=Decimal("1.07"), level=Level.NOTABLE)
+        actual.finding_create("test-finding", "Test", score=Decimal("1.07"), level=Level.NOTABLE)
 
         # Without tolerance rule - should be a mismatch
         diffs_no_rule = compare_investigations(actual, expected)
@@ -212,19 +212,19 @@ class TestCompareInvestigations:
         assert diffs_no_rule[0].status == DiffStatus.MISMATCH
 
         # With tolerance rule - should be OK
-        rules = [ExpectedResult(key="chk:test-check", score=">= 1.0")]
+        rules = [ExpectedResult(key="fnd:test-finding", score=">= 1.0")]
         diffs_with_rule = compare_investigations(actual, expected, result_expected=rules)
         assert len(diffs_with_rule) == 0
 
     def test_tolerance_rule_violated(self) -> None:
         """Test that violations of tolerance rules are still flagged."""
         expected = Cyvest()
-        expected.check_create("test-check", "Test", score=Decimal("1.11"), level=Level.NOTABLE)
+        expected.finding_create("test-finding", "Test", score=Decimal("1.11"), level=Level.NOTABLE)
 
         actual = Cyvest()
-        actual.check_create("test-check", "Test", score=Decimal("0.5"), level=Level.NOTABLE)
+        actual.finding_create("test-finding", "Test", score=Decimal("0.5"), level=Level.NOTABLE)
 
-        rules = [ExpectedResult(key="chk:test-check", score=">= 1.0")]
+        rules = [ExpectedResult(key="fnd:test-finding", score=">= 1.0")]
         diffs = compare_investigations(actual, expected, result_expected=rules)
         assert len(diffs) == 1
         assert diffs[0].status == DiffStatus.MISMATCH
@@ -233,14 +233,14 @@ class TestCompareInvestigations:
     def test_observable_diffs_included(self) -> None:
         """Test that observable diffs are populated."""
         expected = Cyvest()
-        expected_check = expected.check_create("test-check", "Test", score=Decimal("1.0"), level=Level.NOTABLE)
+        expected_finding = expected.finding_create("test-finding", "Test", score=Decimal("1.0"), level=Level.NOTABLE)
         expected_obs = expected.observable_create(Cyvest.OBS.DOMAIN, "example.com")
-        expected_check.link_observable(expected_obs)
+        expected_finding.link_observable(expected_obs)
 
         actual = Cyvest()
-        actual_check = actual.check_create("test-check", "Test", score=Decimal("2.0"), level=Level.NOTABLE)
+        actual_finding = actual.finding_create("test-finding", "Test", score=Decimal("2.0"), level=Level.NOTABLE)
         actual_obs = actual.observable_create(Cyvest.OBS.DOMAIN, "example.com")
-        actual_check.link_observable(actual_obs)
+        actual_finding.link_observable(actual_obs)
 
         diffs = compare_investigations(actual, expected)
         assert len(diffs) == 1
@@ -252,16 +252,16 @@ class TestCompareInvestigations:
     def test_threat_intel_diffs_included(self) -> None:
         """Test that threat intel diffs are populated."""
         expected = Cyvest()
-        expected_check = expected.check_create("test-check", "Test", score=Decimal("1.0"), level=Level.NOTABLE)
+        expected_finding = expected.finding_create("test-finding", "Test", score=Decimal("1.0"), level=Level.NOTABLE)
         expected_obs = expected.observable_create(Cyvest.OBS.DOMAIN, "example.com")
         expected_obs.with_ti("VirusTotal", score=Decimal("0.0"), level=Level.INFO)
-        expected_check.link_observable(expected_obs)
+        expected_finding.link_observable(expected_obs)
 
         actual = Cyvest()
-        actual_check = actual.check_create("test-check", "Test", score=Decimal("2.0"), level=Level.NOTABLE)
+        actual_finding = actual.finding_create("test-finding", "Test", score=Decimal("2.0"), level=Level.NOTABLE)
         actual_obs = actual.observable_create(Cyvest.OBS.DOMAIN, "example.com")
         actual_obs.with_ti("VirusTotal", score=Decimal("1.0"), level=Level.NOTABLE)
-        actual_check.link_observable(actual_obs)
+        actual_finding.link_observable(actual_obs)
 
         diffs = compare_investigations(actual, expected)
         assert len(diffs) == 1
@@ -273,12 +273,12 @@ class TestCompareInvestigations:
         assert ti_diff.expected_score == Decimal("0.0")
         assert ti_diff.actual_score == Decimal("1.0")
 
-    def test_ignore_added_check(self) -> None:
+    def test_ignore_added_finding(self) -> None:
         """Test that ignore={ADDED} suppresses ADDED diffs."""
         expected = Cyvest()
 
         actual = Cyvest()
-        actual.check_create("new-check", "New check", score=Decimal("1.0"), level=Level.NOTABLE)
+        actual.finding_create("new-finding", "New finding", score=Decimal("1.0"), level=Level.NOTABLE)
 
         # Without ignore rule - should be ADDED
         diffs_no_rule = compare_investigations(actual, expected)
@@ -286,14 +286,14 @@ class TestCompareInvestigations:
         assert diffs_no_rule[0].status == DiffStatus.ADDED
 
         # With ignore rule - should be suppressed
-        rules = [ExpectedResult(check_name="new-check", ignore={DiffStatus.ADDED})]
+        rules = [ExpectedResult(finding_name="new-finding", ignore={DiffStatus.ADDED})]
         diffs_with_rule = compare_investigations(actual, expected, result_expected=rules)
         assert len(diffs_with_rule) == 0
 
-    def test_ignore_removed_check(self) -> None:
+    def test_ignore_removed_finding(self) -> None:
         """Test that ignore={REMOVED} suppresses REMOVED diffs."""
         expected = Cyvest()
-        expected.check_create("old-check", "Old check", score=Decimal("1.0"), level=Level.NOTABLE)
+        expected.finding_create("old-finding", "Old finding", score=Decimal("1.0"), level=Level.NOTABLE)
 
         actual = Cyvest()
 
@@ -303,17 +303,17 @@ class TestCompareInvestigations:
         assert diffs_no_rule[0].status == DiffStatus.REMOVED
 
         # With ignore rule - should be suppressed
-        rules = [ExpectedResult(check_name="old-check", ignore={DiffStatus.REMOVED})]
+        rules = [ExpectedResult(finding_name="old-finding", ignore={DiffStatus.REMOVED})]
         diffs_with_rule = compare_investigations(actual, expected, result_expected=rules)
         assert len(diffs_with_rule) == 0
 
-    def test_ignore_mismatch_check(self) -> None:
+    def test_ignore_mismatch_finding(self) -> None:
         """Test that ignore={MISMATCH} suppresses MISMATCH diffs."""
         expected = Cyvest()
-        expected.check_create("test-check", "Test", score=Decimal("1.0"), level=Level.NOTABLE)
+        expected.finding_create("test-finding", "Test", score=Decimal("1.0"), level=Level.NOTABLE)
 
         actual = Cyvest()
-        actual.check_create("test-check", "Test", score=Decimal("2.0"), level=Level.NOTABLE)
+        actual.finding_create("test-finding", "Test", score=Decimal("2.0"), level=Level.NOTABLE)
 
         # Without ignore rule - should be MISMATCH
         diffs_no_rule = compare_investigations(actual, expected)
@@ -321,22 +321,22 @@ class TestCompareInvestigations:
         assert diffs_no_rule[0].status == DiffStatus.MISMATCH
 
         # With ignore rule - should be suppressed
-        rules = [ExpectedResult(check_name="test-check", ignore={DiffStatus.MISMATCH})]
+        rules = [ExpectedResult(finding_name="test-finding", ignore={DiffStatus.MISMATCH})]
         diffs_with_rule = compare_investigations(actual, expected, result_expected=rules)
         assert len(diffs_with_rule) == 0
 
     def test_ignore_multiple_statuses(self) -> None:
         """Test that ignore with multiple statuses works correctly."""
         expected = Cyvest()
-        expected.check_create("removed-check", "Removed", score=Decimal("1.0"), level=Level.NOTABLE)
+        expected.finding_create("removed-finding", "Removed", score=Decimal("1.0"), level=Level.NOTABLE)
 
         actual = Cyvest()
-        actual.check_create("added-check", "Added", score=Decimal("1.0"), level=Level.NOTABLE)
+        actual.finding_create("added-finding", "Added", score=Decimal("1.0"), level=Level.NOTABLE)
 
         # Create rules that ignore both ADDED and REMOVED
         rules = [
-            ExpectedResult(check_name="added-check", ignore={DiffStatus.ADDED, DiffStatus.REMOVED}),
-            ExpectedResult(check_name="removed-check", ignore={DiffStatus.ADDED, DiffStatus.REMOVED}),
+            ExpectedResult(finding_name="added-finding", ignore={DiffStatus.ADDED, DiffStatus.REMOVED}),
+            ExpectedResult(finding_name="removed-finding", ignore={DiffStatus.ADDED, DiffStatus.REMOVED}),
         ]
         diffs = compare_investigations(actual, expected, result_expected=rules)
         assert len(diffs) == 0
@@ -344,15 +344,15 @@ class TestCompareInvestigations:
     def test_ignore_does_not_affect_other_statuses(self) -> None:
         """Test that ignoring ADDED doesn't suppress REMOVED or MISMATCH."""
         expected = Cyvest()
-        expected.check_create("removed-check", "Removed", score=Decimal("1.0"), level=Level.NOTABLE)
+        expected.finding_create("removed-finding", "Removed", score=Decimal("1.0"), level=Level.NOTABLE)
 
         actual = Cyvest()
-        actual.check_create("added-check", "Added", score=Decimal("1.0"), level=Level.NOTABLE)
+        actual.finding_create("added-finding", "Added", score=Decimal("1.0"), level=Level.NOTABLE)
 
         # Rule ignores ADDED only - should not affect REMOVED
         rules = [
-            ExpectedResult(check_name="added-check", ignore={DiffStatus.ADDED}),
-            ExpectedResult(check_name="removed-check", ignore={DiffStatus.ADDED}),  # Wrong status
+            ExpectedResult(finding_name="added-finding", ignore={DiffStatus.ADDED}),
+            ExpectedResult(finding_name="removed-finding", ignore={DiffStatus.ADDED}),  # Wrong status
         ]
         diffs = compare_investigations(actual, expected, result_expected=rules)
         # ADDED is suppressed, REMOVED is NOT suppressed
@@ -360,17 +360,17 @@ class TestCompareInvestigations:
         assert diffs[0].status == DiffStatus.REMOVED
 
     def test_ignore_all_statuses(self) -> None:
-        """Test that ignore with all statuses suppresses everything for that check."""
+        """Test that ignore with all statuses suppresses everything for that finding."""
         expected = Cyvest()
-        expected.check_create("volatile-check", "Volatile", score=Decimal("1.0"), level=Level.NOTABLE)
+        expected.finding_create("volatile-finding", "Volatile", score=Decimal("1.0"), level=Level.NOTABLE)
 
         actual = Cyvest()
-        actual.check_create("volatile-check", "Volatile", score=Decimal("2.0"), level=Level.SUSPICIOUS)
+        actual.finding_create("volatile-finding", "Volatile", score=Decimal("2.0"), level=Level.SUSPICIOUS)
 
         # Ignore all statuses
         rules = [
             ExpectedResult(
-                check_name="volatile-check",
+                finding_name="volatile-finding",
                 ignore={DiffStatus.ADDED, DiffStatus.REMOVED, DiffStatus.MISMATCH},
             )
         ]
@@ -388,40 +388,40 @@ class TestDisplayDiff:
         rendered = output.getvalue()
         assert "Empty Diff" in rendered
 
-    def test_display_added_check(self) -> None:
+    def test_display_added_finding(self) -> None:
         output = StringIO()
         console = Console(file=output, force_terminal=True, width=120)
 
         diffs = [
             DiffItem(
                 status=DiffStatus.ADDED,
-                key="chk:new-check",
-                check_name="new-check",
+                key="fnd:new-finding",
+                finding_name="new-finding",
                 actual_level=Level.NOTABLE,
                 actual_score=Decimal("0.02"),
             )
         ]
         display_diff(diffs, console.print, title="Test Diff")
         rendered = output.getvalue()
-        assert "chk:new-check" in rendered
+        assert "fnd:new-finding" in rendered
         assert "+" in rendered
 
-    def test_display_removed_check(self) -> None:
+    def test_display_removed_finding(self) -> None:
         output = StringIO()
         console = Console(file=output, force_terminal=True, width=120)
 
         diffs = [
             DiffItem(
                 status=DiffStatus.REMOVED,
-                key="chk:old-check",
-                check_name="old-check",
+                key="fnd:old-finding",
+                finding_name="old-finding",
                 expected_level=Level.SUSPICIOUS,
                 expected_score=Decimal("1.0"),
             )
         ]
         display_diff(diffs, console.print, title="Test Diff")
         rendered = output.getvalue()
-        assert "chk:old-check" in rendered
+        assert "fnd:old-finding" in rendered
         assert "-" in rendered
 
     def test_display_mismatch_with_rule(self) -> None:
@@ -431,8 +431,8 @@ class TestDisplayDiff:
         diffs = [
             DiffItem(
                 status=DiffStatus.MISMATCH,
-                key="chk:roger-ai",
-                check_name="roger-ai",
+                key="fnd:roger-ai",
+                finding_name="roger-ai",
                 expected_level=Level.SUSPICIOUS,
                 expected_score=Decimal("1.11"),
                 expected_score_rule="== 1.11",
@@ -442,7 +442,7 @@ class TestDisplayDiff:
         ]
         display_diff(diffs, console.print, title="Test Diff")
         rendered = output.getvalue()
-        assert "chk:roger-ai" in rendered
+        assert "fnd:roger-ai" in rendered
         # The ✗ character for mismatch
         assert "\u2717" in rendered or "✗" in rendered
 
@@ -453,8 +453,8 @@ class TestDisplayDiff:
         diffs = [
             DiffItem(
                 status=DiffStatus.ADDED,
-                key="chk:domain-check",
-                check_name="domain-check",
+                key="fnd:domain-finding",
+                finding_name="domain-finding",
                 actual_level=Level.NOTABLE,
                 actual_score=Decimal("0.02"),
                 observable_diffs=[
@@ -486,10 +486,10 @@ class TestCyvestCompareMethod:
 
     def test_cyvest_compare_method(self) -> None:
         expected = Cyvest()
-        expected.check_create("test-check", "Test", score=Decimal("1.0"), level=Level.NOTABLE)
+        expected.finding_create("test-finding", "Test", score=Decimal("1.0"), level=Level.NOTABLE)
 
         actual = Cyvest()
-        actual.check_create("test-check", "Test", score=Decimal("2.0"), level=Level.NOTABLE)
+        actual.finding_create("test-finding", "Test", score=Decimal("2.0"), level=Level.NOTABLE)
 
         diffs = actual.compare(expected=expected)
         assert len(diffs) == 1
@@ -497,11 +497,11 @@ class TestCyvestCompareMethod:
 
     def test_cyvest_compare_with_rules(self) -> None:
         expected = Cyvest()
-        expected.check_create("test-check", "Test", score=Decimal("1.0"), level=Level.NOTABLE)
+        expected.finding_create("test-finding", "Test", score=Decimal("1.0"), level=Level.NOTABLE)
 
         actual = Cyvest()
-        actual.check_create("test-check", "Test", score=Decimal("2.0"), level=Level.NOTABLE)
+        actual.finding_create("test-finding", "Test", score=Decimal("2.0"), level=Level.NOTABLE)
 
-        rules = [ExpectedResult(key="chk:test-check", score=">= 1.0")]
+        rules = [ExpectedResult(key="fnd:test-finding", score=">= 1.0")]
         diffs = actual.compare(expected=expected, result_expected=rules)
         assert len(diffs) == 0

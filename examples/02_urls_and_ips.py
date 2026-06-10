@@ -65,23 +65,23 @@ def main() -> None:
     cv.observable_add_relationship(internal_host.key, url1.key, cv.REL.RELATED_TO)
     cv.observable_add_relationship(internal_host.key, url2.key, cv.REL.RELATED_TO)
 
-    # Create checks
+    # Create findings
     _ = (
-        cv.check("c2_detection", "Detect C2 communication")
+        cv.finding("c2_detection", "Detect C2 communication")
         .link_observable(url1)
         .link_observable(ip1)
         .tagged(network_tag)
     )
 
     _ = (
-        cv.check("malware_download", "Detect malware download")
+        cv.finding("malware_download", "Detect malware download")
         .link_observable(url2)
         .link_observable(ip2)
         .tagged(network_tag)
     )
 
     _ = (
-        cv.check(
+        cv.finding(
             "compromised_host",
             "Identify compromised endpoint",
             comment="Host made connections to known malicious infrastructure",

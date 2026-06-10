@@ -7,7 +7,7 @@
 
 import type {
   Observable,
-  Check,
+  Finding,
   ThreatIntel,
   Tag,
   Level,
@@ -81,7 +81,7 @@ export function normalizeLevel(level: string): Level {
 /**
  * Check if a string is a valid Level.
  *
- * @param level - String to check
+ * @param level - String to finding
  * @returns True if valid Level
  */
 export function isValidLevel(level: string): level is Level {
@@ -179,7 +179,7 @@ export function isLevelLowerThan(a: Level, b: Level): boolean {
 /**
  * Check if level a is at least as severe as level b.
  *
- * @param a - Level to check
+ * @param a - Level to finding
  * @param minLevel - Minimum required level
  * @returns True if a is at least minLevel
  *
@@ -254,10 +254,10 @@ export function hasLevel(obj: unknown): obj is { level: Level } {
 }
 
 /**
- * Extract level from an entity (Observable, Check, ThreatIntel, Tag).
+ * Extract level from an entity (Observable, Finding, ThreatIntel, Tag).
  */
 export function getEntityLevel(
-  entity: Observable | Check | ThreatIntel | Tag
+  entity: Observable | Finding | ThreatIntel | Tag
 ): Level {
   if ("direct_level" in entity) {
     const directLevel = entity.direct_level;

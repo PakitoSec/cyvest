@@ -2,7 +2,7 @@ import React, { useMemo } from "react";
 
 import { buildObservablesElements } from "../adapters/observablesElements";
 import { createObservablesStylesheet } from "../core/styles";
-import { createElkLayout } from "../layout/elk";
+import { createForceLayout } from "../layout/force";
 import type { CyvestObservablesViewProps } from "../types";
 import { CytoscapeCanvas } from "./CytoscapeCanvas";
 
@@ -23,9 +23,9 @@ export const CyvestObservablesView: React.FC<CyvestObservablesViewProps> = ({
     () =>
       buildObservablesElements(investigation, {
         maxLabelLength,
-        edgeColor: theme?.edgeColor,
+        theme,
       }),
-    [investigation, maxLabelLength, theme?.edgeColor]
+    [investigation, maxLabelLength, theme]
   );
 
   const stylesheet = useMemo(
@@ -33,9 +33,9 @@ export const CyvestObservablesView: React.FC<CyvestObservablesViewProps> = ({
     [theme]
   );
 
-  const elkLayout = useMemo(
-    () => createElkLayout("observables", layout),
-    [layout]
+  const forceLayout = useMemo(
+    () => createForceLayout(elements, "observables", layout),
+    [elements, layout]
   );
 
   return (
@@ -43,7 +43,7 @@ export const CyvestObservablesView: React.FC<CyvestObservablesViewProps> = ({
       view="observables"
       elements={elements}
       stylesheet={stylesheet}
-      layout={elkLayout}
+      layout={forceLayout}
       width={width}
       height={height}
       className={className}

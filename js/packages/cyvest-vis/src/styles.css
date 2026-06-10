@@ -2,52 +2,34 @@
   position: relative;
   overflow: hidden;
   border: 1px solid var(--cyvest-panel-border);
-  border-radius: 14px;
-  background:
-    radial-gradient(circle at 8% 12%, rgba(255, 255, 255, 0.9), transparent 52%),
-    radial-gradient(circle at 90% 84%, rgba(31, 111, 235, 0.12), transparent 50%),
-    var(--cyvest-background);
+  border-radius: 12px;
+  background: var(--cyvest-background);
   font-family: var(--cyvest-font-family);
-}
-
-.cyvest-canvas::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background-image: linear-gradient(
-      to right,
-      rgba(120, 138, 170, 0.2) 1px,
-      transparent 1px
-    ),
-    linear-gradient(
-      to bottom,
-      rgba(120, 138, 170, 0.2) 1px,
-      transparent 1px
-    );
-  background-size: 28px 28px;
-  opacity: 0.34;
-  z-index: 0;
 }
 
 .cyvest-canvas__surface {
   position: absolute;
   inset: 0;
-  z-index: 1;
+}
+
+.cyvest-toolbar,
+.cyvest-view-toggle {
+  position: absolute;
+  z-index: 12;
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--cyvest-panel-border);
+  background: var(--cyvest-panel-bg);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+  backdrop-filter: blur(8px);
 }
 
 .cyvest-toolbar {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  z-index: 12;
-  display: flex;
-  gap: 6px;
-  padding: 6px;
-  border-radius: 10px;
-  border: 1px solid var(--cyvest-panel-border);
-  background: var(--cyvest-panel-bg);
-  box-shadow: 0 8px 18px rgba(13, 27, 52, 0.16);
+  top: 12px;
+  right: 12px;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 9px;
 }
 
 .cyvest-toolbar__button {
@@ -56,77 +38,78 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  color: var(--cyvest-panel-text);
+  border: 0;
+  border-radius: 6px;
+  color: var(--cyvest-panel-muted);
   background: transparent;
   cursor: pointer;
-  transition: background-color 0.14s ease, border-color 0.14s ease,
-    color 0.14s ease;
+  transition: background-color 120ms ease, color 120ms ease;
 }
 
 .cyvest-toolbar__button:hover {
-  background: rgba(31, 111, 235, 0.12);
-  border-color: rgba(31, 111, 235, 0.24);
-  color: var(--cyvest-accent);
+  color: var(--cyvest-panel-text);
+  background: rgba(15, 23, 42, 0.055);
+}
+
+.cyvest-toolbar__button:focus-visible,
+.cyvest-view-toggle__button:focus-visible {
+  outline: 2px solid var(--cyvest-accent);
+  outline-offset: 1px;
 }
 
 .cyvest-toolbar__button svg {
-  width: 17px;
-  height: 17px;
+  width: 15px;
+  height: 15px;
   stroke: currentColor;
-  stroke-width: 2;
+  stroke-width: 1.7;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
 
 .cyvest-view-toggle {
-  position: absolute;
   top: 12px;
   left: 12px;
-  z-index: 22;
-  display: flex;
-  gap: 4px;
-  padding: 4px;
-  border-radius: 11px;
-  border: 1px solid var(--cyvest-panel-border, #d3dae6);
-  background: var(--cyvest-panel-bg, rgba(255, 255, 255, 0.96));
-  box-shadow: 0 8px 18px rgba(13, 27, 52, 0.16);
-  font-family: var(--cyvest-font-family, "IBM Plex Sans", "Segoe UI", sans-serif);
+  gap: 2px;
+  padding: 3px;
+  border-radius: 9px;
 }
 
 .cyvest-view-toggle__button {
-  border: none;
-  border-radius: 8px;
-  padding: 8px 12px;
-  color: var(--cyvest-panel-muted, #556079);
+  border: 0;
+  border-radius: 6px;
+  padding: 7px 10px;
+  color: var(--cyvest-panel-muted);
   background: transparent;
-  font-size: 12px;
+  font-family: var(--cyvest-font-family);
+  font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.01em;
   cursor: pointer;
-  transition: background-color 0.14s ease, color 0.14s ease;
+  transition: background-color 120ms ease, color 120ms ease;
 }
 
 .cyvest-view-toggle__button:hover {
-  background: rgba(31, 111, 235, 0.12);
-  color: var(--cyvest-accent, #1f6feb);
+  color: var(--cyvest-panel-text);
+  background: rgba(15, 23, 42, 0.045);
 }
 
 .cyvest-view-toggle__button--active,
 .cyvest-view-toggle__button--active:hover {
-  background: var(--cyvest-accent, #1f6feb);
-  color: #ffffff;
+  color: var(--cyvest-panel-text);
+  background: var(--cyvest-toggle-active-bg);
 }
 
-@media (max-width: 768px) {
-  .cyvest-view-toggle {
+@media (max-width: 640px) {
+  .cyvest-view-toggle,
+  .cyvest-toolbar {
     top: 8px;
+  }
+
+  .cyvest-view-toggle {
     left: 8px;
   }
 
   .cyvest-toolbar {
-    top: 8px;
     right: 8px;
   }
 }

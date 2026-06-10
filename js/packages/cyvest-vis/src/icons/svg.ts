@@ -71,7 +71,8 @@ export const INVESTIGATION_ICON_NAME_MAP: Record<InvestigationCyNodeType, IconNa
 function toSvgDataUri(iconName: IconName, color: string): string {
   const body = ICON_PATHS[iconName] ?? ICON_PATHS.question;
   const svg = [
-    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"',
+    '<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48"',
+    ' viewBox="0 0 24 24" fill="none"',
     ` stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">`,
     body,
     "</svg>",

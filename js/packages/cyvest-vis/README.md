@@ -1,30 +1,30 @@
 # @cyvest/cyvest-vis
 
-Cytoscape-based React components for rendering Cyvest investigations.
+React components for exploring Cyvest investigations with Cytoscape and a
+deterministic `d3-force` layout.
 
-## Highlights
+The default design uses a neutral canvas, compact nodes, thin edges, and a
+restrained level palette. Color is limited to security-level contours; node
+shape communicates the object category.
 
-- Built on `@cyvest/cyvest-js` investigation and graph helpers
-- Two views: observables graph and investigation hierarchy
-- Layouts: ELK `stress` for observables, Dagre `LR` for investigation
-- Professional built-in SVG icons for nodes
-- Label truncation with full-value events
-- Themeable with CSS variables and typed React props
+## Views
 
-## Install / Build
+`CyvestGraph` provides two related views:
+
+- **Observables**: observables and their directed relationships.
+- **Investigation**: root, tag hierarchy, Findings, and Evidence links.
+
+Both views place the root at the center and use radial depth, link attraction,
+repulsion, and collision forces. Hovering a node isolates its immediate
+neighborhood. Clicking a node or edge emits a typed selection event.
+
+## Install
 
 ```bash
-pnpm install
-pnpm --filter @cyvest/cyvest-vis build
+pnpm add @cyvest/cyvest-vis
 ```
 
-Run tests:
-
-```bash
-pnpm --filter @cyvest/cyvest-vis test
-```
-
-## Usage
+Import the package stylesheet once:
 
 ```tsx
 import { CyvestGraph } from "@cyvest/cyvest-vis";
@@ -40,36 +40,63 @@ import "@cyvest/cyvest-vis/styles.css";
 />
 ```
 
-## Main Exports
+## Force layout
+
+The force simulation runs to completion before Cytoscape renders the graph, so
+the same investigation produces stable positions.
+
+```tsx
+<CyvestGraph
+  investigation={investigation}
+  observablesLayout={{
+    linkDistance: 116,
+    chargeStrength: -420,
+    collisionPadding: 30,
+    radialStep: 126,
+  }}
+  investigationLayout={{
+    linkDistance: 132,
+    radialStep: 142,
+  }}
+/>
+```
+
+Available layout settings include `linkDistance`, `linkStrength`,
+`chargeStrength`, `collisionPadding`, `radialStep`, `radialStrength`,
+`centerStrength`, `iterations`, `padding`, and animation options.
+
+## Theming
+
+Use the `theme` prop to override typed theme tokens:
+
+```tsx
+<CyvestGraph
+  investigation={investigation}
+  theme={{
+    background: "#ffffff",
+    panelText: "#111827",
+    accent: "#334155",
+    edgeColor: "#d5dbe3",
+  }}
+/>
+```
+
+The CSS controls use the same tokens through `--cyvest-*` custom properties.
+
+## Exports
 
 - `CyvestGraph`
 - `CyvestObservablesView`
 - `CyvestInvestigationView`
-- `createElkLayout`
-- `truncateLabel`
-- `getObservableIconSvg`
-- `getInvestigationIconSvg`
+- `computeForcePositions`
+- `createForceLayout`
+- `getDefaultForceOptions`
+- icon, label, color, event, theme, and graph data types
 
-## Theming
+## Development
 
-Use the `theme` prop or override CSS variables.
-
-```css
-:root {
-  --cyvest-background: #f4f7fb;
-  --cyvest-grid-color: #d7dfeb;
-  --cyvest-panel-bg: rgba(255, 255, 255, 0.96);
-  --cyvest-panel-border: #d3dae6;
-  --cyvest-panel-text: #172033;
-  --cyvest-panel-muted: #556079;
-  --cyvest-accent: #1f6feb;
-  --cyvest-font-family: 'IBM Plex Sans', 'Segoe UI', sans-serif;
-}
+```bash
+corepack pnpm -C js --filter @cyvest/cyvest-vis test:ci
+corepack pnpm -C js --filter @cyvest/cyvest-vis build
+corepack pnpm -C js --filter @cyvest/cyvest-app dev
 ```
-
-## Breaking Changes vs v1
-
-- Rendering engine changed from React Flow to Cytoscape.
-- Events moved to `onNodeSelect` / `onEdgeSelect`.
-- Component names are now `CyvestObservablesView` and `CyvestInvestigationView`.
-- Import stylesheet with `@cyvest/cyvest-vis/styles.css`.

@@ -86,4 +86,5 @@ When dependencies change upstream, re-run `uv sync --all-extras` (or `pip instal
 
 - Build your first investigation in [Quick Start](quickstart.md)
 - Deep dive into [Core Concepts](concepts.md)
+- Upgrade an existing integration with the [v5 to v6 migration guide](../migration-v5-to-v6.md)
 - Preview the docs site with `mkdocs serve`

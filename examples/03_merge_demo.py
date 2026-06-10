@@ -31,12 +31,12 @@ def analyze_network_traffic() -> Cyvest:
     internal_host = cv.observable_create(cv.OBS.IPV4, "10.0.1.25", internal=True)
     cv.observable_add_relationship(internal_host.key, malicious_ip.key, cv.REL.RELATED_TO)
 
-    # Create check
-    network_check = cv.check_create(
+    # Create finding
+    network_finding = cv.finding_create(
         "outbound_c2", "network", "Detected outbound C2 traffic", score=Decimal("8.0"), level=cv.LVL.MALICIOUS
     )
-    cv.check_link_observable(network_check.key, malicious_ip.key)
-    cv.check_link_observable(network_check.key, internal_host.key)
+    cv.finding_link_observable(network_finding.key, malicious_ip.key)
+    cv.finding_link_observable(network_finding.key, internal_host.key)
 
     return cv
 
@@ -59,16 +59,16 @@ def analyze_endpoint_logs() -> Cyvest:
     malicious_executable = cv.observable_create(cv.OBS.FILE, "update.exe", internal=False)
     cv.observable_add_relationship(malicious_executable.key, suspicious_hash.key, cv.REL.RELATED_TO)
 
-    # Create check
-    endpoint_check = cv.check_create(
+    # Create finding
+    endpoint_finding = cv.finding_create(
         "malware_execution",
         "endpoint",
         comment="Ransomware executed with SYSTEM privileges",
         score=Decimal("9.5"),
         level=cv.LVL.MALICIOUS,
     )
-    cv.check_link_observable(endpoint_check.key, suspicious_hash.key)
-    cv.check_link_observable(endpoint_check.key, malicious_executable.key)
+    cv.finding_link_observable(endpoint_finding.key, suspicious_hash.key)
+    cv.finding_link_observable(endpoint_finding.key, malicious_executable.key)
 
     return cv
 
@@ -94,16 +94,16 @@ def analyze_email_gateway() -> Cyvest:
     )
     cv.observable_add_relationship(phishing_email.key, phishing_url.key, cv.REL.RELATED_TO)
 
-    # Create check
-    email_check = cv.check_create(
+    # Create finding
+    email_finding = cv.finding_create(
         "phishing_detection",
         "email",
         "Detected phishing email with malware link",
         score=Decimal("6.0"),
         level=cv.LVL.SUSPICIOUS,
     )
-    cv.check_link_observable(email_check.key, phishing_email.key)
-    cv.check_link_observable(email_check.key, phishing_url.key)
+    cv.finding_link_observable(email_finding.key, phishing_email.key)
+    cv.finding_link_observable(email_finding.key, phishing_url.key)
 
     return cv
 
@@ -134,9 +134,9 @@ def main() -> None:
     # Create a tag to organize all findings
     incident_tag = main_investigation.tag_create("incident:findings", "Consolidated findings from all data sources")
 
-    # Add all checks to the tag
-    for check in main_investigation.check_get_all().values():
-        main_investigation.tag_add_check(incident_tag.key, check.key)
+    # Add all findings to the tag
+    for finding in main_investigation.finding_get_all().values():
+        main_investigation.tag_add_finding(incident_tag.key, finding.key)
 
     # Finalize relationships
     main_investigation.finalize_relationships()

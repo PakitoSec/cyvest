@@ -117,10 +117,18 @@ export function createInvestigationStylesheet(
       },
     },
     {
-      selector: "node[nodeType = 'check']",
+      selector: "node[nodeType = 'finding']",
       style: {
         "text-halign": "center",
         "background-position-x": "10px",
+      },
+    },
+    {
+      selector: "node[nodeType = 'evidence']",
+      style: {
+        "text-halign": "center",
+        "background-position-x": "10px",
+        "border-style": "dashed",
       },
     },
     {

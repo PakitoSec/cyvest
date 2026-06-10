@@ -17,10 +17,13 @@ from typing import TYPE_CHECKING, Any, Generic, TypeVar
 from cyvest import keys
 from cyvest.levels import Level
 from cyvest.model import (
-    Check,
     Enrichment,
+    Evidence,
+    EvidenceLink,
+    Finding,
     Observable,
     ObservableLink,
+    ObservableSubtype,
     ObservableType,
     Relationship,
     Tag,
@@ -107,6 +110,14 @@ class ObservableProxy(_ReadOnlyProxy[Observable]):
         return self._read_attr("value")
 
     @property
+    def subtype(self) -> ObservableSubtype | str | None:
+        return self._read_attr("subtype")
+
+    @property
+    def namespace(self) -> str | None:
+        return self._read_attr("namespace")
+
+    @property
     def internal(self) -> bool:
         return self._read_attr("internal")
 
@@ -143,9 +154,9 @@ class ObservableProxy(_ReadOnlyProxy[Observable]):
         return self._read_attr("relationships")
 
     @property
-    def check_links(self) -> list[str]:
-        """Checks that currently link to this observable."""
-        return self._read_attr("check_links")
+    def finding_links(self) -> list[str]:
+        """Findings that currently link to this observable."""
+        return self._read_attr("finding_links")
 
     def get_audit_events(self) -> tuple:
         """Return audit events for this observable."""
@@ -258,38 +269,38 @@ class ObservableProxy(_ReadOnlyProxy[Observable]):
         self._get_investigation().add_relationship(self.key, resolved_target, relationship_type, direction)
         return self
 
-    def link_check(
+    def link_finding(
         self,
-        check: Check | CheckProxy | str,
+        finding: Finding | FindingProxy | str,
         *,
         propagation_mode: PropagationMode = PropagationMode.LOCAL_ONLY,
     ) -> ObservableProxy:
-        """Link this observable to a check."""
-        if isinstance(check, CheckProxy):
-            check_key = check.key
-        elif isinstance(check, Check):
-            check_key = check.key
-        elif isinstance(check, str):
-            check_key = check
+        """Link this observable to a finding."""
+        if isinstance(finding, FindingProxy):
+            finding_key = finding.key
+        elif isinstance(finding, Finding):
+            finding_key = finding.key
+        elif isinstance(finding, str):
+            finding_key = finding
         else:
-            raise TypeError("Check must provide a key.")
+            raise TypeError("Finding must provide a key.")
 
-        self._get_investigation().link_check_observable(check_key, self.key, propagation_mode=propagation_mode)
+        self._get_investigation().link_finding_observable(finding_key, self.key, propagation_mode=propagation_mode)
         return self
 
 
-class CheckProxy(_ReadOnlyProxy[Check]):
-    """Read-only proxy over a check."""
+class FindingProxy(_ReadOnlyProxy[Finding]):
+    """Read-only proxy over a finding."""
 
     def _resolve(self):
-        check = self._get_investigation().get_check(self.key)
-        if check is None:
-            raise ModelNotFoundError(f"Check '{self.key}' no longer exists in this investigation.")
-        return check
+        finding = self._get_investigation().get_finding(self.key)
+        if finding is None:
+            raise ModelNotFoundError(f"Finding '{self.key}' no longer exists in this investigation.")
+        return finding
 
     @property
-    def check_name(self) -> str:
-        return self._read_attr("check_name")
+    def finding_name(self) -> str:
+        return self._read_attr("finding_name")
 
     @property
     def description(self) -> str:
@@ -323,9 +334,13 @@ class CheckProxy(_ReadOnlyProxy[Check]):
     def observable_links(self) -> list[ObservableLink]:
         return self._read_attr("observable_links")
 
+    @property
+    def evidence_links(self) -> list[EvidenceLink]:
+        return self._read_attr("evidence_links")
+
     def get_audit_events(self) -> tuple:
-        """Return audit events for this check."""
-        events = self._get_investigation().get_audit_events(object_type="check", object_key=self.key)
+        """Return audit events for this finding."""
+        events = self._get_investigation().get_audit_events(object_type="finding", object_key=self.key)
         return tuple(events)
 
     def update_metadata(
@@ -335,8 +350,8 @@ class CheckProxy(_ReadOnlyProxy[Check]):
         description: str | None = None,
         extra: dict[str, Any] | None = None,
         merge_extra: bool = True,
-    ) -> CheckProxy:
-        """Update mutable metadata on the check."""
+    ) -> FindingProxy:
+        """Update mutable metadata on the finding."""
         updates: dict[str, Any] = {}
         if comment is not None:
             updates["comment"] = comment
@@ -349,17 +364,17 @@ class CheckProxy(_ReadOnlyProxy[Check]):
             return self
 
         dict_merge = {"extra": merge_extra} if extra is not None else None
-        self._get_investigation().update_model_metadata("check", self.key, updates, dict_merge=dict_merge)
+        self._get_investigation().update_model_metadata("finding", self.key, updates, dict_merge=dict_merge)
         return self
 
-    def set_level(self, level: Level, reason: str | None = None) -> CheckProxy:
+    def set_level(self, level: Level, reason: str | None = None) -> FindingProxy:
         """Set the level without changing score."""
-        check = self._resolve()
-        self._get_investigation().apply_level_change(check, level, reason=reason or "Manual level update")
+        finding = self._resolve()
+        self._get_investigation().apply_level_change(finding, level, reason=reason or "Manual level update")
         return self
 
-    def tagged(self, *tags: Tag | TagProxy | str) -> CheckProxy:
-        """Add this check to one or more tags (auto-creates tags from strings)."""
+    def tagged(self, *tags: Tag | TagProxy | str) -> FindingProxy:
+        """Add this finding to one or more tags (auto-creates tags from strings)."""
         investigation = self._get_investigation()
         for tag in tags:
             if isinstance(tag, TagProxy):
@@ -370,11 +385,11 @@ class CheckProxy(_ReadOnlyProxy[Check]):
                 # Auto-create tag if it doesn't exist
                 tag_key = keys.generate_tag_key(tag)
                 if investigation.get_tag(tag_key) is None:
-                    investigation.add_tag(Tag(name=tag, checks=[], key=tag_key))
+                    investigation.add_tag(Tag(name=tag, findings=[], key=tag_key))
             else:
                 raise TypeError("Tag must provide a key.")
 
-            investigation.add_check_to_tag(tag_key, self.key)
+            investigation.add_finding_to_tag(tag_key, self.key)
         return self
 
     def link_observable(
@@ -382,8 +397,8 @@ class CheckProxy(_ReadOnlyProxy[Check]):
         observable: Observable | ObservableProxy | str,
         *,
         propagation_mode: PropagationMode = PropagationMode.LOCAL_ONLY,
-    ) -> CheckProxy:
-        """Link an observable to this check."""
+    ) -> FindingProxy:
+        """Link an observable to this finding."""
         if isinstance(observable, ObservableProxy):
             observable_key = observable.key
         elif isinstance(observable, Observable):
@@ -393,13 +408,115 @@ class CheckProxy(_ReadOnlyProxy[Check]):
         else:
             raise TypeError("Observable must provide a key.")
 
-        self._get_investigation().link_check_observable(self.key, observable_key, propagation_mode=propagation_mode)
+        self._get_investigation().link_finding_observable(self.key, observable_key, propagation_mode=propagation_mode)
         return self
 
-    def with_score(self, score: Decimal | float, reason: str = "") -> CheckProxy:
-        """Update the check's score."""
-        check = self._resolve()
-        self._get_investigation().apply_score_change(check, Decimal(str(score)), reason=reason)
+    def link_evidence(self, evidence: Evidence | EvidenceProxy | str) -> FindingProxy:
+        """Link evidence to this finding."""
+        if isinstance(evidence, EvidenceProxy):
+            evidence_key = evidence.key
+        elif isinstance(evidence, Evidence):
+            evidence_key = evidence.key
+        elif isinstance(evidence, str):
+            evidence_key = evidence
+        else:
+            raise TypeError("Evidence must provide a key.")
+        self._get_investigation().link_finding_evidence(self.key, evidence_key)
+        return self
+
+    def with_score(self, score: Decimal | float, reason: str = "") -> FindingProxy:
+        """Update the finding's score."""
+        finding = self._resolve()
+        self._get_investigation().apply_score_change(finding, Decimal(str(score)), reason=reason)
+        return self
+
+
+class EvidenceProxy(_ReadOnlyProxy[Evidence]):
+    """Read-only proxy over structured evidence."""
+
+    def _resolve(self):
+        evidence = self._get_investigation().get_evidence(self.key)
+        if evidence is None:
+            raise ModelNotFoundError(f"Evidence '{self.key}' no longer exists in this investigation.")
+        return evidence
+
+    @property
+    def evidence_type(self) -> str:
+        return self._read_attr("evidence_type")
+
+    @property
+    def title(self) -> str:
+        return self._read_attr("title")
+
+    @property
+    def description(self) -> str:
+        return self._read_attr("description")
+
+    @property
+    def source(self) -> str:
+        return self._read_attr("source")
+
+    @property
+    def external_id(self) -> str | None:
+        return self._read_attr("external_id")
+
+    @property
+    def content(self) -> Any | None:
+        return self._read_attr("content")
+
+    @property
+    def uri(self) -> str | None:
+        return self._read_attr("uri")
+
+    @property
+    def captured_at(self):
+        return self._read_attr("captured_at")
+
+    @property
+    def extra(self) -> dict[str, Any]:
+        return self._read_attr("extra")
+
+    @property
+    def finding_links(self) -> list[str]:
+        return self._read_attr("finding_links")
+
+    def link_finding(self, finding: Finding | FindingProxy | str) -> EvidenceProxy:
+        if isinstance(finding, FindingProxy):
+            finding_key = finding.key
+        elif isinstance(finding, Finding):
+            finding_key = finding.key
+        elif isinstance(finding, str):
+            finding_key = finding
+        else:
+            raise TypeError("Finding must provide a key.")
+        self._get_investigation().link_finding_evidence(finding_key, self.key)
+        return self
+
+    def update_metadata(
+        self,
+        *,
+        title: str | None = None,
+        description: str | None = None,
+        extra: dict[str, Any] | None = None,
+        merge_extra: bool = True,
+    ) -> EvidenceProxy:
+        updates = {
+            key: value
+            for key, value in {
+                "title": title,
+                "description": description,
+                "extra": extra,
+            }.items()
+            if value is not None
+        }
+        if updates:
+            dict_merge = {"extra": merge_extra} if extra is not None else None
+            self._get_investigation().update_model_metadata(
+                "evidence",
+                self.key,
+                updates,
+                dict_merge=dict_merge,
+            )
         return self
 
 
@@ -421,11 +538,11 @@ class TagProxy(_ReadOnlyProxy[Tag]):
         return self._read_attr("description")
 
     @property
-    def checks(self) -> list[Check]:
-        return self._read_attr("checks")
+    def findings(self) -> list[Finding]:
+        return self._read_attr("findings")
 
     def get_direct_score(self):
-        """Return the direct score (checks in this tag only, no hierarchy)."""
+        """Return the direct score (findings in this tag only, no hierarchy)."""
         return self._call_readonly("get_direct_score")
 
     def get_direct_level(self):
@@ -442,18 +559,18 @@ class TagProxy(_ReadOnlyProxy[Tag]):
         tag = self._resolve()
         return self._get_investigation().get_tag_aggregated_level(tag.name)
 
-    def add_check(self, check: Check | CheckProxy | str) -> TagProxy:
-        """Add a check to this tag."""
-        if isinstance(check, CheckProxy):
-            check_key = check.key
-        elif isinstance(check, Check):
-            check_key = check.key
-        elif isinstance(check, str):
-            check_key = check
+    def add_finding(self, finding: Finding | FindingProxy | str) -> TagProxy:
+        """Add a finding to this tag."""
+        if isinstance(finding, FindingProxy):
+            finding_key = finding.key
+        elif isinstance(finding, Finding):
+            finding_key = finding.key
+        elif isinstance(finding, str):
+            finding_key = finding
         else:
-            raise TypeError("Check must provide a key.")
+            raise TypeError("Finding must provide a key.")
 
-        self._get_investigation().add_check_to_tag(self.key, check_key)
+        self._get_investigation().add_finding_to_tag(self.key, finding_key)
         return self
 
     def __enter__(self) -> TagProxy:

@@ -25,9 +25,9 @@ from cyvest.extract import (
     observables_to_markdown,
     observables_to_markdown_table,
 )
-from cyvest.io_rich import display_check_query, display_diff, display_observable_query, display_threat_intel_query
+from cyvest.io_rich import display_diff, display_finding_query, display_observable_query, display_threat_intel_query
 from cyvest.io_schema import get_investigation_schema
-from cyvest.io_serialization import load_investigation_json
+from cyvest.io_serialization import load_investigation_json, migrate_v5_to_v6
 from cyvest.io_visualization import VisualizationDependencyMissingError
 from cyvest.keys import parse_key_type
 from cyvest.model_enums import ObservableType
@@ -181,7 +181,7 @@ def merge(inputs: tuple[Path, ...], output: Path, output_format: str, stats: boo
         logger.info("[bold]Merged Investigation Statistics:[/bold]")
         investigation_stats = main_investigation.get_statistics()
         logger.info(f"  Total Observables: {investigation_stats.total_observables}")
-        logger.info(f"  Total Checks: {investigation_stats.total_checks}")
+        logger.info(f"  Total Findings: {investigation_stats.total_findings}")
         logger.info(f"  Total Threat Intel: {investigation_stats.total_threat_intel}")
         logger.info(f"  Total Tags: {investigation_stats.total_tags}")
         logger.info(f"  Global Score: {main_investigation.get_global_score():.2f}")
@@ -255,6 +255,19 @@ def schema_cmd(output: Path | None) -> None:
         return
 
     logger.rich("INFO", json.dumps(schema, indent=2), prefix=False)
+
+
+@cli.command()
+@click.argument("input", type=click.Path(exists=True, dir_okay=False, path_type=Path))
+@click.option("-o", "--output", required=True, type=click.Path(dir_okay=False, path_type=Path))
+def migrate(input: Path, output: Path) -> None:
+    """Migrate a Cyvest 5.x investigation to schema version 6.0.0."""
+    source = _load_investigation(input)
+    migrated = migrate_v5_to_v6(source)
+    output_path = output.resolve()
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(json.dumps(migrated, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    logger.info(f"[green]Migrated investigation written to: {output_path}[/green]")
 
 
 @cli.command()
@@ -393,8 +406,8 @@ def diff(actual: Path, expected: Path, rules: Path | None, title: str) -> None:
 
     \b
     [
-      {"check_name": "domain-check", "score": ">= 1.0"},
-      {"key": "chk:ai-analysis", "level": "SUSPICIOUS", "score": "< 3.0"}
+      {"finding_name": "domain-finding", "score": ">= 1.0"},
+      {"key": "fnd:ai-analysis", "level": "SUSPICIOUS", "score": "< 3.0"}
     ]
 
     Supported operators: >=, <=, >, <, ==, !=
@@ -433,7 +446,7 @@ def diff(actual: Path, expected: Path, rules: Path | None, title: str) -> None:
     "-k",
     "--key",
     required=True,
-    help="Key of the object to query (chk:..., obs:..., or ti:...).",
+    help="Key of the object to query (fnd:..., obs:..., or ti:...).",
 )
 @click.option(
     "-d",
@@ -452,13 +465,13 @@ def query(input: Path, key: str, depth: int) -> None:
 
     \b
     Supports querying:
-    - Checks: --key chk:check-name
+    - Findings: --key fnd:finding-name
     - Observables: --key obs:type:value
     - Threat Intel: --key ti:source:obs:type:value
 
     \b
     Examples:
-        cyvest query investigation.json --key chk:dns-check
+        cyvest query investigation.json --key fnd:dns-finding
         cyvest query investigation.json --key obs:domain:example.com --depth 2
         cyvest query investigation.json -k ti:virustotal:obs:domain:example.com
     """
@@ -467,8 +480,8 @@ def query(input: Path, key: str, depth: int) -> None:
     # Determine key type
     key_type = parse_key_type(key)
 
-    if key_type is None or key_type not in ("chk", "obs", "ti"):
-        raise click.ClickException(f"Invalid key format: '{key}'. Expected chk:..., obs:..., or ti:...")
+    if key_type is None or key_type not in ("fnd", "obs", "ti"):
+        raise click.ClickException(f"Invalid key format: '{key}'. Expected fnd:..., obs:..., or ti:...")
 
     logger.info(f"[cyan]Querying: {key}[/cyan]\n")
 
@@ -476,8 +489,8 @@ def query(input: Path, key: str, depth: int) -> None:
         return logger.rich("INFO", r, prefix=False)
 
     try:
-        if key_type == "chk":
-            display_check_query(cv, key, rich_print)
+        if key_type == "fnd":
+            display_finding_query(cv, key, rich_print)
         elif key_type == "obs":
             display_observable_query(cv, key, rich_print, depth=depth)
         elif key_type == "ti":

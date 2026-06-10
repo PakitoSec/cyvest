@@ -51,10 +51,10 @@ pytest --cov=cyvest --cov-report=term-missing --cov-report=html
 
 | Layer | Role | Files |
 | --- | --- | --- |
-| **Investigation** | Authoritative state: observables, checks, TI, tags, score engine | `src/cyvest/investigation.py` |
+| **Investigation** | Authoritative state: observables, findings, TI, tags, score engine | `src/cyvest/investigation.py` |
 | **Cyvest facade** | Public API + CLI entry, manages deterministic keys, exposes fluent helpers | `src/cyvest/cyvest.py`, `src/cyvest/cli.py` |
-| **Proxy helpers** | Fluent builders for observables/checks/tags with merge-on-create semantics | `src/cyvest/proxies.py` |
-| **Models** | Dataclasses for Observables, Checks, ThreatIntel, etc. | `src/cyvest/model.py` |
+| **Proxy helpers** | Fluent builders for observables/findings/tags with merge-on-create semantics | `src/cyvest/proxies.py` |
+| **Models** | Dataclasses for Observables, Findings, ThreatIntel, etc. | `src/cyvest/model.py` |
 | **Scoring** | Score modes, propagation, and level determination | `src/cyvest/score.py` |
 
 **Merge-on-create** keeps duplicates out by checking keys before inserts. When extending the fluent helpers, call back into `Investigation` for validation rather than mutating models directly.

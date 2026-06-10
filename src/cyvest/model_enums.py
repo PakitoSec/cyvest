@@ -22,6 +22,11 @@ class ObservableType(str, Enum):
     EMAIL = "email"
     FILE = "file"
     ARTIFACT = "artifact"
+    HOST = "host"
+    PROCESS = "process"
+    USER = "user"
+    COMMAND_LINE = "command_line"
+    CLOUD_RESOURCE = "cloud_resource"
 
     @classmethod
     def normalize_root_type(cls, root_type: ObservableType | str | None) -> ObservableType:
@@ -40,6 +45,27 @@ class ObservableType(str, Enum):
         if normalized not in (cls.FILE, cls.ARTIFACT):
             raise ValueError("root_type must be ObservableType.FILE or ObservableType.ARTIFACT")
         return normalized
+
+
+class ObservableSubtype(str, Enum):
+    """Built-in observable representations."""
+
+    USER_EMAIL = "email"
+    USER_SID = "sid"
+    USER_UPN = "upn"
+    USER_OKTA_ID = "okta_id"
+    USER_USERNAME = "username"
+    USER_UID = "uid"
+    HOST_HOSTNAME = "hostname"
+    HOST_FQDN = "fqdn"
+    HOST_NETBIOS = "netbios"
+    HOST_DEVICE_ID = "device_id"
+    PROCESS_PID = "pid"
+    PROCESS_GUID = "process_guid"
+    FILE_PATH = "path"
+    CLOUD_AWS_ARN = "aws_arn"
+    CLOUD_AZURE_RESOURCE_ID = "azure_resource_id"
+    CLOUD_GCP_RESOURCE_NAME = "gcp_resource_name"
 
 
 class RelationshipDirection(str, Enum):
@@ -63,7 +89,7 @@ class RelationshipType(str, Enum):
 
 
 class PropagationMode(str, Enum):
-    """Controls how a Check↔Observable link propagates across merged investigations."""
+    """Controls how a Finding↔Observable link propagates across merged investigations."""
 
     LOCAL_ONLY = "LOCAL_ONLY"
     GLOBAL = "GLOBAL"

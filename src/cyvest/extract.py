@@ -564,7 +564,7 @@ def extract_hashes(text: str) -> Iterator[ExtractedObservable]:
         for match in pattern.finditer(text):
             hash_value = match.group(1).lower()
 
-            # Check it's not a substring of an already-found longer hash
+            # Finding it's not a substring of an already-found longer hash
             is_substring = False
             for existing in seen:
                 if hash_value in existing:

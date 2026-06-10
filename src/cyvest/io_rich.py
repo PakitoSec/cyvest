@@ -53,7 +53,7 @@ def _sort_key_by_score(item: Any) -> tuple[Decimal, str]:
     except (TypeError, ValueError, InvalidOperation):
         decimal_score = Decimal(0)
 
-    item_name = getattr(item, "check_name", "")
+    item_name = getattr(item, "finding_name", "")
     return (-decimal_score, item_name)
 
 
@@ -93,15 +93,15 @@ def _build_observable_tree(
     color_level = get_color_level(obs.level)
     color_score = get_color_score(obs.score)
 
-    linked_checks = ""
-    if obs.check_links:
-        checks_str = "[cyan], [/cyan]".join(escape(check_id) for check_id in obs.check_links)
-        linked_checks = f"[cyan][[/cyan]{checks_str}[cyan]][/cyan] "
+    linked_findings = ""
+    if obs.finding_links:
+        findings_str = "[cyan], [/cyan]".join(escape(finding_id) for finding_id in obs.finding_links)
+        linked_findings = f"[cyan][[/cyan]{findings_str}[cyan]][/cyan] "
 
     whitelisted_str = " [green]WHITELISTED[/green]" if obs.whitelisted else ""
 
     obs_info = (
-        f"{rel_info}{linked_checks}[bold]{obs.key}[/bold] "
+        f"{rel_info}{linked_findings}[bold]{obs.key}[/bold] "
         f"[{color_score}]{obs.score_display}[/{color_score}] "
         f"[{color_level}]{obs.level.name}[/{color_level}]"
         f"{whitelisted_str}"
@@ -353,9 +353,9 @@ def display_summary(
 
     resolved_excluded_levels = _normalize_exclude_levels(exclude_levels)
 
-    all_checks = cv.check_get_all().values()
-    filtered_checks = [c for c in all_checks if c.level not in resolved_excluded_levels]
-    applied_checks = sum(1 for c in filtered_checks if c.level != Level.NONE)
+    all_findings = cv.finding_get_all().values()
+    filtered_findings = [c for c in all_findings if c.level not in resolved_excluded_levels]
+    applied_findings = sum(1 for c in filtered_findings if c.level != Level.NONE)
 
     excluded_caption = ""
     if resolved_excluded_levels:
@@ -363,9 +363,9 @@ def display_summary(
         excluded_caption = f" (excluding: {excluded_names})"
 
     caption_parts = [
-        f"Total Checks: {len(cv.check_get_all())}",
-        f"Displayed: {len(filtered_checks)}{excluded_caption}",
-        f"Applied: {applied_checks}",
+        f"Total Findings: {len(cv.finding_get_all())}",
+        f"Displayed: {len(filtered_findings)}{excluded_caption}",
+        f"Applied: {applied_findings}",
     ]
 
     table = Table(
@@ -376,28 +376,28 @@ def display_summary(
     table.add_column("Score", justify="right")
     table.add_column("Level", justify="center")
 
-    # Checks by level section
-    rule = Rule(f"[bold magenta]CHECKS[/bold magenta]: {len(cv.check_get_all())} checks")
+    # Findings by level section
+    rule = Rule(f"[bold magenta]FINDINGS[/bold magenta]: {len(cv.finding_get_all())} findings")
     table.add_row(rule, "-", "-")
 
     for level_enum in sorted(Level, reverse=True):
         if level_enum in resolved_excluded_levels:
             continue
-        checks = [c for c in cv.check_get_all().values() if c.level == level_enum]
-        checks = sorted(checks, key=_sort_key_by_score)
-        if checks:
+        findings = [c for c in cv.finding_get_all().values() if c.level == level_enum]
+        findings = sorted(findings, key=_sort_key_by_score)
+        if findings:
             color_level = get_color_level(level_enum)
             level_rule = Align(
-                f"[bold {color_level}]{level_enum.name}: {len(checks)} check(s)[/bold {color_level}]",
+                f"[bold {color_level}]{level_enum.name}: {len(findings)} finding(s)[/bold {color_level}]",
                 align="center",
             )
             table.add_row(level_rule, "-", "-")
 
-            for check in checks:
-                color_score = get_color_score(check.score)
-                name = f"  {check.check_name}"
-                score = f"[{color_score}]{check.score_display}[/{color_score}]"
-                level = f"[{color_level}]{check.level.name}[/{color_level}]"
+            for finding in findings:
+                color_score = get_color_score(finding.score)
+                name = f"  {finding.finding_name}"
+                score = f"[{color_score}]{finding.score_display}[/{color_score}]"
+                level = f"[{color_level}]{finding.level.name}[/{color_level}]"
                 table.add_row(name, score, level)
 
     # Tags section (if any)
@@ -531,16 +531,25 @@ def display_statistics(cv: Cyvest, rich_print: Callable[[Any], None]) -> None:
 
     rich_print(obs_table)
 
-    # Check statistics table
+    # Finding statistics table
     rich_print("")
-    check_table = Table(title="Check Statistics")
-    check_table.add_column("Level", style="cyan")
-    check_table.add_column("Count", justify="right")
+    finding_table = Table(title="Finding Statistics")
+    finding_table.add_column("Level", style="cyan")
+    finding_table.add_column("Count", justify="right")
 
-    for level, count in stats.checks_by_level.items():
-        check_table.add_row(level, str(count))
+    for level, count in stats.findings_by_level.items():
+        finding_table.add_row(level, str(count))
 
-    rich_print(check_table)
+    rich_print(finding_table)
+
+    if stats.total_evidences > 0:
+        rich_print("")
+        evidence_table = Table(title="Evidence Statistics")
+        evidence_table.add_column("Type", style="cyan")
+        evidence_table.add_column("Count", justify="right")
+        for evidence_type, count in stats.evidences_by_type.items():
+            evidence_table.add_row(evidence_type, str(count))
+        rich_print(evidence_table)
 
     # Threat intel statistics
     if stats.total_threat_intel > 0:
@@ -617,13 +626,13 @@ def display_diff(
     }
 
     for idx, diff in enumerate(diffs):
-        # Add section separator between checks (except before first)
+        # Add section separator between findings (except before first)
         if idx > 0:
             table.add_section()
 
         status_style = status_styles.get(diff.status, "white")
 
-        # Check row (main row)
+        # Finding row (main row)
         expected_str = _format_level_score(diff.expected_level, diff.expected_score, diff.expected_score_rule)
         actual_str = _format_level_score(diff.actual_level, diff.actual_score)
 
@@ -784,66 +793,66 @@ def _build_relationship_tree_depth(
     return tree
 
 
-def display_check_query(
+def display_finding_query(
     cv: Cyvest,
-    check_key: str,
+    finding_key: str,
     rich_print: Callable[[Any], None],
 ) -> None:
     """
-    Display detailed information about a check.
+    Display detailed information about a finding.
 
     Args:
         cv: Cyvest investigation
-        check_key: Key of the check to display
+        finding_key: Key of the finding to display
         rich_print: Rich renderable handler
 
     Raises:
-        KeyError: If check not found
+        KeyError: If finding not found
     """
-    check = cv.check_get(check_key)
-    if check is None:
-        raise KeyError(f"Check '{check_key}' not found in investigation.")
+    finding = cv.finding_get(finding_key)
+    if finding is None:
+        raise KeyError(f"Finding '{finding_key}' not found in investigation.")
 
-    color_level = get_color_level(check.level)
-    color_score = get_color_score(check.score)
+    color_level = get_color_level(finding.level)
+    color_score = get_color_score(finding.score)
 
     # Build info table
     table = Table(show_header=False, box=None)
     table.add_column("Field", style="cyan")
     table.add_column("Value")
 
-    table.add_row("Key", f"[bold]{escape(check.key)}[/bold]")
-    table.add_row("Name", escape(check.check_name))
-    table.add_row("Description", escape(check.description) if check.description else "[dim]-[/dim]")
+    table.add_row("Key", f"[bold]{escape(finding.key)}[/bold]")
+    table.add_row("Name", escape(finding.finding_name))
+    table.add_row("Description", escape(finding.description) if finding.description else "[dim]-[/dim]")
     table.add_row(
         "Score",
-        f"[bold {color_score}]{check.score_display}[/bold {color_score}]",
+        f"[bold {color_score}]{finding.score_display}[/bold {color_score}]",
     )
     table.add_row(
         "Level",
-        f"[bold {color_level}]{check.level.name}[/bold {color_level}]",
+        f"[bold {color_level}]{finding.level.name}[/bold {color_level}]",
     )
-    table.add_row("Comment", escape(check.comment) if check.comment else "[dim]-[/dim]")
+    table.add_row("Comment", escape(finding.comment) if finding.comment else "[dim]-[/dim]")
     table.add_row(
         "Origin Investigation",
-        escape(check.origin_investigation_id) if check.origin_investigation_id else "[dim]-[/dim]",
+        escape(finding.origin_investigation_id) if finding.origin_investigation_id else "[dim]-[/dim]",
     )
 
     # Extra data
-    if check.extra:
-        table.add_row("Extra", _format_extra_data(check.extra))
+    if finding.extra:
+        table.add_row("Extra", _format_extra_data(finding.extra))
 
     rich_print(
         Panel(
             table,
-            title=f"[bold]Check:[/bold] {escape(check.check_name)}",
+            title=f"[bold]Finding:[/bold] {escape(finding.finding_name)}",
             border_style="blue",
             expand=False,
         )
     )
 
     # Linked observables tree
-    observable_links = check.observable_links
+    observable_links = finding.observable_links
     if observable_links:
         all_observables = cv.observable_get_all()
 
@@ -881,6 +890,21 @@ def display_check_query(
 
         rich_print(Panel(tree, border_style="green", expand=False))
 
+    evidence_links = finding.evidence_links
+    if evidence_links:
+        evidences = cv.evidence_get_all()
+        tree = Tree("[bold]Linked Evidences[/bold]")
+        for link in evidence_links:
+            evidence = evidences.get(link.evidence_key)
+            if evidence is None:
+                tree.add(f"[dim]{escape(link.evidence_key)} (not found)[/dim]")
+                continue
+            tree.add(
+                f"[bold]{escape(evidence.title)}[/bold] "
+                f"[dim]{escape(evidence.evidence_type)} · {escape(evidence.source)}[/dim]"
+            )
+        rich_print(Panel(tree, border_style="cyan", expand=False))
+
 
 def display_observable_query(
     cv: Cyvest,
@@ -916,6 +940,11 @@ def display_observable_query(
 
     table.add_row("Key", f"[bold]{escape(obs.key)}[/bold]")
     table.add_row("Type", escape(obs_type_str))
+    if obs.subtype:
+        subtype = obs.subtype.value if hasattr(obs.subtype, "value") else str(obs.subtype)
+        table.add_row("Subtype", escape(subtype))
+    if obs.namespace:
+        table.add_row("Namespace", escape(obs.namespace))
     table.add_row("Value", escape(obs.value))
     table.add_row(
         "Score",
@@ -929,10 +958,10 @@ def display_observable_query(
     table.add_row("Whitelisted", "[green]Yes[/green]" if obs.whitelisted else "[dim]No[/dim]")
     table.add_row("Comment", escape(obs.comment) if obs.comment else "[dim]-[/dim]")
 
-    # Check links
-    if obs.check_links:
-        checks_str = ", ".join(escape(ck) for ck in obs.check_links)
-        table.add_row("Linked Checks", f"[cyan]{checks_str}[/cyan]")
+    # Finding links
+    if obs.finding_links:
+        findings_str = ", ".join(escape(ck) for ck in obs.finding_links)
+        table.add_row("Linked Findings", f"[cyan]{findings_str}[/cyan]")
 
     # Extra data
     if obs.extra:

@@ -6,7 +6,13 @@ Keys are used for object identification, retrieval, and merging.
 """
 
 import hashlib
+import json
 from typing import Any
+from urllib.parse import quote
+
+from cyvest.model_enums import ObservableSubtype, ObservableType
+
+_MAX_READABLE_OBSERVABLE_IDENTITY_BYTES = 128
 
 
 def _normalize_value(value: str) -> str:
@@ -38,7 +44,38 @@ def _hash_dict(data: dict[str, Any]) -> str:
     return hashlib.sha256(content.encode()).hexdigest()[:16]
 
 
-def generate_observable_key(obs_type: str, value: str) -> str:
+def normalize_observable_value(obs_type: str, value: str, subtype: str | None = None) -> str:
+    """Normalize an observable value for identity without changing its display value."""
+    normalized_type = _normalize_value(obs_type)
+    normalized_subtype = _normalize_value(subtype) if subtype else None
+    stripped = value.strip()
+
+    if normalized_type == ObservableType.COMMAND_LINE.value:
+        return stripped
+    if normalized_type in {ObservableType.EMAIL.value, ObservableType.HOST.value}:
+        return stripped.lower()
+    if normalized_type == ObservableType.USER.value and normalized_subtype in {
+        ObservableSubtype.USER_EMAIL.value,
+        ObservableSubtype.USER_UPN.value,
+    }:
+        return stripped.lower()
+    if normalized_subtype in {
+        ObservableSubtype.USER_UID.value,
+        ObservableSubtype.PROCESS_PID.value,
+    }:
+        try:
+            return str(int(stripped, 10))
+        except ValueError as exc:
+            raise ValueError(f"{normalized_subtype} observable values must be base-10 integers") from exc
+    return stripped
+
+
+def generate_observable_key(
+    obs_type: str,
+    value: str,
+    subtype: str | None = None,
+    namespace: str | None = None,
+) -> str:
     """
     Generate a unique key for an observable.
 
@@ -52,24 +89,85 @@ def generate_observable_key(obs_type: str, value: str) -> str:
         Unique observable key
     """
     normalized_type = _normalize_value(obs_type)
-    normalized_value = _normalize_value(value)
-    return f"obs:{normalized_type}:{normalized_value}"
+    normalized_subtype = _normalize_value(subtype) if subtype else None
+    normalized_namespace = namespace.strip().lower() if namespace else None
+    normalized_value = normalize_observable_value(normalized_type, value, normalized_subtype)
+    identity = json.dumps(
+        {
+            "namespace": normalized_namespace,
+            "subtype": normalized_subtype,
+            "type": normalized_type,
+            "value": normalized_value,
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    )
+    if (
+        normalized_type == ObservableType.COMMAND_LINE.value
+        or len(identity.encode("utf-8")) > _MAX_READABLE_OBSERVABLE_IDENTITY_BYTES
+    ):
+        digest = hashlib.sha256(identity.encode("utf-8")).hexdigest()
+        return f"obs:{normalized_type}:sha256:{digest}"
+
+    if normalized_subtype is None and normalized_namespace is None:
+        return f"obs:{normalized_type}:{normalized_value.lower()}"
+
+    parts = ["obs", quote(normalized_type, safe="._-")]
+    parts.append(quote(normalized_subtype, safe="._-") if normalized_subtype else "_")
+    if normalized_namespace is not None:
+        parts.append(quote(normalized_namespace, safe="._-@"))
+    parts.append(quote(normalized_value, safe="._-@/\\"))
+    return ":".join(parts)
 
 
-def generate_check_key(check_name: str) -> str:
+def generate_finding_key(finding_name: str) -> str:
     """
-    Generate a unique key for a check.
+    Generate a unique key for a finding.
 
-    Format: chk:{check_name}
+    Format: fnd:{finding_name}
 
     Args:
-        check_name: Name of the check
+        finding_name: Name of the finding
 
     Returns:
-        Unique check key
+        Unique finding key
     """
-    normalized_name = _normalize_value(check_name)
-    return f"chk:{normalized_name}"
+    normalized_name = _normalize_value(finding_name)
+    return f"fnd:{normalized_name}"
+
+
+def generate_evidence_key(
+    *,
+    source: str,
+    external_id: str | None,
+    evidence_type: str,
+    content: Any = None,
+    uri: str | None = None,
+) -> str:
+    """Generate a deterministic evidence key."""
+    normalized_source = _normalize_value(source)
+    if external_id:
+        normalized_external_id = external_id.strip()
+        readable = f"evd:{quote(normalized_source, safe='._-')}:{quote(normalized_external_id, safe='._-@/')}"
+        if len(readable.encode("utf-8")) <= 128:
+            return readable
+        digest = hashlib.sha256(f"{normalized_source}\0{normalized_external_id}".encode()).hexdigest()
+        return f"evd:{normalized_source}:sha256:{digest}"
+
+    payload = json.dumps(
+        {
+            "content": content,
+            "source": normalized_source,
+            "type": evidence_type.strip().lower(),
+            "uri": uri,
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+        default=str,
+    )
+    return f"evd:sha256:{hashlib.sha256(payload.encode()).hexdigest()}"
 
 
 def generate_threat_intel_key(source: str, observable_key: str) -> str:
@@ -180,7 +278,7 @@ def parse_key_type(key: str) -> str | None:
         key: The key to parse
 
     Returns:
-        Type prefix (obs, chk, ti, enr, tag) or None if invalid
+        Type prefix (obs, fnd, evd, ti, enr, tag) or None if invalid
     """
     if ":" in key:
         return key.split(":", 1)[0]
@@ -215,7 +313,7 @@ def parse_observable_key(key: str) -> tuple[str, str] | None:
 
 def validate_key(key: str, expected_type: str | None = None) -> bool:
     """
-    Validate a key format and optionally check its type.
+    Validate a key format and optionally finding its type.
 
     Args:
         key: The key to validate
@@ -228,7 +326,7 @@ def validate_key(key: str, expected_type: str | None = None) -> bool:
         return False
 
     key_type = parse_key_type(key)
-    if key_type not in ("obs", "chk", "ti", "enr", "tag"):
+    if key_type not in ("obs", "fnd", "evd", "ti", "enr", "tag"):
         return False
 
     if expected_type and key_type != expected_type:

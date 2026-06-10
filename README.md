@@ -1,42 +1,37 @@
-# Cyvest - Cybersecurity Investigation Framework
+# Cyvest
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**Cyvest** is a Python framework for building, analyzing, and structuring cybersecurity investigations programmatically. It provides automatic scoring, level calculation, relationship tracking, and rich reporting capabilities.
+Cyvest is a Python library and CLI for representing cybersecurity investigations
+as structured, serializable data.
 
-## Features
+An investigation contains observables and their relationships, Findings,
+supporting Evidence, threat intelligence, enrichments, and tags. Cyvest maintains
+deterministic keys, calculates scores and security levels, and records mutations
+in an audit log.
 
-- 🔍 **Structured Investigation Modeling**: Model investigations with observables, checks, threat intelligence, and enrichments
-- 📊 **Automatic Scoring**: Dynamic score calculation and propagation through investigation hierarchy
-- 🎯 **Level Classification**: Automatic security level assignment (TRUSTED, INFO, SAFE, NOTABLE, SUSPICIOUS, MALICIOUS)
-- 🔗 **Relationship Tracking**: Lightweight relationship modeling between observables
-- 🏷️ **Typed Helpers**: Built-in enums for observable types and relationships with autocomplete
-- 📈 **Real-time Statistics**: Live metrics and aggregations throughout the investigation
-- 🔄 **Investigation Merging**: Combine investigations from multiple threads or processes
-- 🧵 **Multi-Threading Support**: Advanced thread-safe shared context available via `cyvest.shared`
-- 💾 **Multiple Export Formats**: JSON and Markdown output for reporting and LLM consumption
-- 🎨 **Rich Console Output**: Beautiful terminal displays with the Rich library
-- 🧩 **Fluent helpers**: Convenient API with method chaining for rapid development
-- 🔬 **Investigation Comparison**: Compare investigations with tolerance rules and visual diff output
-- 🔎 **Observable Extraction**: Extract IOCs (IPs, URLs, domains, emails, hashes) from text, markdown, or web pages with defang/refang support
+## Main capabilities
+
+| Area | Functionality |
+| --- | --- |
+| Data model | Typed observables, Findings, Evidence, threat intelligence, enrichments, tags, and relationships |
+| Scoring | Configurable score aggregation and level propagation across observable and Finding links |
+| Composition | Deterministic merging, shared context for parallel tasks, and investigation comparison |
+| Serialization | Versioned JSON schema, JSON/Markdown export, migration from v5, and generated TypeScript types |
+| Tooling | CLI inspection, statistics, IOC extraction, Rich output, and optional graph visualization |
+
+Cyvest 6 uses a strict `schema_version: "6.0.0"`. Existing v5 integrations
+should follow the [migration guide](docs/migration-v5-to-v6.md).
 
 ## Installation
 
 ### Using uv (recommended)
 
 ```bash
-# Install uv if not already installed
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# Clone the repository
 git clone https://github.com/PakitoSec/cyvest.git
 cd cyvest
-
-# Install dependencies
 uv sync
-
-# Install in development mode
 uv pip install -e .
 ```
 
@@ -46,63 +41,67 @@ uv pip install -e .
 pip install -e .
 ```
 
->  Install the optional visualization extra with\
-> `pip install "cyvest[visualization]"` (or `uv pip install -e ".[visualization]"`).
+The optional visualization dependencies are available with:
+
+```bash
+pip install -e ".[visualization]"
+```
 
 ## Quick Start
 
 ```python
 from decimal import Decimal
+
 from cyvest import Cyvest
 
-# Create an investigation (root_data becomes the root observable extra)
-cv = Cyvest(root_data={"type": "email"})
+cv = Cyvest(investigation_name="email-analysis")
 
-# For deterministic reports (enables diffing between runs), pass a custom investigation_id:
-# cv = Cyvest(root_data={"type": "email"}, investigation_id="email-analysis-v1")
-
-# Create observables
 url = (
     cv.observable(cv.OBS.URL, "https://phishing-site.com", internal=False)
     .with_ti("virustotal", score=Decimal("8.5"), level=cv.LVL.MALICIOUS)
     .relate_to(cv.root(), cv.REL.RELATED_TO)
 )
 
-# Create checks
-check = cv.check("url_analysis", "email_body", "Analyze suspicious URL")
-check.link_observable(url)
-check.with_score(Decimal("8.5"), "Malicious URL detected")
+evidence = cv.evidence(
+    "sandbox_report",
+    "URL detonation report",
+    "internal-sandbox",
+    external_id="report-4242",
+    content={"verdict": "malicious"},
+)
 
-# Display results
-print(f"Global Score: {cv.get_global_score()}")
-print(f"Global Level: {cv.get_global_level()}")
+(
+    cv.finding("url_analysis", "Analyze suspicious URL")
+    .link_observable(url)
+    .link_evidence(evidence)
+    .with_score(Decimal("8.5"), reason="Malicious URL detected")
+)
 
-# Export
+print(cv.get_global_score(), cv.get_global_level())
 cv.io_save_json("investigation.json")
 ```
 
+Public model objects are exposed through read-only proxies. Mutations use the
+facade or fluent methods so score propagation, reverse links, and the audit log
+remain consistent.
+
+For deterministic reports and comparisons, pass an explicit
+`investigation_id` when creating the investigation.
+
 ### Model Proxies
 
-Cyvest only exposes immutable model proxies. Helpers like `observable_create`, `check_create`, and the
-fluent `cv.observable()`/`cv.check()` convenience methods return `ObservableProxy`, `CheckProxy`, `TagProxy`, etc.
-These proxies reflect the live investigation state but raise `AttributeError` if you try to assign to their attributes.
-All mutations are routed through the Investigation layer, so use the facade helpers (`cv.observable_set_level`,
-`cv.check_update_score`, `cv.observable_add_threat_intel`) or the built-in fluent methods on the proxies themselves
-(`with_ti`, `relate_to`, `link_observable`, `with_score`, `set_level`, …) so the score engine and audit log stay consistent.
-
-Mutation helpers that reference existing objects (for example, `cv.observable_add_relationship`,
-`cv.check_link_observable`, `cv.tag_add_check`) raise `KeyError` when a key is missing.
-
-Safe metadata fields like `comment`, `extra`, or `internal` can be updated through the proxies without breaking score
-consistency. Use `set_level()` to update the level without changing the score:
+Helpers such as `observable_create`, `finding_create`, `cv.observable()`, and
+`cv.finding()` return live read-only proxies. Use their mutation methods or the
+equivalent `Cyvest` facade methods:
 
 ```python
 url_obs.update_metadata(comment="triaged", internal=False, extra={"ticket": "INC-4242"})
-check.update_metadata(description="New scope", extra={"playbook": "url-analysis"})
-check.set_level(cv.LVL.SAFE, reason="Verified clean")
+finding.update_metadata(description="New scope", extra={"playbook": "url-analysis"})
+finding.set_level(cv.LVL.SAFE, reason="Verified clean")
 ```
 
-Dictionary fields merge by default; pass `merge_extra=False` (or `merge_data=False` for enrichments) to overwrite them.
+Missing referenced objects raise `KeyError`. Dictionary metadata merges by
+default; use `merge_extra=False` or `merge_data=False` to replace it.
 
 ### Threat Intel Drafts
 
@@ -142,22 +141,70 @@ cv.observable_add_relationship(
 Cyvest exposes enums for observable types and relationships via the facade (`cv.OBS`, `cv.REL`, `cv.DIR`)
 so IDEs can autocomplete the official vocabulary without extra imports.
 
-### Checks
-
-Checks represent verification steps in your investigation:
+Broad entity types use a subtype and, for locally scoped identifiers, a namespace:
 
 ```python
-check = cv.check_create(
-    check_id="malware_detection",
-    scope="endpoint",
+account = cv.observable(cv.OBS.USER, "alice@example.com", subtype=cv.SUB.USER_EMAIL)
+host = cv.observable(
+    cv.OBS.HOST,
+    "WKSTN-42",
+    subtype=cv.SUB.HOST_HOSTNAME,
+    namespace="corp.example",
+)
+process = cv.observable(
+    cv.OBS.PROCESS,
+    "4242",
+    subtype=cv.SUB.PROCESS_PID,
+    namespace=host.key,
+)
+executable = cv.observable(
+    cv.OBS.FILE,
+    r"C:\Windows\System32\cmd.exe",
+    subtype=cv.SUB.FILE_PATH,
+    namespace=host.key,
+)
+process.relate_to(executable, cv.REL.RELATED_TO)
+```
+
+`EMAIL` remains an address observable. `USER/email` asserts that the value identifies an account. Both may coexist
+with the same value and can be related explicitly. A process image path is modeled as `FILE/path`, not as a
+`PROCESS` subtype.
+
+### Findings
+
+Findings represent verification steps in your investigation:
+
+```python
+finding = cv.finding_create(
+    finding_name="malware_detection",
     description="Verify file hash against threat intel",
     score=Decimal("8.0"),
     level=cv.LVL.MALICIOUS
 )
 
-# Link observables to checks
-cv.check_link_observable(check.key, file_hash_obs.key)
+# Link observables to findings
+cv.finding_link_observable(finding.key, file_hash_obs.key)
 ```
+
+### Evidences
+
+Evidence is structured supporting material reusable by multiple findings. The source of truth is
+`Finding.evidence_links`; `Evidence.finding_links` is rebuilt for navigation and UI use.
+
+```python
+event = cv.evidence(
+    "edr_event",
+    "Suspicious process creation",
+    "example-edr",
+    external_id="event-4242",
+    content={"pid": 4242, "parent_pid": 1200},
+)
+
+cv.finding("suspicious_process", "Suspicious process").link_evidence(event)
+cv.finding("unexpected_shell", "Unexpected shell").link_evidence(event)
+```
+
+Evidence has no score or level and does not affect score propagation.
 
 ### Threat Intelligence
 
@@ -184,16 +231,16 @@ ti.remove_taxonomy("confidence")
 
 ### Tags
 
-Tags organize checks with automatic hierarchy based on `:` delimiter:
+Tags organize findings with automatic hierarchy based on `:` delimiter:
 
 ```python
 # Simple: pass tag names directly (auto-creates tags)
-check = cv.check("beacon_detection", "Detect C2 beacons")
-check.tagged("network", "c2:detection", "suspicious")
+finding = cv.finding("beacon_detection", "Detect C2 beacons")
+finding.tagged("network", "c2:detection", "suspicious")
 
 # With description: create tag first, then reference it
-tag = cv.tag("network:c2:detection", "C2 Detection Checks")
-check.tagged(tag)
+tag = cv.tag("network:c2:detection", "C2 Detection Findings")
+finding.tagged(tag)
 
 # Query hierarchy
 children = cv.tag_get_children("network")  # ["network:c2"]
@@ -209,9 +256,8 @@ url_obs = cv.observable_create(cv.OBS.URL, "https://malicious.com")
 same_url = cv.observable_get(cv.OBS.URL, "https://malicious.com")
 same_url_by_key = cv.observable_get(url_obs.key)
 
-check = cv.check_create("malware_detection", "endpoint", "Verify file hash")
-same_check = cv.check_get("malware_detection", "endpoint")
-same_check_by_key = cv.check_get(check.key)
+finding = cv.finding_create("malware_detection", "Verify file hash")
+same_finding_by_key = cv.finding_get(finding.key)
 
 tag = cv.tag_create("network:analysis")
 same_tag = cv.tag_get("network:analysis")
@@ -263,9 +309,9 @@ Scores and levels are automatically calculated and propagated:
   - **OUTBOUND relationships**: target scores propagate to source (source is parent)
   - **INBOUND relationships**: source scores propagate to target (target is parent)
   - **BIDIRECTIONAL relationships**: no hierarchical propagation
-- **Observable → Check (provenance-aware)**: Check score/level only considers observables reachable through *effective* links (`observable_links`)
-  - A link is effective when `propagation_mode="GLOBAL"` or when the check's `origin_investigation_id` matches the current investigation id
-- **Check → Global**: All check scores sum to global investigation score
+- **Observable → Finding (provenance-aware)**: Finding score/level only considers observables reachable through *effective* links (`observable_links`)
+  - A link is effective when `propagation_mode="GLOBAL"` or when the finding's `origin_investigation_id` matches the current investigation id
+- **Finding → Global**: All finding scores sum to global investigation score
 
 Observable score aggregation is configurable via `score_mode_obs`:
 
@@ -280,7 +326,7 @@ cv = Cyvest(score_mode_obs=ScoreMode.SUM)  # accumulative children
 **Provenance model**
 
 - `Investigation.investigation_id` is a stable ULID included in exports.
-- Checks keep a *canonical origin* (`origin_investigation_id`) for LOCAL_ONLY propagation; it is compared against the current investigation id.
+- Findings keep a *canonical origin* (`origin_investigation_id`) for LOCAL_ONLY propagation; it is compared against the current investigation id.
 
 **Audit log**
 
@@ -295,9 +341,9 @@ cv = Cyvest(score_mode_obs=ScoreMode.SUM)  # accumulative children
 To force cross-investigation propagation for a specific link, use a GLOBAL link:
 
 ```python
-cv.check_link_observable(check.key, observable.key, propagation_mode="GLOBAL")
+cv.finding_link_observable(finding.key, observable.key, propagation_mode="GLOBAL")
 # or fluent:
-cv.check("id", "scope", "desc").link_observable(observable, propagation_mode="GLOBAL")
+cv.finding("id", "scope", "desc").link_observable(observable, propagation_mode="GLOBAL")
 ```
 
 Score to Level mapping:
@@ -346,7 +392,7 @@ SAFE observables:
 - Protection is preserved during investigation merges
 - Can be marked SAFE by threat intel sources (e.g., whitelists, reputation databases)
 
-SAFE checks:
+SAFE findings:
 - Automatically inherit SAFE level when linked to SAFE observables (if all other observables are ≤ SAFE)
 - Can still upgrade to higher levels when NOTABLE/SUSPICIOUS/MALICIOUS observables are linked
 
@@ -360,13 +406,13 @@ Its key is derived from type + value (e.g. `obs:file:root` or `obs:artifact:root
 **Barrier as Parent** - Root's propagation is asymmetric:
 - Root **CAN** be updated when children change (aggregates child scores)
 - Root **does NOT** propagate upward beyond itself (stops recursive propagation)
-- Root **DOES** propagate to checks normally
+- Root **DOES** propagate to findings normally
 
 This design enables flexible investigation structures while preventing unintended score contamination.
 
 ### Comparing Investigations
 
-Compare two investigations to identify differences in checks, observables, and threat intelligence:
+Compare two investigations to identify differences in findings, observables, and threat intelligence:
 
 ```python
 from decimal import Decimal
@@ -375,17 +421,17 @@ from cyvest.io_rich import display_diff
 
 # Create expected and actual investigations
 expected = Cyvest(investigation_name="expected")
-expected.check_create("domain-check", "Verify domain", score=Decimal("1.0"))
+expected.finding_create("domain-finding", "Verify domain", score=Decimal("1.0"))
 
 actual = Cyvest(investigation_name="actual")
-actual.check_create("domain-check", "Verify domain", score=Decimal("2.0"))
-actual.check_create("new-check", "New detection", score=Decimal("1.5"))
+actual.finding_create("domain-finding", "Verify domain", score=Decimal("2.0"))
+actual.finding_create("new-finding", "New detection", score=Decimal("1.5"))
 
 # Compare investigations
 diffs = compare_investigations(actual, expected)
 # diffs contains:
-#   - MISMATCH for domain-check (score changed 1.0 -> 2.0)
-#   - ADDED for new-check
+#   - MISMATCH for domain-finding (score changed 1.0 -> 2.0)
+#   - ADDED for new-finding
 ```
 
 **Tolerance Rules**
@@ -395,13 +441,13 @@ Use `result_expected` rules to define acceptable score variations:
 ```python
 # Define tolerance rules
 rules = [
-    # Accept any score >= 1.0 for this check
-    ExpectedResult(check_name="domain-check", score=">= 1.0"),
+    # Accept any score >= 1.0 for this finding
+    ExpectedResult(finding_name="domain-finding", score=">= 1.0"),
     # Accept any score < 3.0 for roger-ai
-    ExpectedResult(key="chk:roger-ai", level=Level.SUSPICIOUS, score="< 3.0"),
+    ExpectedResult(key="fnd:roger-ai", level=Level.SUSPICIOUS, score="< 3.0"),
 ]
 
-# Compare with tolerance - checks satisfying rules are not flagged as diffs
+# Compare with tolerance - findings satisfying rules are not flagged as diffs
 diffs = compare_investigations(actual, expected, result_expected=rules)
 ```
 
@@ -424,11 +470,11 @@ Output:
 ╭────────────────────────────────────────────────┬────────────────────┬─────────────────┬────────╮
 │ Key                                            │      Expected      │     Actual      │ Status │
 ├────────────────────────────────────────────────┼────────────────────┼─────────────────┼────────┤
-│ chk:new-check                                  │         -          │  NOTABLE 1.50   │   +    │
+│ fnd:new-finding                                  │         -          │  NOTABLE 1.50   │   +    │
 │ └── domain: example.com                        │         -          │   INFO 0.00     │        │
 │     └── VirusTotal                             │         -          │   INFO 0.00     │        │
 ├────────────────────────────────────────────────┼────────────────────┼─────────────────┼────────┤
-│ chk:domain-check                               │   NOTABLE 1.00     │  NOTABLE 2.00   │   ✗    │
+│ fnd:domain-finding                               │   NOTABLE 1.00     │  NOTABLE 2.00   │   ✗    │
 ╰────────────────────────────────────────────────┴────────────────────┴─────────────────┴────────╯
 ```
 
@@ -620,14 +666,9 @@ pytest --cov=cyvest
 Build the documentation with MkDocs:
 
 ```bash
-# Install docs dependencies
-uv sync --all-extras
-
-# Serve documentation locally
-mkdocs serve
-
-# Build documentation
-mkdocs build
+uv sync --group docs
+uv run --group docs mkdocs serve
+uv run --group docs mkdocs build --strict
 ```
 
 ## JavaScript packages
@@ -639,7 +680,7 @@ The repo includes a PNPM workspace under `js/` with three packages:
 - `@cyvest/cyvest-app`: Vite demo that bundles the JS packages with sample investigations.
 
 The JS packages track the generated schema; serialized investigations should include fields like
-`investigation_id`, `investigation_name`, `audit_log`, `score_display`, `check_links`, and
+`investigation_id`, `investigation_name`, `audit_log`, `score_display`, `finding_links`, and
 `observable_links`. The investigation start time is recorded as an `INVESTIGATION_STARTED` event
 in the `audit_log`.
 
@@ -647,41 +688,9 @@ See `docs/js-packages.md` for workspace commands and usage snippets.
 
 ## Contributing
 
-Contributions are welcome! Please:
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes with tests
-4. Run the test suite
-5. Submit a pull request
+Changes should include focused tests and pass the Python and JavaScript
+validation commands documented in [CONTRIBUTING](docs/contributing.md).
 
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
-
-## Use Cases
-
-Cyvest is designed for:
-
-- **Security Operations Centers (SOCs)**: Automate investigation workflows
-- **Incident Response**: Structure and document incident investigations
-- **Threat Hunting**: Build repeatable hunting methodologies
-- **Malware Analysis**: Track relationships between artifacts
-- **Phishing Analysis**: Analyze emails and linked resources
-- **Integration**: Combine results from multiple security tools
-- **Regression Testing**: Compare investigation outputs across rule or detection updates
-
-## Architecture Highlights
-
-- **Concurrency**: Advanced `SharedInvestigationContext` (via `cyvest.shared`) enables safe parallel task execution
-- **Deterministic Keys**: Same objects always generate same keys for merging
-- **Deterministic IDs**: Optional `investigation_id` parameter for reproducible reports and diffing
-- **Score Propagation**: Automatic hierarchical score calculation
-- **Flexible Export**: JSON for storage, Markdown for LLM analysis
-- **Audit Trail**: Score change history for debugging
-- **Investigation Comparison**: Compare investigations with tolerance rules for regression testing
-
-## Future Enhancements
-
-- Database persistence layer
-- Additional export formats (PDF, HTML)

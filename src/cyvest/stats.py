@@ -1,7 +1,7 @@
 """
 Statistics and aggregation engine for Cyvest investigations.
 
-Provides live counters and aggregations for observables, checks, threat intel,
+Provides live counters and aggregations for observables, findings, threat intel,
 and other investigation metrics.
 """
 
@@ -10,7 +10,7 @@ from __future__ import annotations
 from collections import defaultdict
 
 from cyvest.levels import Level
-from cyvest.model import Check, Observable, Tag, ThreatIntel
+from cyvest.model import Evidence, Finding, Observable, Tag, ThreatIntel
 from cyvest.model_schema import StatisticsSchema
 
 
@@ -18,14 +18,15 @@ class InvestigationStats:
     """
     Tracks and aggregates statistics for an investigation.
 
-    Provides real-time metrics about observables, checks, threat intel,
+    Provides real-time metrics about observables, findings, threat intel,
     and other investigation components.
     """
 
     def __init__(self) -> None:
         """Initialize statistics tracking."""
         self._observables: dict[str, Observable] = {}
-        self._checks: dict[str, Check] = {}
+        self._findings: dict[str, Finding] = {}
+        self._evidences: dict[str, Evidence] = {}
         self._threat_intels: dict[str, ThreatIntel] = {}
         self._tags: dict[str, Tag] = {}
 
@@ -38,14 +39,18 @@ class InvestigationStats:
         """
         self._observables[observable.key] = observable
 
-    def register_check(self, check: Check) -> None:
+    def register_finding(self, finding: Finding) -> None:
         """
-        Register a check for statistics tracking.
+        Register a finding for statistics tracking.
 
         Args:
-            check: Check to track
+            finding: Finding to track
         """
-        self._checks[check.key] = check
+        self._findings[finding.key] = finding
+
+    def register_evidence(self, evidence: Evidence) -> None:
+        """Register evidence for statistics tracking."""
+        self._evidences[evidence.key] = evidence
 
     def register_threat_intel(self, ti: ThreatIntel) -> None:
         """
@@ -142,47 +147,59 @@ class InvestigationStats:
         """
         return sum(1 for obs in self._observables.values() if obs.whitelisted)
 
-    def get_check_count_by_level(self) -> dict[Level, int]:
+    def get_finding_count_by_level(self) -> dict[Level, int]:
         """
-        Get count of checks by level.
+        Get count of findings by level.
 
         Returns:
             Dictionary mapping level to count
         """
         counts: dict[Level, int] = defaultdict(int)
-        for check in self._checks.values():
-            counts[check.level] += 1
+        for finding in self._findings.values():
+            counts[finding.level] += 1
         return dict(counts)
 
-    def get_check_keys_by_level(self) -> dict[Level, list[str]]:
+    def get_finding_keys_by_level(self) -> dict[Level, list[str]]:
         """
-        Get check keys grouped by level.
+        Get finding keys grouped by level.
 
         Returns:
-            Dictionary mapping level to list of check keys
+            Dictionary mapping level to list of finding keys
         """
         keys: dict[Level, list[str]] = defaultdict(list)
-        for check in self._checks.values():
-            keys[check.level].append(check.key)
+        for finding in self._findings.values():
+            keys[finding.level].append(finding.key)
         return dict(keys)
 
-    def get_applied_check_count(self) -> int:
+    def get_applied_finding_count(self) -> int:
         """
-        Get count of checks that were applied (level != NONE).
+        Get count of findings that were applied (level != NONE).
 
         Returns:
-            Count of applied checks
+            Count of applied findings
         """
-        return sum(1 for check in self._checks.values() if check.level != Level.NONE)
+        return sum(1 for finding in self._findings.values() if finding.level != Level.NONE)
 
-    def get_total_check_count(self) -> int:
+    def get_total_finding_count(self) -> int:
         """
-        Get total number of checks.
+        Get total number of findings.
 
         Returns:
-            Total check count
+            Total finding count
         """
-        return len(self._checks)
+        return len(self._findings)
+
+    def get_evidence_count_by_type(self) -> dict[str, int]:
+        counts: dict[str, int] = defaultdict(int)
+        for evidence in self._evidences.values():
+            counts[evidence.evidence_type] += 1
+        return dict(counts)
+
+    def get_evidence_count_by_source(self) -> dict[str, int]:
+        counts: dict[str, int] = defaultdict(int)
+        for evidence in self._evidences.values():
+            counts[evidence.source] += 1
+        return dict(counts)
 
     def get_threat_intel_count(self) -> int:
         """
@@ -226,17 +243,17 @@ class InvestigationStats:
         """
         return len(self._tags)
 
-    def get_checks_by_level(self, level: Level) -> list[Check]:
+    def get_findings_by_level(self, level: Level) -> list[Finding]:
         """
-        Get all checks with a specific level.
+        Get all findings with a specific level.
 
         Args:
             level: Level to filter by
 
         Returns:
-            List of checks with the specified level
+            List of findings with the specified level
         """
-        return [check for check in self._checks.values() if check.level == level]
+        return [finding for finding in self._findings.values() if finding.level == level]
 
     def get_observables_by_level(self, level: Level) -> list[Observable]:
         """
@@ -281,9 +298,12 @@ class InvestigationStats:
                 obs_type: {str(lvl): count for lvl, count in levels.items()}
                 for obs_type, levels in self.get_observable_count_by_type_and_level().items()
             },
-            total_checks=self.get_total_check_count(),
-            applied_checks=self.get_applied_check_count(),
-            checks_by_level={str(k): v for k, v in self.get_check_keys_by_level().items()},
+            total_findings=self.get_total_finding_count(),
+            applied_findings=self.get_applied_finding_count(),
+            findings_by_level={str(k): v for k, v in self.get_finding_keys_by_level().items()},
+            total_evidences=len(self._evidences),
+            evidences_by_type=self.get_evidence_count_by_type(),
+            evidences_by_source=self.get_evidence_count_by_source(),
             total_threat_intel=self.get_threat_intel_count(),
             threat_intel_by_source=self.get_threat_intel_count_by_source(),
             threat_intel_by_level={str(k): v for k, v in self.get_threat_intel_count_by_level().items()},

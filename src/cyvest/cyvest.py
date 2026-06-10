@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import threading
 from collections.abc import Callable, Iterable
+from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Final, Literal, overload
@@ -23,8 +24,8 @@ from cyvest import keys
 from cyvest.compare import compare_investigations
 from cyvest.investigation import Investigation, InvestigationWhitelist
 from cyvest.io_rich import (
-    display_check_query,
     display_diff,
+    display_finding_query,
     display_observable_query,
     display_statistics,
     display_summary,
@@ -40,10 +41,16 @@ from cyvest.io_serialization import (
 )
 from cyvest.io_visualization import generate_network_graph
 from cyvest.levels import Level
-from cyvest.model import Check, Enrichment, Observable, Tag, Taxonomy, ThreatIntel, round_score_decimal
-from cyvest.model_enums import ObservableType, PropagationMode, RelationshipDirection, RelationshipType
+from cyvest.model import Enrichment, Evidence, Finding, Observable, Tag, Taxonomy, ThreatIntel, round_score_decimal
+from cyvest.model_enums import (
+    ObservableSubtype,
+    ObservableType,
+    PropagationMode,
+    RelationshipDirection,
+    RelationshipType,
+)
 from cyvest.model_schema import InvestigationSchema, StatisticsSchema
-from cyvest.proxies import CheckProxy, EnrichmentProxy, ObservableProxy, TagProxy, ThreatIntelProxy
+from cyvest.proxies import EnrichmentProxy, EvidenceProxy, FindingProxy, ObservableProxy, TagProxy, ThreatIntelProxy
 from cyvest.score import ScoreMode
 
 if TYPE_CHECKING:
@@ -56,11 +63,12 @@ class Cyvest:
     """
     High-level facade for building and managing cybersecurity investigations.
 
-    Provides methods for creating observables, checks, threat intel, enrichments,
+    Provides methods for creating observables, findings, threat intel, enrichments,
     and tags, with automatic score propagation and statistics tracking.
     """
 
     OBS: Final[type[ObservableType]] = ObservableType
+    SUB: Final[type[ObservableSubtype]] = ObservableSubtype
     REL: Final[type[RelationshipType]] = RelationshipType
     DIR: Final[type[RelationshipDirection]] = RelationshipDirection
     PROP: Final[type[PropagationMode]] = PropagationMode
@@ -99,10 +107,15 @@ class Cyvest:
             return None
         return ObservableProxy(self._investigation, observable.key)
 
-    def _check_proxy(self, check: Check | None) -> CheckProxy | None:
-        if check is None:
+    def _finding_proxy(self, finding: Finding | None) -> FindingProxy | None:
+        if finding is None:
             return None
-        return CheckProxy(self._investigation, check.key)
+        return FindingProxy(self._investigation, finding.key)
+
+    def _evidence_proxy(self, evidence: Evidence | None) -> EvidenceProxy | None:
+        if evidence is None:
+            return None
+        return EvidenceProxy(self._investigation, evidence.key)
 
     def _tag_proxy(self, tag: Tag | None) -> TagProxy | None:
         if tag is None:
@@ -141,11 +154,17 @@ class Cyvest:
             raise KeyError(f"observable '{key}' not found in investigation.")
         return observable
 
-    def _require_check(self, key: str) -> Check:
-        check = self._investigation.get_check(key)
-        if check is None:
-            raise KeyError(f"check '{key}' not found in investigation.")
-        return check
+    def _require_finding(self, key: str) -> Finding:
+        finding = self._investigation.get_finding(key)
+        if finding is None:
+            raise KeyError(f"finding '{key}' not found in investigation.")
+        return finding
+
+    def _require_evidence(self, key: str) -> Evidence:
+        evidence = self._investigation.get_evidence(key)
+        if evidence is None:
+            raise KeyError(f"evidence '{key}' not found in investigation.")
+        return evidence
 
     # Investigation-level helpers
 
@@ -212,8 +231,10 @@ class Cyvest:
 
     def observable_create(
         self,
-        obs_type: ObservableType,
+        obs_type: ObservableType | str,
         value: str,
+        subtype: ObservableSubtype | str | None = None,
+        namespace: str | None = None,
         internal: bool = False,
         whitelisted: bool = False,
         comment: str = "",
@@ -239,6 +260,8 @@ class Cyvest:
         """
         obs_kwargs: dict[str, Any] = {
             "obs_type": obs_type,
+            "subtype": subtype,
+            "namespace": namespace,
             "value": value,
             "internal": internal,
             "whitelisted": whitelisted,
@@ -260,7 +283,13 @@ class Cyvest:
         ...
 
     @overload
-    def observable_get(self, obs_type: ObservableType, value: str) -> ObservableProxy | None:
+    def observable_get(
+        self,
+        obs_type: ObservableType | str,
+        value: str,
+        subtype: ObservableSubtype | str | None = None,
+        namespace: str | None = None,
+    ) -> ObservableProxy | None:
         """Get an observable by type and value."""
         ...
 
@@ -282,11 +311,24 @@ class Cyvest:
         if kwargs:
             if not args and set(kwargs) == {"key"}:
                 key = kwargs["key"]
-            elif not args and set(kwargs) == {"obs_type", "value"}:
+            elif (
+                not args
+                and {"obs_type", "value"} <= set(kwargs)
+                and set(kwargs) <= {"obs_type", "value", "subtype", "namespace"}
+            ):
                 obs_type = kwargs["obs_type"]
                 value = kwargs["value"]
+                subtype = kwargs.get("subtype")
+                namespace = kwargs.get("namespace")
                 try:
-                    key = keys.generate_observable_key(obs_type.value, value)
+                    obs_type_value = obs_type.value if isinstance(obs_type, ObservableType) else str(obs_type)
+                    subtype_value = subtype.value if isinstance(subtype, ObservableSubtype) else subtype
+                    key = keys.generate_observable_key(
+                        obs_type_value,
+                        value,
+                        subtype=subtype_value,
+                        namespace=namespace,
+                    )
                 except Exception as e:
                     raise ValueError(
                         f"Failed to generate observable key for type='{obs_type}', value='{value}': {e}"
@@ -295,10 +337,19 @@ class Cyvest:
                 raise ValueError("observable_get() accepts either (key: str) or (obs_type: ObservableType, value: str)")
         elif len(args) == 1:
             key = args[0]
-        elif len(args) == 2:
-            obs_type, value = args
+        elif 2 <= len(args) <= 4:
+            obs_type, value = args[:2]
+            subtype = args[2] if len(args) >= 3 else None
+            namespace = args[3] if len(args) == 4 else None
             try:
-                key = keys.generate_observable_key(obs_type.value, value)
+                obs_type_value = obs_type.value if isinstance(obs_type, ObservableType) else str(obs_type)
+                subtype_value = subtype.value if isinstance(subtype, ObservableSubtype) else subtype
+                key = keys.generate_observable_key(
+                    obs_type_value,
+                    value,
+                    subtype=subtype_value,
+                    namespace=namespace,
+                )
             except Exception as e:
                 raise ValueError(
                     f"Failed to generate observable key for type='{obs_type}', value='{value}': {e}"
@@ -564,103 +615,155 @@ class Cyvest:
             for key in self._investigation.get_all_threat_intels().keys()
         }
 
-    # Check methods
+    # Finding methods
 
-    def check_create(
+    def finding_create(
         self,
-        check_name: str,
+        finding_name: str,
         description: str,
         comment: str = "",
         extra: dict[str, Any] | None = None,
         score: Decimal | float | None = None,
         level: Level | None = None,
-    ) -> CheckProxy:
+    ) -> FindingProxy:
         """
-        Create a new check.
+        Create a new finding.
 
         Args:
-            check_name: Check name
-            description: Check description
+            finding_name: Finding name
+            description: Finding description
             comment: Optional comment
             extra: Optional extra data
             score: Optional explicit score
             level: Optional explicit level
 
         Returns:
-            The created check
+            The created finding
         """
-        check_kwargs: dict[str, Any] = {
-            "check_name": check_name,
+        finding_kwargs: dict[str, Any] = {
+            "finding_name": finding_name,
             "description": description,
             "comment": comment,
             "extra": extra or {},
             "origin_investigation_id": self._investigation.investigation_id,
         }
         if score is not None:
-            check_kwargs["score"] = Decimal(str(score))
+            finding_kwargs["score"] = Decimal(str(score))
         if level is not None:
-            check_kwargs["level"] = level
-        check = Check(**check_kwargs)
-        return self._check_proxy(self._investigation.add_check(check))
+            finding_kwargs["level"] = level
+        finding = Finding(**finding_kwargs)
+        return self._finding_proxy(self._investigation.add_finding(finding))
 
-    def check_get(self, key: str) -> CheckProxy | None:
+    def finding_get(self, key: str) -> FindingProxy | None:
         """
-        Get a check by key.
+        Get a finding by key.
 
         Args:
-            key: Check key
+            key: Finding key
 
         Returns:
-            Check if found, None otherwise
+            Finding when found, otherwise None
         """
-        return self._check_proxy(self._investigation.get_check(key))
+        return self._finding_proxy(self._investigation.get_finding(key))
 
-    def check_get_all(self) -> dict[str, CheckProxy]:
-        """Get read-only proxies for all checks."""
-        return {key: CheckProxy(self._investigation, key) for key in self._investigation.get_all_checks().keys()}
+    def finding_get_all(self) -> dict[str, FindingProxy]:
+        """Get read-only proxies for all findings."""
+        return {key: FindingProxy(self._investigation, key) for key in self._investigation.get_all_findings().keys()}
 
-    def check_link_observable(
+    def finding_link_observable(
         self,
-        check_key: str,
+        finding_key: str,
         observable: Observable | ObservableProxy | str,
         propagation_mode: PropagationMode = PropagationMode.LOCAL_ONLY,
-    ) -> CheckProxy:
+    ) -> FindingProxy:
         """
-        Link an observable to a check.
+        Link an observable to a finding.
 
         Args:
-            check_key: Key of the check
+            finding_key: Key of the finding
             observable: Observable, ObservableProxy, or its key
             propagation_mode: Propagation behavior for this link
 
         Returns:
-            The check
+            The finding
 
         Raises:
-            KeyError: If the check or observable does not exist
+            KeyError: If the finding or observable does not exist
         """
         observable_key = self._resolve_observable_key(observable)
-        result = self._investigation.link_check_observable(check_key, observable_key, propagation_mode=propagation_mode)
-        return self._check_proxy(result)
+        result = self._investigation.link_finding_observable(
+            finding_key,
+            observable_key,
+            propagation_mode=propagation_mode,
+        )
+        return self._finding_proxy(result)
 
-    def check_update_score(self, check_key: str, score: Decimal | float, reason: str = "") -> CheckProxy:
+    def finding_update_score(self, finding_key: str, score: Decimal | float, reason: str = "") -> FindingProxy:
         """
-        Update a check's score.
+        Update a finding's score.
 
         Args:
-            check_key: Key of the check
+            finding_key: Key of the finding
             score: New score
             reason: Reason for update
 
         Returns:
-            The check
+            The finding
 
         Raises:
-            KeyError: If the check does not exist
+            KeyError: If the finding does not exist
         """
-        check = self._require_check(check_key)
-        self._investigation.apply_score_change(check, Decimal(str(score)), reason=reason)
-        return self._check_proxy(check)
+        finding = self._require_finding(finding_key)
+        self._investigation.apply_score_change(finding, Decimal(str(score)), reason=reason)
+        return self._finding_proxy(finding)
+
+    def evidence_create(
+        self,
+        evidence_type: str,
+        title: str,
+        source: str,
+        *,
+        description: str = "",
+        external_id: str | None = None,
+        content: Any | None = None,
+        uri: str | None = None,
+        captured_at: datetime | None = None,
+        extra: dict[str, Any] | None = None,
+    ) -> EvidenceProxy:
+        """Create or merge structured evidence."""
+        evidence_kwargs: dict[str, Any] = {
+            "evidence_type": evidence_type,
+            "title": title,
+            "description": description,
+            "source": source,
+            "external_id": external_id,
+            "content": content,
+            "uri": uri,
+            "extra": extra or {},
+        }
+        if captured_at is not None:
+            evidence_kwargs["captured_at"] = captured_at
+        evidence = Evidence(**evidence_kwargs)
+        return self._evidence_proxy(self._investigation.add_evidence(evidence))
+
+    def evidence_get(self, key: str) -> EvidenceProxy | None:
+        """Get evidence by key."""
+        return self._evidence_proxy(self._investigation.get_evidence(key))
+
+    def evidence_get_all(self) -> dict[str, EvidenceProxy]:
+        """Get read-only proxies for all evidences."""
+        return {key: EvidenceProxy(self._investigation, key) for key in self._investigation.get_all_evidences()}
+
+    def finding_link_evidence(
+        self,
+        finding: Finding | FindingProxy | str,
+        evidence: Evidence | EvidenceProxy | str,
+    ) -> FindingProxy:
+        """Link an evidence object to a finding."""
+        finding_key = finding if isinstance(finding, str) else finding.key
+        evidence_key = evidence if isinstance(evidence, str) else evidence.key
+        result = self._investigation.link_finding_evidence(finding_key, evidence_key)
+        return self._finding_proxy(result)
 
     # Tag methods
 
@@ -725,21 +828,21 @@ class Cyvest:
         """Get read-only proxies for all tags."""
         return {key: TagProxy(self._investigation, key) for key in self._investigation.get_all_tags().keys()}
 
-    def tag_add_check(self, tag_key: str, check_key: str) -> TagProxy:
+    def tag_add_finding(self, tag_key: str, finding_key: str) -> TagProxy:
         """
-        Add a check to a tag.
+        Add a finding to a tag.
 
         Args:
             tag_key: Key of the tag
-            check_key: Key of the check
+            finding_key: Key of the finding
 
         Returns:
             The tag
 
         Raises:
-            KeyError: If the tag or check does not exist
+            KeyError: If the tag or finding does not exist
         """
-        tag = self._investigation.add_check_to_tag(tag_key, check_key)
+        tag = self._investigation.add_finding_to_tag(tag_key, finding_key)
         return self._tag_proxy(tag)
 
     def tag_get_children(self, tag_name: str) -> list[TagProxy]:
@@ -963,7 +1066,7 @@ class Cyvest:
             include_tags: Include tags section in the report (default: False)
             include_enrichments: Include enrichments section in the report (default: False)
             include_observables: Include observables section in the report (default: True)
-            exclude_levels: Set of levels to exclude from checks section (default: {Level.NONE})
+            exclude_levels: Set of levels to exclude from findings section (default: {Level.NONE})
 
         Returns:
             Markdown formatted report as a string
@@ -1089,7 +1192,7 @@ class Cyvest:
                 external service (e.g. a SOAR/TIP API response).
             preprocessor: Optional callback that receives a **shallow copy**
                 of *report* and returns a (possibly modified) dict before
-                validation.  Runs before the safe-override check.
+                validation.  Runs before the safe-override finding.
             safe_getter: Optional callable that extracts a value from the
                 report dict to match against *safe_values*.
             safe_values: Values that, when matched by *safe_getter*, force
@@ -1203,7 +1306,7 @@ class Cyvest:
 
         Args:
             expected: The reference investigation (expected results), optional
-            result_expected: List of ExpectedResult tolerance rules for specific checks
+            result_expected: List of ExpectedResult tolerance rules for specific findings
 
         Returns:
             List of DiffItem for all differences found
@@ -1271,7 +1374,7 @@ class Cyvest:
 
         Args:
             expected: The reference investigation (expected results), optional
-            result_expected: List of ExpectedResult tolerance rules for specific checks
+            result_expected: List of ExpectedResult tolerance rules for specific findings
             title: Title for the diff table
             rich_print: Optional callable that takes a renderable and returns None
         """
@@ -1283,28 +1386,28 @@ class Cyvest:
         diffs = compare_investigations(actual=self, expected=expected, result_expected=result_expected)
         display_diff(diffs, rich_print, title=title)
 
-    def display_check(
+    def display_finding(
         self,
-        check_key: str,
+        finding_key: str,
         rich_print: Callable[[Any], None] | None = None,
     ) -> None:
         """
-        Display detailed information about a check.
+        Display detailed information about a finding.
 
         Args:
-            check_key: Key of the check to display (format: chk:check-name)
+            finding_key: Key of the finding to display (format: fnd:finding-name)
             rich_print: Optional callable that takes a renderable and returns None.
                         If not provided, uses the default logger.
 
         Raises:
-            KeyError: If check not found
+            KeyError: If finding not found
         """
         if rich_print is None:
 
             def rich_print(renderables: Any) -> None:
                 logger.rich("INFO", renderables, width=150, prefix=False)
 
-        display_check_query(self, check_key, rich_print)
+        display_finding_query(self, finding_key, rich_print)
 
     def display_observable(
         self,
@@ -1449,8 +1552,10 @@ class Cyvest:
 
     def observable(
         self,
-        obs_type: ObservableType,
+        obs_type: ObservableType | str,
         value: str,
+        subtype: ObservableSubtype | str | None = None,
+        namespace: str | None = None,
         internal: bool = False,
         whitelisted: bool = False,
         comment: str = "",
@@ -1474,32 +1579,53 @@ class Cyvest:
         Returns:
             Observable proxy exposing mutation helpers for chaining
         """
-        return self.observable_create(obs_type, value, internal, whitelisted, comment, extra, score, level)
+        return self.observable_create(
+            obs_type,
+            value,
+            subtype,
+            namespace,
+            internal,
+            whitelisted,
+            comment,
+            extra,
+            score,
+            level,
+        )
 
-    def check(
+    def finding(
         self,
-        check_name: str,
+        finding_name: str,
         description: str,
         comment: str = "",
         extra: dict[str, Any] | None = None,
         score: Decimal | float | None = None,
         level: Level | None = None,
-    ) -> CheckProxy:
+    ) -> FindingProxy:
         """
-        Create a check with fluent helper methods.
+        Create a finding with fluent helper methods.
 
         Args:
-            check_name: Check name
-            description: Check description
+            finding_name: Finding name
+            description: Finding description
             comment: Optional comment
             extra: Optional extra data
             score: Optional explicit score
             level: Optional explicit level
 
         Returns:
-            Check proxy exposing mutation helpers for chaining
+            Finding proxy exposing mutation helpers for chaining
         """
-        return self.check_create(check_name, description, comment, extra, score, level)
+        return self.finding_create(finding_name, description, comment, extra, score, level)
+
+    def evidence(
+        self,
+        evidence_type: str,
+        title: str,
+        source: str,
+        **kwargs: Any,
+    ) -> EvidenceProxy:
+        """Create or fetch structured evidence with fluent helpers."""
+        return self.evidence_create(evidence_type, title, source, **kwargs)
 
     def tag(self, name: str, description: str = "") -> TagProxy:
         """

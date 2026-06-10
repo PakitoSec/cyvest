@@ -42,29 +42,29 @@ def main() -> None:
     # Link URL to domain
     cv.observable_add_relationship(phishing_url.key, domain.key, cv.REL.RELATED_TO)
 
-    # Create checks
-    sender_check = cv.check_create(
+    # Create findings
+    sender_finding = cv.finding_create(
         "sender_verification",
         "Verify sender authenticity",
-        comment="Sender domain not in known contacts. SPF check failed.",
+        comment="Sender domain not in known contacts. SPF finding failed.",
         score=Decimal("3.5"),
     )
 
-    url_check = cv.check_create(
+    url_finding = cv.finding_create(
         "url_analysis",
         "Analyze URLs in email body",
         comment="Found phishing URL attempting to steal credentials",
         score=Decimal("8.5"),
     )
 
-    # Link checks to observables
-    cv.check_link_observable(sender_check.key, sender_email.key)
-    cv.check_link_observable(url_check.key, phishing_url.key)
+    # Link findings to observables
+    cv.finding_link_observable(sender_finding.key, sender_email.key)
+    cv.finding_link_observable(url_finding.key, phishing_url.key)
 
     # Create tag for organization
     email_tag = cv.tag_create("email:analysis", "Analysis of suspicious email")
-    cv.tag_add_check(email_tag.key, sender_check.key)
-    cv.tag_add_check(email_tag.key, url_check.key)
+    cv.tag_add_finding(email_tag.key, sender_finding.key)
+    cv.tag_add_finding(email_tag.key, url_finding.key)
 
     # Add enrichment
     cv.enrichment_create(

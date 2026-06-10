@@ -24,7 +24,7 @@ _LEVEL_ORDER = {
 
 class Level(str, Enum):
     """
-    Security level classification for checks, observables, and threat intelligence.
+    Security level classification for findings, observables, and threat intelligence.
 
     Levels are ordered from lowest (NONE) to highest (MALICIOUS) severity.
     """

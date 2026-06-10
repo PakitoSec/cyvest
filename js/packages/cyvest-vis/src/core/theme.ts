@@ -20,6 +20,7 @@ export function createThemeStyle(
     "--cyvest-panel-text": resolved.panelText,
     "--cyvest-panel-muted": resolved.panelTextMuted,
     "--cyvest-accent": resolved.accent,
+    "--cyvest-toggle-active-bg": resolved.toggleActiveSurface,
     "--cyvest-font-family": resolved.fontFamily,
   } as React.CSSProperties;
 }

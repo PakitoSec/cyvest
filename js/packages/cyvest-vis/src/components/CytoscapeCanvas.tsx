@@ -137,12 +137,37 @@ export const CytoscapeCanvas: React.FC<CytoscapeCanvasProps> = ({
       });
     };
 
+    const handleNodeMouseOver = (event: EventObjectNode) => {
+      const node = event.target;
+      const neighborhood = node.closedNeighborhood();
+      cy.elements().addClass("cyvest-dimmed");
+      neighborhood.removeClass("cyvest-dimmed");
+      node.addClass("cyvest-focus");
+      node.connectedEdges().addClass("cyvest-focus");
+    };
+
+    const clearFocus = () => {
+      cy.elements().removeClass("cyvest-dimmed cyvest-focus");
+    };
+
+    const handleCanvasTap = (event: EventObjectNode | EventObjectEdge) => {
+      if (event.target === cy) {
+        cy.elements().unselect();
+      }
+    };
+
     cy.on("tap", "node", handleNodeTap);
     cy.on("tap", "edge", handleEdgeTap);
+    cy.on("mouseover", "node", handleNodeMouseOver);
+    cy.on("mouseout", "node", clearFocus);
+    cy.on("tap", handleCanvasTap);
 
     return () => {
       cy.removeListener("tap", "node", handleNodeTap);
       cy.removeListener("tap", "edge", handleEdgeTap);
+      cy.removeListener("mouseover", "node", handleNodeMouseOver);
+      cy.removeListener("mouseout", "node", clearFocus);
+      cy.removeListener("tap", handleCanvasTap);
     };
   }, [onEdgeSelect, onNodeSelect, view]);
 

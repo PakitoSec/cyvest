@@ -9,17 +9,19 @@ import {
 import type { ElementDefinition } from "cytoscape";
 
 import type {
+  CyvestThemeTokens,
   InvestigationCyEdgeData,
   InvestigationCyNodeData,
   InvestigationCyNodeType,
 } from "../types";
 import { getInvestigationIconSvg } from "../icons/svg";
-import { getLevelBackgroundColor, getLevelColor } from "../utils/colors";
+import { getLevelColor, resolveTheme } from "../utils/colors";
 import { truncateLabel } from "../utils/labels";
 
 export interface InvestigationAdapterOptions {
   maxLabelLength?: number;
   edgeColor?: string;
+  theme?: Partial<CyvestThemeTokens>;
 }
 
 const ROOT_NODE_ID = "inv-root";
@@ -30,18 +32,59 @@ function createNodeData(
   label: string,
   level: Level,
   score: number,
-  maxLabelLength: number
+  maxLabelLength: number,
+  theme: CyvestThemeTokens
 ): InvestigationCyNodeData {
-  const borderColor = getLevelColor(level);
-
-  const sizeByType: Record<InvestigationCyNodeType, { width: number; height: number }> = {
-    root: { width: 190, height: 52 },
-    tag: { width: 156, height: 46 },
-    finding: { width: 174, height: 52 },
-    evidence: { width: 174, height: 46 },
+  const styleByType: Record<
+    InvestigationCyNodeType,
+    {
+      width: number;
+      height: number;
+      shape: "ellipse" | "round-rectangle" | "diamond";
+      fillColor: string;
+      borderColor: string;
+      iconColor: string;
+      borderWidth: number;
+    }
+  > = {
+    root: {
+      width: 56,
+      height: 56,
+      shape: "ellipse",
+      fillColor: theme.rootSurface,
+      borderColor: theme.rootSurface,
+      iconColor: theme.rootText,
+      borderWidth: 1,
+    },
+    tag: {
+      width: 28,
+      height: 28,
+      shape: "diamond",
+      fillColor: theme.nodeSurfaceMuted,
+      borderColor: "#94a3b8",
+      iconColor: theme.iconMutedColor,
+      borderWidth: 1.5,
+    },
+    finding: {
+      width: 42,
+      height: 42,
+      shape: "ellipse",
+      fillColor: theme.nodeSurface,
+      borderColor: getLevelColor(level),
+      iconColor: theme.iconMutedColor,
+      borderWidth: 2,
+    },
+    evidence: {
+      width: 36,
+      height: 30,
+      shape: "round-rectangle",
+      fillColor: theme.nodeSurfaceMuted,
+      borderColor: "#94a3b8",
+      iconColor: theme.iconMutedColor,
+      borderWidth: 1.5,
+    },
   };
-
-  const dimensions = sizeByType[nodeType];
+  const style = styleByType[nodeType];
 
   return {
     id: nodeId,
@@ -54,13 +97,13 @@ function createNodeData(
     labelFull: label,
     level,
     score,
-    borderColor,
-    fillColor: getLevelBackgroundColor(level),
-    icon: getInvestigationIconSvg(nodeType, { color: borderColor }),
-    width: dimensions.width,
-    height: dimensions.height,
-    shape: "round-rectangle",
-    borderWidth: 2,
+    borderColor: style.borderColor,
+    fillColor: style.fillColor,
+    icon: getInvestigationIconSvg(nodeType, { color: style.iconColor }),
+    width: style.width,
+    height: style.height,
+    shape: style.shape,
+    borderWidth: style.borderWidth,
   };
 }
 
@@ -113,9 +156,9 @@ function createEdge(
     id,
     relationshipType,
     color: edgeColor,
-    width: 1.5,
+    width: 1.05,
     sourceArrowShape: "none",
-    targetArrowShape: "triangle",
+    targetArrowShape: "none",
   };
 
   return {
@@ -133,7 +176,8 @@ export function buildInvestigationElements(
   options?: InvestigationAdapterOptions
 ): ElementDefinition[] {
   const maxLabelLength = options?.maxLabelLength ?? 26;
-  const edgeColor = options?.edgeColor ?? "#8a95aa";
+  const theme = resolveTheme(options?.theme);
+  const edgeColor = options?.edgeColor ?? theme.edgeColor;
 
   const nodes: ElementDefinition[] = [];
   const edges: ElementDefinition[] = [];
@@ -147,7 +191,8 @@ export function buildInvestigationElements(
       root.value,
       root.level,
       root.score,
-      maxLabelLength
+      maxLabelLength,
+      theme
     ),
   });
 
@@ -171,7 +216,8 @@ export function buildInvestigationElements(
       finding.finding_name,
       finding.level,
       finding.score,
-      maxLabelLength
+      maxLabelLength,
+      theme
     );
 
     nodes.push({ group: "nodes", data: nodeData });
@@ -198,7 +244,8 @@ export function buildInvestigationElements(
         evidence.title,
         "INFO",
         0,
-        maxLabelLength
+        maxLabelLength,
+        theme
       ),
     });
   }
@@ -240,7 +287,8 @@ export function buildInvestigationElements(
         shortTagName,
         tagLevel,
         tagScore,
-        maxLabelLength
+        maxLabelLength,
+        theme
       ),
     });
   }

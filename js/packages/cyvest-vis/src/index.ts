@@ -15,16 +15,23 @@ export {
   getLevelColor,
   getLevelBackgroundColor,
   lightenHexColor,
+  mixHexColor,
 } from "./utils/colors";
 
-export { createElkLayout, getDefaultElkOptions } from "./layout/elk";
+export {
+  computeForcePositions,
+  createForceLayout,
+  getDefaultForceOptions,
+} from "./layout/force";
 
 export {
   DEFAULT_CYVEST_THEME,
+  DARK_CYVEST_THEME,
   type CyvestThemeTokens,
   type CyvestViewMode,
   type CyvestElkDirection,
   type CyvestElkOptions,
+  type CyvestForceOptions,
   type CyNodeSelectEvent,
   type CyEdgeSelectEvent,
   type CyvestBaseViewProps,

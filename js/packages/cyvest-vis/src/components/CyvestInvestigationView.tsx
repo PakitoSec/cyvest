@@ -2,7 +2,7 @@ import React, { useMemo } from "react";
 
 import { buildInvestigationElements } from "../adapters/investigationElements";
 import { createInvestigationStylesheet } from "../core/styles";
-import { createElkLayout } from "../layout/elk";
+import { createForceLayout } from "../layout/force";
 import type { CyvestInvestigationViewProps } from "../types";
 import { CytoscapeCanvas } from "./CytoscapeCanvas";
 
@@ -23,9 +23,9 @@ export const CyvestInvestigationView: React.FC<CyvestInvestigationViewProps> = (
     () =>
       buildInvestigationElements(investigation, {
         maxLabelLength,
-        edgeColor: theme?.edgeColor,
+        theme,
       }),
-    [investigation, maxLabelLength, theme?.edgeColor]
+    [investigation, maxLabelLength, theme]
   );
 
   const stylesheet = useMemo(
@@ -33,9 +33,9 @@ export const CyvestInvestigationView: React.FC<CyvestInvestigationViewProps> = (
     [theme]
   );
 
-  const elkLayout = useMemo(
-    () => createElkLayout("investigation", layout),
-    [layout]
+  const forceLayout = useMemo(
+    () => createForceLayout(elements, "investigation", layout),
+    [elements, layout]
   );
 
   return (
@@ -43,7 +43,7 @@ export const CyvestInvestigationView: React.FC<CyvestInvestigationViewProps> = (
       view="investigation"
       elements={elements}
       stylesheet={stylesheet}
-      layout={elkLayout}
+      layout={forceLayout}
       width={width}
       height={height}
       className={className}

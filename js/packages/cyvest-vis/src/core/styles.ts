@@ -3,7 +3,7 @@ import type { Stylesheet } from "cytoscape";
 import type { CyvestThemeTokens } from "../types";
 import { resolveTheme } from "../utils/colors";
 
-export function createObservablesStylesheet(
+function createSharedStylesheet(
   theme?: Partial<CyvestThemeTokens>
 ): Stylesheet[] {
   const resolved = resolveTheme(theme);
@@ -17,34 +17,59 @@ export function createObservablesStylesheet(
         height: "data(height)",
         label: "data(labelShort)",
         color: resolved.panelText,
-        "font-size": 11,
+        "font-size": 10.5,
         "font-family": resolved.fontFamily,
         "font-weight": 500,
+        "min-zoomed-font-size": 8,
         "text-wrap": "none",
-        "text-max-width": 210,
+        "text-max-width": 190,
         "text-halign": "center",
         "text-valign": "bottom",
-        "text-margin-y": 10,
+        "text-margin-y": 9,
+        "text-background-color": resolved.panelBackground,
+        "text-background-opacity": 0.86,
+        "text-background-padding": 2,
+        "text-background-shape": "roundrectangle",
         "background-color": "data(fillColor)",
         "border-color": "data(borderColor)",
         "border-width": "data(borderWidth)",
         "background-image": "data(icon)",
         "background-fit": "none",
-        "background-width": "13px",
-        "background-height": "13px",
+        "background-width": "48%",
+        "background-height": "48%",
         "background-position-x": "50%",
         "background-position-y": "50%",
         "background-image-opacity": 1,
         "background-opacity": 1,
         opacity: "data(opacity)",
         "overlay-opacity": 0,
+        "transition-property":
+          "opacity, border-width, border-color, underlay-opacity, underlay-padding",
+        "transition-duration": 140,
       },
     },
     {
       selector: "node:selected",
       style: {
-        "border-color": resolved.accent,
-        "border-width": 3,
+        "border-color": resolved.edgeSelectedColor,
+        "border-width": 2.5,
+        "underlay-color": resolved.accent,
+        "underlay-opacity": 0.12,
+        "underlay-padding": 7,
+      },
+    },
+    {
+      selector: "node.cyvest-focus",
+      style: {
+        "underlay-color": resolved.accent,
+        "underlay-opacity": 0.08,
+        "underlay-padding": 6,
+      },
+    },
+    {
+      selector: ".cyvest-dimmed",
+      style: {
+        opacity: 0.16,
       },
     },
     {
@@ -57,24 +82,52 @@ export function createObservablesStylesheet(
         "target-arrow-shape": "data(targetArrowShape)",
         "source-arrow-shape": "data(sourceArrowShape)",
         "curve-style": "bezier",
-        "arrow-scale": 1,
-        opacity: 0.88,
+        "arrow-scale": 0.62,
+        opacity: 0.78,
         "overlay-opacity": 0,
+        "transition-property": "opacity, line-color, width",
+        "transition-duration": 140,
+      },
+    },
+    {
+      selector: "edge.cyvest-focus",
+      style: {
+        width: 1.7,
+        "line-color": resolved.edgeSelectedColor,
+        "target-arrow-color": resolved.edgeSelectedColor,
+        "source-arrow-color": resolved.edgeSelectedColor,
+        opacity: 0.9,
       },
     },
     {
       selector: "edge:selected",
       style: {
+        width: 1.9,
         "line-color": resolved.edgeSelectedColor,
         "target-arrow-color": resolved.edgeSelectedColor,
         "source-arrow-color": resolved.edgeSelectedColor,
         label: "data(relationshipType)",
         color: resolved.panelTextMuted,
-        "font-size": 10,
+        "font-size": 9,
         "font-family": resolved.fontFamily,
         "text-background-color": resolved.panelBackground,
-        "text-background-opacity": 0.98,
+        "text-background-opacity": 0.94,
         "text-background-padding": 2,
+      },
+    },
+  ];
+}
+
+export function createObservablesStylesheet(
+  theme?: Partial<CyvestThemeTokens>
+): Stylesheet[] {
+  return [
+    ...createSharedStylesheet(theme),
+    {
+      selector: "node[?isRoot]",
+      style: {
+        "font-weight": 700,
+        "text-margin-y": 11,
       },
     },
   ];
@@ -83,84 +136,29 @@ export function createObservablesStylesheet(
 export function createInvestigationStylesheet(
   theme?: Partial<CyvestThemeTokens>
 ): Stylesheet[] {
-  const resolved = resolveTheme(theme);
-
   return [
+    ...createSharedStylesheet(theme),
     {
-      selector: "node",
+      selector: "node[nodeType = 'root']",
       style: {
-        shape: "data(shape)",
-        width: "data(width)",
-        height: "data(height)",
-        label: "data(labelShort)",
-        color: resolved.panelText,
-        "font-size": 10,
-        "font-family": resolved.fontFamily,
-        "font-weight": 500,
-        "text-wrap": "none",
-        "text-max-width": 190,
-        "text-halign": "center",
-        "text-valign": "center",
-        "text-justification": "center",
-        "background-color": "data(fillColor)",
-        "border-color": "data(borderColor)",
-        "border-width": "data(borderWidth)",
-        "background-image": "data(icon)",
-        "background-fit": "none",
-        "background-width": "18px",
-        "background-height": "18px",
-        "background-position-x": "10px",
-        "background-position-y": "50%",
-        "background-image-opacity": 0.9,
-        "text-margin-x": 0,
-        "overlay-opacity": 0,
+        "font-weight": 700,
+        "font-size": 11,
+        "text-margin-y": 11,
       },
     },
     {
-      selector: "node[nodeType = 'finding']",
+      selector: "node[nodeType = 'tag']",
       style: {
-        "text-halign": "center",
-        "background-position-x": "10px",
+        "font-size": 9.5,
+        "background-width": "42%",
+        "background-height": "42%",
       },
     },
     {
       selector: "node[nodeType = 'evidence']",
       style: {
-        "text-halign": "center",
-        "background-position-x": "10px",
         "border-style": "dashed",
-      },
-    },
-    {
-      selector: "node:selected",
-      style: {
-        "border-color": resolved.accent,
-        "border-width": 3,
-      },
-    },
-    {
-      selector: "edge",
-      style: {
-        width: "data(width)",
-        "line-color": "data(color)",
-        "target-arrow-color": "data(color)",
-        "source-arrow-color": "data(color)",
-        "target-arrow-shape": "data(targetArrowShape)",
-        "source-arrow-shape": "data(sourceArrowShape)",
-        "curve-style": "taxi",
-        "taxi-direction": "rightward",
-        "taxi-turn": "26px",
-        "arrow-scale": 0.95,
-        opacity: 0.9,
-        "overlay-opacity": 0,
-      },
-    },
-    {
-      selector: "edge:selected",
-      style: {
-        "line-color": resolved.edgeSelectedColor,
-        "target-arrow-color": resolved.edgeSelectedColor,
-        "source-arrow-color": resolved.edgeSelectedColor,
+        "font-size": 9.5,
       },
     },
   ];

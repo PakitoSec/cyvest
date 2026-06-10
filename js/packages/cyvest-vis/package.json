@@ -34,12 +34,10 @@
   "dependencies": {
     "@cyvest/cyvest-js": "workspace:*",
     "cytoscape": "^3.34.0",
-    "cytoscape-dagre": "^4.0.0",
-    "cytoscape-elk": "^2.3.0",
-    "dagre": "^0.8.5",
-    "elkjs": "^0.11.1"
+    "d3-force": "^3.0.0"
   },
   "devDependencies": {
+    "@types/d3-force": "^3.0.10",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "react": "^19.2.7",

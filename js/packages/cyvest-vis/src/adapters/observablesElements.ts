@@ -8,16 +8,18 @@ import {
 import type { ElementDefinition } from "cytoscape";
 
 import type {
+  CyvestThemeTokens,
   ObservableCyEdgeData,
   ObservableCyNodeData,
 } from "../types";
 import { getObservableIconSvg } from "../icons/svg";
-import { getLevelBackgroundColor, getLevelColor } from "../utils/colors";
+import { getLevelBackgroundColor, getLevelColor, resolveTheme } from "../utils/colors";
 import { truncateLabel } from "../utils/labels";
 
 export interface ObservablesAdapterOptions {
   maxLabelLength?: number;
   edgeColor?: string;
+  theme?: Partial<CyvestThemeTokens>;
 }
 
 function findFallbackRootId(graph: InvestigationGraph): string | undefined {
@@ -75,11 +77,14 @@ export function buildObservablesElements(
   const rootObservable = getRootObservable(investigation);
   const rootId = rootObservable?.key ?? findFallbackRootId(graph);
   const maxLabelLength = options?.maxLabelLength ?? 28;
-  const edgeColor = options?.edgeColor ?? "#8a95aa";
+  const theme = resolveTheme(options?.theme);
+  const edgeColor = options?.edgeColor ?? theme.edgeColor;
 
   const nodes: ElementDefinition[] = graph.nodes.map((node) => {
     const isRoot = node.id === rootId;
     const borderColor = getLevelColor(node.level);
+    const dimension = isRoot ? 52 : 38;
+    const iconColor = isRoot ? theme.rootText : theme.iconMutedColor;
 
     const data: ObservableCyNodeData = {
       id: node.id,
@@ -93,13 +98,17 @@ export function buildObservablesElements(
       whitelisted: node.whitelisted,
       internal: node.internal,
       shape: "ellipse",
-      width: 48,
-      height: 48,
-      borderWidth: 2,
-      borderColor,
-      fillColor: getLevelBackgroundColor(node.level),
-      icon: getObservableIconSvg(node.type, { color: borderColor }),
-      opacity: node.whitelisted ? 0.5 : 1,
+      width: dimension,
+      height: dimension,
+      borderWidth: isRoot ? 1 : 2,
+      borderColor: isRoot ? theme.rootSurface : borderColor,
+      fillColor: isRoot
+        ? theme.rootSurface
+        : node.internal
+          ? theme.nodeSurface
+          : getLevelBackgroundColor(node.level, theme),
+      icon: getObservableIconSvg(node.type, { color: iconColor }),
+      opacity: node.whitelisted ? 0.52 : 1,
     };
 
     return {
@@ -119,7 +128,7 @@ export function buildObservablesElements(
         relationshipType: edge.type,
         direction: edge.direction,
         color: edgeColor,
-        width: 1.6,
+        width: 1.15,
         sourceArrowShape: arrowShape.sourceArrowShape,
         targetArrowShape: arrowShape.targetArrowShape,
       };

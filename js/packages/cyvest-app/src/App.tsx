@@ -1,8 +1,26 @@
 import type { CyvestInvestigation } from "@cyvest/cyvest-js";
 import { getStartedAt } from "@cyvest/cyvest-js";
-import { CyvestGraph, type CyNodeSelectEvent } from "@cyvest/cyvest-vis";
-import React, { useEffect, useState } from "react";
+import {
+  CyvestGraph,
+  DARK_CYVEST_THEME,
+  type CyNodeSelectEvent,
+} from "@cyvest/cyvest-vis";
+import React, { useEffect, useMemo, useState } from "react";
+
 import { loadInvestigation, INVESTIGATIONS, type InvestigationKey } from "./api";
+
+function formatNodeValue(value: unknown): string | null {
+  if (value === undefined || value === null || value === "") {
+    return null;
+  }
+  if (typeof value === "number") {
+    return Number.isInteger(value) ? String(value) : value.toFixed(2);
+  }
+  if (typeof value === "boolean") {
+    return value ? "Yes" : "No";
+  }
+  return String(value);
+}
 
 export const App: React.FC = () => {
   const [investigation, setInvestigation] =
@@ -14,6 +32,7 @@ export const App: React.FC = () => {
   );
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [darkMode, setDarkMode] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -28,107 +47,146 @@ export const App: React.FC = () => {
       .finally(() => setLoading(false));
   }, [selectedKey]);
 
-  if (error) {
-    return <div style={{ padding: 16, color: "#b91c1c" }}>{error}</div>;
-  }
+  const selectedDetails = useMemo(() => {
+    if (!selectedNode) return [];
+    return [
+      ["Type", selectedNode.nodeType],
+      ["Level", selectedNode.data.level],
+      ["Score", selectedNode.data.score],
+      ["Observable type", selectedNode.data.observableType],
+      ["Internal", selectedNode.data.internal],
+      ["Whitelisted", selectedNode.data.whitelisted],
+    ]
+      .map(([label, value]) => [label, formatNodeValue(value)] as const)
+      .filter((entry): entry is readonly [string, string] => entry[1] !== null);
+  }, [selectedNode]);
 
   return (
-    <div
-      style={{
-        height: "100%",
-        display: "flex",
-        flexDirection: "column",
-        fontFamily:
-          "'IBM Plex Sans', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif",
-        background: "#eff3f8",
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 16,
-          padding: 16,
-        }}
-      >
-        <h1 style={{ margin: 0, color: "#0f172a" }}>Cyvest Demo</h1>
-        <select
-          value={selectedKey}
-          onChange={(event) =>
-            setSelectedKey(event.target.value as InvestigationKey)
-          }
-          style={{
-            padding: "8px 12px",
-            fontSize: 14,
-            borderRadius: 8,
-            border: "1px solid #cfd7e4",
-            background: "#ffffff",
-            cursor: "pointer",
-            color: "#12213a",
-          }}
-        >
-          {Object.entries(INVESTIGATIONS).map(([key, { name }]) => (
-            <option key={key} value={key}>
-              {name}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {loading ? (
-        <div style={{ padding: 16, color: "#334155" }}>Loading…</div>
-      ) : investigation ? (
-        <>
-          <div style={{ padding: "0 16px 8px" }}>
-            <h2 style={{ margin: 0, color: "#0f172a" }}>
-              {investigation.investigation_name ?? investigation.investigation_id}
-            </h2>
-            <div style={{ color: "#5a667f", fontSize: 13, marginTop: 4 }}>
-              <span>Score {investigation.score_display}</span>
-              <span> | Level {investigation.level}</span>
-              <span> | Started {getStartedAt(investigation) ?? "N/A"}</span>
-            </div>
-          </div>
-
-          <div style={{ flex: 1, minHeight: 0, padding: "0 16px 0" }}>
-            <CyvestGraph
-              investigation={investigation}
-              height="100%"
-              onNodeSelect={setSelectedNode}
-              showViewToggle={true}
-              showToolbar={true}
-              observablesLayout={{
-                algorithm: "stress",
-                spacingNodeNode: 72,
-              }}
-              investigationLayout={{
-                algorithm: "layered",
-                direction: "RIGHT",
-              }}
-            />
-          </div>
-
-          {selectedNode && (
-            <div
-              style={{
-                margin: "12px 16px 16px",
-                padding: 12,
-                borderRadius: 10,
-                border: "1px solid #cfd7e4",
-                background: "#ffffff",
-                color: "#172033",
-                fontSize: 13,
-              }}
+    <main className="app-shell" data-theme={darkMode ? "dark" : "light"}>
+      <header className="app-header">
+        <div>
+          <div className="app-eyebrow">CYVEST</div>
+          <h1>Investigation graph</h1>
+        </div>
+        <div className="app-header__controls">
+          <button
+            type="button"
+            className="app-theme-toggle"
+            aria-pressed={darkMode}
+            onClick={() => setDarkMode((value) => !value)}
+          >
+            {darkMode ? "Light mode" : "Dark mode"}
+          </button>
+          <label className="app-investigation-picker">
+            <span>Dataset</span>
+            <select
+              value={selectedKey}
+              onChange={(event) =>
+                setSelectedKey(event.target.value as InvestigationKey)
+              }
             >
-              <strong>Selected node:</strong> {selectedNode.label}
-              <span style={{ color: "#5a667f" }}>
-                {" "}
-                ({selectedNode.nodeType}, {selectedNode.nodeId})
-              </span>
+              {Object.entries(INVESTIGATIONS).map(([key, { name }]) => (
+                <option key={key} value={key}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      </header>
+
+      {error ? <div className="app-state app-state--error">{error}</div> : null}
+      {loading ? <div className="app-state">Loading investigation…</div> : null}
+
+      {!loading && investigation ? (
+        <>
+          <section className="app-summary">
+            <div>
+              <h2>
+                {investigation.investigation_name ??
+                  investigation.investigation_id}
+              </h2>
+              <p>
+                Started {getStartedAt(investigation) ?? "N/A"} · Schema{" "}
+                {investigation.schema_version}
+              </p>
             </div>
-          )}
+            <dl className="app-metrics">
+              <div>
+                <dt>Level</dt>
+                <dd>{investigation.level}</dd>
+              </div>
+              <div>
+                <dt>Score</dt>
+                <dd>{investigation.score_display}</dd>
+              </div>
+              <div>
+                <dt>Observables</dt>
+                <dd>{Object.keys(investigation.observables).length}</dd>
+              </div>
+              <div>
+                <dt>Findings</dt>
+                <dd>{Object.keys(investigation.findings).length}</dd>
+              </div>
+              <div>
+                <dt>Evidence</dt>
+                <dd>{Object.keys(investigation.evidences).length}</dd>
+              </div>
+            </dl>
+          </section>
+
+          <section className="app-workspace">
+            <div className="app-graph">
+              <CyvestGraph
+                investigation={investigation}
+                height="100%"
+                theme={darkMode ? DARK_CYVEST_THEME : undefined}
+                onNodeSelect={setSelectedNode}
+                showViewToggle
+                showToolbar
+                observablesLayout={{
+                  linkDistance: 116,
+                  radialStep: 126,
+                }}
+                investigationLayout={{
+                  linkDistance: 132,
+                  radialStep: 142,
+                }}
+              />
+            </div>
+
+            <aside className="app-inspector" aria-live="polite">
+              <div className="app-inspector__heading">
+                <span>Selection</span>
+                {selectedNode ? (
+                  <button type="button" onClick={() => setSelectedNode(null)}>
+                    Clear
+                  </button>
+                ) : null}
+              </div>
+              {selectedNode ? (
+                <>
+                  <h3>{selectedNode.label}</h3>
+                  <p className="app-inspector__id">{selectedNode.nodeId}</p>
+                  <dl>
+                    {selectedDetails.map(([label, value]) => (
+                      <div key={label}>
+                        <dt>{label}</dt>
+                        <dd>{value}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </>
+              ) : (
+                <p className="app-inspector__empty">
+                  Select a node to inspect its identity, score, and graph role.
+                  Hover a node to isolate its immediate neighborhood.
+                </p>
+              )}
+            </aside>
+          </section>
         </>
       ) : null}
-    </div>
+    </main>
   );
 };

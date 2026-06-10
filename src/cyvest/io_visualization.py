@@ -296,7 +296,9 @@ def generate_network_graph(
 
         # Add group attribute for type-based grouping
         if group_by_type:
-            node_options["group"] = obs.obs_type.value
+            node_options["group"] = (
+                obs.obs_type.value if isinstance(obs.obs_type, ObservableType) else str(obs.obs_type)
+            )
 
         # Fix root node at center position if physics is disabled
         if key == root_key and not physics:

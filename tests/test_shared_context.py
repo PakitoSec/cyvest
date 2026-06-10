@@ -26,6 +26,7 @@ from decimal import Decimal
 import pytest
 
 from cyvest import Cyvest, keys
+from cyvest.model import Observable
 from cyvest.shared import SharedInvestigationContext
 
 
@@ -630,6 +631,7 @@ def test_prevent_relationship_with_shared_copy():
         assert "cy.observable" in error_msg
         assert "Incorrect pattern" in error_msg
         assert "Correct pattern" in error_msg
+        assert "cy.observable(ObservableType.DOMAIN, 'malicious.com')" in error_msg
 
     # Correct pattern should work
     with shared.create_cyvest() as cy3:
@@ -646,6 +648,19 @@ def test_prevent_relationship_with_shared_copy():
     assert url is not None
     assert len(url.relationships) > 0
     assert any(rel.target_key.endswith("malicious.com") for rel in url.relationships)
+
+
+def test_shared_copy_error_formats_custom_observable_type_as_string():
+    """Custom observable types should produce valid Python in the suggested fix."""
+    cv = Cyvest()
+    source = cv.observable(Cyvest.OBS.DOMAIN, "example.com")
+    custom_copy = Observable(obs_type="custom-indicator", value="user's value")
+    custom_copy._from_shared_context = True
+
+    with pytest.raises(ValueError) as exc_info:
+        source.relate_to(custom_copy, Cyvest.REL.RELATED_TO)
+
+    assert """cy.observable('custom-indicator', "user's value")""" in str(exc_info.value)
 
 
 def test_copied_observable_has_marker():

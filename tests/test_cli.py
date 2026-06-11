@@ -54,6 +54,17 @@ def test_cli_stats_detailed(tmp_path: Path) -> None:
     assert result.exit_code == 0
 
 
+def test_cli_stats_overview_accepts_statistics_schema(tmp_path: Path) -> None:
+    """CLI 'stats' overview accepts the Pydantic statistics model returned by Cyvest."""
+    sample = _write_sample(tmp_path)
+    runner = CliRunner()
+
+    result = runner.invoke(cli, ["stats", str(sample)])
+
+    assert result.exit_code == 0
+    assert result.exception is None
+
+
 def test_cli_export_writes_files(tmp_path: Path) -> None:
     """CLI 'export' command writes both JSON and Markdown outputs."""
     sample = _write_sample(tmp_path)

@@ -1,5 +1,3 @@
-import type { InvestigationCyNodeType } from "../types";
-
 export interface IconRenderOptions {
   color?: string;
 }
@@ -13,10 +11,7 @@ type IconName =
   | "hash"
   | "flask"
   | "question"
-  | "crosshair"
-  | "finding"
-  | "evidence"
-  | "tag";
+  | "finding";
 
 const ICON_PATHS: Record<IconName, string> = {
   globe:
@@ -35,14 +30,8 @@ const ICON_PATHS: Record<IconName, string> = {
     '<path d="M10 2v7.5a2 2 0 0 1-.2.9L4.7 20.5a1 1 0 0 0 .9 1.5h12.8a1 1 0 0 0 .9-1.5l-5.1-10.1a2 2 0 0 1-.2-.9V2"/><path d="M8.5 2h7"/><path d="M7 16h10"/>',
   question:
     '<circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><path d="M12 17h.01"/>',
-  crosshair:
-    '<circle cx="12" cy="12" r="10"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/>',
   finding:
     '<rect x="7" y="3" width="10" height="4" rx="1.5"/><rect x="5" y="5" width="14" height="16" rx="2"/><path d="m9 14 2.5 2.5L16 12"/>',
-  evidence:
-    '<path d="M4 4h16v16H4z"/><path d="M8 9h8M8 13h8M8 17h5"/>',
-  tag:
-    '<path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3.4 13.4a2 2 0 0 1 0-2.8l7.2-7.2a2 2 0 0 1 2.8 0l7.2 7.2a2 2 0 0 1 0 2.8z"/><circle cx="9" cy="9" r="1.2"/>',
 };
 
 export const OBSERVABLE_ICON_NAME_MAP: Record<string, IconName> = {
@@ -59,13 +48,6 @@ export const OBSERVABLE_ICON_NAME_MAP: Record<string, IconName> = {
   user: "mail",
   command_line: "link",
   cloud_resource: "globe",
-};
-
-export const INVESTIGATION_ICON_NAME_MAP: Record<InvestigationCyNodeType, IconName> = {
-  root: "crosshair",
-  finding: "finding",
-  evidence: "evidence",
-  tag: "tag",
 };
 
 function toSvgDataUri(iconName: IconName, color: string): string {
@@ -87,13 +69,5 @@ export function getObservableIconSvg(
 ): string {
   const normalizedType = observableType.toLowerCase().trim();
   const icon = OBSERVABLE_ICON_NAME_MAP[normalizedType] ?? "question";
-  return toSvgDataUri(icon, options?.color ?? "#314264");
-}
-
-export function getInvestigationIconSvg(
-  nodeType: InvestigationCyNodeType,
-  options?: IconRenderOptions
-): string {
-  const icon = INVESTIGATION_ICON_NAME_MAP[nodeType] ?? "question";
   return toSvgDataUri(icon, options?.color ?? "#314264");
 }

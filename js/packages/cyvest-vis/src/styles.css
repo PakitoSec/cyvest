@@ -12,8 +12,7 @@
   inset: 0;
 }
 
-.cyvest-toolbar,
-.cyvest-view-toggle {
+.cyvest-toolbar {
   position: absolute;
   z-index: 12;
   display: flex;
@@ -51,8 +50,7 @@
   background: rgba(15, 23, 42, 0.055);
 }
 
-.cyvest-toolbar__button:focus-visible,
-.cyvest-view-toggle__button:focus-visible {
+.cyvest-toolbar__button:focus-visible {
   outline: 2px solid var(--cyvest-accent);
   outline-offset: 1px;
 }
@@ -66,47 +64,9 @@
   stroke-linejoin: round;
 }
 
-.cyvest-view-toggle {
-  top: 12px;
-  left: 12px;
-  gap: 2px;
-  padding: 3px;
-  border-radius: 9px;
-}
-
-.cyvest-view-toggle__button {
-  border: 0;
-  border-radius: 6px;
-  padding: 7px 10px;
-  color: var(--cyvest-panel-muted);
-  background: transparent;
-  font-family: var(--cyvest-font-family);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-  cursor: pointer;
-  transition: background-color 120ms ease, color 120ms ease;
-}
-
-.cyvest-view-toggle__button:hover {
-  color: var(--cyvest-panel-text);
-  background: rgba(15, 23, 42, 0.045);
-}
-
-.cyvest-view-toggle__button--active,
-.cyvest-view-toggle__button--active:hover {
-  color: var(--cyvest-panel-text);
-  background: var(--cyvest-toggle-active-bg);
-}
-
 @media (max-width: 640px) {
-  .cyvest-view-toggle,
   .cyvest-toolbar {
     top: 8px;
-  }
-
-  .cyvest-view-toggle {
-    left: 8px;
   }
 
   .cyvest-toolbar {

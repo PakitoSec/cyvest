@@ -676,7 +676,7 @@ uv run --group docs mkdocs build --strict
 The repo includes a PNPM workspace under `js/` with three packages:
 
 - `@cyvest/cyvest-js`: TypeScript types, schema validation, and helpers for Cyvest investigations.
-- `@cyvest/cyvest-vis`: React components for graph visualization (Cytoscape + ELK/Dagre, depends on `@cyvest/cyvest-js`).
+- `@cyvest/cyvest-vis`: React component for the force-directed observable graph (Cytoscape + `d3-force`).
 - `@cyvest/cyvest-app`: Vite demo that bundles the JS packages with sample investigations.
 
 The JS packages track the generated schema; serialized investigations should include fields like

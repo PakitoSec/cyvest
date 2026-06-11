@@ -1,30 +1,12 @@
 # @cyvest/cyvest-vis
 
-React components for exploring Cyvest investigations with Cytoscape and a
-deterministic `d3-force` layout.
+React components for exploring the observable relationship graph of a Cyvest
+investigation with Cytoscape and `d3-force`.
 
 The default design uses a neutral canvas, compact nodes, thin edges, and a
-restrained level palette. Color is limited to security-level contours; node
-shape communicates the object category.
+restrained level palette. Color is limited to security-level contours.
 
-## Views
-
-`CyvestGraph` provides two related views:
-
-- **Observables**: observables and their directed relationships.
-- **Investigation**: root, tag hierarchy, Findings, and Evidence links.
-
-Both views place the root at the center and use radial depth, link attraction,
-repulsion, and collision forces. Hovering a node isolates its immediate
-neighborhood. Clicking a node or edge emits a typed selection event.
-
-## Install
-
-```bash
-pnpm add @cyvest/cyvest-vis
-```
-
-Import the package stylesheet once:
+## Usage
 
 ```tsx
 import { CyvestGraph } from "@cyvest/cyvest-vis";
@@ -33,41 +15,40 @@ import "@cyvest/cyvest-vis/styles.css";
 <CyvestGraph
   investigation={investigation}
   height={620}
-  initialView="observables"
   onNodeSelect={(event) => {
-    console.log(event.nodeId, event.label, event.nodeType);
+    console.log(event.nodeId, event.label);
   }}
 />
 ```
 
-## Force layout
+`CyvestGraph` and `CyvestObservablesView` render the same observable graph.
+`CyvestGraph` is the concise public entry point.
 
-The force simulation runs to completion before Cytoscape renders the graph, so
-the same investigation produces stable positions.
+Hovering a node isolates its immediate neighborhood. The initial placement is
+deterministic; a live force simulation then settles the graph and is reheated
+while nodes are dragged.
+
+## Force layout
 
 ```tsx
 <CyvestGraph
   investigation={investigation}
-  observablesLayout={{
+  layout={{
     linkDistance: 116,
     chargeStrength: -420,
     collisionPadding: 30,
     radialStep: 126,
   }}
-  investigationLayout={{
-    linkDistance: 132,
-    radialStep: 142,
-  }}
 />
 ```
 
-Available layout settings include `linkDistance`, `linkStrength`,
-`chargeStrength`, `collisionPadding`, `radialStep`, `radialStrength`,
-`centerStrength`, `iterations`, `padding`, and animation options.
+Set `physics={false}` to keep only the deterministic initial placement.
+
+Available settings include `linkDistance`, `linkStrength`, `chargeStrength`,
+`collisionPadding`, `radialStep`, `radialStrength`, `centerStrength`,
+`iterations`, `padding`, and animation options.
 
 ## Theming
-
-Use the `theme` prop to override typed theme tokens:
 
 ```tsx
 <CyvestGraph
@@ -81,17 +62,16 @@ Use the `theme` prop to override typed theme tokens:
 />
 ```
 
-The CSS controls use the same tokens through `--cyvest-*` custom properties.
+Use `DARK_CYVEST_THEME` for the built-in dark theme.
 
 ## Exports
 
 - `CyvestGraph`
 - `CyvestObservablesView`
-- `CyvestInvestigationView`
 - `computeForcePositions`
 - `createForceLayout`
-- `getDefaultForceOptions`
-- icon, label, color, event, theme, and graph data types
+- `startForceSimulation`
+- theme, event, icon, label, color, and observable graph data types
 
 ## Development
 

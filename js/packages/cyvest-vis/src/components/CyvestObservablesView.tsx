@@ -15,6 +15,7 @@ export const CyvestObservablesView: React.FC<CyvestObservablesViewProps> = ({
   onCyReady,
   onNodeSelect,
   onEdgeSelect,
+  physics = true,
   showToolbar = true,
   layout,
   maxLabelLength = 28,
@@ -34,16 +35,17 @@ export const CyvestObservablesView: React.FC<CyvestObservablesViewProps> = ({
   );
 
   const forceLayout = useMemo(
-    () => createForceLayout(elements, "observables", layout),
+    () => createForceLayout(elements, layout),
     [elements, layout]
   );
 
   return (
     <CytoscapeCanvas
-      view="observables"
       elements={elements}
       stylesheet={stylesheet}
       layout={forceLayout}
+      forceOptions={layout}
+      physics={physics}
       width={width}
       height={height}
       className={className}

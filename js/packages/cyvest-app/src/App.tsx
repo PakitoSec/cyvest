@@ -66,7 +66,7 @@ export const App: React.FC = () => {
       <header className="app-header">
         <div>
           <div className="app-eyebrow">CYVEST</div>
-          <h1>Investigation graph</h1>
+          <h1>Observable graph</h1>
         </div>
         <div className="app-header__controls">
           <button
@@ -142,15 +142,10 @@ export const App: React.FC = () => {
                 height="100%"
                 theme={darkMode ? DARK_CYVEST_THEME : undefined}
                 onNodeSelect={setSelectedNode}
-                showViewToggle
                 showToolbar
-                observablesLayout={{
+                layout={{
                   linkDistance: 116,
                   radialStep: 126,
-                }}
-                investigationLayout={{
-                  linkDistance: 132,
-                  radialStep: 142,
                 }}
               />
             </div>

@@ -132,34 +132,3 @@ export function createObservablesStylesheet(
     },
   ];
 }
-
-export function createInvestigationStylesheet(
-  theme?: Partial<CyvestThemeTokens>
-): Stylesheet[] {
-  return [
-    ...createSharedStylesheet(theme),
-    {
-      selector: "node[nodeType = 'root']",
-      style: {
-        "font-weight": 700,
-        "font-size": 11,
-        "text-margin-y": 11,
-      },
-    },
-    {
-      selector: "node[nodeType = 'tag']",
-      style: {
-        "font-size": 9.5,
-        "background-width": "42%",
-        "background-height": "42%",
-      },
-    },
-    {
-      selector: "node[nodeType = 'evidence']",
-      style: {
-        "border-style": "dashed",
-        "font-size": 9.5,
-      },
-    },
-  ];
-}

@@ -15,12 +15,11 @@ recorded as an `INVESTIGATION_STARTED` event in the `audit_log`.
 
 ## @cyvest/cyvest-vis
 
-Interactive graph visualization for Cyvest investigations with a clean v2 API.
+Interactive visualization of Cyvest observable relationships.
 
 ### Features
 
-- **Observables Graph**: force-directed observable and relationship view centered on the root
-- **Investigation Graph**: radial force-directed view of root, tags, Findings, and Evidence
+- **Observable Graph**: force-directed observable and relationship view centered on the root
 - **Restrained visual language**: neutral surfaces, compact SVG nodes, thin edges, and level color used only as a contour
 - **Interactive focus**: pan/zoom, fit, deterministic layout replay, selection, and neighborhood focus on hover
 
@@ -33,7 +32,6 @@ import "@cyvest/cyvest-vis/styles.css";
 <CyvestGraph
   investigation={investigation}
   height={600}
-  showViewToggle
   onNodeSelect={(event) => console.log(event.nodeId, event.label)}
 />
 ```
@@ -42,11 +40,10 @@ import "@cyvest/cyvest-vis/styles.css";
 
 | Component | Description |
 |-----------|-------------|
-| `CyvestGraph` | Combined view with toggle between Observables and Investigation |
+| `CyvestGraph` | Main force-directed graph of observables and relationships |
 | `CyvestObservablesView` | Force-directed graph of observables and relationships |
-| `CyvestInvestigationView` | Force-directed graph of root, tags, Findings, and Evidence |
 
-See `js/packages/cyvest-vis/README.md` for full v2 API and theming details.
+See `js/packages/cyvest-vis/README.md` for the full v6 API and theming details.
 
 ## Workspace commands
 

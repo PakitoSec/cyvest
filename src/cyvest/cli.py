@@ -8,12 +8,14 @@ and generating simple reports from serialized investigations.
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
 import click
 from logurich import get_logger
 from logurich.opt_click import click_logger_params
+from pydantic import BaseModel
 from rich.console import Console
 
 from cyvest import __version__
@@ -43,13 +45,23 @@ def _load_investigation(input_path: Path) -> dict[str, Any]:
         return json.load(handle)
 
 
-def _print_stats_overview(stats: dict[str, Any]) -> None:
+def _statistics_as_dict(stats: Mapping[str, Any] | BaseModel | None) -> dict[str, Any]:
+    """Return statistics as a plain dictionary for CLI rendering."""
+    if stats is None:
+        return {}
+    if isinstance(stats, BaseModel):
+        return stats.model_dump(mode="json")
+    return dict(stats)
+
+
+def _print_stats_overview(stats: Mapping[str, Any] | BaseModel | None) -> None:
     """Render a lightweight overview of statistics."""
-    if not stats:
+    stats_data = _statistics_as_dict(stats)
+    if not stats_data:
         logger.info("  No statistics available.")
         return
 
-    for key, value in stats.items():
+    for key, value in stats_data.items():
         if isinstance(value, dict):
             continue
         logger.info("  %s: %s", key, value)
@@ -57,7 +69,7 @@ def _print_stats_overview(stats: dict[str, Any]) -> None:
 
 def _write_markdown(data: dict[str, Any], output_path: Path) -> None:
     """Write a basic Markdown report derived from serialized data."""
-    stats = data.get("stats", {})
+    stats = _statistics_as_dict(data.get("stats", {}))
     score_value = data.get("score", None)
     try:
         score_display = "N/A" if score_value is None else f"{float(score_value):.2f}"

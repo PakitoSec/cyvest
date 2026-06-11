@@ -3,18 +3,23 @@ import type { Core, ElementDefinition, EventObjectEdge, EventObjectNode, LayoutO
 
 import { createCyInstance } from "../core/createCyInstance";
 import { createThemeStyle } from "../core/theme";
+import {
+  startForceSimulation,
+  type ForceSimulationController,
+} from "../layout/force";
 import type {
   CyEdgeSelectEvent,
   CyNodeSelectEvent,
+  CyvestForceOptions,
   CyvestThemeTokens,
-  CyvestViewMode,
 } from "../types";
 
 interface CytoscapeCanvasProps {
-  view: CyvestViewMode;
   elements: ElementDefinition[];
   stylesheet: Stylesheet[];
   layout: LayoutOptions;
+  forceOptions?: CyvestForceOptions;
+  physics?: boolean;
   width: number | string;
   height: number | string;
   className?: string;
@@ -30,10 +35,11 @@ function joinClassNames(...names: Array<string | undefined | false>): string {
 }
 
 export const CytoscapeCanvas: React.FC<CytoscapeCanvasProps> = ({
-  view,
   elements,
   stylesheet,
   layout,
+  forceOptions,
+  physics = true,
   width,
   height,
   className,
@@ -46,8 +52,13 @@ export const CytoscapeCanvas: React.FC<CytoscapeCanvasProps> = ({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const cyRef = useRef<Core | null>(null);
   const layoutRef = useRef(layout);
+  const forceOptionsRef = useRef(forceOptions);
+  const physicsRef = useRef(physics);
+  const simulationRef = useRef<ForceSimulationController | null>(null);
 
   layoutRef.current = layout;
+  forceOptionsRef.current = forceOptions;
+  physicsRef.current = physics;
 
   useEffect(() => {
     if (!containerRef.current) {
@@ -59,6 +70,8 @@ export const CytoscapeCanvas: React.FC<CytoscapeCanvasProps> = ({
     onCyReady?.(cy);
 
     return () => {
+      simulationRef.current?.stop();
+      simulationRef.current = null;
       cy.destroy();
       cyRef.current = null;
     };
@@ -70,8 +83,21 @@ export const CytoscapeCanvas: React.FC<CytoscapeCanvasProps> = ({
       return;
     }
 
-    const runner = cy.layout(layoutRef.current);
+    simulationRef.current?.stop();
+    simulationRef.current = null;
+
+    const runner = cy.layout({
+      ...layoutRef.current,
+      animate: false,
+    });
     runner.run();
+
+    if (physicsRef.current) {
+      simulationRef.current = startForceSimulation(
+        cy,
+        forceOptionsRef.current
+      );
+    }
   }, []);
 
   useEffect(() => {
@@ -105,7 +131,7 @@ export const CytoscapeCanvas: React.FC<CytoscapeCanvasProps> = ({
       const rawLabel = data.labelFull ?? data.labelShort ?? node.id();
 
       onNodeSelect({
-        view,
+        view: "observables",
         nodeId: node.id(),
         nodeType:
           typeof data.nodeType === "string" ? data.nodeType : "unknown",
@@ -124,7 +150,7 @@ export const CytoscapeCanvas: React.FC<CytoscapeCanvasProps> = ({
       const data = edge.data() as Record<string, unknown>;
 
       onEdgeSelect({
-        view,
+        view: "observables",
         edgeId: edge.id(),
         sourceId: edge.source().id(),
         targetId: edge.target().id(),
@@ -169,7 +195,7 @@ export const CytoscapeCanvas: React.FC<CytoscapeCanvasProps> = ({
       cy.removeListener("mouseout", "node", clearFocus);
       cy.removeListener("tap", handleCanvasTap);
     };
-  }, [onEdgeSelect, onNodeSelect, view]);
+  }, [onEdgeSelect, onNodeSelect]);
 
   const handleFit = useCallback(() => {
     const cy = cyRef.current;
@@ -227,8 +253,8 @@ export const CytoscapeCanvas: React.FC<CytoscapeCanvasProps> = ({
             type="button"
             className="cyvest-toolbar__button"
             onClick={runLayout}
-            title="Re-run layout"
-            aria-label="Re-run layout"
+            title="Reheat physics"
+            aria-label="Reheat physics"
           >
             <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
               <path d="M21 12a9 9 0 1 1-2.64-6.36" />

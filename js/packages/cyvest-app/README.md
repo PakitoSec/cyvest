@@ -1,11 +1,11 @@
 # @cyvest/cyvest-app
 
-Vite demo application for the `@cyvest/cyvest-vis` Cytoscape visualization library (ELK for observables, Dagre for investigation view).
+Vite demo application for the `@cyvest/cyvest-vis` force-directed observable graph.
 
 ## What it does
 
 - Loads bundled investigations (`src/investigations/*.json`) and validates them with `@cyvest/cyvest-js`
-- Renders both observables and investigation views with `CyvestGraph`
+- Renders the observable relationship graph with `CyvestGraph`
 - Demonstrates node selection events and basic layout customization
 
 ## Run locally

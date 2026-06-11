@@ -103,7 +103,7 @@ Cyvest (facade + fluent proxies)
 ## JavaScript Packages
 
 - `@cyvest/cyvest-js`: TypeScript types, schema validation, and graph helpers for Cyvest investigations.
-- `@cyvest/cyvest-vis`: React components (Cytoscape + ELK/Dagre) to visualize investigations.
+- `@cyvest/cyvest-vis`: React component (Cytoscape + `d3-force`) for observable relationship graphs.
 - `@cyvest/cyvest-app`: Vite demo bundling the JS packages with sample investigations.
 
 [See JavaScript packages guide](js-packages.md) for install and workspace commands.

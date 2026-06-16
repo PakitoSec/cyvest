@@ -6,15 +6,20 @@ from __future__ import annotations
 
 import base64
 import json
+import re
 from unittest.mock import MagicMock, patch
 
+import pytest
 from click.testing import CliRunner
 
 from cyvest.cli import cli
 from cyvest.extract import (
     ExtractedObservable,
+    ExtractionPattern,
+    clear_extraction_patterns,
     defang,
     extract_all,
+    extract_custom,
     extract_domains,
     extract_emails,
     extract_from_url,
@@ -23,11 +28,14 @@ from cyvest.extract import (
     extract_ipv4,
     extract_ipv6,
     extract_urls,
+    get_extraction_patterns,
     observables_to_markdown,
     observables_to_markdown_table,
     refang,
+    register_extraction_pattern,
+    unregister_extraction_pattern,
 )
-from cyvest.model_enums import ObservableType
+from cyvest.model_enums import ObservableSubtype, ObservableType
 
 # =============================================================================
 # Refang / Defang Tests
@@ -99,6 +107,229 @@ class TestDefang:
         result = defang("https://malware.evil.com/payload")
         assert "hxxps://" in result
         assert "[.]" in result
+
+
+# =============================================================================
+# Custom Extraction Pattern Tests
+# =============================================================================
+
+
+class TestExtractionPattern:
+    """Tests for custom extraction pattern registration."""
+
+    def teardown_method(self):
+        clear_extraction_patterns()
+
+    def test_pattern_accepts_string_regex(self):
+        pattern = ExtractionPattern(
+            name="user",
+            obs_type=ObservableType.USER,
+            subtype=ObservableSubtype.USER_USERNAME,
+            namespace="windows",
+            pattern=r"user=(?P<value>[A-Za-z0-9._-]+)",
+        )
+
+        assert pattern.obs_type == ObservableType.USER
+        assert pattern.subtype == ObservableSubtype.USER_USERNAME
+        assert pattern.namespace == "windows"
+        assert pattern.compiled_pattern.search("user=alice").group("value") == "alice"
+
+    def test_pattern_accepts_compiled_regex(self):
+        compiled = re.compile(r"host=(?P<value>[A-Za-z0-9.-]+)")
+        pattern = ExtractionPattern(
+            name="host",
+            obs_type="host",
+            subtype=ObservableSubtype.HOST_FQDN,
+            pattern=compiled,
+        )
+
+        assert pattern.obs_type == ObservableType.HOST
+        assert pattern.compiled_pattern is compiled
+
+    def test_pattern_rejects_missing_value_group(self):
+        with pytest.raises(ValueError, match="named 'value' group"):
+            ExtractionPattern(
+                name="broken",
+                obs_type=ObservableType.DOMAIN,
+                pattern=r"domain=([A-Za-z0-9.-]+)",
+            )
+
+    def test_pattern_rejects_unknown_observable_type(self):
+        with pytest.raises(ValueError, match="Unknown observable type"):
+            ExtractionPattern(
+                name="ticket",
+                obs_type="ticket",
+                pattern=r"ticket=(?P<value>[A-Z]+-\d+)",
+            )
+
+    def test_pattern_rejects_user_without_subtype(self):
+        with pytest.raises(ValueError, match="requires a subtype"):
+            ExtractionPattern(
+                name="user",
+                obs_type=ObservableType.USER,
+                pattern=r"user=(?P<value>[A-Za-z0-9._-]+)",
+            )
+
+    def test_pattern_rejects_namespace_required_subtype_without_namespace(self):
+        with pytest.raises(ValueError, match="requires a namespace"):
+            ExtractionPattern(
+                name="hostname",
+                obs_type=ObservableType.HOST,
+                subtype=ObservableSubtype.HOST_HOSTNAME,
+                pattern=r"host=(?P<value>[A-Za-z0-9-]+)",
+            )
+
+    def test_extract_custom_per_call_user_and_host(self):
+        patterns = [
+            ExtractionPattern(
+                name="user",
+                obs_type=ObservableType.USER,
+                subtype=ObservableSubtype.USER_USERNAME,
+                namespace="windows",
+                pattern=r"user=(?P<value>[A-Za-z0-9._-]+)",
+            ),
+            ExtractionPattern(
+                name="host",
+                obs_type=ObservableType.HOST,
+                subtype=ObservableSubtype.HOST_FQDN,
+                pattern=r"host=(?P<value>[A-Za-z0-9.-]+)",
+                normalize=str.lower,
+            ),
+        ]
+
+        observables = extract_all("user=Alice host=WEB01.EXAMPLE.COM", extraction_patterns=patterns)
+
+        by_type = {obs.obs_type: obs for obs in observables}
+        assert by_type[ObservableType.USER].value == "Alice"
+        assert by_type[ObservableType.USER].subtype == ObservableSubtype.USER_USERNAME
+        assert by_type[ObservableType.USER].namespace == "windows"
+        assert by_type[ObservableType.HOST].value == "web01.example.com"
+        assert by_type[ObservableType.HOST].subtype == ObservableSubtype.HOST_FQDN
+
+    def test_extract_custom_iterator(self):
+        pattern = ExtractionPattern(
+            name="host",
+            obs_type=ObservableType.HOST,
+            subtype=ObservableSubtype.HOST_FQDN,
+            pattern=r"host=(?P<value>[A-Za-z0-9.-]+)",
+        )
+
+        observables = list(extract_custom("host=web01.example.com", [pattern]))
+
+        assert len(observables) == 1
+        assert observables[0].obs_type == ObservableType.HOST
+        assert observables[0].value == "web01.example.com"
+
+    def test_global_registration_and_clear(self):
+        pattern = ExtractionPattern(
+            name="host",
+            obs_type=ObservableType.HOST,
+            subtype=ObservableSubtype.HOST_FQDN,
+            pattern=r"host=(?P<value>[A-Za-z0-9.-]+)",
+        )
+
+        register_extraction_pattern(pattern)
+        assert get_extraction_patterns() == (pattern,)
+        observables = extract_all("host=web01.example.com")
+        assert any(obs.obs_type == ObservableType.HOST for obs in observables)
+
+        clear_extraction_patterns()
+        assert get_extraction_patterns() == ()
+        observables = extract_all("host=web01.example.com")
+        assert all(obs.obs_type != ObservableType.HOST for obs in observables)
+
+    def test_global_registration_rejects_duplicate_without_replace(self):
+        pattern = ExtractionPattern(
+            name="host",
+            obs_type=ObservableType.HOST,
+            subtype=ObservableSubtype.HOST_FQDN,
+            pattern=r"host=(?P<value>[A-Za-z0-9.-]+)",
+        )
+
+        register_extraction_pattern(pattern)
+        with pytest.raises(ValueError, match="already registered"):
+            register_extraction_pattern(pattern)
+
+    def test_unregister_pattern(self):
+        pattern = ExtractionPattern(
+            name="host",
+            obs_type=ObservableType.HOST,
+            subtype=ObservableSubtype.HOST_FQDN,
+            pattern=r"host=(?P<value>[A-Za-z0-9.-]+)",
+        )
+
+        register_extraction_pattern(pattern)
+        unregister_extraction_pattern("host")
+
+        assert get_extraction_patterns() == ()
+
+    def test_custom_patterns_obey_type_filter(self):
+        user_pattern = ExtractionPattern(
+            name="user",
+            obs_type=ObservableType.USER,
+            subtype=ObservableSubtype.USER_USERNAME,
+            namespace="windows",
+            pattern=r"user=(?P<value>[A-Za-z0-9._-]+)",
+        )
+        host_pattern = ExtractionPattern(
+            name="host",
+            obs_type=ObservableType.HOST,
+            subtype=ObservableSubtype.HOST_FQDN,
+            pattern=r"host=(?P<value>[A-Za-z0-9.-]+)",
+        )
+
+        observables = extract_all(
+            "user=alice host=web01.example.com",
+            types={ObservableType.USER},
+            extraction_patterns=[user_pattern, host_pattern],
+        )
+
+        assert len(observables) == 1
+        assert observables[0].obs_type == ObservableType.USER
+
+    def test_custom_deduping_respects_subtype_and_namespace(self):
+        local_user = ExtractionPattern(
+            name="local-user",
+            obs_type=ObservableType.USER,
+            subtype=ObservableSubtype.USER_USERNAME,
+            namespace="local",
+            pattern=r"user=(?P<value>[A-Za-z0-9._-]+)",
+        )
+        domain_user = ExtractionPattern(
+            name="domain-user",
+            obs_type=ObservableType.USER,
+            subtype=ObservableSubtype.USER_USERNAME,
+            namespace="domain",
+            pattern=r"user=(?P<value>[A-Za-z0-9._-]+)",
+        )
+
+        observables = extract_all(
+            "user=alice user=alice",
+            extraction_patterns=[local_user, domain_user],
+        )
+
+        user_observables = [obs for obs in observables if obs.obs_type == ObservableType.USER]
+        assert len(user_observables) == 2
+        assert {obs.namespace for obs in user_observables} == {"local", "domain"}
+        assert {obs.count for obs in user_observables} == {2}
+
+    def test_extract_custom_no_refang_preserves_defanged_value(self):
+        pattern = ExtractionPattern(
+            name="host",
+            obs_type=ObservableType.HOST,
+            subtype=ObservableSubtype.HOST_FQDN,
+            pattern=r"host=(?P<value>[A-Za-z0-9\[\].-]+)",
+        )
+
+        observables = extract_all(
+            "host=web01[.]example[.]com",
+            extraction_patterns=[pattern],
+            refang_output=False,
+        )
+
+        host = next(obs for obs in observables if obs.obs_type == ObservableType.HOST)
+        assert host.value == "web01[.]example[.]com"
+        assert host.defanged is True
 
 
 # =============================================================================

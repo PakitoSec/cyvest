@@ -86,6 +86,87 @@ Use the facade namespace for autocomplete:
 obs = cv.observable(cv.OBS.URL, "https://example.com")
 ```
 
+### Observable canonicalisation
+
+Some raw identifiers describe the same real-world entity. For example, `USER/email alice@example.com` and
+`USER/username/windows alice` might both refer to the canonical Okta user `USER/uid/okta 123`.
+
+Register an instance-local resolver when you want `observable_create()` to resolve source identities before creating
+the observable:
+
+```python
+from cyvest import Cyvest, ObservableAlias, ObservableIdentity, ObservableResolver
+
+cv = Cyvest()
+
+def resolve_user_to_okta(alias: ObservableAlias) -> ObservableIdentity | None:
+    lookup = {
+        ("email", None, "alice@example.com"): "123",
+        ("username", "windows", "alice"): "123",
+    }
+    subtype = alias.subtype.value if hasattr(alias.subtype, "value") else alias.subtype
+    okta_uid = lookup.get((subtype, alias.namespace, alias.value.lower()))
+    if okta_uid is None:
+        return None
+
+    return ObservableIdentity(
+        obs_type=cv.OBS.USER,
+        subtype=cv.SUB.USER_UID,
+        namespace="okta",
+        value=okta_uid,
+    )
+
+cv.observable_resolver_register(
+    ObservableResolver(
+        name="okta-user-id",
+        source_types={
+            (cv.OBS.USER, cv.SUB.USER_EMAIL),
+            (cv.OBS.USER, cv.SUB.USER_USERNAME),
+        },
+        resolve=resolve_user_to_okta,
+    )
+)
+
+email = cv.observable_create(cv.OBS.USER, "alice@example.com", subtype=cv.SUB.USER_EMAIL)
+username = cv.observable_create(
+    cv.OBS.USER,
+    "alice",
+    subtype=cv.SUB.USER_USERNAME,
+    namespace="windows",
+)
+
+assert email.key == username.key
+assert email.subtype == cv.SUB.USER_UID
+assert email.namespace == "okta"
+assert email.value == "123"
+assert email.occurrence_count == 2
+```
+
+Resolvers are evaluated in registration order and the first non-`None` `ObservableIdentity` wins. Returning `None`
+means "not resolved", so Cyvest creates the source observable normally. Resolver exceptions are not swallowed.
+
+The source identities are stored on the canonical observable as typed aliases:
+
+```python
+for alias in email.aliases:
+    print(alias.obs_type, alias.subtype, alias.namespace, alias.value, alias.count)
+```
+
+`ObservableIdentity` is the canonical identity returned by a resolver. `ObservableAlias` is the source identity
+stored on the canonical observable, with a `count` for repeated occurrences. The canonical `Observable` also tracks
+`occurrence_count`, which is merged across repeated creations and investigation merges.
+
+Resolver registration is per `Cyvest` instance:
+
+```python
+cv.observable_resolver_get_all()
+cv.observable_resolver_unregister("okta-user-id")
+cv.observable_resolver_clear()
+```
+
+For async lookups, register `aresolve=` and use `await cv.observable_acreate(...)`. If a matching async resolver is
+registered, synchronous `observable_create()` raises a clear error instead of blocking the event loop.
+
 ### Findings
 
 **Findings** represent verification steps in your investigation:

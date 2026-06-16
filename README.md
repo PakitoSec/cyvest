@@ -170,6 +170,36 @@ process.relate_to(executable, cv.REL.RELATED_TO)
 with the same value and can be related explicitly. A process image path is modeled as `FILE/path`, not as a
 `PROCESS` subtype.
 
+You can also canonicalise identities at creation time with instance-local observable resolvers. Resolvers receive a
+source `ObservableAlias` and may return a canonical `ObservableIdentity`; Cyvest creates or merges the canonical
+observable and stores the source identity as an alias with counts.
+
+```python
+from cyvest import ObservableAlias, ObservableIdentity, ObservableResolver
+
+def resolve_user(alias: ObservableAlias) -> ObservableIdentity | None:
+    if alias.value.lower() != "alice@example.com":
+        return None
+    return ObservableIdentity(
+        obs_type=cv.OBS.USER,
+        subtype=cv.SUB.USER_UID,
+        namespace="okta",
+        value="123",
+    )
+
+cv.observable_resolver_register(
+    ObservableResolver(
+        name="okta-user-id",
+        source_types={(cv.OBS.USER, cv.SUB.USER_EMAIL)},
+        resolve=resolve_user,
+    )
+)
+
+user = cv.observable_create(cv.OBS.USER, "alice@example.com", subtype=cv.SUB.USER_EMAIL)
+assert user.subtype == cv.SUB.USER_UID
+assert user.aliases[0].subtype == cv.SUB.USER_EMAIL
+```
+
 ### Findings
 
 Findings represent verification steps in your investigation:

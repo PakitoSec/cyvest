@@ -19,6 +19,8 @@
       "extra": {},
       "score": 0.0,
       "level": "INFO",
+      "aliases": [],
+      "occurrence_count": 1,
       "threat_intels": [],
       "relationships": [
         {
@@ -57,6 +59,8 @@
       "extra": {},
       "score": 9.0,
       "level": "MALICIOUS",
+      "aliases": [],
+      "occurrence_count": 1,
       "threat_intels": [
         "ti:virustotal:obs:domain:evil-phishing.com",
         "ti:alienvault otx:obs:domain:evil-phishing.com"
@@ -79,6 +83,8 @@
       "extra": {},
       "score": 9.5,
       "level": "MALICIOUS",
+      "aliases": [],
+      "occurrence_count": 1,
       "threat_intels": [
         "ti:abuseipdb:obs:ipv4:185.220.101.50"
       ],
@@ -106,6 +112,8 @@
       "extra": {},
       "score": 4.5,
       "level": "SUSPICIOUS",
+      "aliases": [],
+      "occurrence_count": 1,
       "threat_intels": [
         "ti:virustotal:obs:domain:sketchy-site.net"
       ],
@@ -131,6 +139,8 @@
       "extra": {},
       "score": 3.0,
       "level": "SUSPICIOUS",
+      "aliases": [],
+      "occurrence_count": 1,
       "threat_intels": [
         "ti:shodan:obs:ipv4:192.168.100.5"
       ],
@@ -150,6 +160,8 @@
       "extra": {},
       "score": 8.0,
       "level": "MALICIOUS",
+      "aliases": [],
+      "occurrence_count": 1,
       "threat_intels": [
         "ti:emailrep:obs:email:attacker@evil-phishing.com"
       ],
@@ -177,6 +189,8 @@
       "extra": {},
       "score": -1.0,
       "level": "TRUSTED",
+      "aliases": [],
+      "occurrence_count": 1,
       "threat_intels": [
         "ti:internal whitelist:obs:email:victim@company.com"
       ],
@@ -198,6 +212,8 @@
       "extra": {},
       "score": 10.0,
       "level": "MALICIOUS",
+      "aliases": [],
+      "occurrence_count": 1,
       "threat_intels": [
         "ti:email gateway:obs:artifact:phishing email - invoice #12345"
       ],
@@ -240,6 +256,8 @@
       "extra": {},
       "score": 10.0,
       "level": "MALICIOUS",
+      "aliases": [],
+      "occurrence_count": 1,
       "threat_intels": [
         "ti:urlhaus:obs:url:https://evil-phishing.com/login"
       ],
@@ -267,6 +285,8 @@
       "extra": {},
       "score": 9.0,
       "level": "MALICIOUS",
+      "aliases": [],
+      "occurrence_count": 1,
       "threat_intels": [
         "ti:urlhaus:obs:url:https://evil-phishing.com/verify"
       ],
@@ -294,6 +314,8 @@
       "extra": {},
       "score": 10.0,
       "level": "MALICIOUS",
+      "aliases": [],
+      "occurrence_count": 1,
       "threat_intels": [
         "ti:virustotal:obs:file:invoice.exe"
       ],
@@ -326,6 +348,8 @@
       "extra": {},
       "score": -2.0,
       "level": "TRUSTED",
+      "aliases": [],
+      "occurrence_count": 1,
       "threat_intels": [
         "ti:internal whitelist:obs:domain:google.com"
       ],
@@ -345,6 +369,8 @@
       "extra": {},
       "score": 2.0,
       "level": "NOTABLE",
+      "aliases": [],
+      "occurrence_count": 1,
       "threat_intels": [
         "ti:passive dns:obs:domain:new-service.cloud"
       ],

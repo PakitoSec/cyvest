@@ -26,6 +26,9 @@ export type ObjectType = string | null;
 export type ObjectKey = string | null;
 export type Subtype = string | null;
 export type Namespace = string | null;
+export type Subtype1 = string | null;
+export type Namespace1 = string | null;
+export type Aliases = ObservableAlias[];
 export type ThreatIntels = string[];
 /**
  * Direction of a relationship between observables.
@@ -150,6 +153,8 @@ export interface Observable {
   extra: Extra;
   score: number;
   level: Level;
+  aliases: Aliases;
+  occurrence_count?: number;
   threat_intels: ThreatIntels;
   relationships: Relationships;
   key: string;
@@ -158,6 +163,17 @@ export interface Observable {
   [k: string]: unknown;
 }
 export interface Extra {
+  [k: string]: unknown;
+}
+/**
+ * Source observable identity attached to a canonical observable.
+ */
+export interface ObservableAlias {
+  type: string;
+  subtype?: Subtype1;
+  namespace?: Namespace1;
+  value: string;
+  count?: number;
   [k: string]: unknown;
 }
 /**

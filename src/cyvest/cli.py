@@ -558,7 +558,7 @@ def _format_observables(
 
     if output_format == "json":
         return json_module.dumps(
-            [obs.model_dump(mode="json") for obs in observables],
+            [obs.model_dump(mode="json", exclude_none=True) for obs in observables],
             indent=2,
             ensure_ascii=False,
         )

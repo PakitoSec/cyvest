@@ -15,11 +15,12 @@ import ipaddress
 import re
 import urllib.parse
 import urllib.request
-from collections.abc import Iterator
+from collections.abc import Callable, Iterable, Iterator
+from dataclasses import dataclass, field
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from cyvest.model_enums import ObservableType
+from cyvest.model_enums import ObservableSubtype, ObservableType
 
 # =============================================================================
 # Pydantic Model
@@ -32,6 +33,8 @@ class ExtractedObservable(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     obs_type: ObservableType = Field(..., description="Type of the observable")
+    subtype: ObservableSubtype | str | None = Field(default=None, description="Optional observable subtype")
+    namespace: str | None = Field(default=None, description="Optional observable namespace")
     value: str = Field(..., description="Normalized (refanged) value")
     original: str = Field(..., description="Original matched text")
     defanged: bool = Field(default=False, description="Whether the original was defanged")
@@ -75,6 +78,232 @@ class ExtractedObservable(BaseModel):
             lines.append(f"  - Original: `{self.original}`")
 
         return "\n".join(lines)
+
+
+# =============================================================================
+# Custom Extraction Patterns
+# =============================================================================
+
+_CUSTOM_VALUE_GROUP = "value"
+
+
+def _normalize_subtype(subtype: ObservableSubtype | str | None) -> ObservableSubtype | str | None:
+    """Normalize a subtype value the same way the Observable model does."""
+    if subtype is None or isinstance(subtype, ObservableSubtype):
+        return subtype
+    normalized = str(subtype).strip().lower()
+    if not normalized:
+        return None
+    try:
+        return ObservableSubtype(normalized)
+    except ValueError:
+        return normalized
+
+
+def _normalize_namespace(namespace: str | None) -> str | None:
+    """Normalize a namespace value the same way the Observable model does."""
+    if namespace is None:
+        return None
+    normalized = str(namespace).strip()
+    return normalized or None
+
+
+def _subtype_value(subtype: ObservableSubtype | str | None) -> str | None:
+    """Return the string value for a subtype."""
+    if isinstance(subtype, ObservableSubtype):
+        return subtype.value
+    return subtype
+
+
+def _validate_pattern_identity(
+    obs_type: ObservableType,
+    subtype: ObservableSubtype | str | None,
+    namespace: str | None,
+) -> None:
+    """Validate custom pattern identity metadata against Observable rules."""
+    subtype_value = _subtype_value(subtype)
+    allowed_subtypes = {
+        ObservableType.USER: {
+            ObservableSubtype.USER_EMAIL.value,
+            ObservableSubtype.USER_SID.value,
+            ObservableSubtype.USER_UPN.value,
+            ObservableSubtype.USER_OKTA_ID.value,
+            ObservableSubtype.USER_USERNAME.value,
+            ObservableSubtype.USER_UID.value,
+        },
+        ObservableType.HOST: {
+            ObservableSubtype.HOST_HOSTNAME.value,
+            ObservableSubtype.HOST_FQDN.value,
+            ObservableSubtype.HOST_NETBIOS.value,
+            ObservableSubtype.HOST_DEVICE_ID.value,
+        },
+        ObservableType.PROCESS: {
+            ObservableSubtype.PROCESS_PID.value,
+            ObservableSubtype.PROCESS_GUID.value,
+        },
+        ObservableType.FILE: {ObservableSubtype.FILE_PATH.value},
+        ObservableType.CLOUD_RESOURCE: {
+            ObservableSubtype.CLOUD_AWS_ARN.value,
+            ObservableSubtype.CLOUD_AZURE_RESOURCE_ID.value,
+            ObservableSubtype.CLOUD_GCP_RESOURCE_NAME.value,
+        },
+    }
+    subtype_required = {
+        ObservableType.USER,
+        ObservableType.HOST,
+        ObservableType.PROCESS,
+        ObservableType.CLOUD_RESOURCE,
+    }
+    if obs_type in subtype_required and not subtype_value:
+        raise ValueError(f"Observable type '{obs_type.value}' requires a subtype")
+    if obs_type == ObservableType.COMMAND_LINE and subtype_value is not None:
+        raise ValueError("COMMAND_LINE observables do not accept a subtype")
+    if isinstance(subtype, ObservableSubtype) and subtype_value not in allowed_subtypes.get(obs_type, set()):
+        raise ValueError(f"Subtype '{subtype_value}' is not valid for observable type '{obs_type.value}'")
+
+    namespace_required = {
+        (ObservableType.USER, ObservableSubtype.USER_OKTA_ID.value),
+        (ObservableType.USER, ObservableSubtype.USER_USERNAME.value),
+        (ObservableType.USER, ObservableSubtype.USER_UID.value),
+        (ObservableType.HOST, ObservableSubtype.HOST_HOSTNAME.value),
+        (ObservableType.HOST, ObservableSubtype.HOST_NETBIOS.value),
+        (ObservableType.HOST, ObservableSubtype.HOST_DEVICE_ID.value),
+        (ObservableType.PROCESS, ObservableSubtype.PROCESS_PID.value),
+        (ObservableType.FILE, ObservableSubtype.FILE_PATH.value),
+    }
+    if (obs_type, subtype_value) in namespace_required and not namespace:
+        raise ValueError(f"Observable {obs_type.value}/{subtype_value} requires a namespace")
+
+
+@dataclass(frozen=True)
+class ExtractionPattern:
+    """
+    Regex-backed custom extraction pattern.
+
+    The pattern must include a named ``value`` group. For example:
+    ``r"user=(?P<value>[A-Za-z0-9._-]+)"``.
+    """
+
+    name: str
+    obs_type: ObservableType | str
+    pattern: str | re.Pattern[str]
+    subtype: ObservableSubtype | str | None = None
+    namespace: str | None = None
+    flags: int = re.IGNORECASE
+    normalize: Callable[[str], str] | None = None
+    compiled_pattern: re.Pattern[str] = field(init=False, repr=False, compare=False)
+
+    def __post_init__(self) -> None:
+        normalized_name = self.name.strip()
+        if not normalized_name:
+            raise ValueError("Extraction pattern name must not be empty")
+
+        try:
+            if isinstance(self.obs_type, ObservableType):
+                obs_type = self.obs_type
+            else:
+                obs_type = ObservableType(str(self.obs_type).lower())
+        except ValueError as exc:
+            raise ValueError(f"Unknown observable type: {self.obs_type}") from exc
+
+        subtype = _normalize_subtype(self.subtype)
+        namespace = _normalize_namespace(self.namespace)
+        _validate_pattern_identity(obs_type, subtype, namespace)
+
+        if isinstance(self.pattern, re.Pattern):
+            compiled_pattern = self.pattern
+        else:
+            compiled_pattern = re.compile(self.pattern, self.flags)
+        if _CUSTOM_VALUE_GROUP not in compiled_pattern.groupindex:
+            raise ValueError("Extraction pattern must define a named 'value' group")
+
+        object.__setattr__(self, "name", normalized_name)
+        object.__setattr__(self, "obs_type", obs_type)
+        object.__setattr__(self, "subtype", subtype)
+        object.__setattr__(self, "namespace", namespace)
+        object.__setattr__(self, "compiled_pattern", compiled_pattern)
+
+
+_REGISTERED_EXTRACTION_PATTERNS: dict[str, ExtractionPattern] = {}
+
+
+def register_extraction_pattern(pattern: ExtractionPattern, *, replace: bool = False) -> None:
+    """
+    Register a global custom extraction pattern.
+
+    Registered patterns participate in ``extract_all`` and ``extract_from_url`` by default.
+
+    Args:
+        pattern: Pattern to register.
+        replace: Replace an existing pattern with the same name.
+
+    Raises:
+        ValueError: If a pattern with the same name already exists and replace is False.
+    """
+    if pattern.name in _REGISTERED_EXTRACTION_PATTERNS and not replace:
+        raise ValueError(f"Extraction pattern already registered: {pattern.name}")
+    _REGISTERED_EXTRACTION_PATTERNS[pattern.name] = pattern
+
+
+def unregister_extraction_pattern(name: str) -> None:
+    """
+    Unregister a global custom extraction pattern.
+
+    Args:
+        name: Registered pattern name.
+
+    Raises:
+        KeyError: If no pattern with the given name is registered.
+    """
+    del _REGISTERED_EXTRACTION_PATTERNS[name]
+
+
+def clear_extraction_patterns() -> None:
+    """Remove all globally registered custom extraction patterns."""
+    _REGISTERED_EXTRACTION_PATTERNS.clear()
+
+
+def get_extraction_patterns() -> tuple[ExtractionPattern, ...]:
+    """Return globally registered custom extraction patterns."""
+    return tuple(_REGISTERED_EXTRACTION_PATTERNS.values())
+
+
+def extract_custom(
+    text: str,
+    patterns: Iterable[ExtractionPattern],
+    refang_output: bool = True,
+) -> Iterator[ExtractedObservable]:
+    """
+    Extract observables using custom registered or per-call patterns.
+
+    Args:
+        text: Text to extract observables from.
+        patterns: Custom extraction patterns.
+        refang_output: Whether to refang extracted values.
+
+    Yields:
+        ExtractedObservable for each custom pattern match.
+    """
+    for extraction_pattern in patterns:
+        for match in extraction_pattern.compiled_pattern.finditer(text):
+            original = match.group(_CUSTOM_VALUE_GROUP)
+            value = original.strip()
+            defanged = _is_defanged(original)
+            if refang_output:
+                value = refang(value)
+            if extraction_pattern.normalize is not None:
+                value = extraction_pattern.normalize(value)
+            if not value:
+                continue
+
+            yield ExtractedObservable(
+                obs_type=extraction_pattern.obs_type,
+                subtype=extraction_pattern.subtype,
+                namespace=extraction_pattern.namespace,
+                value=value,
+                original=original,
+                defanged=defanged,
+            )
 
 
 # =============================================================================
@@ -657,6 +886,8 @@ def extract_all(
     text: str,
     types: set[ObservableType] | None = None,
     refang_output: bool = True,
+    extraction_patterns: Iterable[ExtractionPattern] | None = None,
+    include_registered_patterns: bool = True,
 ) -> list[ExtractedObservable]:
     """
     Extract all observables from text.
@@ -665,10 +896,18 @@ def extract_all(
         text: Text to extract observables from.
         types: Optional set of types to extract. If None, extracts all types.
         refang_output: Whether to refang extracted observables.
+        extraction_patterns: Optional per-call custom extraction patterns.
+        include_registered_patterns: Include globally registered extraction patterns.
 
     Returns:
         Deduplicated list of extracted observables with occurrence counts.
     """
+    custom_patterns: list[ExtractionPattern] = []
+    if include_registered_patterns:
+        custom_patterns.extend(get_extraction_patterns())
+    if extraction_patterns is not None:
+        custom_patterns.extend(extraction_patterns)
+
     if types is None:
         types = {
             ObservableType.URL,
@@ -678,14 +917,16 @@ def extract_all(
             ObservableType.HASH,
             ObservableType.DOMAIN,
         }
+        types.update(pattern.obs_type for pattern in custom_patterns)
 
     # Track counts per observable
-    counts: dict[tuple[ObservableType, str], int] = {}
+    counts: dict[tuple[ObservableType, str | None, str | None, str], int] = {}
     # Store first occurrence of each observable (for original/defanged info)
-    first_seen: dict[tuple[ObservableType, str], ExtractedObservable] = {}
+    first_seen: dict[tuple[ObservableType, str | None, str | None, str], ExtractedObservable] = {}
 
     def _process_obs(obs: ExtractedObservable) -> None:
-        key = (obs.obs_type, obs.value)
+        subtype = obs.subtype.value if isinstance(obs.subtype, ObservableSubtype) else obs.subtype
+        key = (obs.obs_type, subtype, obs.namespace, obs.value)
         if key in counts:
             counts[key] += 1
         else:
@@ -716,12 +957,21 @@ def extract_all(
         for obs in extract_domains(text, refang_output):
             _process_obs(obs)
 
+    for obs in extract_custom(
+        text,
+        (pattern for pattern in custom_patterns if pattern.obs_type in types),
+        refang_output,
+    ):
+        _process_obs(obs)
+
     # Build results with counts
     results: list[ExtractedObservable] = []
     for key, obs in first_seen.items():
         results.append(
             ExtractedObservable(
                 obs_type=obs.obs_type,
+                subtype=obs.subtype,
+                namespace=obs.namespace,
                 value=obs.value,
                 original=obs.original,
                 defanged=obs.defanged,
@@ -742,6 +992,8 @@ def extract_from_url(
     types: set[ObservableType] | None = None,
     refang_output: bool = True,
     timeout: int = 30,
+    extraction_patterns: Iterable[ExtractionPattern] | None = None,
+    include_registered_patterns: bool = True,
 ) -> list[ExtractedObservable]:
     """
     Fetch content from a URL and extract observables.
@@ -751,6 +1003,8 @@ def extract_from_url(
         types: Optional set of types to extract. If None, extracts all types.
         refang_output: Whether to refang extracted observables.
         timeout: Request timeout in seconds.
+        extraction_patterns: Optional per-call custom extraction patterns.
+        include_registered_patterns: Include globally registered extraction patterns.
 
     Returns:
         Deduplicated list of extracted observables.
@@ -777,7 +1031,13 @@ def extract_from_url(
         except (UnicodeDecodeError, LookupError):
             text = response.read().decode("utf-8", errors="replace")
 
-    return extract_all(text, types=types, refang_output=refang_output)
+    return extract_all(
+        text,
+        types=types,
+        refang_output=refang_output,
+        extraction_patterns=extraction_patterns,
+        include_registered_patterns=include_registered_patterns,
+    )
 
 
 # =============================================================================

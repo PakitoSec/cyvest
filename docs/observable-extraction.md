@@ -199,6 +199,70 @@ for domain in extract_domains(text):
     print(f"Domain: {domain.value}")
 ```
 
+### Custom Extraction Patterns
+
+Library users can add regex-backed extraction patterns for existing `ObservableType`
+values. A custom pattern must include a named `value` capture group.
+
+```python
+from cyvest.extract import ExtractionPattern, extract_all
+from cyvest.model_enums import ObservableSubtype, ObservableType
+
+text = "Event user=alice host=web01.example.com"
+
+patterns = [
+    ExtractionPattern(
+        name="windows-user",
+        obs_type=ObservableType.USER,
+        subtype=ObservableSubtype.USER_USERNAME,
+        namespace="windows",
+        pattern=r"user=(?P<value>[A-Za-z0-9._-]+)",
+    ),
+    ExtractionPattern(
+        name="host-fqdn",
+        obs_type=ObservableType.HOST,
+        subtype=ObservableSubtype.HOST_FQDN,
+        pattern=r"host=(?P<value>[A-Za-z0-9.-]+)",
+        normalize=str.lower,
+    ),
+]
+
+observables = extract_all(text, extraction_patterns=patterns)
+```
+
+Custom patterns can also be registered globally:
+
+```python
+from cyvest.extract import (
+    ExtractionPattern,
+    clear_extraction_patterns,
+    extract_all,
+    register_extraction_pattern,
+)
+from cyvest.model_enums import ObservableSubtype, ObservableType
+
+register_extraction_pattern(
+    ExtractionPattern(
+        name="upn",
+        obs_type=ObservableType.USER,
+        subtype=ObservableSubtype.USER_UPN,
+        pattern=r"upn=(?P<value>[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+)",
+    )
+)
+
+observables = extract_all("upn=alice@example.com")
+clear_extraction_patterns()
+```
+
+Registered patterns participate in `extract_all()` and `extract_from_url()` by
+default. Pass `include_registered_patterns=False` to ignore global patterns for a
+single call.
+
+`USER`, `HOST`, `PROCESS`, and `CLOUD_RESOURCE` custom patterns require a subtype
+because those observable types require one in Cyvest identities. Some subtypes,
+such as `USER_USERNAME`, `HOST_HOSTNAME`, and `HOST_DEVICE_ID`, also require a
+namespace.
+
 ### Extract from URL
 
 Fetch content from a web page and extract observables:

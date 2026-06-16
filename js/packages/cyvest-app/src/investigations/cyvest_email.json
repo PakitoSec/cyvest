@@ -60,13 +60,15 @@
           }
         ]
       },
-      "score": 10.0,
+      "score": 10,
       "level": "MALICIOUS",
       "threat_intels": [],
       "relationships": [],
       "key": "obs:artifact:root",
       "finding_links": [],
-      "score_display": "10.00"
+      "score_display": "10.00",
+      "aliases": [],
+      "occurrence_count": 1
     },
     "obs:email:noreply@dmalicious.com": {
       "type": "email",
@@ -77,7 +79,7 @@
       "whitelisted": false,
       "comment": "",
       "extra": {},
-      "score": 5.0,
+      "score": 5,
       "level": "MALICIOUS",
       "threat_intels": [
         "ti:vt:obs:email:noreply@dmalicious.com",
@@ -100,7 +102,9 @@
         "fnd:from",
         "fnd:from-proofpoint"
       ],
-      "score_display": "5.00"
+      "score_display": "5.00",
+      "aliases": [],
+      "occurrence_count": 1
     },
     "obs:domain:dmalicious.com": {
       "type": "domain",
@@ -111,7 +115,7 @@
       "whitelisted": false,
       "comment": "",
       "extra": {},
-      "score": 2.0,
+      "score": 2,
       "level": "NOTABLE",
       "threat_intels": [
         "ti:vt:obs:domain:dmalicious.com"
@@ -125,7 +129,9 @@
       ],
       "key": "obs:domain:dmalicious.com",
       "finding_links": [],
-      "score_display": "2.00"
+      "score_display": "2.00",
+      "aliases": [],
+      "occurrence_count": 1
     },
     "obs:ipv4:8.1.2.3": {
       "type": "ipv4",
@@ -136,7 +142,7 @@
       "whitelisted": false,
       "comment": "",
       "extra": {},
-      "score": 2.0,
+      "score": 2,
       "level": "NOTABLE",
       "threat_intels": [
         "ti:abuseipdb:obs:ipv4:8.1.2.3"
@@ -144,7 +150,9 @@
       "relationships": [],
       "key": "obs:ipv4:8.1.2.3",
       "finding_links": [],
-      "score_display": "2.00"
+      "score_display": "2.00",
+      "aliases": [],
+      "occurrence_count": 1
     },
     "obs:email:user@company.com": {
       "type": "email",
@@ -155,7 +163,7 @@
       "whitelisted": false,
       "comment": "",
       "extra": {},
-      "score": 0.0,
+      "score": 0,
       "level": "INFO",
       "threat_intels": [],
       "relationships": [
@@ -169,7 +177,9 @@
       "finding_links": [
         "fnd:receiver"
       ],
-      "score_display": "0.00"
+      "score_display": "0.00",
+      "aliases": [],
+      "occurrence_count": 1
     },
     "obs:url:https://virus.com/payload.exe": {
       "type": "url",
@@ -180,7 +190,7 @@
       "whitelisted": false,
       "comment": "",
       "extra": {},
-      "score": 5.0,
+      "score": 5,
       "level": "MALICIOUS",
       "threat_intels": [
         "ti:vt:obs:url:https://virus.com/payload.exe"
@@ -196,7 +206,9 @@
       "finding_links": [
         "fnd:body-url-https://virus.com/payload.exe"
       ],
-      "score_display": "5.00"
+      "score_display": "5.00",
+      "aliases": [],
+      "occurrence_count": 1
     },
     "obs:domain:virus.com": {
       "type": "domain",
@@ -207,7 +219,7 @@
       "whitelisted": false,
       "comment": "",
       "extra": {},
-      "score": 5.0,
+      "score": 5,
       "level": "MALICIOUS",
       "threat_intels": [
         "ti:vt:obs:domain:virus.com"
@@ -223,7 +235,9 @@
       "finding_links": [
         "fnd:body-domain-virus.com"
       ],
-      "score_display": "5.00"
+      "score_display": "5.00",
+      "aliases": [],
+      "occurrence_count": 1
     },
     "obs:url:https://virus.com/about": {
       "type": "url",
@@ -234,7 +248,7 @@
       "whitelisted": false,
       "comment": "",
       "extra": {},
-      "score": 3.0,
+      "score": 3,
       "level": "SUSPICIOUS",
       "threat_intels": [
         "ti:vt:obs:url:https://virus.com/about"
@@ -250,7 +264,9 @@
       "finding_links": [
         "fnd:body-url-https://virus.com/about"
       ],
-      "score_display": "3.00"
+      "score_display": "3.00",
+      "aliases": [],
+      "occurrence_count": 1
     },
     "obs:url:https://domain.com/ok/toto": {
       "type": "url",
@@ -261,7 +277,7 @@
       "whitelisted": false,
       "comment": "",
       "extra": {},
-      "score": -1.0,
+      "score": -1,
       "level": "TRUSTED",
       "threat_intels": [
         "ti:vt:obs:url:https://domain.com/ok/toto"
@@ -277,7 +293,9 @@
       "finding_links": [
         "fnd:body-url-https://domain.com/ok/toto"
       ],
-      "score_display": "-1.00"
+      "score_display": "-1.00",
+      "aliases": [],
+      "occurrence_count": 1
     },
     "obs:domain:domain.com": {
       "type": "domain",
@@ -288,7 +306,7 @@
       "whitelisted": false,
       "comment": "",
       "extra": {},
-      "score": 0.0,
+      "score": 0,
       "level": "INFO",
       "threat_intels": [
         "ti:vt:obs:domain:domain.com"
@@ -304,7 +322,9 @@
       "finding_links": [
         "fnd:body-domain-domain.com"
       ],
-      "score_display": "0.00"
+      "score_display": "0.00",
+      "aliases": [],
+      "occurrence_count": 1
     },
     "obs:file:body/html": {
       "type": "file",
@@ -315,7 +335,7 @@
       "whitelisted": false,
       "comment": "",
       "extra": {},
-      "score": 5.0,
+      "score": 5,
       "level": "MALICIOUS",
       "threat_intels": [],
       "relationships": [
@@ -327,7 +347,9 @@
       ],
       "key": "obs:file:body/html",
       "finding_links": [],
-      "score_display": "5.00"
+      "score_display": "5.00",
+      "aliases": [],
+      "occurrence_count": 1
     },
     "obs:file:invoice.pdf": {
       "type": "file",
@@ -338,7 +360,7 @@
       "whitelisted": false,
       "comment": "",
       "extra": {},
-      "score": 10.0,
+      "score": 10,
       "level": "MALICIOUS",
       "threat_intels": [
         "ti:malwarebazaar:obs:file:invoice.pdf"
@@ -359,7 +381,9 @@
       "finding_links": [
         "fnd:attachment-invoice.pdf"
       ],
-      "score_display": "10.00"
+      "score_display": "10.00",
+      "aliases": [],
+      "occurrence_count": 1
     },
     "obs:hash:md5:d41d8cd98f00b204e9800998ecf8427e": {
       "type": "hash",
@@ -370,7 +394,7 @@
       "whitelisted": false,
       "comment": "",
       "extra": {},
-      "score": 10.0,
+      "score": 10,
       "level": "MALICIOUS",
       "threat_intels": [
         "ti:vt:obs:hash:md5:d41d8cd98f00b204e9800998ecf8427e"
@@ -378,7 +402,9 @@
       "relationships": [],
       "key": "obs:hash:md5:d41d8cd98f00b204e9800998ecf8427e",
       "finding_links": [],
-      "score_display": "10.00"
+      "score_display": "10.00",
+      "aliases": [],
+      "occurrence_count": 1
     }
   },
   "findings": {
@@ -387,7 +413,7 @@
       "description": "test email vt 10",
       "comment": "> ok boys",
       "extra": {},
-      "score": 2.0,
+      "score": 2,
       "level": "NOTABLE",
       "origin_investigation_id": "fragment-emailfrom",
       "observable_links": [
@@ -405,7 +431,7 @@
       "description": "test email vt 10",
       "comment": "> ok boys",
       "extra": {},
-      "score": 5.0,
+      "score": 5,
       "level": "MALICIOUS",
       "origin_investigation_id": "fragment-emailfrombis",
       "observable_links": [
@@ -441,7 +467,7 @@
       "description": "URL analysis https://virus.com/payload.exe",
       "comment": "> score: 5",
       "extra": {},
-      "score": 5.0,
+      "score": 5,
       "level": "MALICIOUS",
       "origin_investigation_id": "fragment-bodiesurltask",
       "observable_links": [
@@ -459,7 +485,7 @@
       "description": "URL analysis https://virus.com/about",
       "comment": "> score: 3",
       "extra": {},
-      "score": 3.0,
+      "score": 3,
       "level": "SUSPICIOUS",
       "origin_investigation_id": "fragment-bodiesurltask",
       "observable_links": [
@@ -477,7 +503,7 @@
       "description": "URL analysis https://domain.com/ok/toto",
       "comment": "> score: -1",
       "extra": {},
-      "score": 0.0,
+      "score": 0,
       "level": "INFO",
       "origin_investigation_id": "fragment-bodiesurltask",
       "observable_links": [
@@ -495,7 +521,7 @@
       "description": "Domain analysis virus.com",
       "comment": "> score: 3",
       "extra": {},
-      "score": 5.0,
+      "score": 5,
       "level": "MALICIOUS",
       "origin_investigation_id": "fragment-bodiesdomaintask",
       "observable_links": [
@@ -513,7 +539,7 @@
       "description": "Domain analysis domain.com",
       "comment": "> score: 0",
       "extra": {},
-      "score": 0.0,
+      "score": 0,
       "level": "INFO",
       "origin_investigation_id": "fragment-bodiesdomaintask",
       "observable_links": [
@@ -531,7 +557,7 @@
       "description": "File: invoice.pdf (1024 bytes)",
       "comment": "> MD5: d41d8cd98f00b204e9800998ecf8427e\n> SHA256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\n> Threat score: 10",
       "extra": {},
-      "score": 10.0,
+      "score": 10,
       "level": "MALICIOUS",
       "origin_investigation_id": "fragment-attachmenttask",
       "observable_links": [
@@ -549,7 +575,7 @@
       "description": "Aggregated Email Risk Assessment",
       "comment": "> **Aggregated Risk Assessment**\n> Total risk score: 6.0\n> Indicators analyzed: 2\n>\n> **Risk Factors:**\n> - Suspicious URLs detected (max score: 5)\n> - Malicious attachment detected (score: 10)\n>\n> **Component Analysis:**\n> - Header findings: 2\n> - URL findings: 3\n> - Attachment findings: 2\n",
       "extra": {},
-      "score": 6.0,
+      "score": 6,
       "level": "MALICIOUS",
       "origin_investigation_id": "fragment-aggregatedrisktask",
       "observable_links": [],
@@ -562,7 +588,7 @@
       "description": "AI Analysis",
       "comment": "",
       "extra": {},
-      "score": 0.0,
+      "score": 0,
       "level": "MALICIOUS",
       "origin_investigation_id": "fragment-ai",
       "observable_links": [],
@@ -578,7 +604,7 @@
       "observable_key": "obs:domain:dmalicious.com",
       "comment": "",
       "extra": {},
-      "score": 1.0,
+      "score": 1,
       "level": "NOTABLE",
       "taxonomies": [],
       "key": "ti:vt:obs:domain:dmalicious.com",
@@ -589,7 +615,7 @@
       "observable_key": "obs:ipv4:8.1.2.3",
       "comment": "",
       "extra": {},
-      "score": 2.0,
+      "score": 2,
       "level": "NOTABLE",
       "taxonomies": [],
       "key": "ti:abuseipdb:obs:ipv4:8.1.2.3",
@@ -600,7 +626,7 @@
       "observable_key": "obs:email:noreply@dmalicious.com",
       "comment": "> test",
       "extra": {},
-      "score": 0.0,
+      "score": 0,
       "level": "INFO",
       "taxonomies": [],
       "key": "ti:vt:obs:email:noreply@dmalicious.com",
@@ -611,7 +637,7 @@
       "observable_key": "obs:email:noreply@dmalicious.com",
       "comment": "> test",
       "extra": {},
-      "score": 5.0,
+      "score": 5,
       "level": "MALICIOUS",
       "taxonomies": [],
       "key": "ti:proofpoint:obs:email:noreply@dmalicious.com",
@@ -622,7 +648,7 @@
       "observable_key": "obs:url:https://virus.com/payload.exe",
       "comment": "",
       "extra": {},
-      "score": 5.0,
+      "score": 5,
       "level": "MALICIOUS",
       "taxonomies": [],
       "key": "ti:vt:obs:url:https://virus.com/payload.exe",
@@ -633,7 +659,7 @@
       "observable_key": "obs:url:https://virus.com/about",
       "comment": "",
       "extra": {},
-      "score": 3.0,
+      "score": 3,
       "level": "SUSPICIOUS",
       "taxonomies": [],
       "key": "ti:vt:obs:url:https://virus.com/about",
@@ -644,7 +670,7 @@
       "observable_key": "obs:url:https://domain.com/ok/toto",
       "comment": "",
       "extra": {},
-      "score": -1.0,
+      "score": -1,
       "level": "TRUSTED",
       "taxonomies": [],
       "key": "ti:vt:obs:url:https://domain.com/ok/toto",
@@ -655,7 +681,7 @@
       "observable_key": "obs:domain:virus.com",
       "comment": "",
       "extra": {},
-      "score": 3.0,
+      "score": 3,
       "level": "SUSPICIOUS",
       "taxonomies": [],
       "key": "ti:vt:obs:domain:virus.com",
@@ -666,7 +692,7 @@
       "observable_key": "obs:domain:domain.com",
       "comment": "",
       "extra": {},
-      "score": 0.0,
+      "score": 0,
       "level": "INFO",
       "taxonomies": [],
       "key": "ti:vt:obs:domain:domain.com",
@@ -677,7 +703,7 @@
       "observable_key": "obs:hash:md5:d41d8cd98f00b204e9800998ecf8427e",
       "comment": "MD5 hash analysis",
       "extra": {},
-      "score": 10.0,
+      "score": 10,
       "level": "MALICIOUS",
       "taxonomies": [],
       "key": "ti:vt:obs:hash:md5:d41d8cd98f00b204e9800998ecf8427e",
@@ -688,7 +714,7 @@
       "observable_key": "obs:file:invoice.pdf",
       "comment": "Known malware: invoice.pdf",
       "extra": {},
-      "score": 10.0,
+      "score": 10,
       "level": "MALICIOUS",
       "taxonomies": [],
       "key": "ti:malwarebazaar:obs:file:invoice.pdf",
@@ -725,7 +751,7 @@
       "description": "",
       "findings": [],
       "key": "tag:bodies",
-      "direct_score": 0.0,
+      "direct_score": 0,
       "direct_level": "INFO"
     },
     "tag:bodies:urls": {
@@ -737,7 +763,7 @@
         "fnd:body-url-https://domain.com/ok/toto"
       ],
       "key": "tag:bodies:urls",
-      "direct_score": 8.0,
+      "direct_score": 8,
       "direct_level": "MALICIOUS"
     },
     "tag:bodies:domains": {
@@ -748,7 +774,7 @@
         "fnd:body-domain-domain.com"
       ],
       "key": "tag:bodies:domains",
-      "direct_score": 5.0,
+      "direct_score": 5,
       "direct_level": "MALICIOUS"
     },
     "tag:attachments": {
@@ -758,7 +784,7 @@
         "fnd:attachment-invoice.pdf"
       ],
       "key": "tag:attachments",
-      "direct_score": 10.0,
+      "direct_score": 10,
       "direct_level": "MALICIOUS"
     },
     "tag:risk_assessment": {
@@ -768,7 +794,7 @@
         "fnd:email_risk_aggregated"
       ],
       "key": "tag:risk_assessment",
-      "direct_score": 6.0,
+      "direct_score": 6,
       "direct_level": "MALICIOUS"
     },
     "tag:risk_assessment:ai": {
@@ -778,7 +804,7 @@
         "fnd:ai"
       ],
       "key": "tag:risk_assessment:ai",
-      "direct_score": 0.0,
+      "direct_score": 0,
       "direct_level": "INFO"
     }
   },

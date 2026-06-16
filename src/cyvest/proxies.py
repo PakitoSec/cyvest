@@ -22,6 +22,7 @@ from cyvest.model import (
     EvidenceLink,
     Finding,
     Observable,
+    ObservableAlias,
     ObservableLink,
     ObservableSubtype,
     ObservableType,
@@ -144,6 +145,14 @@ class ObservableProxy(_ReadOnlyProxy[Observable]):
     @property
     def level(self) -> Level:
         return self._read_attr("level")
+
+    @property
+    def aliases(self) -> list[ObservableAlias]:
+        return self._read_attr("aliases")
+
+    @property
+    def occurrence_count(self) -> int:
+        return self._read_attr("occurrence_count")
 
     @property
     def threat_intels(self) -> list[ThreatIntel]:

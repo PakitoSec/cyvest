@@ -41,7 +41,18 @@ from cyvest.io_serialization import (
 )
 from cyvest.io_visualization import generate_network_graph
 from cyvest.levels import Level
-from cyvest.model import Enrichment, Evidence, Finding, Observable, Tag, Taxonomy, ThreatIntel, round_score_decimal
+from cyvest.model import (
+    Enrichment,
+    Evidence,
+    Finding,
+    Observable,
+    ObservableAlias,
+    ObservableIdentity,
+    Tag,
+    Taxonomy,
+    ThreatIntel,
+    round_score_decimal,
+)
 from cyvest.model_enums import (
     ObservableSubtype,
     ObservableType,
@@ -51,6 +62,7 @@ from cyvest.model_enums import (
 )
 from cyvest.model_schema import InvestigationSchema, StatisticsSchema
 from cyvest.proxies import EnrichmentProxy, EvidenceProxy, FindingProxy, ObservableProxy, TagProxy, ThreatIntelProxy
+from cyvest.resolvers import ObservableResolver
 from cyvest.score import ScoreMode
 
 if TYPE_CHECKING:
@@ -99,6 +111,7 @@ class Cyvest:
             investigation_name=investigation_name,
             investigation_id=investigation_id,
         )
+        self._observable_resolvers: list[ObservableResolver] = []
 
     # Internal helpers
 
@@ -229,6 +242,150 @@ class Cyvest:
 
     # Observable methods
 
+    @staticmethod
+    def _normalized_source_type(
+        obs_type: ObservableType | str,
+        subtype: ObservableSubtype | str | None,
+    ) -> tuple[str, str | None]:
+        normalized_type = obs_type.value if isinstance(obs_type, ObservableType) else str(obs_type).strip().lower()
+        normalized_subtype = subtype.value if isinstance(subtype, ObservableSubtype) else subtype
+        if isinstance(normalized_subtype, str):
+            normalized_subtype = normalized_subtype.strip().lower()
+        return normalized_type, normalized_subtype
+
+    @classmethod
+    def _resolver_applies(cls, resolver: ObservableResolver, alias: ObservableAlias) -> bool:
+        alias_source_type = cls._normalized_source_type(alias.obs_type, alias.subtype)
+        return any(
+            cls._normalized_source_type(obs_type, subtype) == alias_source_type
+            for obs_type, subtype in resolver.source_types
+        )
+
+    @staticmethod
+    def _observable_kwargs_from_identity(
+        identity: ObservableIdentity,
+        *,
+        internal: bool,
+        whitelisted: bool,
+        comment: str,
+        extra: dict[str, Any],
+        score: Decimal | float | None,
+        level: Level | None,
+        aliases: list[ObservableAlias] | None = None,
+    ) -> dict[str, Any]:
+        obs_kwargs: dict[str, Any] = {
+            "obs_type": identity.obs_type,
+            "subtype": identity.subtype,
+            "namespace": identity.namespace,
+            "value": identity.value,
+            "internal": internal,
+            "whitelisted": whitelisted,
+            "comment": comment,
+            "extra": extra,
+            "aliases": aliases or [],
+        }
+        if score is not None:
+            obs_kwargs["score"] = Decimal(str(score))
+        if level is not None:
+            obs_kwargs["level"] = level
+        return obs_kwargs
+
+    def observable_resolver_register(self, resolver: ObservableResolver, *, replace: bool = False) -> None:
+        """Register an instance-local observable identity resolver."""
+        if not isinstance(resolver, ObservableResolver):
+            raise TypeError("resolver must be an ObservableResolver.")
+        existing_idx = next(
+            (idx for idx, item in enumerate(self._observable_resolvers) if item.name == resolver.name),
+            None,
+        )
+        if existing_idx is not None:
+            if not replace:
+                raise ValueError(f"Observable resolver '{resolver.name}' is already registered.")
+            self._observable_resolvers[existing_idx] = resolver
+            return
+        self._observable_resolvers.append(resolver)
+
+    def observable_resolver_unregister(self, name: str) -> bool:
+        """Unregister an observable identity resolver by name."""
+        normalized_name = name.strip()
+        for idx, resolver in enumerate(self._observable_resolvers):
+            if resolver.name == normalized_name:
+                del self._observable_resolvers[idx]
+                return True
+        return False
+
+    def observable_resolver_clear(self) -> None:
+        """Remove all instance-local observable identity resolvers."""
+        self._observable_resolvers.clear()
+
+    def observable_resolver_get_all(self) -> tuple[ObservableResolver, ...]:
+        """Return registered observable identity resolvers in evaluation order."""
+        return tuple(self._observable_resolvers)
+
+    def _resolve_observable_identity_sync(self, alias: ObservableAlias) -> ObservableIdentity | None:
+        for resolver in self._observable_resolvers:
+            if self._resolver_applies(resolver, alias) and resolver.aresolve is not None:
+                raise RuntimeError(
+                    f"Observable resolver '{resolver.name}' is async; use 'await cv.observable_acreate(...)'."
+                )
+        for resolver in self._observable_resolvers:
+            if not self._resolver_applies(resolver, alias):
+                continue
+            if resolver.resolve is None:
+                continue
+            resolved = resolver.resolve(alias)
+            if resolved is not None:
+                return ObservableIdentity.model_validate(resolved)
+        return None
+
+    async def _resolve_observable_identity_async(self, alias: ObservableAlias) -> ObservableIdentity | None:
+        for resolver in self._observable_resolvers:
+            if not self._resolver_applies(resolver, alias):
+                continue
+            resolved: ObservableIdentity | None = None
+            if resolver.resolve is not None:
+                resolved = resolver.resolve(alias)
+            elif resolver.aresolve is not None:
+                resolved = await resolver.aresolve(alias)
+            if resolved is not None:
+                return ObservableIdentity.model_validate(resolved)
+        return None
+
+    def _observable_create_from_resolved_identity(
+        self,
+        *,
+        alias: ObservableAlias,
+        identity: ObservableIdentity | None,
+        internal: bool,
+        whitelisted: bool,
+        comment: str,
+        extra: dict[str, Any] | None,
+        score: Decimal | float | None,
+        level: Level | None,
+    ) -> ObservableProxy:
+        source_identity = ObservableIdentity(
+            obs_type=alias.obs_type,
+            subtype=alias.subtype,
+            namespace=alias.namespace,
+            value=alias.value,
+        )
+        canonical_identity = identity or source_identity
+        aliases = [alias] if identity is not None else []
+        obs = Observable(
+            **self._observable_kwargs_from_identity(
+                canonical_identity,
+                internal=internal,
+                whitelisted=whitelisted,
+                comment=comment,
+                extra=extra or {},
+                score=score,
+                level=level,
+                aliases=aliases,
+            )
+        )
+        obs_result, _ = self._investigation.add_observable(obs)
+        return self._observable_proxy(obs_result)
+
     def observable_create(
         self,
         obs_type: ObservableType | str,
@@ -258,24 +415,45 @@ class Cyvest:
         Returns:
             The created or existing observable
         """
-        obs_kwargs: dict[str, Any] = {
-            "obs_type": obs_type,
-            "subtype": subtype,
-            "namespace": namespace,
-            "value": value,
-            "internal": internal,
-            "whitelisted": whitelisted,
-            "comment": comment,
-            "extra": extra or {},
-        }
-        if score is not None:
-            obs_kwargs["score"] = Decimal(str(score))
-        if level is not None:
-            obs_kwargs["level"] = level
-        obs = Observable(**obs_kwargs)
-        # Unwrap tuple - facade returns only Observable, discards deferred relationships
-        obs_result, _ = self._investigation.add_observable(obs)
-        return self._observable_proxy(obs_result)
+        alias = ObservableAlias(obs_type=obs_type, subtype=subtype, namespace=namespace, value=value)
+        identity = self._resolve_observable_identity_sync(alias)
+        return self._observable_create_from_resolved_identity(
+            alias=alias,
+            identity=identity,
+            internal=internal,
+            whitelisted=whitelisted,
+            comment=comment,
+            extra=extra,
+            score=score,
+            level=level,
+        )
+
+    async def observable_acreate(
+        self,
+        obs_type: ObservableType | str,
+        value: str,
+        subtype: ObservableSubtype | str | None = None,
+        namespace: str | None = None,
+        internal: bool = False,
+        whitelisted: bool = False,
+        comment: str = "",
+        extra: dict[str, Any] | None = None,
+        score: Decimal | float | None = None,
+        level: Level | None = None,
+    ) -> ObservableProxy:
+        """Async variant of observable_create supporting async resolvers."""
+        alias = ObservableAlias(obs_type=obs_type, subtype=subtype, namespace=namespace, value=value)
+        identity = await self._resolve_observable_identity_async(alias)
+        return self._observable_create_from_resolved_identity(
+            alias=alias,
+            identity=identity,
+            internal=internal,
+            whitelisted=whitelisted,
+            comment=comment,
+            extra=extra,
+            score=score,
+            level=level,
+        )
 
     @overload
     def observable_get(self, key: str) -> ObservableProxy | None:

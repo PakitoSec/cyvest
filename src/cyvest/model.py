@@ -276,6 +276,64 @@ class ThreatIntel(BaseModel):
         return _format_score_decimal(self.score)
 
 
+class _ObservableIdentityBase(AliasDumpModel):
+    """Shared typed observable identity fields."""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True, populate_by_name=True)
+
+    obs_type: ObservableType | str = Field(..., alias="type")
+    subtype: ObservableSubtype | str | None = Field(default=None)
+    namespace: str | None = Field(default=None)
+    value: str = Field(...)
+
+    @field_validator("obs_type", mode="before")
+    @classmethod
+    def coerce_obs_type(cls, v: Any) -> ObservableType | str:
+        return Observable.coerce_obs_type(v)
+
+    @field_validator("subtype", mode="before")
+    @classmethod
+    def coerce_subtype(cls, v: Any) -> ObservableSubtype | str | None:
+        return Observable.coerce_subtype(v)
+
+    @field_validator("namespace", mode="before")
+    @classmethod
+    def coerce_namespace(cls, v: Any) -> str | None:
+        return Observable.coerce_namespace(v)
+
+    @model_validator(mode="after")
+    def validate_identity(self) -> Self:
+        Observable(
+            obs_type=self.obs_type,
+            subtype=self.subtype,
+            namespace=self.namespace,
+            value=self.value,
+        )
+        return self
+
+    @property
+    def identity_tuple(self) -> tuple[ObservableType | str, ObservableSubtype | str | None, str | None, str]:
+        return (self.obs_type, self.subtype, self.namespace, self.value)
+
+    @field_serializer("obs_type")
+    def serialize_obs_type(self, v: ObservableType | str) -> str:
+        return v.value if isinstance(v, ObservableType) else v
+
+    @field_serializer("subtype")
+    def serialize_subtype(self, v: ObservableSubtype | str | None) -> str | None:
+        return v.value if isinstance(v, ObservableSubtype) else v
+
+
+class ObservableIdentity(_ObservableIdentityBase):
+    """Canonical observable identity returned by observable resolvers."""
+
+
+class ObservableAlias(_ObservableIdentityBase):
+    """Source observable identity attached to a canonical observable."""
+
+    count: int = Field(default=1, ge=1)
+
+
 class Observable(AliasDumpModel):
     """
     Represents a cyber observable (IP, URL, domain, hash, etc.).
@@ -296,6 +354,8 @@ class Observable(AliasDumpModel):
     extra: dict[str, Any] = Field(...)
     score: Decimal = Field(...)
     level: Level = Field(...)
+    aliases: list[ObservableAlias] = Field(...)
+    occurrence_count: int = Field(default=1, ge=1)
     threat_intels: list[ThreatIntel] = Field(...)
     relationships: list[Relationship] = Field(...)
     key: str = Field(...)
@@ -375,6 +435,10 @@ class Observable(AliasDumpModel):
             values["threat_intels"] = []
         if "relationships" not in values:
             values["relationships"] = []
+        if "aliases" not in values:
+            values["aliases"] = []
+        if "occurrence_count" not in values:
+            values["occurrence_count"] = 1
         if "key" not in values:
             values["key"] = ""
         return values
@@ -432,6 +496,20 @@ class Observable(AliasDumpModel):
                 namespace=self.namespace,
             )
 
+        return self
+
+    @model_validator(mode="after")
+    def dedupe_aliases(self) -> Self:
+        alias_key_type = tuple[ObservableType | str, ObservableSubtype | str | None, str | None, str]
+        aliases_by_key: dict[alias_key_type, ObservableAlias] = {}
+        for alias in self.aliases:
+            alias_key = alias.identity_tuple
+            existing = aliases_by_key.get(alias_key)
+            if existing is None:
+                aliases_by_key[alias_key] = alias
+            else:
+                existing.count += alias.count
+        self.aliases = list(aliases_by_key.values())
         return self
 
     @field_serializer("obs_type")

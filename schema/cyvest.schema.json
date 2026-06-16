@@ -432,6 +432,19 @@
         "level": {
           "$ref": "#/$defs/Level"
         },
+        "aliases": {
+          "items": {
+            "$ref": "#/$defs/ObservableAlias"
+          },
+          "title": "Aliases",
+          "type": "array"
+        },
+        "occurrence_count": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Occurrence Count",
+          "type": "integer"
+        },
         "threat_intels": {
           "items": {
             "type": "string"
@@ -474,6 +487,7 @@
         "extra",
         "score",
         "level",
+        "aliases",
         "threat_intels",
         "relationships",
         "key",
@@ -481,6 +495,54 @@
         "score_display"
       ],
       "title": "Observable",
+      "type": "object"
+    },
+    "ObservableAlias": {
+      "description": "Source observable identity attached to a canonical observable.",
+      "properties": {
+        "type": {
+          "title": "Type",
+          "type": "string"
+        },
+        "subtype": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Subtype"
+        },
+        "namespace": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Namespace"
+        },
+        "value": {
+          "title": "Value",
+          "type": "string"
+        },
+        "count": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Count",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "type",
+        "value"
+      ],
+      "title": "ObservableAlias",
       "type": "object"
     },
     "ObservableLink": {

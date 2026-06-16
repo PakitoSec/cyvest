@@ -438,6 +438,17 @@ class Investigation:
         # Merge internal status (if either is external, result is external)
         existing.internal = existing.internal and incoming.internal
 
+        # Merge occurrence and alias counts.
+        existing.occurrence_count += incoming.occurrence_count
+        existing_aliases = {alias.identity_tuple: alias for alias in existing.aliases}
+        for alias in incoming.aliases:
+            existing_alias = existing_aliases.get(alias.identity_tuple)
+            if existing_alias is None:
+                existing.aliases.append(alias.model_copy(deep=True))
+                existing_aliases[alias.identity_tuple] = existing.aliases[-1]
+            else:
+                existing_alias.count += alias.count
+
         # Merge threat intels (avoid duplicates by key)
         existing_ti_keys = {ti.key for ti in existing.threat_intels}
         for ti in incoming.threat_intels:

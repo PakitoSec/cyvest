@@ -354,6 +354,8 @@ def load_investigation_dict(data: dict[str, Any]) -> Cyvest:
             "extra": obs_info.get("extra", {}),
             "score": Decimal(str(obs_info.get("score", 0))),
             "level": obs_info.get("level", "INFO"),
+            "aliases": obs_info.get("aliases", []),
+            "occurrence_count": obs_info.get("occurrence_count", 1),
             "key": obs_info.get("key", ""),
             "relationships": [Relationship.model_validate(rel) for rel in obs_info.get("relationships", [])],
         }
@@ -373,11 +375,16 @@ def load_investigation_dict(data: dict[str, Any]) -> Cyvest:
             "extra": root_obs_info.get("extra", root_data),
             "score": Decimal(str(root_obs_info.get("score", 0))),
             "level": root_obs_info.get("level", "INFO"),
+            "aliases": root_obs_info.get("aliases", []),
+            "occurrence_count": root_obs_info.get("occurrence_count", 1),
             "key": new_root_key,
             "relationships": [Relationship.model_validate(rel) for rel in root_obs_info.get("relationships", [])],
         }
         root_obs = Observable.model_validate(root_data)
-        cv._investigation.add_observable(root_obs)
+        merged_root, _ = cv._investigation.add_observable(root_obs)
+        # Loading merges serialized root data into the fresh root created by Cyvest().
+        # Preserve the serialized occurrence count instead of counting the loader-created root.
+        merged_root.occurrence_count = root_obs.occurrence_count
 
     # Threat intel - leverage Pydantic model_validate
     for ti_info in data.get("threat_intels", {}).values():

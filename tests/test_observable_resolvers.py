@@ -71,8 +71,7 @@ def test_sync_resolver_canonicalizes_aliases_and_counts() -> None:
     assert email_obs.occurrence_count == 2
     assert len(email_obs.aliases) == 2
     alias_keys = {
-        (alias.obs_type, alias.subtype, alias.namespace, alias.value, alias.count)
-        for alias in email_obs.aliases
+        (alias.obs_type, alias.subtype, alias.namespace, alias.value, alias.count) for alias in email_obs.aliases
     }
     assert (Cyvest.OBS.USER, Cyvest.SUB.USER_EMAIL, None, "alice@example.com", 1) in alias_keys
     assert (Cyvest.OBS.USER, Cyvest.SUB.USER_USERNAME, "windows", "alice", 1) in alias_keys

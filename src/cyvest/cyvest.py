@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import threading
 from collections.abc import Callable, Iterable
+from copy import deepcopy
 from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
@@ -22,7 +23,7 @@ from logurich import get_logger
 
 from cyvest import keys
 from cyvest.compare import compare_investigations
-from cyvest.investigation import Investigation, InvestigationWhitelist
+from cyvest.investigation import Investigation, InvestigationWhitelist, _deep_merge_dict
 from cyvest.io_rich import (
     display_diff,
     display_finding_query,
@@ -62,7 +63,7 @@ from cyvest.model_enums import (
 )
 from cyvest.model_schema import InvestigationSchema, StatisticsSchema
 from cyvest.proxies import EnrichmentProxy, EvidenceProxy, FindingProxy, ObservableProxy, TagProxy, ThreatIntelProxy
-from cyvest.resolvers import ObservableResolver
+from cyvest.resolvers import ObservableResolution, ObservableResolver, ObservableResolverResult
 from cyvest.score import ScoreMode
 
 if TYPE_CHECKING:
@@ -322,7 +323,15 @@ class Cyvest:
         """Return registered observable identity resolvers in evaluation order."""
         return tuple(self._observable_resolvers)
 
-    def _resolve_observable_identity_sync(self, alias: ObservableAlias) -> ObservableIdentity | None:
+    @staticmethod
+    def _normalize_observable_resolution(resolved: ObservableResolverResult) -> ObservableResolution | None:
+        if resolved is None:
+            return None
+        if isinstance(resolved, ObservableResolution):
+            return ObservableResolution.model_validate(resolved)
+        return ObservableResolution(identity=ObservableIdentity.model_validate(resolved))
+
+    def _resolve_observable_identity_sync(self, alias: ObservableAlias) -> tuple[str, ObservableResolution] | None:
         for resolver in self._observable_resolvers:
             if self._resolver_applies(resolver, alias) and resolver.aresolve is not None:
                 raise RuntimeError(
@@ -335,27 +344,57 @@ class Cyvest:
                 continue
             resolved = resolver.resolve(alias)
             if resolved is not None:
-                return ObservableIdentity.model_validate(resolved)
+                resolution = self._normalize_observable_resolution(resolved)
+                if resolution is not None:
+                    return resolver.name, resolution
         return None
 
-    async def _resolve_observable_identity_async(self, alias: ObservableAlias) -> ObservableIdentity | None:
+    async def _resolve_observable_identity_async(
+        self,
+        alias: ObservableAlias,
+    ) -> tuple[str, ObservableResolution] | None:
         for resolver in self._observable_resolvers:
             if not self._resolver_applies(resolver, alias):
                 continue
-            resolved: ObservableIdentity | None = None
+            resolved: ObservableResolverResult = None
             if resolver.resolve is not None:
                 resolved = resolver.resolve(alias)
             elif resolver.aresolve is not None:
                 resolved = await resolver.aresolve(alias)
             if resolved is not None:
-                return ObservableIdentity.model_validate(resolved)
+                resolution = self._normalize_observable_resolution(resolved)
+                if resolution is not None:
+                    return resolver.name, resolution
         return None
+
+    @staticmethod
+    def _observable_extra_with_resolution(
+        extra: dict[str, Any] | None,
+        resolved: tuple[str, ObservableResolution] | None,
+    ) -> dict[str, Any]:
+        observable_extra = deepcopy(extra) if extra is not None else {}
+        resolver_data = observable_extra.get("resolver_data")
+        if resolver_data is not None and not isinstance(resolver_data, dict):
+            raise ValueError("Observable extra field 'resolver_data' must be a dictionary.")
+
+        if resolved is None:
+            return observable_extra
+
+        resolver_name, resolution = resolved
+        if not resolution.metadata:
+            return observable_extra
+
+        if resolver_data is None:
+            resolver_data = {}
+            observable_extra["resolver_data"] = resolver_data
+        _deep_merge_dict(resolver_data, {resolver_name: resolution.metadata})
+        return observable_extra
 
     def _observable_create_from_resolved_identity(
         self,
         *,
         alias: ObservableAlias,
-        identity: ObservableIdentity | None,
+        resolved: tuple[str, ObservableResolution] | None,
         internal: bool,
         whitelisted: bool,
         comment: str,
@@ -369,15 +408,15 @@ class Cyvest:
             namespace=alias.namespace,
             value=alias.value,
         )
-        canonical_identity = identity or source_identity
-        aliases = [alias] if identity is not None else []
+        canonical_identity = resolved[1].identity if resolved is not None else source_identity
+        aliases = [alias] if resolved is not None else []
         obs = Observable(
             **self._observable_kwargs_from_identity(
                 canonical_identity,
                 internal=internal,
                 whitelisted=whitelisted,
                 comment=comment,
-                extra=extra or {},
+                extra=self._observable_extra_with_resolution(extra, resolved),
                 score=score,
                 level=level,
                 aliases=aliases,
@@ -416,10 +455,10 @@ class Cyvest:
             The created or existing observable
         """
         alias = ObservableAlias(obs_type=obs_type, subtype=subtype, namespace=namespace, value=value)
-        identity = self._resolve_observable_identity_sync(alias)
+        resolved = self._resolve_observable_identity_sync(alias)
         return self._observable_create_from_resolved_identity(
             alias=alias,
-            identity=identity,
+            resolved=resolved,
             internal=internal,
             whitelisted=whitelisted,
             comment=comment,
@@ -443,10 +482,10 @@ class Cyvest:
     ) -> ObservableProxy:
         """Async variant of observable_create supporting async resolvers."""
         alias = ObservableAlias(obs_type=obs_type, subtype=subtype, namespace=namespace, value=value)
-        identity = await self._resolve_observable_identity_async(alias)
+        resolved = await self._resolve_observable_identity_async(alias)
         return self._observable_create_from_resolved_identity(
             alias=alias,
-            identity=identity,
+            resolved=resolved,
             internal=internal,
             whitelisted=whitelisted,
             comment=comment,

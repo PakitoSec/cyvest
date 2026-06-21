@@ -6,7 +6,7 @@ import asyncio
 
 import pytest
 
-from cyvest import Cyvest, ObservableAlias, ObservableIdentity, ObservableResolver
+from cyvest import Cyvest, Observable, ObservableAlias, ObservableIdentity, ObservableResolution, ObservableResolver
 
 
 def _okta_identity(value: str = "123") -> ObservableIdentity:
@@ -162,6 +162,209 @@ def test_observable_acreate_supports_async_resolver() -> None:
         assert obs.aliases[0].value == "alice@example.com"
 
     asyncio.run(run())
+
+
+def test_resolution_metadata_is_stored_with_manual_extra() -> None:
+    cv = Cyvest()
+    cv.observable_resolver_register(
+        ObservableResolver(
+            name="okta-user-id",
+            source_types={(Cyvest.OBS.USER, Cyvest.SUB.USER_EMAIL)},
+            resolve=lambda alias: ObservableResolution(
+                identity=_okta_identity(),
+                metadata={
+                    "profile": {
+                        "email": alias.value,
+                        "status": "ACTIVE",
+                    },
+                    "groups": ["employees"],
+                },
+            ),
+        )
+    )
+
+    obs = cv.observable_create(
+        Cyvest.OBS.USER,
+        "alice@example.com",
+        subtype=Cyvest.SUB.USER_EMAIL,
+        extra={
+            "source": "manual",
+            "resolver_data": {
+                "okta-user-id": {
+                    "profile": {"tenant": "example"},
+                }
+            },
+        },
+    )
+
+    assert obs.extra == {
+        "source": "manual",
+        "resolver_data": {
+            "okta-user-id": {
+                "profile": {
+                    "tenant": "example",
+                    "email": "alice@example.com",
+                    "status": "ACTIVE",
+                },
+                "groups": ["employees"],
+            }
+        },
+    }
+
+
+def test_async_resolution_metadata_is_stored() -> None:
+    async def run() -> None:
+        async def resolve(alias: ObservableAlias) -> ObservableResolution:
+            await asyncio.sleep(0)
+            return ObservableResolution(
+                identity=_okta_identity(),
+                metadata={"lookup": {"matched": alias.value}},
+            )
+
+        cv = Cyvest()
+        cv.observable_resolver_register(
+            ObservableResolver(
+                name="async-okta",
+                source_types={(Cyvest.OBS.USER, Cyvest.SUB.USER_EMAIL)},
+                aresolve=resolve,
+            )
+        )
+
+        obs = await cv.observable_acreate(Cyvest.OBS.USER, "alice@example.com", subtype=Cyvest.SUB.USER_EMAIL)
+
+        assert obs.extra["resolver_data"]["async-okta"] == {"lookup": {"matched": "alice@example.com"}}
+
+    asyncio.run(run())
+
+
+def test_resolution_metadata_merges_recursively_on_repeated_creation() -> None:
+    def resolve(alias: ObservableAlias) -> ObservableResolution:
+        if alias.subtype == Cyvest.SUB.USER_EMAIL:
+            metadata = {
+                "profile": {"email": alias.value},
+                "groups": ["email-users"],
+            }
+        else:
+            metadata = {
+                "profile": {"username": alias.value},
+                "groups": ["username-users"],
+            }
+        return ObservableResolution(identity=_okta_identity(), metadata=metadata)
+
+    cv = Cyvest()
+    cv.observable_resolver_register(
+        ObservableResolver(
+            name="okta-user-id",
+            source_types={
+                (Cyvest.OBS.USER, Cyvest.SUB.USER_EMAIL),
+                (Cyvest.OBS.USER, Cyvest.SUB.USER_USERNAME),
+            },
+            resolve=resolve,
+        )
+    )
+
+    cv.observable_create(Cyvest.OBS.USER, "alice@example.com", subtype=Cyvest.SUB.USER_EMAIL)
+    obs = cv.observable_create(
+        Cyvest.OBS.USER,
+        "alice",
+        subtype=Cyvest.SUB.USER_USERNAME,
+        namespace="windows",
+    )
+
+    assert obs.extra["resolver_data"]["okta-user-id"] == {
+        "profile": {
+            "email": "alice@example.com",
+            "username": "alice",
+        },
+        "groups": ["username-users"],
+    }
+
+
+def test_resolution_metadata_merges_recursively_across_investigations() -> None:
+    cv1 = Cyvest()
+    cv2 = Cyvest()
+    cv1.observable_resolver_register(
+        ObservableResolver(
+            name="okta-user-id",
+            source_types={(Cyvest.OBS.USER, Cyvest.SUB.USER_EMAIL)},
+            resolve=lambda alias: ObservableResolution(
+                identity=_okta_identity(),
+                metadata={"profile": {"email": alias.value}},
+            ),
+        )
+    )
+    cv2.observable_resolver_register(
+        ObservableResolver(
+            name="okta-user-id",
+            source_types={(Cyvest.OBS.USER, Cyvest.SUB.USER_USERNAME)},
+            resolve=lambda alias: ObservableResolution(
+                identity=_okta_identity(),
+                metadata={"profile": {"username": alias.value}},
+            ),
+        )
+    )
+
+    obs = cv1.observable_create(Cyvest.OBS.USER, "alice@example.com", subtype=Cyvest.SUB.USER_EMAIL)
+    cv2.observable_create(
+        Cyvest.OBS.USER,
+        "alice",
+        subtype=Cyvest.SUB.USER_USERNAME,
+        namespace="windows",
+    )
+    cv1.merge_investigation(cv2)
+
+    merged = cv1.observable_get(obs.key)
+    assert merged is not None
+    assert merged.extra["resolver_data"]["okta-user-id"]["profile"] == {
+        "email": "alice@example.com",
+        "username": "alice",
+    }
+
+
+def test_resolution_metadata_survives_json_roundtrip(tmp_path) -> None:
+    cv = Cyvest()
+    cv.observable_resolver_register(
+        ObservableResolver(
+            name="okta-user-id",
+            source_types={(Cyvest.OBS.USER, Cyvest.SUB.USER_EMAIL)},
+            resolve=lambda alias: ObservableResolution(
+                identity=_okta_identity(),
+                metadata={"profile": {"email": alias.value}},
+            ),
+        )
+    )
+    obs = cv.observable_create(Cyvest.OBS.USER, "alice@example.com", subtype=Cyvest.SUB.USER_EMAIL)
+
+    path = tmp_path / "resolution-metadata.json"
+    cv.io_save_json(path)
+    loaded = Cyvest.io_load_json(path)
+    loaded_obs = loaded.observable_get(obs.key)
+
+    assert loaded_obs is not None
+    assert loaded_obs.extra["resolver_data"]["okta-user-id"] == {"profile": {"email": "alice@example.com"}}
+
+
+def test_resolver_data_extra_must_be_a_dictionary() -> None:
+    cv = Cyvest()
+
+    with pytest.raises(ValueError, match="resolver_data.*dictionary"):
+        Observable(obs_type=Cyvest.OBS.IPV4, value="192.0.2.0", extra={"resolver_data": "invalid"})
+
+    with pytest.raises(ValueError, match="resolver_data.*dictionary"):
+        cv.observable_create(Cyvest.OBS.IPV4, "192.0.2.1", extra={"resolver_data": "invalid"})
+
+    obs = cv.observable_create(Cyvest.OBS.IPV4, "192.0.2.2")
+    with pytest.raises(ValueError, match="resolver_data.*dictionary"):
+        obs.update_metadata(extra={"resolver_data": "invalid"})
+
+
+def test_unresolved_observable_has_no_resolver_metadata() -> None:
+    cv = Cyvest()
+    cv.observable_resolver_register(_resolver("missing-okta-user", None))
+
+    obs = cv.observable_create(Cyvest.OBS.USER, "alice@example.com", subtype=Cyvest.SUB.USER_EMAIL)
+
+    assert "resolver_data" not in obs.extra
 
 
 def test_repeated_canonical_creations_merge_occurrence_and_alias_counts() -> None:

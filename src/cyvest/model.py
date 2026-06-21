@@ -402,6 +402,10 @@ class Observable(AliasDumpModel):
     def coerce_extra(cls, v: Any) -> dict[str, Any]:
         if v is None:
             return {}
+        if isinstance(v, dict):
+            resolver_data = v.get("resolver_data")
+            if resolver_data is not None and not isinstance(resolver_data, dict):
+                raise ValueError("Observable extra field 'resolver_data' must be a dictionary.")
         return v
 
     @field_validator("score", mode="before")

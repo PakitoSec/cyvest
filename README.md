@@ -175,7 +175,7 @@ source `ObservableAlias` and may return a canonical `ObservableIdentity`; Cyvest
 observable and stores the source identity as an alias with counts.
 
 ```python
-from cyvest import ObservableAlias, ObservableIdentity, ObservableResolver
+from cyvest import ObservableAlias, ObservableIdentity, ObservableResolution, ObservableResolver
 
 def resolve_user(alias: ObservableAlias) -> ObservableIdentity | None:
     if alias.value.lower() != "alice@example.com":
@@ -199,6 +199,10 @@ user = cv.observable_create(cv.OBS.USER, "alice@example.com", subtype=cv.SUB.USE
 assert user.subtype == cv.SUB.USER_UID
 assert user.aliases[0].subtype == cv.SUB.USER_EMAIL
 ```
+
+Resolvers that also retrieve profile or provenance data can return `ObservableResolution` instead. Cyvest stores its
+`metadata` in `user.extra["resolver_data"][resolver.name]` and recursively merges dictionary values across repeated
+creations and investigation merges.
 
 ### Findings
 

@@ -43,6 +43,16 @@ if TYPE_CHECKING:
 logger = get_logger(__name__)
 
 
+def _deep_merge_dict(base: dict[str, Any], update: dict[str, Any]) -> dict[str, Any]:
+    """Recursively merge update into base, copying replaced values."""
+    for key, value in update.items():
+        if key in base and isinstance(base[key], dict) and isinstance(value, dict):
+            _deep_merge_dict(base[key], value)
+        else:
+            base[key] = deepcopy(value)
+    return base
+
+
 class Investigation:
     """
     Core investigation state and operations.
@@ -422,11 +432,11 @@ class Investigation:
         if incoming.level > existing.level:
             self.apply_level_change(existing, incoming.level, reason=f"Merged from {incoming.key}")
 
-        # Update extra (merge dictionaries)
+        # Update extra (merge dictionaries recursively)
         if existing.extra:
-            existing.extra.update(incoming.extra)
+            _deep_merge_dict(existing.extra, incoming.extra)
         elif incoming.extra:
-            existing.extra = dict(incoming.extra)
+            existing.extra = deepcopy(incoming.extra)
 
         # Overwrite comment if incoming is non-empty
         if incoming.comment:
@@ -611,18 +621,9 @@ class Investigation:
             The merged enrichment (existing is modified in place)
         """
 
-        def deep_merge(base: dict, update: dict) -> dict:
-            """Recursively merge dictionaries."""
-            for key, value in update.items():
-                if key in base and isinstance(base[key], dict) and isinstance(value, dict):
-                    deep_merge(base[key], value)
-                else:
-                    base[key] = value
-            return base
-
         # Deep merge data structures
         if isinstance(existing.data, dict) and isinstance(incoming.data, dict):
-            deep_merge(existing.data, incoming.data)
+            _deep_merge_dict(existing.data, incoming.data)
         else:
             existing.data = deepcopy(incoming.data)
 
@@ -1340,6 +1341,10 @@ class Investigation:
             if field in dict_fields:
                 if not isinstance(value, dict):
                     raise TypeError(f"Field '{field}' on {model_type} expects a dict value.")
+                if model_type == "observable" and field == "extra":
+                    resolver_data = value.get("resolver_data")
+                    if resolver_data is not None and not isinstance(resolver_data, dict):
+                        raise ValueError("Observable extra field 'resolver_data' must be a dictionary.")
                 merge = dict_merge.get(field, True) if dict_merge else True
                 if merge:
                     current_value = getattr(target, field, None)

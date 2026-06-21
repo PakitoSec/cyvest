@@ -4,11 +4,26 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from typing import Any
+
+from pydantic import BaseModel, ConfigDict, Field
 
 from cyvest.model import ObservableAlias, ObservableIdentity
 from cyvest.model_enums import ObservableSubtype, ObservableType
 
 ObservableSourceType = tuple[ObservableType | str, ObservableSubtype | str | None]
+
+
+class ObservableResolution(BaseModel):
+    """Canonical observable identity and metadata returned by a resolver."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    identity: ObservableIdentity
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+ObservableResolverResult = ObservableIdentity | ObservableResolution | None
 
 
 @dataclass(frozen=True)
@@ -17,8 +32,8 @@ class ObservableResolver:
 
     name: str
     source_types: set[ObservableSourceType]
-    resolve: Callable[[ObservableAlias], ObservableIdentity | None] | None = None
-    aresolve: Callable[[ObservableAlias], Awaitable[ObservableIdentity | None]] | None = None
+    resolve: Callable[[ObservableAlias], ObservableResolverResult] | None = None
+    aresolve: Callable[[ObservableAlias], Awaitable[ObservableResolverResult]] | None = None
 
     def __post_init__(self) -> None:
         name = self.name.strip()

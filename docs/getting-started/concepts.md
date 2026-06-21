@@ -95,7 +95,13 @@ Register an instance-local resolver when you want `observable_create()` to resol
 the observable:
 
 ```python
-from cyvest import Cyvest, ObservableAlias, ObservableIdentity, ObservableResolver
+from cyvest import (
+    Cyvest,
+    ObservableAlias,
+    ObservableIdentity,
+    ObservableResolution,
+    ObservableResolver,
+)
 
 cv = Cyvest()
 
@@ -166,6 +172,31 @@ cv.observable_resolver_clear()
 
 For async lookups, register `aresolve=` and use `await cv.observable_acreate(...)`. If a matching async resolver is
 registered, synchronous `observable_create()` raises a clear error instead of blocking the event loop.
+
+When the lookup also returns useful attributes, return an `ObservableResolution`:
+
+```python
+def resolve_user_to_okta(alias: ObservableAlias) -> ObservableResolution | None:
+    user = lookup_okta_user(alias)
+    if user is None:
+        return None
+
+    return ObservableResolution(
+        identity=ObservableIdentity(
+            obs_type=cv.OBS.USER,
+            subtype=cv.SUB.USER_UID,
+            namespace="okta",
+            value=user["id"],
+        ),
+        metadata=user,
+    )
+```
+
+Cyvest stores this metadata on the canonical observable under
+`observable.extra["resolver_data"][resolver.name]`. Dictionaries are merged recursively across repeated observable
+creations and investigation merges; incoming scalar and list values replace previous values. Resolver metadata
+coexists with `extra=` passed to `observable_create()`. The reserved `extra["resolver_data"]` value must be a
+dictionary.
 
 ### Findings
 

@@ -31,7 +31,7 @@ from cyvest.model_enums import ObservableSubtype, ObservableType, RelationshipDi
 from cyvest.proxies import EnrichmentProxy, EvidenceProxy, FindingProxy, ObservableProxy, TagProxy, ThreatIntelProxy
 from cyvest.resolvers import ObservableResolution, ObservableResolver
 
-__version__ = "6.1.1"
+__version__ = "6.1.2"
 
 __all__ = [
     # Core class

@@ -153,7 +153,7 @@ export interface Observable {
   extra: Extra;
   score: number;
   level: Level;
-  aliases: Aliases;
+  aliases?: Aliases;
   occurrence_count?: number;
   threat_intels: ThreatIntels;
   relationships: Relationships;

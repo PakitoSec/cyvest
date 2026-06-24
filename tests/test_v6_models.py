@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 import pytest
 
 from cyvest import Cyvest, ObservableSubtype, ObservableType
+from cyvest.io_schema import get_investigation_schema
 from cyvest.io_serialization import load_investigation_dict, migrate_v5_to_v6
 from cyvest.model import Evidence, Observable
 
@@ -67,6 +68,13 @@ def test_command_line_keys_are_sha256_based() -> None:
 
     assert command.key.startswith("obs:command_line:sha256:")
     assert len(command.key.rsplit(":", 1)[-1]) == 64
+
+
+def test_observable_aliases_are_optional_in_generated_schema() -> None:
+    schema = get_investigation_schema()
+    observable_schema = schema["$defs"]["Observable"]
+
+    assert "aliases" not in observable_schema["required"]
 
 
 def test_evidence_many_to_many_links_survive_roundtrip() -> None:
@@ -201,4 +209,24 @@ def test_migrate_v5_to_v6_rewrites_findings_and_preserves_email() -> None:
     assert migrated["findings"]["fnd:sender"]["evidence_links"] == []
     assert migrated["tags"]["tag:email"]["findings"] == ["fnd:sender"]
     assert migrated["observables"]["obs:email:user@example.com"]["type"] == "email"
+    assert migrated["observables"]["obs:email:user@example.com"]["aliases"] == []
     assert migrated["evidences"] == {}
+
+
+def test_migrate_v6_backfills_missing_observable_aliases() -> None:
+    v6 = {
+        "schema_version": "6.0.0",
+        "investigation_id": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+        "observables": {
+            "obs:email:user@example.com": {
+                "type": "email",
+                "value": "user@example.com",
+                "key": "obs:email:user@example.com",
+            }
+        },
+    }
+
+    migrated = migrate_v5_to_v6(v6)
+
+    assert migrated["observables"]["obs:email:user@example.com"]["aliases"] == []
+    assert "aliases" not in v6["observables"]["obs:email:user@example.com"]

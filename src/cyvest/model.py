@@ -354,7 +354,7 @@ class Observable(AliasDumpModel):
     extra: dict[str, Any] = Field(...)
     score: Decimal = Field(...)
     level: Level = Field(...)
-    aliases: list[ObservableAlias] = Field(...)
+    aliases: list[ObservableAlias] = Field(default_factory=list)
     occurrence_count: int = Field(default=1, ge=1)
     threat_intels: list[ThreatIntel] = Field(...)
     relationships: list[Relationship] = Field(...)
@@ -504,8 +504,9 @@ class Observable(AliasDumpModel):
 
     @model_validator(mode="after")
     def dedupe_aliases(self) -> Self:
-        alias_key_type = tuple[ObservableType | str, ObservableSubtype | str | None, str | None, str]
-        aliases_by_key: dict[alias_key_type, ObservableAlias] = {}
+        aliases_by_key: dict[
+            tuple[ObservableType | str, ObservableSubtype | str | None, str | None, str], ObservableAlias
+        ] = {}
         for alias in self.aliases:
             alias_key = alias.identity_tuple
             existing = aliases_by_key.get(alias_key)

@@ -493,10 +493,19 @@ def load_investigation_dict(data: dict[str, Any]) -> Cyvest:
     return cv
 
 
+def _backfill_v6_observable_defaults(data: dict[str, Any]) -> dict[str, Any]:
+    """Backfill defaults added after the initial v6 schema release."""
+    for raw_observable in data.get("observables", {}).values():
+        if isinstance(raw_observable, dict):
+            raw_observable.setdefault("aliases", [])
+
+    return data
+
+
 def migrate_v5_to_v6(data: dict[str, Any]) -> dict[str, Any]:
     """Migrate a serialized Cyvest 5.x investigation to the strict 6.0.0 format."""
     if data.get("schema_version") == "6.0.0":
-        return deepcopy(data)
+        return _backfill_v6_observable_defaults(deepcopy(data))
 
     migrated = deepcopy(data)
     migrated["schema_version"] = "6.0.0"
@@ -507,6 +516,7 @@ def migrate_v5_to_v6(data: dict[str, Any]) -> dict[str, Any]:
         observable = dict(raw_observable)
         observable.setdefault("subtype", None)
         observable.setdefault("namespace", None)
+        observable.setdefault("aliases", [])
         new_key = keys.generate_observable_key(
             str(observable.get("type", "unknown")),
             str(observable.get("value", "")),

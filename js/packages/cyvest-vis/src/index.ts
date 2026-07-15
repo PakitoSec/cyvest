@@ -16,6 +16,19 @@ export {
 } from "./utils/colors";
 
 export {
+  BUILT_IN_RELATIONSHIP_TYPES,
+  getRelationshipFamily,
+  resolveRelationshipProfile,
+} from "./core/relationships";
+
+export {
+  EMPTY_GRAPH_FILTERS,
+  filterInvestigation,
+  matchesGraphQuery,
+  normalizeGraphFilters,
+} from "./core/filters";
+
+export {
   computeForcePositions,
   createForceLayout,
   getDefaultForceOptions,
@@ -28,6 +41,11 @@ export {
   DARK_CYVEST_THEME,
   type CyvestThemeTokens,
   type CyvestForceOptions,
+  type CyvestRelationshipFamily,
+  type CyvestRelationshipProfile,
+  type CyvestRelationshipProfileOverrides,
+  type CyvestGraphFilterState,
+  type CyvestGraphControls,
   type CyNodeSelectEvent,
   type CyEdgeSelectEvent,
   type CyvestBaseViewProps,

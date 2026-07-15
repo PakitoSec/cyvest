@@ -741,7 +741,7 @@ Relationships let you link observables together. Use the Cyvest facade or proxy 
 cv.observable_add_relationship(
     source=url,  # Observable proxy
     target=ip,   # Observable proxy
-    relationship_type=cv.REL.RELATED_TO,
+    relationship_type=cv.REL.RESOLVES_TO,
 )
 
 # Override direction to control score hierarchy
@@ -760,7 +760,12 @@ cv.observable_add_relationship(
 )
 ```
 
-`RELATED_TO` defaults to `BIDIRECTIONAL`. Choose `OUTBOUND` or `INBOUND` when you need explicit parent/child scoring.
+Use the narrowest semantic type available: `CONTAINS` and `DERIVED_FROM` for
+structure and lineage, `RESOLVES_TO` and `HOSTS` for infrastructure,
+`COMMUNICATES_WITH` and `EXECUTES` for behavior, and `RELATED_TO` for
+weak correlations. `RELATED_TO` and `COMMUNICATES_WITH` default to
+`BIDIRECTIONAL`; the other built-ins default to `OUTBOUND`. An explicit
+direction always wins and remains the source of score propagation semantics.
 
 ## Key Generation
 

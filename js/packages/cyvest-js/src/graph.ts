@@ -166,7 +166,7 @@ export function getObservableParents(
  *
  * @param inv - The investigation to search
  * @param observableKey - Key of the source observable
- * @param relationshipType - Type of relationship to filter (e.g., "related-to", "uses")
+ * @param relationshipType - Type of relationship to filter (e.g., "related-to", "contains")
  * @returns Array of related observables
  */
 export function getRelatedObservablesByType(
@@ -300,10 +300,14 @@ export function getObservableGraph(inv: CyvestInvestigation): InvestigationGraph
     // Build edges from relationships
     for (const rel of obs.relationships) {
       // Create a unique edge key to avoid duplicates
-      const edgeKey =
+      const endpoints =
         rel.direction === "bidirectional"
           ? [key, rel.target_key].sort().join("--")
           : `${key}--${rel.target_key}`;
+      // Multiple semantic relationships may legitimately connect the same
+      // observables. Only collapse an exact duplicate (including its type and
+      // direction), while still folding reverse copies of bidirectional links.
+      const edgeKey = `${endpoints}--${rel.relationship_type}--${rel.direction}`;
 
       if (!seenEdges.has(edgeKey)) {
         seenEdges.add(edgeKey);

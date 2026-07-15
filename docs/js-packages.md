@@ -19,7 +19,7 @@ Interactive visualization of Cyvest observable relationships.
 
 ### Features
 
-- **Observable Graph**: force-directed observable and relationship view centered on the root
+- **Observable Explorer**: community-aware force graph centered on the root, with typed edges, search, filters, legend, and node/edge inspection
 - **Restrained visual language**: neutral surfaces, compact SVG nodes, thin edges, and level color used only as a contour
 - **Interactive focus**: pan/zoom, fit, deterministic layout replay, selection, and neighborhood focus on hover
 

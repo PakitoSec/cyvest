@@ -3,33 +3,16 @@ import { getStartedAt } from "@cyvest/cyvest-js";
 import {
   CyvestGraph,
   DARK_CYVEST_THEME,
-  type CyNodeSelectEvent,
 } from "@cyvest/cyvest-vis";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 
 import { loadInvestigation, INVESTIGATIONS, type InvestigationKey } from "./api";
-
-function formatNodeValue(value: unknown): string | null {
-  if (value === undefined || value === null || value === "") {
-    return null;
-  }
-  if (typeof value === "number") {
-    return Number.isInteger(value) ? String(value) : value.toFixed(2);
-  }
-  if (typeof value === "boolean") {
-    return value ? "Yes" : "No";
-  }
-  return String(value);
-}
 
 export const App: React.FC = () => {
   const [investigation, setInvestigation] =
     useState<CyvestInvestigation | null>(null);
   const [selectedKey, setSelectedKey] =
     useState<InvestigationKey>("cyvest_visual");
-  const [selectedNode, setSelectedNode] = useState<CyNodeSelectEvent | null>(
-    null
-  );
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [darkMode, setDarkMode] = useState(false);
@@ -37,7 +20,6 @@ export const App: React.FC = () => {
   useEffect(() => {
     setLoading(true);
     setError(null);
-    setSelectedNode(null);
     loadInvestigation(selectedKey)
       .then(setInvestigation)
       .catch((err) => {
@@ -46,20 +28,6 @@ export const App: React.FC = () => {
       })
       .finally(() => setLoading(false));
   }, [selectedKey]);
-
-  const selectedDetails = useMemo(() => {
-    if (!selectedNode) return [];
-    return [
-      ["Type", selectedNode.nodeType],
-      ["Level", selectedNode.data.level],
-      ["Score", selectedNode.data.score],
-      ["Observable type", selectedNode.data.observableType],
-      ["Internal", selectedNode.data.internal],
-      ["Whitelisted", selectedNode.data.whitelisted],
-    ]
-      .map(([label, value]) => [label, formatNodeValue(value)] as const)
-      .filter((entry): entry is readonly [string, string] => entry[1] !== null);
-  }, [selectedNode]);
 
   return (
     <main className="app-shell" data-theme={darkMode ? "dark" : "light"}>
@@ -141,44 +109,10 @@ export const App: React.FC = () => {
                 investigation={investigation}
                 height="100%"
                 theme={darkMode ? DARK_CYVEST_THEME : undefined}
-                onNodeSelect={setSelectedNode}
-                showToolbar
-                layout={{
-                  linkDistance: 116,
-                  radialStep: 126,
-                }}
+                controls="full"
+                showInspector
               />
             </div>
-
-            <aside className="app-inspector" aria-live="polite">
-              <div className="app-inspector__heading">
-                <span>Selection</span>
-                {selectedNode ? (
-                  <button type="button" onClick={() => setSelectedNode(null)}>
-                    Clear
-                  </button>
-                ) : null}
-              </div>
-              {selectedNode ? (
-                <>
-                  <h3>{selectedNode.label}</h3>
-                  <p className="app-inspector__id">{selectedNode.nodeId}</p>
-                  <dl>
-                    {selectedDetails.map(([label, value]) => (
-                      <div key={label}>
-                        <dt>{label}</dt>
-                        <dd>{value}</dd>
-                      </div>
-                    ))}
-                  </dl>
-                </>
-              ) : (
-                <p className="app-inspector__empty">
-                  Select a node to inspect its identity, score, and graph role.
-                  Hover a node to isolate its immediate neighborhood.
-                </p>
-              )}
-            </aside>
           </section>
         </>
       ) : null}

@@ -2,7 +2,7 @@
 
 from decimal import Decimal
 
-from cyvest.model import Observable, ObservableType, Relationship, RelationshipType
+from cyvest.model import Observable, ObservableType, Relationship, RelationshipDirection, RelationshipType
 
 
 def test_observable_type_enum_values() -> None:
@@ -21,6 +21,20 @@ def test_observable_type_enum_values() -> None:
 def test_relationship_type_enum_values() -> None:
     """Test that RelationshipType enum has expected values."""
     assert RelationshipType.RELATED_TO.value == "related-to"
+    assert RelationshipType.CONTAINS.value == "contains"
+    assert RelationshipType.DERIVED_FROM.value == "derived-from"
+    assert RelationshipType.RESOLVES_TO.value == "resolves-to"
+    assert RelationshipType.HOSTS.value == "hosts"
+    assert RelationshipType.COMMUNICATES_WITH.value == "communicates-with"
+    assert RelationshipType.EXECUTES.value == "executes"
+
+
+def test_relationship_type_semantic_directions() -> None:
+    """Built-in relationship types expose useful semantic defaults."""
+    assert RelationshipType.RELATED_TO.get_default_direction() == RelationshipDirection.BIDIRECTIONAL
+    assert RelationshipType.COMMUNICATES_WITH.get_default_direction() == RelationshipDirection.BIDIRECTIONAL
+    assert RelationshipType.CONTAINS.get_default_direction() == RelationshipDirection.OUTBOUND
+    assert RelationshipType.RESOLVES_TO.get_default_direction() == RelationshipDirection.OUTBOUND
 
 
 def test_observable_with_enum_type() -> None:

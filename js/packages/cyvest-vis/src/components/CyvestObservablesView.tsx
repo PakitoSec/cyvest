@@ -19,14 +19,16 @@ export const CyvestObservablesView: React.FC<CyvestObservablesViewProps> = ({
   showToolbar = true,
   layout,
   maxLabelLength = 28,
+  relationshipProfiles,
 }) => {
   const elements = useMemo(
     () =>
       buildObservablesElements(investigation, {
         maxLabelLength,
         theme,
+        relationshipProfiles,
       }),
-    [investigation, maxLabelLength, theme]
+    [investigation, maxLabelLength, relationshipProfiles, theme]
   );
 
   const stylesheet = useMemo(

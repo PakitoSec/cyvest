@@ -1,61 +1,122 @@
-.cyvest-canvas {
+.cyvest-canvas,
+.cyvest-explorer {
   position: relative;
   overflow: hidden;
+  color: var(--cyvest-panel-text);
   border: 1px solid var(--cyvest-panel-border);
-  border-radius: 12px;
+  border-radius: 14px;
   background: var(--cyvest-background);
   font-family: var(--cyvest-font-family);
+}
+
+.cyvest-canvas::before,
+.cyvest-explorer__main::before {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  content: "";
+  pointer-events: none;
+  background-image:
+    linear-gradient(var(--cyvest-grid-color) 1px, transparent 1px),
+    linear-gradient(90deg, var(--cyvest-grid-color) 1px, transparent 1px);
+  background-size: 36px 36px;
+  opacity: 0.32;
+  mask-image: radial-gradient(circle at center, black 18%, transparent 78%);
+  -webkit-mask-image: radial-gradient(circle at center, black 18%, transparent 78%);
 }
 
 .cyvest-canvas__surface {
   position: absolute;
   inset: 0;
+  z-index: 1;
 }
 
-.cyvest-toolbar {
+.cyvest-explorer {
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: minmax(360px, 1fr) auto;
+  min-width: 0;
+  min-height: 360px;
+}
+
+.cyvest-explorer__main {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.cyvest-explorer__main > .cyvest-canvas {
+  width: 100% !important;
+  height: 100% !important;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.cyvest-toolbar,
+.cyvest-commandbar,
+.cyvest-filter-panel {
   position: absolute;
   z-index: 12;
-  display: flex;
-  align-items: center;
   border: 1px solid var(--cyvest-panel-border);
   background: var(--cyvest-panel-bg);
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
-  backdrop-filter: blur(8px);
+  box-shadow: 0 8px 28px rgba(19, 32, 51, 0.08);
+  backdrop-filter: blur(14px);
 }
 
 .cyvest-toolbar {
-  top: 12px;
-  right: 12px;
+  top: 14px;
+  right: 14px;
+  display: flex;
+  align-items: center;
   gap: 2px;
   padding: 3px;
   border-radius: 9px;
 }
 
+.cyvest-explorer .cyvest-toolbar {
+  top: 14px;
+}
+
+.cyvest-toolbar__button,
+.cyvest-commandbar button,
+.cyvest-inspector button {
+  color: var(--cyvest-panel-muted);
+  background: transparent;
+  cursor: pointer;
+}
+
 .cyvest-toolbar__button {
-  width: 30px;
-  height: 30px;
+  width: 31px;
+  height: 31px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border: 0;
   border-radius: 6px;
-  color: var(--cyvest-panel-muted);
-  background: transparent;
-  cursor: pointer;
   transition: background-color 120ms ease, color 120ms ease;
 }
 
-.cyvest-toolbar__button:hover {
+.cyvest-toolbar__button:hover,
+.cyvest-commandbar button:hover,
+.cyvest-inspector button:hover {
   color: var(--cyvest-panel-text);
-  background: rgba(15, 23, 42, 0.055);
+  background: var(--cyvest-selection-surface);
 }
 
-.cyvest-toolbar__button:focus-visible {
+.cyvest-toolbar__button:focus-visible,
+.cyvest-commandbar button:focus-visible,
+.cyvest-search input:focus-visible,
+.cyvest-chipset button:focus-visible,
+.cyvest-inspector button:focus-visible {
   outline: 2px solid var(--cyvest-accent);
-  outline-offset: 1px;
+  outline-offset: 2px;
 }
 
-.cyvest-toolbar__button svg {
+.cyvest-toolbar__button svg,
+.cyvest-commandbar svg,
+.cyvest-inspector svg {
   width: 15px;
   height: 15px;
   stroke: currentColor;
@@ -64,12 +125,324 @@
   stroke-linejoin: round;
 }
 
-@media (max-width: 640px) {
-  .cyvest-toolbar {
-    top: 8px;
-  }
+.cyvest-commandbar {
+  top: 14px;
+  left: 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px;
+  border-radius: 11px;
+}
 
-  .cyvest-toolbar {
-    right: 8px;
+.cyvest-search {
+  width: clamp(180px, 24vw, 290px);
+  height: 34px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px 0 9px;
+  color: var(--cyvest-panel-muted);
+}
+
+.cyvest-search input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  color: var(--cyvest-panel-text);
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+}
+
+.cyvest-search input::placeholder {
+  color: var(--cyvest-panel-muted);
+}
+
+.cyvest-search button,
+.cyvest-commandbar__icon {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+}
+
+.cyvest-commandbar__button {
+  position: relative;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 11px;
+  border: 0;
+  border-left: 1px solid var(--cyvest-panel-border);
+  border-radius: 7px;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.cyvest-commandbar__button.is-active {
+  color: var(--cyvest-panel-text);
+  background: var(--cyvest-selection-surface);
+}
+
+.cyvest-commandbar__badge {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--cyvest-accent);
+}
+
+.cyvest-filter-panel {
+  top: 66px;
+  left: 14px;
+  width: min(540px, calc(100% - 28px));
+  max-height: calc(100% - 118px);
+  overflow: auto;
+  padding: 15px;
+  border-radius: 12px;
+}
+
+.cyvest-filter-panel__group + .cyvest-filter-panel__group {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--cyvest-panel-border);
+}
+
+.cyvest-filter-panel__group > span,
+.cyvest-inspector__eyebrow {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--cyvest-panel-muted);
+  font-size: 9px;
+  font-weight: 750;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+.cyvest-chipset {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.cyvest-chipset button {
+  padding: 5px 9px;
+  border: 1px solid var(--cyvest-panel-border);
+  border-radius: 999px;
+  color: var(--cyvest-panel-muted);
+  background: transparent;
+  font: inherit;
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.cyvest-chipset button:hover,
+.cyvest-chipset button.is-active {
+  color: var(--cyvest-panel-text);
+  border-color: color-mix(in srgb, var(--cyvest-accent) 48%, var(--cyvest-panel-border));
+  background: var(--cyvest-selection-surface);
+}
+
+.cyvest-chipset--relationships i {
+  width: 19px;
+  display: block;
+  border-top-width: 1.5px;
+  border-top-style: solid;
+}
+
+.cyvest-chipset--relationships i[data-line-style="dashed"] { border-top-style: dashed; }
+.cyvest-chipset--relationships i[data-line-style="dotted"] { border-top-style: dotted; }
+
+.cyvest-graph-status {
+  position: absolute;
+  z-index: 11;
+  right: 15px;
+  bottom: 10px;
+  display: flex;
+  gap: 12px;
+  color: var(--cyvest-panel-muted);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  pointer-events: none;
+}
+
+.cyvest-inspector {
+  position: relative;
+  z-index: 15;
+  min-width: 0;
+  max-height: 220px;
+  overflow: auto;
+  border-top: 1px solid var(--cyvest-panel-border);
+  background: var(--cyvest-panel-bg);
+}
+
+.cyvest-inspector__header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 15px;
+  border-bottom: 1px solid var(--cyvest-panel-border);
+  background: var(--cyvest-panel-bg);
+  backdrop-filter: blur(14px);
+}
+
+.cyvest-inspector__eyebrow { margin-bottom: 5px; }
+
+.cyvest-inspector__header strong {
+  display: block;
+  color: var(--cyvest-panel-text);
+  font-size: 12px;
+  font-weight: 680;
+}
+
+.cyvest-inspector__header button {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+}
+
+.cyvest-inspector__content { padding: 14px 15px; }
+
+.cyvest-inspector h3 {
+  margin: 0 0 6px;
+  color: var(--cyvest-panel-text);
+  font-size: 15px;
+  font-weight: 680;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.cyvest-inspector__id {
+  margin: 0 0 20px;
+  color: var(--cyvest-panel-muted);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 9px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.cyvest-inspector dl { margin: 0; }
+
+.cyvest-inspector dl div {
+  display: grid;
+  grid-template-columns: 90px minmax(0, 1fr);
+  gap: 10px;
+  padding: 10px 0;
+  border-top: 1px solid var(--cyvest-panel-border);
+}
+
+.cyvest-inspector dt {
+  color: var(--cyvest-panel-muted);
+  font-size: 9px;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.cyvest-inspector dd {
+  margin: 0;
+  color: var(--cyvest-panel-text);
+  font-size: 11px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.cyvest-inspector__empty {
+  margin: 0;
+  padding: 20px 18px;
+  color: var(--cyvest-panel-muted);
+  font-size: 11px;
+  line-height: 1.65;
+}
+
+.cyvest-inspector__neighbors {
+  margin-top: 22px;
+}
+
+.cyvest-inspector__neighbors > span {
+  color: var(--cyvest-panel-muted);
+  font-size: 9px;
+  font-weight: 720;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.cyvest-inspector__neighbors ul {
+  margin: 9px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cyvest-inspector__neighbors li {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  gap: 7px;
+  align-items: center;
+  padding: 8px 0;
+  border-top: 1px solid var(--cyvest-panel-border);
+}
+
+.cyvest-inspector__neighbors i {
+  color: var(--cyvest-accent);
+  font-style: normal;
+  font-size: 12px;
+  text-align: center;
+}
+
+.cyvest-inspector__neighbors strong,
+.cyvest-inspector__neighbors small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cyvest-inspector__neighbors strong {
+  color: var(--cyvest-panel-text);
+  font-size: 10.5px;
+  font-weight: 620;
+}
+
+.cyvest-inspector__neighbors small {
+  margin-top: 2px;
+  color: var(--cyvest-panel-muted);
+  font-size: 9px;
+}
+
+@media (max-width: 640px) {
+  .cyvest-commandbar { top: 8px; left: 8px; right: 8px; }
+  .cyvest-search { width: 100%; }
+  .cyvest-commandbar__button { font-size: 0; }
+  .cyvest-commandbar__button svg { margin: 0; }
+  .cyvest-filter-panel { top: 58px; left: 8px; width: calc(100% - 16px); }
+  .cyvest-toolbar { top: 58px; right: 8px; }
+  .cyvest-explorer .cyvest-toolbar { top: 58px; }
+  .cyvest-graph-status { right: 9px; bottom: 7px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cyvest-canvas *,
+  .cyvest-explorer * {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
   }
 }

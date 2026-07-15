@@ -36,7 +36,10 @@ logger = logging.getLogger(__name__)
 @click.option("-o", "--output", type=click.Path(dir_okay=False, path_type=Path), default=None)
 def main(no_audit_log: bool = False, output: Path | None = None) -> None:
     # Create a comprehensive investigation with various observables
-    cv = Cyvest(investigation_id="cyvest-visual-example", investigation_name="Visualization Example")
+    cv = Cyvest(
+        investigation_id="cyvest-visual-example",
+        investigation_name="Visualization Example",
+    )
     # Malicious infrastructure
     malicious_domain = (
         cv.observable(cv.OBS.DOMAIN, "evil-phishing.com")
@@ -47,17 +50,16 @@ def main(no_audit_log: bool = False, output: Path | None = None) -> None:
     malicious_ip = (
         cv.observable(cv.OBS.IPV4, "185.220.101.50")
         .with_ti("AbuseIPDB", score=9.5, comment="C2 server")
-        .relate_to(malicious_domain, cv.REL.RELATED_TO, cv.DIR.OUTBOUND)
+        .relate_to(malicious_domain, cv.REL.HOSTS)
     )
 
     # Suspicious infrastructure
-    _ = (
+    suspicious_domain = (
         cv.observable(cv.OBS.DOMAIN, "sketchy-site.net")
         .with_ti("VirusTotal", score=4.5, comment="Some detections")
         .relate_to(
             cv.observable(cv.OBS.IPV4, "192.168.100.5").with_ti("Shodan", score=3.0),
-            cv.REL.RELATED_TO,
-            cv.DIR.OUTBOUND,
+            cv.REL.RESOLVES_TO,
         )
     )
 
@@ -75,8 +77,8 @@ def main(no_audit_log: bool = False, output: Path | None = None) -> None:
     # Email artifact with multiple relationships
     email_message = (
         cv.observable(cv.OBS.ARTIFACT, "Phishing Email - Invoice #12345")
-        .relate_to(attacker_email, cv.REL.RELATED_TO, cv.DIR.OUTBOUND)
-        .relate_to(victim_email, cv.REL.RELATED_TO, cv.DIR.OUTBOUND)
+        .relate_to(attacker_email, cv.REL.CONTAINS)
+        .relate_to(victim_email, cv.REL.CONTAINS)
         .with_ti("Email Gateway", score=7.0, comment="Flagged as suspicious")
     )
 
@@ -84,35 +86,39 @@ def main(no_audit_log: bool = False, output: Path | None = None) -> None:
     phishing_url1 = (
         cv.observable(cv.OBS.URL, "https://evil-phishing.com/login")
         .with_ti("URLhaus", score=9.0)
-        .relate_to(malicious_domain, cv.REL.RELATED_TO, cv.DIR.OUTBOUND)
+        .relate_to(malicious_domain, cv.REL.RELATED_TO)
     )
 
     phishing_url2 = (
         cv.observable(cv.OBS.URL, "https://evil-phishing.com/verify")
         .with_ti("URLhaus", score=8.5)
-        .relate_to(malicious_domain, cv.REL.RELATED_TO, cv.DIR.OUTBOUND)
+        .relate_to(malicious_domain, cv.REL.RELATED_TO)
     )
 
     # Email contains URLs
-    email_message.relate_to(phishing_url1, cv.REL.RELATED_TO, cv.DIR.OUTBOUND)
-    email_message.relate_to(phishing_url2, cv.REL.RELATED_TO, cv.DIR.OUTBOUND)
+    email_message.relate_to(phishing_url1, cv.REL.CONTAINS)
+    email_message.relate_to(phishing_url2, cv.REL.CONTAINS)
+
+    suspicious_url = (
+        cv.observable(cv.OBS.URL, "https://sketchy-site.net/invoice")
+        .with_ti("URLhaus", score=4.5, comment="Low-confidence redirect")
+        .relate_to(suspicious_domain, cv.REL.RELATED_TO)
+    )
+    trusted_url = cv.observable(
+        cv.OBS.URL,
+        "https://accounts.google.com/security",
+        whitelisted=True,
+    ).with_ti("Internal Whitelist", score=-2.0, comment="Known safe link")
+
+    email_message.relate_to(suspicious_url, cv.REL.CONTAINS)
+    email_message.relate_to(trusted_url, cv.REL.CONTAINS)
 
     # Malware file dropped
     malware_file = (
         cv.observable(cv.OBS.FILE, "invoice.exe")
         .with_ti("VirusTotal", score=10.0, comment="Detected by 45/70 engines")
-        .relate_to(phishing_url1, cv.REL.RELATED_TO, cv.DIR.INBOUND)
-        .relate_to(malicious_ip, cv.REL.RELATED_TO, cv.DIR.BIDIRECTIONAL)
-    )
-
-    # Safe/whitelisted observables for contrast
-    _ = cv.observable(cv.OBS.DOMAIN, "google.com", whitelisted=True).with_ti(
-        "Internal Whitelist", score=-2.0, comment="Known good domain"
-    )
-
-    # Notable but not malicious
-    _ = cv.observable(cv.OBS.DOMAIN, "new-service.cloud").with_ti(
-        "Passive DNS", score=2.0, comment="Recently registered domain"
+        .relate_to(phishing_url1, cv.REL.DERIVED_FROM)
+        .relate_to(malicious_ip, cv.REL.COMMUNICATES_WITH)
     )
 
     # Create findings linking observables
@@ -129,6 +135,7 @@ def main(no_audit_log: bool = False, output: Path | None = None) -> None:
         cv.finding("url_analysis", "Malicious URLs found in email")
         .link_observable(phishing_url1)
         .link_observable(phishing_url2)
+        .link_observable(suspicious_url)
         .with_score(9.0)
         .tagged("phishing:investigation:network")
     )

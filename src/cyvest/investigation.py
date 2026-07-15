@@ -1061,6 +1061,101 @@ class Investigation:
 
         return source_obs
 
+    def remove_relationship(
+        self,
+        source: Observable | str,
+        target: Observable | str,
+        relationship_type: RelationshipType | str,
+        direction: RelationshipDirection | str | None = None,
+    ) -> bool:
+        """Remove one exact relationship and recalculate observable scores."""
+
+        source_key = source.key if isinstance(source, Observable) else source
+        target_key = target.key if isinstance(target, Observable) else target
+        source_obs = self._observables.get(source_key)
+        if source_obs is None:
+            raise KeyError(f"observable '{source_key}' not found in investigation.")
+        if target_key not in self._observables:
+            raise KeyError(f"observable '{target_key}' not found in investigation.")
+        expected = Relationship(
+            target_key=target_key,
+            relationship_type=relationship_type,
+            direction=direction,
+        )
+        for index, relationship in enumerate(source_obs.relationships):
+            if relationship == expected:
+                source_obs.relationships.pop(index)
+                self._score_engine.recalculate_all()
+                self._record_event(
+                    event_type="RELATIONSHIP_REMOVED",
+                    object_type="observable",
+                    object_key=source_key,
+                    details=expected.model_dump(mode="json"),
+                )
+                return True
+        return False
+
+    def apply_relationship_proposals(
+        self,
+        proposals: tuple[Any, ...],
+        *,
+        actor: str | None,
+        tool: str | None,
+        model: str | None,
+        plan_digest: str,
+    ) -> tuple[int, AuditEvent | None]:
+        """Apply relationship proposals atomically with one score recalculation."""
+
+        snapshots = {
+            key: deepcopy(observable.relationships)
+            for key, observable in self._observables.items()
+        }
+        applied_count = 0
+        try:
+            for proposal in proposals:
+                source = self._observables[proposal.source_key]
+                expected = Relationship(
+                    target_key=proposal.target_key,
+                    relationship_type=proposal.relationship_type,
+                    direction=proposal.direction,
+                )
+                if proposal.operation == "add":
+                    before = len(source.relationships)
+                    self._create_relationship(
+                        source,
+                        proposal.target_key,
+                        proposal.relationship_type,
+                        proposal.direction,
+                    )
+                    applied_count += len(source.relationships) - before
+                else:
+                    for index, relationship in enumerate(source.relationships):
+                        if relationship == expected:
+                            source.relationships.pop(index)
+                            applied_count += 1
+                            break
+            self._score_engine.recalculate_all()
+        except Exception:
+            for key, relationships in snapshots.items():
+                self._observables[key].relationships = relationships
+            self._score_engine.recalculate_all()
+            raise
+
+        event = self._record_event(
+            event_type="RELATIONSHIP_PLAN_APPLIED",
+            object_type="investigation",
+            object_key=self.investigation_id,
+            actor=actor,
+            tool=tool,
+            details={
+                "plan_digest": plan_digest,
+                "model": model,
+                "applied_count": applied_count,
+                "proposals": [proposal.model_dump(mode="json") for proposal in proposals],
+            },
+        )
+        return applied_count, event
+
     def link_finding_observable(
         self,
         finding_key: str,

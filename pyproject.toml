@@ -55,6 +55,8 @@ docs = [
 ]
 
 [project.optional-dependencies]
+bedrock = ["langchain>=1.0", "langchain-aws>=0.2"]
+langchain = ["langchain>=1.0"]
 visualization = ["pyvis>=0.3.2"]
 
 [tool.ruff]

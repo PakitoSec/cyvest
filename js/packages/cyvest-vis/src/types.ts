@@ -11,6 +11,11 @@ export interface CyvestThemeTokens {
   accent: string;
   edgeColor: string;
   edgeSelectedColor: string;
+  edgeStructuralColor: string;
+  edgeInfrastructureColor: string;
+  edgeBehavioralColor: string;
+  edgeAssociationColor: string;
+  selectionSurface: string;
   fontFamily: string;
   /** Default fill for internal observable nodes. */
   nodeSurface: string;
@@ -29,15 +34,20 @@ export interface CyvestThemeTokens {
 }
 
 export const DEFAULT_CYVEST_THEME: CyvestThemeTokens = {
-  background: "#f8fafc",
-  gridColor: "#e2e8f0",
+  background: "#f7f9fc",
+  gridColor: "#e6ebf2",
   panelBackground: "rgba(255, 255, 255, 0.97)",
   panelBorder: "#e2e8f0",
-  panelText: "#0f172a",
-  panelTextMuted: "#64748b",
-  accent: "#334155",
-  edgeColor: "#cbd5e1",
-  edgeSelectedColor: "#475569",
+  panelText: "#132033",
+  panelTextMuted: "#65758b",
+  accent: "#2f557f",
+  edgeColor: "#738298",
+  edgeSelectedColor: "#2f557f",
+  edgeStructuralColor: "#4f6075",
+  edgeInfrastructureColor: "#63748a",
+  edgeBehavioralColor: "#748398",
+  edgeAssociationColor: "#738298",
+  selectionSurface: "rgba(47, 85, 127, 0.08)",
   fontFamily:
     "IBM Plex Sans, Segoe UI, Helvetica Neue, Arial, sans-serif",
   nodeSurface: "#ffffff",
@@ -59,6 +69,11 @@ export const DARK_CYVEST_THEME: CyvestThemeTokens = {
   accent: "#cbd5e1",
   edgeColor: "#475569",
   edgeSelectedColor: "#cbd5e1",
+  edgeStructuralColor: "#c0cad8",
+  edgeInfrastructureColor: "#9aa9bc",
+  edgeBehavioralColor: "#7d8da3",
+  edgeAssociationColor: "#627188",
+  selectionSurface: "rgba(148, 163, 184, 0.10)",
   fontFamily:
     "IBM Plex Sans, Segoe UI, Helvetica Neue, Arial, sans-serif",
   nodeSurface: "#1e293b",
@@ -78,12 +93,52 @@ export interface CyvestForceOptions {
   radialStep?: number;
   radialStrength?: number;
   centerStrength?: number;
+  branchSpacing?: number;
+  branchStrength?: number;
+  layerSpacing?: number;
+  layerStrength?: number;
+  siblingSpacing?: number;
+  rootLinkDistance?: number;
+  rootLinkStrength?: number;
   iterations?: number;
   padding?: number;
   fit?: boolean;
   animate?: boolean;
   animationDuration?: number;
 }
+
+export type CyvestRelationshipFamily =
+  | "structural"
+  | "infrastructure"
+  | "behavioral"
+  | "association";
+
+export interface CyvestRelationshipProfile {
+  label: string;
+  family: CyvestRelationshipFamily;
+  distance: number;
+  strength: number;
+  width: number;
+  lineStyle: "solid" | "dashed" | "dotted";
+  dashPattern: number[];
+  opacity: number;
+  color: string;
+}
+
+export type CyvestRelationshipProfileOverrides = Record<
+  string,
+  Partial<CyvestRelationshipProfile>
+>;
+
+export interface CyvestGraphFilterState {
+  query: string;
+  observableTypes: string[];
+  levels: Level[];
+  relationshipTypes: string[];
+  scope: "all" | "internal" | "external" | "whitelisted";
+}
+
+export type CyvestGraphControls = "full" | "compact" | "none";
 
 export interface CyNodeSelectEvent {
   view: "observables";
@@ -100,6 +155,8 @@ export interface CyEdgeSelectEvent {
   sourceId: string;
   targetId: string;
   relationshipType?: string;
+  relationshipFamily?: CyvestRelationshipFamily;
+  direction?: RelationshipDirection;
   data: Record<string, unknown>;
   element: EdgeSingular;
 }
@@ -110,6 +167,7 @@ export interface CyvestBaseViewProps {
   width?: number | string;
   className?: string;
   theme?: Partial<CyvestThemeTokens>;
+  relationshipProfiles?: CyvestRelationshipProfileOverrides;
   /** Keep the d3-force simulation active and reheat it while nodes are dragged. */
   physics?: boolean;
   onCyReady?: (cy: Core) => void;
@@ -124,6 +182,10 @@ export interface CyvestObservablesViewProps extends CyvestBaseViewProps {
 }
 
 export interface CyvestGraphProps extends CyvestBaseViewProps {
+  controls?: CyvestGraphControls;
+  showInspector?: boolean;
+  filterState?: Partial<CyvestGraphFilterState>;
+  onFilterStateChange?: (state: CyvestGraphFilterState) => void;
   showToolbar?: boolean;
   layout?: CyvestForceOptions;
   maxLabelLength?: number;
@@ -133,6 +195,7 @@ export interface ObservableCyNodeData extends Record<string, unknown> {
   id: string;
   nodeType: "observable";
   labelShort: string;
+  displayLabel: string;
   labelFull: string;
   observableType: string;
   level: Level;
@@ -154,8 +217,17 @@ export interface ObservableCyEdgeData extends Record<string, unknown> {
   id: string;
   relationshipType: string;
   direction: RelationshipDirection;
+  relationshipFamily: CyvestRelationshipFamily;
+  relationshipLabel: string;
   color: string;
   width: number;
+  opacity: number;
+  lineStyle: "solid" | "dashed" | "dotted";
+  dashPattern: number[];
+  distance: number;
+  strength: number;
+  curvature: number;
+  isRootLink: boolean;
   sourceArrowShape: "none" | "triangle";
   targetArrowShape: "none" | "triangle";
 }

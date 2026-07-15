@@ -80,12 +80,20 @@ class RelationshipType(str, Enum):
     """Relationship types supported by Cyvest."""
 
     RELATED_TO = "related-to"
+    CONTAINS = "contains"
+    DERIVED_FROM = "derived-from"
+    RESOLVES_TO = "resolves-to"
+    HOSTS = "hosts"
+    COMMUNICATES_WITH = "communicates-with"
+    EXECUTES = "executes"
 
     def get_default_direction(self) -> RelationshipDirection:
         """
         Get the default direction for this relationship type.
         """
-        return RelationshipDirection.BIDIRECTIONAL
+        if self in {self.RELATED_TO, self.COMMUNICATES_WITH}:
+            return RelationshipDirection.BIDIRECTIONAL
+        return RelationshipDirection.OUTBOUND
 
 
 class PropagationMode(str, Enum):

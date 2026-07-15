@@ -65,6 +65,16 @@ from cyvest.model_schema import InvestigationSchema, StatisticsSchema
 from cyvest.proxies import EnrichmentProxy, EvidenceProxy, FindingProxy, ObservableProxy, TagProxy, ThreatIntelProxy
 from cyvest.resolvers import ObservableResolution, ObservableResolver, ObservableResolverResult
 from cyvest.score import ScoreMode
+from cyvest.semantics import (
+    RelationshipApplyResult,
+    RelationshipContext,
+    RelationshipPlan,
+    RelationshipPlanPreview,
+    build_relationship_context,
+    get_graph_revision,
+    get_relationship_plan_digest,
+    validate_relationship_plan,
+)
 
 if TYPE_CHECKING:
     from cyvest.shared import SharedInvestigationContext
@@ -594,7 +604,7 @@ class Cyvest:
         self,
         source: Observable | ObservableProxy | str,
         target: Observable | ObservableProxy | str,
-        relationship_type: RelationshipType,
+        relationship_type: RelationshipType | str,
         direction: RelationshipDirection | None = None,
     ) -> ObservableProxy:
         """
@@ -616,6 +626,80 @@ class Cyvest:
         target_key = self._resolve_observable_key(target)
         result = self._investigation.add_relationship(source_key, target_key, relationship_type, direction)
         return self._observable_proxy(result)
+
+    def observable_remove_relationship(
+        self,
+        source: Observable | ObservableProxy | str,
+        target: Observable | ObservableProxy | str,
+        relationship_type: RelationshipType | str,
+        direction: RelationshipDirection | None = None,
+    ) -> bool:
+        """Remove one exact relationship between existing observables."""
+
+        return self._investigation.remove_relationship(
+            self._resolve_observable_key(source),
+            self._resolve_observable_key(target),
+            relationship_type,
+            direction,
+        )
+
+    def relationship_context_get(self) -> RelationshipContext:
+        """Return the compact, revisioned graph context intended for agents."""
+
+        return build_relationship_context(
+            self._investigation.get_all_observables(),
+            self._investigation.get_root().key,
+        )
+
+    def relationship_plan_validate(
+        self,
+        plan: RelationshipPlan,
+        *,
+        allow_custom_types: bool = False,
+    ) -> RelationshipPlanPreview:
+        """Validate an agent relationship plan without mutating the graph."""
+
+        return validate_relationship_plan(
+            self._investigation.get_all_observables(),
+            plan,
+            allow_custom_types=allow_custom_types,
+        )
+
+    def relationship_plan_apply(
+        self,
+        plan: RelationshipPlan,
+        *,
+        strict: bool = True,
+        allow_custom_types: bool = False,
+        actor: str = "agent",
+        tool: str | None = None,
+    ) -> RelationshipApplyResult:
+        """Validate and atomically apply a relationship plan."""
+
+        preview = self.relationship_plan_validate(plan, allow_custom_types=allow_custom_types)
+        if strict and not preview.valid:
+            codes = ", ".join(issue.code for issue in preview.issues if issue.severity == "error")
+            raise ValueError(f"Relationship plan validation failed: {codes}")
+        if plan.graph_revision != preview.graph_revision:
+            raise ValueError("Relationship plan validation failed: stale_graph_revision")
+        revision_before = get_graph_revision(self._investigation.get_all_observables())
+        plan_digest = get_relationship_plan_digest(plan)
+        applied_count, event = self._investigation.apply_relationship_proposals(
+            preview.accepted,
+            actor=actor,
+            tool=tool or plan.tool,
+            model=plan.model,
+            plan_digest=plan_digest,
+        )
+        revision_after = get_graph_revision(self._investigation.get_all_observables())
+        return RelationshipApplyResult(
+            plan_digest=plan_digest,
+            graph_revision_before=revision_before,
+            graph_revision_after=revision_after,
+            applied_count=applied_count,
+            skipped_count=len(plan.proposals) - applied_count,
+            audit_event_id=event.event_id if event else None,
+        )
 
     def observable_add_threat_intel(
         self,

@@ -49,7 +49,7 @@ from cyvest.semantics import (
     validate_relationship_plan,
 )
 
-__version__ = "6.1.2"
+__version__ = "6.2.0"
 
 __all__ = [
     # Core class

@@ -5,15 +5,14 @@ Demonstrates how to compare two Cyvest investigations with optional tolerance ru
 Shows differences in findings, observables, and threat intelligence between investigations.
 """
 
-import logging
 from decimal import Decimal
 
-from logurich import init_logger
+from logurich import get_logger, init_logger
 
 from cyvest import Cyvest, ExpectedResult, Level, compare_investigations
 from cyvest.io_rich import display_diff
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def create_expected_investigation() -> Cyvest:

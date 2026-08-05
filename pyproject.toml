@@ -1,16 +1,17 @@
 [project]
 name = "cyvest"
-version = "6.1.2"
+version = "6.2.0"
 description = "Cybersecurity investigation model"
 readme = {file = "README.md", content-type = "text/markdown"}
 requires-python = ">=3.10"
-license = { text = "MIT" }
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [
     { name = "PakitoSec", email = "jeromep83@gmail.com" }
 ]
 dependencies = [
     "click>=8",
-    "logurich[click]>=0.9.0",
+    "logurich[click]==1.0.0b2",
     "pydantic>=2.12.5",
     "rich>=13",
     "typing-extensions>=4.15",
@@ -19,7 +20,6 @@ keywords = ["cybersecurity", "investigation", "threat-intel", "security-analysis
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
@@ -36,8 +36,11 @@ Repository = "https://github.com/PakitoSec/cyvest"
 Issues = "https://github.com/PakitoSec/cyvest/issues"
 
 [build-system]
-requires = ["uv_build>=0.9.8,<0.12.0"]
+requires = ["uv_build>=0.12.1,<0.13.0"]
 build-backend = "uv_build"
+
+[tool.uv]
+required-version = ">=0.12.1,<0.13.0"
 
 [dependency-groups]
 dev = [
@@ -77,3 +80,6 @@ addopts = [
     "--cov-report=term-missing",
     "--cov-report=html",
 ]
+
+[tool.uv.sources]
+logurich = { git = "https://github.com/PakitoSec/logurich.git", rev = "e40c371f705459b58d9f57c0249a357aacd0b74e" }

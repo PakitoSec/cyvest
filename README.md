@@ -506,7 +506,9 @@ Display differences in a rich table format:
 
 ```python
 from cyvest.io_rich import display_diff
-from logurich import logger
+from logurich import get_logger
+
+logger = get_logger(__name__)
 
 # Display diff table with tree structure showing observables and threat intel
 display_diff(diffs, lambda r: logger.rich("INFO", r), title="Investigation Diff")

@@ -18,7 +18,6 @@ from decimal import Decimal
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Final, Literal, overload
 
-import logurich  # noqa: F401
 from logurich import get_logger
 
 from cyvest import keys

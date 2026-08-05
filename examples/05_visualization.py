@@ -12,16 +12,16 @@ The visualization uses the Rich color scheme:
 - Edge labels show the relationship type
 """
 
-import logging
 import tempfile
 from pathlib import Path
 
 import click
+from logurich import get_logger
 from logurich.opt_click import click_logger_params
 
 from cyvest import Cyvest
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 @click.command()

@@ -5,19 +5,19 @@ Demonstrates using ThreadPoolExecutor to run investigation tasks in parallel,
 with each task building a Cyvest fragment that merges into the main investigation.
 """
 
-import logging
 from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any
 
 import click
+from logurich import get_logger
 from logurich.opt_click import click_logger_params
 
 from cyvest import Cyvest
 from cyvest.shared import SharedInvestigationContext
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # ============================================================================
 # Task Framework

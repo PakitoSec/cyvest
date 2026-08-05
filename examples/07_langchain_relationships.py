@@ -7,17 +7,16 @@ Install the optional dependency first:
 """
 
 import argparse
-import logging
 from typing import Any
 
 from langchain.agents import create_agent
 from langchain.chat_models import init_chat_model
-from logurich import init_logger
+from logurich import get_logger, init_logger
 
 from cyvest import Cyvest, RelationshipPlan
 from cyvest.langchain import RELATIONSHIP_PLANNER_SYSTEM_PROMPT, create_relationship_tools
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def plan_with_agent(cv: Cyvest, model: Any, request: str) -> RelationshipPlan:

@@ -186,7 +186,7 @@ export function buildObservablesElements(
       const curvature =
         parallelCount > 1
           ? (parallelIndex - (parallelCount - 1) / 2) * 34
-          : edge.type === "communicates-with" || edge.type === "related-to"
+          : edge.type === "related-to"
             ? (index % 2 === 0 ? 52 : -52)
           : 0;
       const data: ObservableCyEdgeData = {

@@ -47,18 +47,6 @@ The optional visualization dependencies are available with:
 pip install -e ".[visualization]"
 ```
 
-Install the optional LangChain-compatible relationship tools with:
-
-```bash
-pip install -e ".[langchain]"
-```
-
-For AWS Bedrock agents, install the provider-specific extra:
-
-```bash
-pip install -e ".[bedrock]"
-```
-
 ## Quick Start
 
 ```python
@@ -145,14 +133,15 @@ ip_obs = cv.observable_create(cv.OBS.IPV4, "192.0.2.1", internal=False)
 cv.observable_add_relationship(
     url_obs,  # Can pass ObservableProxy directly
     ip_obs,   # Or use .key for string keys
-    cv.REL.RESOLVES_TO,
+    cv.REL.PIVOT,
 )
 ```
 
 Cyvest exposes enums for observable types and relationships via the facade (`cv.OBS`, `cv.REL`, `cv.DIR`)
 so IDEs can autocomplete the official vocabulary without extra imports.
-Built-ins cover `RELATED_TO`, `CONTAINS`, `DERIVED_FROM`, `RESOLVES_TO`,
-`HOSTS`, `COMMUNICATES_WITH`, and `EXECUTES`.
+Relationships describe the analyst pivot that produced the target from the source:
+`EXTRACTION` (target extracted from the source), `PIVOT` (target obtained by enriching
+the source) and `RELATED_TO` (correlation without an established mechanism).
 
 Broad entity types use a subtype and, for locally scoped identifiers, a namespace:
 

@@ -24,7 +24,7 @@ const investigation = parseCyvest(cyvestVisualData);
 const emailInvestigation = parseCyvest(cyvestEmailData);
 
 describe("email investigation semantics", () => {
-  it("uses precise relationship types instead of generic associations", () => {
+  it("records the analyst pivot instead of generic associations", () => {
     const relationships = Object.values(emailInvestigation.observables).flatMap(
       (observable) => observable.relationships
     );
@@ -38,10 +38,8 @@ describe("email investigation semantics", () => {
     );
 
     expect(counts).toEqual({
-      contains: 9,
-      "derived-from": 1,
-      hosts: 4,
-      "resolves-to": 1,
+      extraction: 11,
+      pivot: 4,
     });
     expect(relationships).not.toContainEqual(
       expect.objectContaining({ relationship_type: "related-to" })
@@ -139,28 +137,22 @@ describe("cytoscape adapters", () => {
   });
 
   it("maps semantic relationships to distinct visual and physical profiles", () => {
-    const structural = resolveRelationshipProfile("contains");
-    const infrastructure = resolveRelationshipProfile("resolves-to");
-    const behavioral = resolveRelationshipProfile("communicates-with");
+    const extraction = resolveRelationshipProfile("extraction");
+    const pivot = resolveRelationshipProfile("pivot");
     const association = resolveRelationshipProfile("custom-correlation");
 
-    expect(structural).toMatchObject({
-      family: "structural",
+    expect(extraction).toMatchObject({
+      family: "extraction",
       distance: 84,
       strength: 0.9,
       lineStyle: "solid",
       dashPattern: [1, 0],
     });
-    expect(infrastructure).toMatchObject({
-      family: "infrastructure",
+    expect(pivot).toMatchObject({
+      family: "pivot",
+      distance: 124,
       lineStyle: "dashed",
       dashPattern: [9, 3],
-    });
-    expect(behavioral).toMatchObject({
-      family: "behavioral",
-      distance: 132,
-      lineStyle: "dashed",
-      dashPattern: [3, 4],
     });
     expect(association).toMatchObject({
       family: "association",
@@ -169,21 +161,19 @@ describe("cytoscape adapters", () => {
       dashPattern: [1, 5],
     });
     expect([
-      structural.distance,
-      infrastructure.distance,
-      behavioral.distance,
+      extraction.distance,
+      pivot.distance,
       association.distance,
     ]).toEqual([...[
-      structural.distance,
-      infrastructure.distance,
-      behavioral.distance,
+      extraction.distance,
+      pivot.distance,
       association.distance,
     ]].sort((left, right) => left - right));
   });
 
   it("preserves an explicit zero-strength relationship override", () => {
-    const profile = resolveRelationshipProfile("contains", {
-      overrides: { contains: { strength: 0 } },
+    const profile = resolveRelationshipProfile("extraction", {
+      overrides: { extraction: { strength: 0 } },
     });
 
     expect(profile.strength).toBe(0);
@@ -234,8 +224,8 @@ describe("force-directed layout", () => {
         id: `root-${target}`,
         source: "root",
         target,
-        relationshipFamily: "structural",
-        relationshipType: "contains",
+        relationshipFamily: "extraction",
+        relationshipType: "extraction",
       },
     });
     const elements = [
@@ -269,7 +259,7 @@ describe("force-directed layout", () => {
       id: string,
       source: string,
       target: string,
-      family: "structural" | "association",
+      family: "extraction" | "association",
       strength: number,
       isRootLink = false
     ) => ({
@@ -279,7 +269,7 @@ describe("force-directed layout", () => {
         source,
         target,
         relationshipFamily: family,
-        distance: family === "structural" ? 84 : 176,
+        distance: family === "extraction" ? 84 : 176,
         strength,
         isRootLink,
       },
@@ -291,7 +281,7 @@ describe("force-directed layout", () => {
       node("c"),
       node("d"),
       edge("root-a", "root", "a", "association", 0.24, true),
-      edge("a-b", "a", "b", "structural", 0.9),
+      edge("a-b", "a", "b", "extraction", 0.9),
       edge("b-c", "b", "c", "association", 0.16),
       edge("c-d", "c", "d", "association", 0.16),
     ];
@@ -304,7 +294,7 @@ describe("force-directed layout", () => {
     expect(Math.hypot(targets.d.x, targets.d.y)).toBeGreaterThan(Math.hypot(targets.c.x, targets.c.y));
   });
 
-  it("turns infrastructure links between siblings into local tree branches", () => {
+  it("turns pivot links between siblings into local tree branches", () => {
     const targets = computeSemanticTargets(buildObservablesElements(emailInvestigation));
     const domain = targets["obs:domain:virus.com"];
     const hostedUrl = targets["obs:url:https://virus.com/payload.exe"];
@@ -322,16 +312,16 @@ describe("force-directed layout", () => {
       group: "nodes" as const,
       data: { id, labelShort: id, width: 40, height: 40, isRoot },
     });
-    const edge = (id: string, source: string, target: string, family: "structural" | "association") => ({
+    const edge = (id: string, source: string, target: string, family: "extraction" | "association") => ({
       group: "edges" as const,
       data: {
         id,
         source,
         target,
         relationshipFamily: family,
-        relationshipType: family === "structural" ? "contains" : "related-to",
-        direction: family === "structural" ? "outbound" : "bidirectional",
-        strength: family === "structural" ? 0.9 : 0.16,
+        relationshipType: family === "extraction" ? "extraction" : "related-to",
+        direction: family === "extraction" ? "outbound" : "bidirectional",
+        strength: family === "extraction" ? 0.9 : 0.16,
       },
     });
     const elements = [
@@ -340,10 +330,10 @@ describe("force-directed layout", () => {
       node("b"),
       node("c"),
       node("d"),
-      edge("root-a", "root", "a", "structural"),
-      edge("root-b", "root", "b", "structural"),
-      edge("root-c", "root", "c", "structural"),
-      edge("root-d", "root", "d", "structural"),
+      edge("root-a", "root", "a", "extraction"),
+      edge("root-b", "root", "b", "extraction"),
+      edge("root-c", "root", "c", "extraction"),
+      edge("root-d", "root", "d", "extraction"),
       edge("a-c", "a", "c", "association"),
     ];
 

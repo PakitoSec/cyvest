@@ -10,8 +10,8 @@ const FAMILY_DEFAULTS: Record<
   CyvestRelationshipFamily,
   Omit<CyvestRelationshipProfile, "label" | "color">
 > = {
-  structural: {
-    family: "structural",
+  extraction: {
+    family: "extraction",
     distance: 84,
     strength: 0.9,
     width: 1.7,
@@ -19,22 +19,13 @@ const FAMILY_DEFAULTS: Record<
     dashPattern: [1, 0],
     opacity: 0.88,
   },
-  infrastructure: {
-    family: "infrastructure",
-    distance: 108,
-    strength: 0.72,
+  pivot: {
+    family: "pivot",
+    distance: 124,
+    strength: 0.64,
     width: 1.4,
     lineStyle: "dashed",
     dashPattern: [9, 3],
-    opacity: 0.78,
-  },
-  behavioral: {
-    family: "behavioral",
-    distance: 132,
-    strength: 0.55,
-    width: 1.3,
-    lineStyle: "dashed",
-    dashPattern: [3, 4],
     opacity: 0.78,
   },
   association: {
@@ -49,12 +40,8 @@ const FAMILY_DEFAULTS: Record<
 };
 
 const RELATIONSHIP_FAMILIES: Record<string, CyvestRelationshipFamily> = {
-  contains: "structural",
-  "derived-from": "structural",
-  "resolves-to": "infrastructure",
-  hosts: "infrastructure",
-  "communicates-with": "behavioral",
-  executes: "behavioral",
+  extraction: "extraction",
+  pivot: "pivot",
   "related-to": "association",
 };
 
@@ -71,9 +58,8 @@ function getFamilyColor(
   theme: CyvestThemeTokens
 ): string {
   return {
-    structural: theme.edgeStructuralColor,
-    infrastructure: theme.edgeInfrastructureColor,
-    behavioral: theme.edgeBehavioralColor,
+    extraction: theme.edgeExtractionColor,
+    pivot: theme.edgePivotColor,
     association: theme.edgeAssociationColor,
   }[family];
 }

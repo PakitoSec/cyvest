@@ -149,7 +149,7 @@ function calculateTopology(
   const hierarchyNeighbors = new Map(nodeIds.map((id) => [id, [] as string[]]));
   const isHierarchyLink = (link: ForceLink) =>
     link.direction !== "bidirectional" && (
-      link.family === "structural" || link.family === "infrastructure"
+      link.family === "extraction" || link.family === "pivot"
     );
 
   for (const link of links) {
@@ -200,10 +200,10 @@ function calculateTopology(
     parent.set(id, rootId);
   }
 
-  // Infrastructure links between siblings form a clearer local tree than a
+  // Pivot links between siblings form a clearer local tree than a
   // chord across the same ring (for example domain -> hosted URL).
   for (const link of links) {
-    if (link.family !== "infrastructure" || link.direction === "bidirectional") continue;
+    if (link.family !== "pivot" || link.direction === "bidirectional") continue;
     const source = endpointId(link.source);
     const target = endpointId(link.target);
     const semanticParent = link.direction === "inbound" ? target : source;

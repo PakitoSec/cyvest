@@ -50,7 +50,7 @@ def main(no_audit_log: bool = False, output: Path | None = None) -> None:
     malicious_ip = (
         cv.observable(cv.OBS.IPV4, "185.220.101.50")
         .with_ti("AbuseIPDB", score=9.5, comment="C2 server")
-        .relate_to(malicious_domain, cv.REL.HOSTS)
+        .relate_to(malicious_domain, cv.REL.PIVOT)
     )
 
     # Suspicious infrastructure
@@ -59,7 +59,7 @@ def main(no_audit_log: bool = False, output: Path | None = None) -> None:
         .with_ti("VirusTotal", score=4.5, comment="Some detections")
         .relate_to(
             cv.observable(cv.OBS.IPV4, "192.168.100.5").with_ti("Shodan", score=3.0),
-            cv.REL.RESOLVES_TO,
+            cv.REL.PIVOT,
         )
     )
 
@@ -77,8 +77,8 @@ def main(no_audit_log: bool = False, output: Path | None = None) -> None:
     # Email artifact with multiple relationships
     email_message = (
         cv.observable(cv.OBS.ARTIFACT, "Phishing Email - Invoice #12345")
-        .relate_to(attacker_email, cv.REL.CONTAINS)
-        .relate_to(victim_email, cv.REL.CONTAINS)
+        .relate_to(attacker_email, cv.REL.EXTRACTION)
+        .relate_to(victim_email, cv.REL.EXTRACTION)
         .with_ti("Email Gateway", score=7.0, comment="Flagged as suspicious")
     )
 
@@ -96,8 +96,8 @@ def main(no_audit_log: bool = False, output: Path | None = None) -> None:
     )
 
     # Email contains URLs
-    email_message.relate_to(phishing_url1, cv.REL.CONTAINS)
-    email_message.relate_to(phishing_url2, cv.REL.CONTAINS)
+    email_message.relate_to(phishing_url1, cv.REL.EXTRACTION)
+    email_message.relate_to(phishing_url2, cv.REL.EXTRACTION)
 
     suspicious_url = (
         cv.observable(cv.OBS.URL, "https://sketchy-site.net/invoice")
@@ -110,15 +110,15 @@ def main(no_audit_log: bool = False, output: Path | None = None) -> None:
         whitelisted=True,
     ).with_ti("Internal Whitelist", score=-2.0, comment="Known safe link")
 
-    email_message.relate_to(suspicious_url, cv.REL.CONTAINS)
-    email_message.relate_to(trusted_url, cv.REL.CONTAINS)
+    email_message.relate_to(suspicious_url, cv.REL.EXTRACTION)
+    email_message.relate_to(trusted_url, cv.REL.EXTRACTION)
 
     # Malware file dropped
     malware_file = (
         cv.observable(cv.OBS.FILE, "invoice.exe")
         .with_ti("VirusTotal", score=10.0, comment="Detected by 45/70 engines")
-        .relate_to(phishing_url1, cv.REL.DERIVED_FROM)
-        .relate_to(malicious_ip, cv.REL.COMMUNICATES_WITH)
+        .relate_to(phishing_url1, cv.REL.EXTRACTION)
+        .relate_to(malicious_ip, cv.REL.RELATED_TO)
     )
 
     # Create findings linking observables

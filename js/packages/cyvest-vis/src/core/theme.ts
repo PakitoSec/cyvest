@@ -21,9 +21,8 @@ export function createThemeStyle(
     "--cyvest-panel-muted": resolved.panelTextMuted,
     "--cyvest-accent": resolved.accent,
     "--cyvest-selection-surface": resolved.selectionSurface,
-    "--cyvest-edge-structural": resolved.edgeStructuralColor,
-    "--cyvest-edge-infrastructure": resolved.edgeInfrastructureColor,
-    "--cyvest-edge-behavioral": resolved.edgeBehavioralColor,
+    "--cyvest-edge-extraction": resolved.edgeExtractionColor,
+    "--cyvest-edge-pivot": resolved.edgePivotColor,
     "--cyvest-edge-association": resolved.edgeAssociationColor,
     "--cyvest-font-family": resolved.fontFamily,
   } as React.CSSProperties;

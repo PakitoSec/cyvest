@@ -76,7 +76,7 @@
       "relationships": [
         {
           "target_key": "obs:domain:evil-phishing.com",
-          "relationship_type": "hosts",
+          "relationship_type": "pivot",
           "direction": "outbound"
         }
       ],
@@ -105,7 +105,7 @@
       "relationships": [
         {
           "target_key": "obs:ipv4:192.168.100.5",
-          "relationship_type": "resolves-to",
+          "relationship_type": "pivot",
           "direction": "outbound"
         }
       ],
@@ -205,32 +205,32 @@
       "relationships": [
         {
           "target_key": "obs:email:attacker@evil-phishing.com",
-          "relationship_type": "contains",
+          "relationship_type": "extraction",
           "direction": "outbound"
         },
         {
           "target_key": "obs:email:victim@company.com",
-          "relationship_type": "contains",
+          "relationship_type": "extraction",
           "direction": "outbound"
         },
         {
           "target_key": "obs:url:https://evil-phishing.com/login",
-          "relationship_type": "contains",
+          "relationship_type": "extraction",
           "direction": "outbound"
         },
         {
           "target_key": "obs:url:https://evil-phishing.com/verify",
-          "relationship_type": "contains",
+          "relationship_type": "extraction",
           "direction": "outbound"
         },
         {
           "target_key": "obs:url:https://sketchy-site.net/invoice",
-          "relationship_type": "contains",
+          "relationship_type": "extraction",
           "direction": "outbound"
         },
         {
           "target_key": "obs:url:https://accounts.google.com/security",
-          "relationship_type": "contains",
+          "relationship_type": "extraction",
           "direction": "outbound"
         }
       ],
@@ -367,12 +367,12 @@
       "relationships": [
         {
           "target_key": "obs:url:https://evil-phishing.com/login",
-          "relationship_type": "derived-from",
+          "relationship_type": "extraction",
           "direction": "outbound"
         },
         {
           "target_key": "obs:ipv4:185.220.101.50",
-          "relationship_type": "communicates-with",
+          "relationship_type": "related-to",
           "direction": "bidirectional"
         }
       ],

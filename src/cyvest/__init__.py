@@ -30,24 +30,6 @@ from cyvest.model import (
 from cyvest.model_enums import ObservableSubtype, ObservableType, RelationshipDirection, RelationshipType
 from cyvest.proxies import EnrichmentProxy, EvidenceProxy, FindingProxy, ObservableProxy, TagProxy, ThreatIntelProxy
 from cyvest.resolvers import ObservableResolution, ObservableResolver
-from cyvest.semantics import (
-    RelationshipApplyResult,
-    RelationshipContext,
-    RelationshipContextEdge,
-    RelationshipContextObservable,
-    RelationshipDefinition,
-    RelationshipFamily,
-    RelationshipOperation,
-    RelationshipPlan,
-    RelationshipPlanPreview,
-    RelationshipProposal,
-    RelationshipValidationIssue,
-    build_relationship_context,
-    get_graph_revision,
-    get_relationship_catalog,
-    get_relationship_plan_digest,
-    validate_relationship_plan,
-)
 
 __version__ = "6.2.0"
 
@@ -60,22 +42,6 @@ __all__ = [
     "ObservableSubtype",
     "RelationshipDirection",
     "RelationshipType",
-    "RelationshipDefinition",
-    "RelationshipApplyResult",
-    "RelationshipContext",
-    "RelationshipContextEdge",
-    "RelationshipContextObservable",
-    "RelationshipFamily",
-    "RelationshipOperation",
-    "RelationshipPlan",
-    "RelationshipPlanPreview",
-    "RelationshipProposal",
-    "RelationshipValidationIssue",
-    "build_relationship_context",
-    "get_graph_revision",
-    "get_relationship_plan_digest",
-    "get_relationship_catalog",
-    "validate_relationship_plan",
     # Proxies
     "FindingProxy",
     "EvidenceProxy",

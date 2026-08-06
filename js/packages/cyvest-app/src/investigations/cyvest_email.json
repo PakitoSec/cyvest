@@ -2,7 +2,7 @@
   "schema_version": "6.0.0",
   "investigation_id": "cyvest-email-example",
   "investigation_name": "Email Investigation",
-  "score": 34.1,
+  "score": 36.1,
   "level": "MALICIOUS",
   "whitelisted": false,
   "whitelists": [],
@@ -68,22 +68,22 @@
       "relationships": [
         {
           "target_key": "obs:email:noreply@dmalicious.com",
-          "relationship_type": "contains",
+          "relationship_type": "extraction",
           "direction": "outbound"
         },
         {
           "target_key": "obs:email:user@company.com",
-          "relationship_type": "contains",
+          "relationship_type": "extraction",
           "direction": "outbound"
         },
         {
           "target_key": "obs:file:body/html",
-          "relationship_type": "contains",
+          "relationship_type": "extraction",
           "direction": "outbound"
         },
         {
           "target_key": "obs:file:invoice.pdf",
-          "relationship_type": "contains",
+          "relationship_type": "extraction",
           "direction": "outbound"
         }
       ],
@@ -108,7 +108,13 @@
         "ti:vt:obs:email:noreply@dmalicious.com",
         "ti:proofpoint:obs:email:noreply@dmalicious.com"
       ],
-      "relationships": [],
+      "relationships": [
+        {
+          "target_key": "obs:domain:dmalicious.com",
+          "relationship_type": "extraction",
+          "direction": "outbound"
+        }
+      ],
       "key": "obs:email:noreply@dmalicious.com",
       "finding_links": [
         "fnd:from",
@@ -125,8 +131,8 @@
       "whitelisted": false,
       "comment": "",
       "extra": {},
-      "score": 5.0,
-      "level": "MALICIOUS",
+      "score": 2.0,
+      "level": "NOTABLE",
       "aliases": [],
       "occurrence_count": 1,
       "threat_intels": [
@@ -135,18 +141,13 @@
       "relationships": [
         {
           "target_key": "obs:ipv4:8.1.2.3",
-          "relationship_type": "resolves-to",
-          "direction": "outbound"
-        },
-        {
-          "target_key": "obs:email:noreply@dmalicious.com",
-          "relationship_type": "hosts",
+          "relationship_type": "pivot",
           "direction": "outbound"
         }
       ],
       "key": "obs:domain:dmalicious.com",
       "finding_links": [],
-      "score_display": "5.00"
+      "score_display": "2.00"
     },
     "obs:ipv4:8.1.2.3": {
       "type": "ipv4",
@@ -207,27 +208,27 @@
       "relationships": [
         {
           "target_key": "obs:url:https://virus.com/payload.exe",
-          "relationship_type": "contains",
+          "relationship_type": "extraction",
           "direction": "outbound"
         },
         {
           "target_key": "obs:url:https://virus.com/about",
-          "relationship_type": "contains",
+          "relationship_type": "extraction",
           "direction": "outbound"
         },
         {
           "target_key": "obs:url:https://domain.com/ok/toto",
-          "relationship_type": "contains",
+          "relationship_type": "extraction",
           "direction": "outbound"
         },
         {
           "target_key": "obs:domain:virus.com",
-          "relationship_type": "contains",
+          "relationship_type": "extraction",
           "direction": "outbound"
         },
         {
           "target_key": "obs:domain:domain.com",
-          "relationship_type": "contains",
+          "relationship_type": "extraction",
           "direction": "outbound"
         }
       ],
@@ -277,12 +278,12 @@
       "relationships": [
         {
           "target_key": "obs:url:https://virus.com/payload.exe",
-          "relationship_type": "hosts",
+          "relationship_type": "pivot",
           "direction": "outbound"
         },
         {
           "target_key": "obs:url:https://virus.com/about",
-          "relationship_type": "hosts",
+          "relationship_type": "pivot",
           "direction": "outbound"
         }
       ],
@@ -357,7 +358,7 @@
       "relationships": [
         {
           "target_key": "obs:url:https://domain.com/ok/toto",
-          "relationship_type": "hosts",
+          "relationship_type": "pivot",
           "direction": "outbound"
         }
       ],
@@ -409,7 +410,7 @@
       "relationships": [
         {
           "target_key": "obs:file:invoice.pdf",
-          "relationship_type": "derived-from",
+          "relationship_type": "extraction",
           "direction": "inbound"
         }
       ],
@@ -424,8 +425,8 @@
       "description": "test email vt 10",
       "comment": "> ok boys",
       "extra": {},
-      "score": 0.0,
-      "level": "INFO",
+      "score": 2.0,
+      "level": "NOTABLE",
       "origin_investigation_id": "fragment-emailfrom",
       "observable_links": [
         {
@@ -435,7 +436,7 @@
       ],
       "evidence_links": [],
       "key": "fnd:from",
-      "score_display": "0.00"
+      "score_display": "2.00"
     },
     "fnd:from-proofpoint": {
       "finding_name": "from-proofpoint",
@@ -754,7 +755,7 @@
         "fnd:receiver"
       ],
       "key": "tag:emails",
-      "direct_score": 5.1,
+      "direct_score": 7.1,
       "direct_level": "MALICIOUS"
     },
     "tag:bodies": {
@@ -834,8 +835,8 @@
       "hash": 1
     },
     "observables_by_level": {
-      "MALICIOUS": 8,
-      "NOTABLE": 1,
+      "MALICIOUS": 7,
+      "NOTABLE": 2,
       "INFO": 2,
       "SUSPICIOUS": 1,
       "TRUSTED": 1
@@ -849,7 +850,8 @@
         "INFO": 1
       },
       "domain": {
-        "MALICIOUS": 2,
+        "NOTABLE": 1,
+        "MALICIOUS": 1,
         "INFO": 1
       },
       "ipv4": {
@@ -870,10 +872,9 @@
     "total_findings": 11,
     "applied_findings": 11,
     "findings_by_level": {
-      "INFO": [
+      "NOTABLE": [
         "fnd:from",
-        "fnd:body-url-https://domain.com/ok/toto",
-        "fnd:body-domain-domain.com"
+        "fnd:receiver"
       ],
       "MALICIOUS": [
         "fnd:from-proofpoint",
@@ -883,11 +884,12 @@
         "fnd:email_risk_aggregated",
         "fnd:ai"
       ],
-      "NOTABLE": [
-        "fnd:receiver"
-      ],
       "SUSPICIOUS": [
         "fnd:body-url-https://virus.com/about"
+      ],
+      "INFO": [
+        "fnd:body-url-https://domain.com/ok/toto",
+        "fnd:body-domain-domain.com"
       ]
     },
     "total_evidences": 0,
@@ -913,5 +915,5 @@
     "root_type": "artifact",
     "score_mode_obs": "max"
   },
-  "score_display": "34.10"
+  "score_display": "36.10"
 }

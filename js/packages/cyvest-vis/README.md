@@ -29,7 +29,7 @@ low-level `CyvestObservablesView` remains available for custom shells.
 Hovering a node isolates its immediate neighborhood. The initial placement is
 deterministic. The investigation subject stays at the center while semantic
 branches receive stable angular sectors on the first ring. Cross-linked
-branches are placed next to each other, then directional infrastructure links
+branches are placed next to each other, then directional pivot links
 form small outward-facing trees inside each sector. Weak links can connect
 sectors without collapsing them into one cloud.
 
@@ -56,15 +56,17 @@ accepted for API compatibility.
 
 ## Relationship profiles
 
-Custom relationship strings default to the weak `association` family. Override
-them without adding visual metadata to the investigation JSON:
+Edges are grouped into three families that mirror the analyst pivot recorded in
+the investigation: `extraction`, `pivot`, and `association`. Custom relationship
+strings default to the weak `association` family. Override them without adding
+visual metadata to the investigation JSON:
 
 ```tsx
 <CyvestGraph
   investigation={investigation}
   relationshipProfiles={{
     "downloaded-from": {
-      family: "behavioral",
+      family: "pivot",
       distance: 124,
       strength: 0.58,
       lineStyle: "dashed",

@@ -166,7 +166,7 @@ export function getObservableParents(
  *
  * @param inv - The investigation to search
  * @param observableKey - Key of the source observable
- * @param relationshipType - Type of relationship to filter (e.g., "related-to", "contains")
+ * @param relationshipType - Type of relationship to filter (e.g., "related-to", "extraction")
  * @returns Array of related observables
  */
 export function getRelatedObservablesByType(

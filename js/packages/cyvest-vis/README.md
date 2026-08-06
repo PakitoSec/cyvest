@@ -26,6 +26,17 @@ import "@cyvest/cyvest-vis/styles.css";
 canvas toolbar only, or `controls="none"` for an unadorned embedded view. The
 low-level `CyvestObservablesView` remains available for custom shells.
 
+| Prop | Description |
+| --- | --- |
+| `controls` | `"full"` (default) for search, filters and legend, `"compact"` for the canvas toolbar only, `"none"` for an unadorned view |
+| `showInspector` | Show the side panel describing the selected node or edge |
+| `filterState` | Control the filters from the outside, as a partial `CyvestGraphFilterState` |
+| `onFilterStateChange` | Called with the complete state whenever a filter changes |
+| `relationshipProfiles` | Override the visual and physical profile of a relationship type |
+| `theme` | Partial `CyvestThemeTokens`, see Theming |
+| `physics` | Set to `false` to keep only the deterministic initial placement |
+| `layout` | Force layout options, see Force layout |
+
 Hovering a node isolates its immediate neighborhood. The initial placement is
 deterministic. The investigation subject stays at the center while semantic
 branches receive stable angular sectors on the first ring. Cross-linked
@@ -98,6 +109,8 @@ Use `DARK_CYVEST_THEME` for the built-in dark theme.
 - `computeForcePositions`
 - `createForceLayout`
 - `startForceSimulation`
+- `BUILT_IN_RELATIONSHIP_TYPES`, `getRelationshipFamily`, `resolveRelationshipProfile`
+- `EMPTY_GRAPH_FILTERS`, `normalizeGraphFilters`, `filterInvestigation`, `matchesGraphQuery`
 - theme, event, icon, label, color, and observable graph data types
 
 ## Development

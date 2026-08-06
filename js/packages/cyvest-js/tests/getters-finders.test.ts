@@ -151,6 +151,7 @@ function createTestInvestigation(): CyvestInvestigation {
             observable_key: "obs:ipv4:192.168.1.1",
           },
         ],
+        evidence_links: [],
       },
       "fnd:domain_finding": {
         key: "fnd:domain_finding",
@@ -167,6 +168,7 @@ function createTestInvestigation(): CyvestInvestigation {
             observable_key: "obs:domain:example.com",
           },
         ],
+        evidence_links: [],
       },
       "fnd:dns_lookup": {
         key: "fnd:dns_lookup",
@@ -179,6 +181,7 @@ function createTestInvestigation(): CyvestInvestigation {
         level: "INFO",
         origin_investigation_id: "01HXYZTESTINVESTIGATION",
         observable_links: [],
+        evidence_links: [],
       },
     },
     evidences: {},
@@ -248,6 +251,7 @@ function createTestInvestigation(): CyvestInvestigation {
       total_findings: 3,
       applied_findings: 2,
       findings_by_level: { INFO: ["fnd:ip_finding", "fnd:dns_lookup"], MALICIOUS: ["fnd:domain_finding"] },
+      total_evidences: 0,
       total_threat_intel: 1,
       threat_intel_by_source: { virustotal: 1 },
       threat_intel_by_level: { MALICIOUS: 1 },

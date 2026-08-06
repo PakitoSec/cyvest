@@ -65,13 +65,14 @@ describe("label utilities", () => {
 
   it("shows every label on wide canvases and prioritizes labels in compact mode", () => {
     const stylesheet = createObservablesStylesheet();
-    const nodeStyle = stylesheet.find((rule) => rule.selector === "node")?.style;
-    const compactStyle = stylesheet.find(
-      (rule) => rule.selector === "node.cyvest-compact-label"
-    )?.style;
-    const compactRootStyle = stylesheet.find(
-      (rule) => rule.selector === "node[?isRoot].cyvest-compact-label"
-    )?.style;
+    // Cytoscape blocks are either style-based or css-based; only the former is used here
+    const styleFor = (selector: string) => {
+      const rule = stylesheet.find((block) => block.selector === selector);
+      return rule && "style" in rule ? rule.style : undefined;
+    };
+    const nodeStyle = styleFor("node");
+    const compactStyle = styleFor("node.cyvest-compact-label");
+    const compactRootStyle = styleFor("node[?isRoot].cyvest-compact-label");
 
     expect(nodeStyle).toMatchObject({
       label: "data(labelShort)",

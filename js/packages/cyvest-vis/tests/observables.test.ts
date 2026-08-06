@@ -65,13 +65,14 @@ describe("label utilities", () => {
 
   it("shows every label on wide canvases and prioritizes labels in compact mode", () => {
     const stylesheet = createObservablesStylesheet();
-    const nodeStyle = stylesheet.find((rule) => rule.selector === "node")?.style;
-    const compactStyle = stylesheet.find(
-      (rule) => rule.selector === "node.cyvest-compact-label"
-    )?.style;
-    const compactRootStyle = stylesheet.find(
-      (rule) => rule.selector === "node[?isRoot].cyvest-compact-label"
-    )?.style;
+    // Cytoscape blocks are either style-based or css-based; only the former is used here
+    const styleFor = (selector: string) => {
+      const rule = stylesheet.find((block) => block.selector === selector);
+      return rule && "style" in rule ? rule.style : undefined;
+    };
+    const nodeStyle = styleFor("node");
+    const compactStyle = styleFor("node.cyvest-compact-label");
+    const compactRootStyle = styleFor("node[?isRoot].cyvest-compact-label");
 
     expect(nodeStyle).toMatchObject({
       label: "data(labelShort)",
@@ -189,8 +190,8 @@ describe("graph filters", () => {
     const filtered = filterInvestigation(
       investigation,
       normalizeGraphFilters({
-        observableTypes: ["domain"],
-        relationshipTypes: ["resolves-to"],
+        observableTypes: ["domain", "url"],
+        relationshipTypes: ["related-to"],
       })
     );
 
@@ -200,14 +201,19 @@ describe("graph filters", () => {
         (item) =>
           item.value === "root" ||
           item.value === "Phishing Email - Invoice #12345" ||
-          item.type === "domain"
+          item.type === "domain" ||
+          item.type === "url"
       )
     ).toBe(true);
+
+    const keptRelationships = Object.values(filtered.observables)
+      .filter((item) => item.value !== "root")
+      .flatMap((item) => item.relationships);
+
+    // Guards the assertion below against passing on an empty list
+    expect(keptRelationships.length).toBeGreaterThan(0);
     expect(
-      Object.values(filtered.observables)
-        .filter((item) => item.value !== "root")
-        .flatMap((item) => item.relationships)
-        .every((relationship) => relationship.relationship_type === "resolves-to")
+      keptRelationships.every((relationship) => relationship.relationship_type === "related-to")
     ).toBe(true);
   });
 });

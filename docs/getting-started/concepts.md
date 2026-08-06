@@ -335,6 +335,42 @@ cv = Cyvest(score_mode_obs=ScoreMode.MAX)
 cv = Cyvest(score_mode_obs=ScoreMode.SUM)
 ```
 
+#### Observables Reached Through Several Branches
+
+A score depends only on the observable's own threat intel and on its subtree, never
+on the order observables were inserted. When an observable is reachable through two
+independent deduction chains, it is expanded in both: this is corroboration, not
+double counting.
+
+```python
+cv = Cyvest(score_mode_obs=ScoreMode.SUM)
+
+# report -> domain_a -> shared_ip, and report -> domain_b -> shared_ip
+# domain_a = its own TI + shared_ip subtree
+# domain_b = its own TI + shared_ip subtree
+# report   = domain_a + domain_b, the shared IP weighing in each branch
+```
+
+In MAX mode this makes no difference, since taking a maximum twice changes nothing.
+A cycle stops at the observable already present on the current path, which then
+contributes only its own threat intel score.
+
+!!! warning "Changed in 6.2.0"
+    Earlier versions deduplicated an observable across the branches of a single
+    traversal, so the second branch was truncated to its threat intel score. A
+    parent score could therefore be lower than the sum of its children. SUM mode
+    scores computed before 6.2.0 may differ; recalculation is automatic on load.
+
+#### Relationships That Do Not Carry Score
+
+Only `OUTBOUND` and `INBOUND` relationships build the hierarchy. A `BIDIRECTIONAL`
+relationship is never traversed, in either direction, so it transports no score.
+
+Since `RELATED_TO` defaults to `BIDIRECTIONAL`, a relationship created without an
+explicit direction leaves both scores untouched. This is intended: a correlation
+with no established deduction mechanism has no reason to make a score propagate.
+`EXTRACTION` and `PIVOT` default to `OUTBOUND` and do propagate.
+
 ### Audit Log
 
 All meaningful changes are recorded in a centralized, append-only audit log at the investigation level:

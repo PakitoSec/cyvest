@@ -134,7 +134,7 @@ function createGraphTestInvestigation(): CyvestInvestigation {
     evidences: {},
     threat_intels: {},
     enrichments: {},
-    containers: {},
+    tags: {},
     stats: {
       total_observables: 5,
       internal_observables: 1,
@@ -146,10 +146,11 @@ function createGraphTestInvestigation(): CyvestInvestigation {
       total_findings: 0,
       applied_findings: 0,
       findings_by_level: {},
+      total_evidences: 0,
       total_threat_intel: 0,
       threat_intel_by_source: {},
       threat_intel_by_level: {},
-      total_containers: 0,
+      total_tags: 0,
     },
     data_extraction: {
       root_type: "file",
@@ -228,7 +229,7 @@ describe("Graph Traversal", () => {
     });
   });
 
-  describe("getObservableGraph", () => {
+describe("getObservableGraph", () => {
     it("returns correct node count", () => {
       const graph = getObservableGraph(inv);
       expect(graph.nodes).toHaveLength(5);
@@ -256,6 +257,26 @@ describe("Graph Traversal", () => {
       expect(fromEdge).toBeDefined();
       expect(fromEdge?.source).toBe("obs:file:msg1");
       expect(fromEdge?.target).toBe("obs:email:sender@example.com");
+    });
+
+    it("preserves distinct semantic relationships between the same nodes", () => {
+      inv.observables["obs:file:msg1"].relationships.push({
+        target_key: "obs:email:sender@example.com",
+        relationship_type: "extraction",
+        direction: "outbound",
+      });
+
+      const graph = getObservableGraph(inv);
+      const parallelEdges = graph.edges.filter(
+        (edge) =>
+          edge.source === "obs:file:msg1" &&
+          edge.target === "obs:email:sender@example.com"
+      );
+
+      expect(parallelEdges.map((edge) => edge.type).sort()).toEqual([
+        "extraction",
+        "from",
+      ]);
     });
   });
 

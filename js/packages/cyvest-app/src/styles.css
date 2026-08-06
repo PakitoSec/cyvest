@@ -176,9 +176,7 @@ select {
 }
 
 .app-workspace {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 280px;
-  gap: 14px;
+  display: block;
   max-width: 1600px;
   height: calc(100vh - 174px);
   min-height: 520px;
@@ -186,84 +184,15 @@ select {
 }
 
 .app-graph {
+  height: 100%;
   min-width: 0;
   min-height: 0;
 }
 
-.app-inspector {
-  overflow: auto;
-  padding: 16px;
-  border: 1px solid var(--app-border);
-  border-radius: 11px;
-  background: var(--app-surface);
-}
-
-.app-inspector__heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--app-border-soft);
-  color: var(--app-text-muted);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.app-inspector__heading button {
-  padding: 3px 0;
-  border: 0;
-  color: var(--app-text-muted);
-  background: transparent;
-  font-size: 11px;
-  cursor: pointer;
-}
-
-.app-inspector h3 {
-  margin: 18px 0 5px;
-  color: var(--app-text-strong);
-  font-size: 15px;
-  font-weight: 650;
-  overflow-wrap: anywhere;
-}
-
-.app-inspector__id {
-  margin: 0 0 20px;
-  color: var(--app-text-faint);
-  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-  font-size: 10px;
-  overflow-wrap: anywhere;
-}
-
-.app-inspector dl {
-  margin: 0;
-}
-
-.app-inspector dl div {
-  display: grid;
-  grid-template-columns: 92px 1fr;
-  gap: 10px;
-  padding: 10px 0;
-  border-top: 1px solid var(--app-border-soft);
-}
-
-.app-inspector dd {
-  margin: 0;
-  color: var(--app-text);
-  font-size: 12px;
-  overflow-wrap: anywhere;
-}
-
-.app-inspector__empty,
 .app-state {
   color: var(--app-text-muted);
   font-size: 13px;
   line-height: 1.65;
-}
-
-.app-inspector__empty {
-  margin: 18px 0 0;
 }
 
 .app-state {
@@ -293,7 +222,6 @@ select {
   }
 
   .app-workspace {
-    grid-template-columns: 1fr;
     height: auto;
   }
 

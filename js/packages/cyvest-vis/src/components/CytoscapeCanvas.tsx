@@ -1,5 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useRef } from "react";
-import type { Core, ElementDefinition, EventObjectEdge, EventObjectNode, LayoutOptions, Stylesheet } from "cytoscape";
+import type {
+  Core,
+  ElementDefinition,
+  EventObject,
+  EventObjectEdge,
+  EventObjectNode,
+  LayoutOptions,
+  StylesheetJson,
+} from "cytoscape";
 
 import { createCyInstance } from "../core/createCyInstance";
 import { createThemeStyle } from "../core/theme";
@@ -16,7 +24,7 @@ import type {
 
 interface CytoscapeCanvasProps {
   elements: ElementDefinition[];
-  stylesheet: Stylesheet[];
+  stylesheet: StylesheetJson;
   layout: LayoutOptions;
   forceOptions?: CyvestForceOptions;
   physics?: boolean;
@@ -28,6 +36,15 @@ interface CytoscapeCanvasProps {
   onNodeSelect?: (event: CyNodeSelectEvent) => void;
   onEdgeSelect?: (event: CyEdgeSelectEvent) => void;
   showToolbar?: boolean;
+}
+
+const COMPACT_LABELS_WIDTH = 640;
+const COMPACT_FIT_PADDING = 32;
+
+export function updateLabelDensity(cy: Core, containerWidth: number): boolean {
+  const compact = containerWidth < COMPACT_LABELS_WIDTH;
+  cy.nodes().toggleClass("cyvest-compact-label", compact);
+  return compact;
 }
 
 function joinClassNames(...names: Array<string | undefined | false>): string {
@@ -54,11 +71,14 @@ export const CytoscapeCanvas: React.FC<CytoscapeCanvasProps> = ({
   const layoutRef = useRef(layout);
   const forceOptionsRef = useRef(forceOptions);
   const physicsRef = useRef(physics);
+  const onCyReadyRef = useRef(onCyReady);
+  const compactLabelsRef = useRef<boolean | null>(null);
   const simulationRef = useRef<ForceSimulationController | null>(null);
 
   layoutRef.current = layout;
   forceOptionsRef.current = forceOptions;
   physicsRef.current = physics;
+  onCyReadyRef.current = onCyReady;
 
   useEffect(() => {
     if (!containerRef.current) {
@@ -67,7 +87,7 @@ export const CytoscapeCanvas: React.FC<CytoscapeCanvasProps> = ({
 
     const cy = createCyInstance(containerRef.current);
     cyRef.current = cy;
-    onCyReady?.(cy);
+    onCyReadyRef.current?.(cy);
 
     return () => {
       simulationRef.current?.stop();
@@ -75,7 +95,7 @@ export const CytoscapeCanvas: React.FC<CytoscapeCanvasProps> = ({
       cy.destroy();
       cyRef.current = null;
     };
-  }, [onCyReady]);
+  }, []);
 
   const runLayout = useCallback(() => {
     const cy = cyRef.current;
@@ -89,7 +109,7 @@ export const CytoscapeCanvas: React.FC<CytoscapeCanvasProps> = ({
     const runner = cy.layout({
       ...layoutRef.current,
       animate: false,
-    });
+    } as LayoutOptions);
     runner.run();
 
     if (physicsRef.current) {
@@ -110,10 +130,14 @@ export const CytoscapeCanvas: React.FC<CytoscapeCanvasProps> = ({
       cy.elements().remove();
       cy.add(elements);
       cy.style().fromJson(stylesheet).update();
+      compactLabelsRef.current = updateLabelDensity(
+        cy,
+        containerRef.current?.clientWidth ?? 0
+      );
     });
 
     runLayout();
-  }, [elements, runLayout, stylesheet]);
+  }, [elements, physics, runLayout, stylesheet]);
 
   useEffect(() => {
     const cy = cyRef.current;
@@ -158,6 +182,14 @@ export const CytoscapeCanvas: React.FC<CytoscapeCanvasProps> = ({
           typeof data.relationshipType === "string"
             ? data.relationshipType
             : undefined,
+        relationshipFamily:
+          typeof data.relationshipFamily === "string"
+            ? data.relationshipFamily as CyEdgeSelectEvent["relationshipFamily"]
+            : undefined,
+        direction:
+          typeof data.direction === "string"
+            ? data.direction as CyEdgeSelectEvent["direction"]
+            : undefined,
         data,
         element: edge,
       });
@@ -176,7 +208,13 @@ export const CytoscapeCanvas: React.FC<CytoscapeCanvasProps> = ({
       cy.elements().removeClass("cyvest-dimmed cyvest-focus");
     };
 
-    const handleCanvasTap = (event: EventObjectNode | EventObjectEdge) => {
+    const handleEdgeMouseOver = (event: EventObjectEdge) => {
+      cy.elements().addClass("cyvest-dimmed");
+      event.target.removeClass("cyvest-dimmed").addClass("cyvest-focus");
+      event.target.connectedNodes().removeClass("cyvest-dimmed");
+    };
+
+    const handleCanvasTap = (event: EventObject) => {
       if (event.target === cy) {
         cy.elements().unselect();
       }
@@ -185,17 +223,64 @@ export const CytoscapeCanvas: React.FC<CytoscapeCanvasProps> = ({
     cy.on("tap", "node", handleNodeTap);
     cy.on("tap", "edge", handleEdgeTap);
     cy.on("mouseover", "node", handleNodeMouseOver);
+    cy.on("mouseover", "edge", handleEdgeMouseOver);
     cy.on("mouseout", "node", clearFocus);
+    cy.on("mouseout", "edge", clearFocus);
     cy.on("tap", handleCanvasTap);
 
     return () => {
       cy.removeListener("tap", "node", handleNodeTap);
       cy.removeListener("tap", "edge", handleEdgeTap);
       cy.removeListener("mouseover", "node", handleNodeMouseOver);
+      cy.removeListener("mouseover", "edge", handleEdgeMouseOver);
       cy.removeListener("mouseout", "node", clearFocus);
+      cy.removeListener("mouseout", "edge", clearFocus);
       cy.removeListener("tap", handleCanvasTap);
     };
   }, [onEdgeSelect, onNodeSelect]);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    const cy = cyRef.current;
+    if (!container || !cy || typeof ResizeObserver === "undefined") {
+      return;
+    }
+
+    let animationFrame: number | null = null;
+    let settledFitTimer: ReturnType<typeof setTimeout> | null = null;
+    const observer = new ResizeObserver(() => {
+      if (animationFrame !== null) cancelAnimationFrame(animationFrame);
+      animationFrame = requestAnimationFrame(() => {
+        if (cy.destroyed()) return;
+        cy.resize();
+        const compact = updateLabelDensity(cy, container.clientWidth);
+        if (compactLabelsRef.current !== compact) {
+          compactLabelsRef.current = compact;
+          runLayout();
+        }
+        const layoutPadding = (
+          layoutRef.current as LayoutOptions & { padding?: number }
+        ).padding;
+        const padding = typeof layoutPadding === "number" ? layoutPadding : 56;
+        const fitPadding = compact ? Math.min(padding, COMPACT_FIT_PADDING) : padding;
+        const fit = () => {
+          if (!cy.destroyed()) {
+            cy.fit(undefined, fitPadding);
+          }
+        };
+        fit();
+        if (settledFitTimer !== null) clearTimeout(settledFitTimer);
+        settledFitTimer = setTimeout(fit, 520);
+      });
+    });
+    observer.observe(container);
+
+    return () => {
+      observer.disconnect();
+      if (animationFrame !== null) cancelAnimationFrame(animationFrame);
+      if (settledFitTimer !== null) clearTimeout(settledFitTimer);
+    };
+  }, [runLayout]);
 
   const handleFit = useCallback(() => {
     const cy = cyRef.current;
@@ -203,10 +288,13 @@ export const CytoscapeCanvas: React.FC<CytoscapeCanvasProps> = ({
       return;
     }
 
-    const padding =
-      typeof layout.padding === "number" ? layout.padding : 56;
-    cy.fit(undefined, padding);
-  }, [layout.padding]);
+    const layoutPadding = (layout as LayoutOptions & { padding?: number }).padding;
+    const padding = typeof layoutPadding === "number" ? layoutPadding : 56;
+    cy.fit(
+      undefined,
+      compactLabelsRef.current ? Math.min(padding, COMPACT_FIT_PADDING) : padding
+    );
+  }, [layout]);
 
   const handleCenter = useCallback(() => {
     const cy = cyRef.current;
@@ -214,7 +302,11 @@ export const CytoscapeCanvas: React.FC<CytoscapeCanvasProps> = ({
       return;
     }
 
-    cy.center();
+    const root = cy.nodes().filter((node) => node.data("isRoot") === true).first();
+    cy.animate(
+      { center: { eles: root.empty() ? cy.nodes() : root } },
+      { duration: 260 }
+    );
   }, []);
 
   const wrapperStyle = useMemo(

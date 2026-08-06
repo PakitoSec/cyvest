@@ -133,13 +133,15 @@ ip_obs = cv.observable_create(cv.OBS.IPV4, "192.0.2.1", internal=False)
 cv.observable_add_relationship(
     url_obs,  # Can pass ObservableProxy directly
     ip_obs,   # Or use .key for string keys
-    cv.REL.RELATED_TO,
-    cv.DIR.BIDIRECTIONAL,
+    cv.REL.PIVOT,
 )
 ```
 
 Cyvest exposes enums for observable types and relationships via the facade (`cv.OBS`, `cv.REL`, `cv.DIR`)
 so IDEs can autocomplete the official vocabulary without extra imports.
+Relationships describe the analyst pivot that produced the target from the source:
+`EXTRACTION` (target extracted from the source), `PIVOT` (target obtained by enriching
+the source) and `RELATED_TO` (correlation without an established mechanism).
 
 Broad entity types use a subtype and, for locally scoped identifiers, a namespace:
 
@@ -493,7 +495,9 @@ Display differences in a rich table format:
 
 ```python
 from cyvest.io_rich import display_diff
-from logurich import logger
+from logurich import get_logger
+
+logger = get_logger(__name__)
 
 # Display diff table with tree structure showing observables and threat intel
 display_diff(diffs, lambda r: logger.rich("INFO", r), title="Investigation Diff")

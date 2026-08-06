@@ -5,19 +5,19 @@ Demonstrates using ThreadPoolExecutor to run investigation tasks in parallel,
 with each task building a Cyvest fragment that merges into the main investigation.
 """
 
-import logging
 from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any
 
 import click
+from logurich import get_logger
 from logurich.opt_click import click_logger_params
 
 from cyvest import Cyvest
 from cyvest.shared import SharedInvestigationContext
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # ============================================================================
 # Task Framework
@@ -156,20 +156,18 @@ class EmailFrom(BaseRule):
         # Build observable chain with threat intel
         obs = (
             cy.observable(cy.OBS.EMAIL, from_addr)
-            .relate_to(cy.root(), relationship_type=cy.REL.RELATED_TO, direction=cy.DIR.INBOUND)
+            .with_ti("VT", 0, "> test")
             .relate_to(
                 cy.observable(cy.OBS.DOMAIN, from_domain)
                 .with_ti("VT", from_domain_score)
                 .relate_to(
                     cy.observable(cy.OBS.IPV4, from_ip).with_ti("ABUSEIPDB", from_ip_score),
-                    cy.REL.RELATED_TO,
-                    direction=cy.DIR.OUTBOUND,
+                    cy.REL.PIVOT,
                 ),
-                cy.REL.RELATED_TO,
-                direction=cy.DIR.OUTBOUND,
+                cy.REL.EXTRACTION,
             )
-            .with_ti("VT", 0, "> test")
         )
+        cy.root().relate_to(obs, cy.REL.EXTRACTION)
 
         # Create finding for header analysis
         cy.finding("from", "test email vt 10", "> ok boys").link_observable(obs).tagged("emails")
@@ -218,11 +216,11 @@ class EmailReciever(BaseRule):
         logger.info("Analyzing email receiver")
 
         cy.enrichment_create("receiver", {"receiver": ["ok"]}, context="from splunk")
-        cy.finding("receiver", "description", "> receiver").with_score(0.1).link_observable(
-            cy.observable(cy.OBS.EMAIL, "user@company.com").relate_to(
-                cy.root(), cy.REL.RELATED_TO, direction=cy.DIR.INBOUND
-            )
-        ).tagged("emails")
+        receiver = cy.observable(cy.OBS.EMAIL, "user@company.com")
+        cy.root().relate_to(receiver, cy.REL.EXTRACTION)
+        cy.finding("receiver", "description", "> receiver").with_score(0.1).link_observable(receiver).tagged(
+            "emails"
+        )
 
         logger.info("Email receiver analysis complete")
 
@@ -252,6 +250,8 @@ class BodiesUrlTask(BaseRule):
 
         # Create tag for URL findings
         tag = cy.tag("bodies:urls", "Bodies URLs Analysis")
+        body_obs = cy.observable(cy.OBS.FILE, "BODY/HTML")
+        cy.root().relate_to(body_obs, cy.REL.EXTRACTION)
 
         # Analyze each URL
         for url_data in urls_with_scores:
@@ -267,12 +267,9 @@ class BodiesUrlTask(BaseRule):
                     matching_domain = domain
                     break
             url_obs = cy.observable(cy.OBS.URL, url).with_ti("VT", score)
+            body_obs.relate_to(url_obs, cy.REL.EXTRACTION)
             if matching_domain:
-                url_obs.relate_to(
-                    cy.observable(cy.OBS.DOMAIN, matching_domain),
-                    cy.REL.RELATED_TO,
-                    direction=cy.DIR.INBOUND,
-                )
+                cy.observable(cy.OBS.DOMAIN, matching_domain).relate_to(url_obs, cy.REL.PIVOT)
 
             # Create finding and link to tag
             chk = (
@@ -308,6 +305,8 @@ class BodiesDomainTask(BaseRule):
 
         # Create tag for domain findings
         tag = cy.tag("bodies:domains", "Bodies Domains Analysis")
+        body_obs = cy.observable(cy.OBS.FILE, "BODY/HTML")
+        cy.root().relate_to(body_obs, cy.REL.EXTRACTION)
 
         # Analyze each domain
         for domain_data in domains_with_scores:
@@ -317,17 +316,8 @@ class BodiesDomainTask(BaseRule):
             logger.info(f"Analyzing domain: {domain} (score: {score})")
 
             # Build Domain observable with relationships
-            domain_obs = (
-                cy.observable(cy.OBS.DOMAIN, domain)
-                .with_ti("VT", score)
-                .relate_to(
-                    cy.observable(cy.OBS.FILE, "BODY/HTML").relate_to(
-                        cy.root(), cy.REL.RELATED_TO, direction=cy.DIR.INBOUND
-                    ),
-                    cy.REL.RELATED_TO,
-                    direction=cy.DIR.INBOUND,
-                )
-            )
+            domain_obs = cy.observable(cy.OBS.DOMAIN, domain).with_ti("VT", score)
+            body_obs.relate_to(domain_obs, cy.REL.EXTRACTION)
 
             # Create finding and link to tag
             chk = (
@@ -373,14 +363,12 @@ class AttachmentTask(BaseRule):
             logger.info(f"Analyzing attachment: {filename} (score: {score})")
 
             # Build file observable with hash observables
-            file_obs = (
-                cy.observable(cy.OBS.FILE, filename)
-                .relate_to(cy.root(), cy.REL.RELATED_TO, direction=cy.DIR.INBOUND)
-                .relate_to(
-                    cy.observable(cy.OBS.HASH, f"MD5:{md5_hash}").with_ti("VT", score, "MD5 hash analysis"),
-                    cy.REL.RELATED_TO,
-                )
+            file_obs = cy.observable(cy.OBS.FILE, filename)
+            hash_obs = cy.observable(cy.OBS.HASH, f"MD5:{md5_hash}").with_ti(
+                "VT", score, "MD5 hash analysis"
             )
+            cy.root().relate_to(file_obs, cy.REL.EXTRACTION)
+            hash_obs.relate_to(file_obs, cy.REL.EXTRACTION, direction=cy.DIR.INBOUND)
 
             # Add threat intel based on score
             if score >= 5:

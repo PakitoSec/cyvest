@@ -222,7 +222,7 @@ class ScoreEngine:
             # Propagate to linked findings
             self._propagate_observable_to_findings(observable.key)
 
-    def _calculate_observable_score(self, observable: Observable, visited: set[str] | None = None) -> Decimal:
+    def _calculate_observable_score(self, observable: Observable) -> Decimal:
         """
         Calculate the complete observable score based on threat intel and hierarchical relationships.
 
@@ -230,6 +230,11 @@ class ScoreEngine:
         - OUTBOUND relationships: target is a hierarchical child
         - INBOUND relationships: source has inbound to this observable (source is child)
         - BIDIRECTIONAL relationships: excluded from hierarchy
+
+        The score is compositional: it depends only on the observable's own threat
+        intel and on its subtree, never on the traversal order. An observable
+        reachable through several independent deduction chains contributes to each
+        of them, which is corroboration rather than double counting.
 
         Root Barrier in Calculation:
         When collecting child scores, observables with value="root" (root) are SKIPPED.
@@ -244,27 +249,49 @@ class ScoreEngine:
 
         Args:
             observable: The observable to calculate score for
-            visited: Set of visited observable keys to prevent cycles
 
         Returns:
             Calculated score based on score_mode:
             - MAX mode: max(all TI scores, all child scores)
             - SUM mode: max(TI scores) + sum(child scores)
         """
-        # Initialize visited set for cycle detection
-        if visited is None:
-            visited = set()
+        score, _ = self._calculate_subtree_score(observable, frozenset(), {})
+        return score
 
-        # Prevent infinite recursion
-        if observable.key in visited:
-            # Return only the observable's own TI score (don't recurse)
-            return max((ti.score for ti in observable.threat_intels), default=Decimal("0"))
+    def _calculate_subtree_score(
+        self,
+        observable: Observable,
+        path: frozenset[str],
+        memo: dict[str, Decimal],
+    ) -> tuple[Decimal, bool]:
+        """
+        Compute the subtree score of an observable along one traversal path.
 
-        # Mark this observable as visited
-        visited.add(observable.key)
+        `path` holds the ancestors of the current traversal only, so it cuts cycles
+        without deduplicating observables shared by sibling branches. Because an
+        acyclic subtree score is path-independent, it is memoized in `memo` and the
+        traversal stays linear on directed acyclic hierarchies.
 
+        Args:
+            observable: The observable to score
+            path: Keys of the ancestors on the current traversal path
+            memo: Cache of subtree scores that were computed without cutting a cycle
+
+        Returns:
+            The subtree score, and whether it was computed without cutting a cycle
+        """
         # Get max threat intel score for this observable
         max_ti_score = max((ti.score for ti in observable.threat_intels), default=Decimal("0"))
+
+        # Cycle barrier: an ancestor is revisited, stop at its own TI score
+        if observable.key in path:
+            return max_ti_score, False
+
+        cached = memo.get(observable.key)
+        if cached is not None:
+            return cached, True
+
+        child_path = path | {observable.key}
 
         # Collect child observable scores recursively
         # Children are defined two ways:
@@ -274,6 +301,7 @@ class ScoreEngine:
         # Root Barrier Note: Root (value="root") is SKIPPED when appearing as a child
         # to prevent cross-contamination between observables linked through root
         child_scores = []
+        cycle_free = True
 
         # Method 1: OUTBOUND relationships from this observable
         for rel in observable.relationships:
@@ -285,8 +313,9 @@ class ScoreEngine:
                     if child.value == "root":
                         continue
                     # Recursively calculate child's complete score
-                    child_score = self._calculate_observable_score(child, visited)
+                    child_score, child_cycle_free = self._calculate_subtree_score(child, child_path, memo)
                     child_scores.append(child_score)
+                    cycle_free = cycle_free and child_cycle_free
 
         # Method 2: Other observables with INBOUND relationships pointing to this observable
         # If obs_x has INBOUND to this observable, then obs_x is a child
@@ -299,18 +328,23 @@ class ScoreEngine:
             for rel in other_obs.relationships:
                 if rel.direction == RelationshipDirection.INBOUND and rel.target_key == observable.key:
                     # other_obs has INBOUND to this observable, so other_obs is a child
-                    child_score = self._calculate_observable_score(other_obs, visited)
+                    child_score, child_cycle_free = self._calculate_subtree_score(other_obs, child_path, memo)
                     child_scores.append(child_score)
+                    cycle_free = cycle_free and child_cycle_free
 
         # Calculate final score based on mode
         if self._score_mode_obs == ScoreMode.MAX:
             # MAX mode: take maximum of all scores (TI + children)
-            all_scores = [max_ti_score] + child_scores
-            return max(all_scores, default=Decimal("0"))
+            score = max([max_ti_score] + child_scores, default=Decimal("0"))
         else:
             # SUM mode: max TI score + sum of child scores
-            sum_children = sum(child_scores, Decimal("0"))
-            return max_ti_score + sum_children
+            score = max_ti_score + sum(child_scores, Decimal("0"))
+
+        # Only a cycle-free subtree has a path-independent score, so only it is cacheable
+        if cycle_free:
+            memo[observable.key] = score
+
+        return score, cycle_free
 
     def _propagate_to_parent_observables(self, observable: Observable) -> None:
         """

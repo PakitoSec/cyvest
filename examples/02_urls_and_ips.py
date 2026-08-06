@@ -5,16 +5,15 @@ Demonstrates investigating multiple URLs and their associated IP addresses
 with relationship tracking.
 """
 
-import logging
 import tempfile
 from decimal import Decimal
 from pathlib import Path
 
-from logurich import init_logger
+from logurich import get_logger, init_logger
 
 from cyvest import Cyvest
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def main() -> None:

@@ -84,7 +84,9 @@ Use `display_diff()` to render differences as a rich table:
 
 ```python
 from cyvest.io_rich import display_diff
-from logurich import logger
+from logurich import get_logger
+
+logger = get_logger(__name__)
 
 display_diff(diffs, lambda r: logger.rich("INFO", r), title="Investigation Diff")
 ```

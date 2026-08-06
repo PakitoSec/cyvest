@@ -741,7 +741,7 @@ Relationships let you link observables together. Use the Cyvest facade or proxy 
 cv.observable_add_relationship(
     source=url,  # Observable proxy
     target=ip,   # Observable proxy
-    relationship_type=cv.REL.RELATED_TO,
+    relationship_type=cv.REL.PIVOT,
 )
 
 # Override direction to control score hierarchy
@@ -760,7 +760,18 @@ cv.observable_add_relationship(
 )
 ```
 
-`RELATED_TO` defaults to `BIDIRECTIONAL`. Choose `OUTBOUND` or `INBOUND` when you need explicit parent/child scoring.
+The vocabulary describes the analyst pivot that produced the target from the
+source, not an ontology of the entities themselves. Read an edge as
+"source → what I deduced from it":
+
+| Type | Meaning | Default direction |
+| --- | --- | --- |
+| `EXTRACTION` | The target was extracted from the source: a URL in an email body, a hash of a file, an IP in a header. | `OUTBOUND` |
+| `PIVOT` | The target was obtained by enriching the source: DNS resolution, whois, threat intel, sandbox detonation. | `OUTBOUND` |
+| `RELATED_TO` | The observables correlate but the deduction mechanism is not established. | `BIDIRECTIONAL` |
+
+An explicit direction always wins and remains the source of score propagation
+semantics.
 
 ## Key Generation
 

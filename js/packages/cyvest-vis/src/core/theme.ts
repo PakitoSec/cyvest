@@ -20,6 +20,10 @@ export function createThemeStyle(
     "--cyvest-panel-text": resolved.panelText,
     "--cyvest-panel-muted": resolved.panelTextMuted,
     "--cyvest-accent": resolved.accent,
+    "--cyvest-selection-surface": resolved.selectionSurface,
+    "--cyvest-edge-extraction": resolved.edgeExtractionColor,
+    "--cyvest-edge-pivot": resolved.edgePivotColor,
+    "--cyvest-edge-association": resolved.edgeAssociationColor,
     "--cyvest-font-family": resolved.fontFamily,
   } as React.CSSProperties;
 }

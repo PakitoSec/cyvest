@@ -1,10 +1,11 @@
 # @cyvest/cyvest-vis
 
-React components for exploring the observable relationship graph of a Cyvest
-investigation with Cytoscape and `d3-force`.
+React components for exploring a Cyvest investigation as a typed,
+community-aware observable graph with Cytoscape and `d3-force`.
 
-The default design uses a neutral canvas, compact nodes, thin edges, and a
-restrained level palette. Color is limited to security-level contours.
+The complete explorer includes search, semantic filters, an interactive
+relationship legend, and a node/edge inspector. Security color stays on nodes;
+line weight and rhythm distinguish edge families.
 
 ## Usage
 
@@ -21,12 +22,16 @@ import "@cyvest/cyvest-vis/styles.css";
 />
 ```
 
-`CyvestGraph` and `CyvestObservablesView` render the same observable graph.
-`CyvestGraph` is the concise public entry point.
+`CyvestGraph` is the complete public explorer. Use `controls="compact"` for the
+canvas toolbar only, or `controls="none"` for an unadorned embedded view. The
+low-level `CyvestObservablesView` remains available for custom shells.
 
 Hovering a node isolates its immediate neighborhood. The initial placement is
-deterministic; a live force simulation then settles the graph and is reheated
-while nodes are dragged.
+deterministic. The investigation subject stays at the center while semantic
+branches receive stable angular sectors on the first ring. Cross-linked
+branches are placed next to each other, then directional pivot links
+form small outward-facing trees inside each sector. Weak links can connect
+sectors without collapsing them into one cloud.
 
 ## Force layout
 
@@ -34,19 +39,41 @@ while nodes are dragged.
 <CyvestGraph
   investigation={investigation}
   layout={{
-    linkDistance: 116,
-    chargeStrength: -420,
-    collisionPadding: 30,
-    radialStep: 126,
+    layerSpacing: 148,
+    layerStrength: 0.9,
+    siblingSpacing: 132,
+    collisionPadding: 24,
   }}
 />
 ```
 
 Set `physics={false}` to keep only the deterministic initial placement.
 
-Available settings include `linkDistance`, `linkStrength`, `chargeStrength`,
-`collisionPadding`, `radialStep`, `radialStrength`, `centerStrength`,
-`iterations`, `padding`, and animation options.
+Available settings include `layerSpacing`, `layerStrength`, `siblingSpacing`,
+`chargeStrength`, `collisionPadding`, `rootLinkDistance`, `rootLinkStrength`,
+`iterations`, padding, and animation options. Legacy layout options remain
+accepted for API compatibility.
+
+## Relationship profiles
+
+Edges are grouped into three families that mirror the analyst pivot recorded in
+the investigation: `extraction`, `pivot`, and `association`. Custom relationship
+strings default to the weak `association` family. Override them without adding
+visual metadata to the investigation JSON:
+
+```tsx
+<CyvestGraph
+  investigation={investigation}
+  relationshipProfiles={{
+    "downloaded-from": {
+      family: "pivot",
+      distance: 124,
+      strength: 0.58,
+      lineStyle: "dashed",
+    },
+  }}
+/>
+```
 
 ## Theming
 

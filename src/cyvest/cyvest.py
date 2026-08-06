@@ -18,7 +18,6 @@ from decimal import Decimal
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Final, Literal, overload
 
-import logurich  # noqa: F401
 from logurich import get_logger
 
 from cyvest import keys
@@ -594,7 +593,7 @@ class Cyvest:
         self,
         source: Observable | ObservableProxy | str,
         target: Observable | ObservableProxy | str,
-        relationship_type: RelationshipType,
+        relationship_type: RelationshipType | str,
         direction: RelationshipDirection | None = None,
     ) -> ObservableProxy:
         """

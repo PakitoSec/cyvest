@@ -2,7 +2,7 @@
   "schema_version": "6.0.0",
   "investigation_id": "cyvest-visual-example",
   "investigation_name": "Visualization Example",
-  "score": 39.5,
+  "score": 37.5,
   "level": "MALICIOUS",
   "whitelisted": false,
   "whitelists": [],
@@ -25,21 +25,6 @@
       "relationships": [
         {
           "target_key": "obs:artifact:phishing email - invoice #12345",
-          "relationship_type": "related-to",
-          "direction": "bidirectional"
-        },
-        {
-          "target_key": "obs:domain:sketchy-site.net",
-          "relationship_type": "related-to",
-          "direction": "bidirectional"
-        },
-        {
-          "target_key": "obs:domain:google.com",
-          "relationship_type": "related-to",
-          "direction": "bidirectional"
-        },
-        {
-          "target_key": "obs:domain:new-service.cloud",
           "relationship_type": "related-to",
           "direction": "bidirectional"
         }
@@ -91,7 +76,7 @@
       "relationships": [
         {
           "target_key": "obs:domain:evil-phishing.com",
-          "relationship_type": "related-to",
+          "relationship_type": "pivot",
           "direction": "outbound"
         }
       ],
@@ -120,7 +105,7 @@
       "relationships": [
         {
           "target_key": "obs:ipv4:192.168.100.5",
-          "relationship_type": "related-to",
+          "relationship_type": "pivot",
           "direction": "outbound"
         }
       ],
@@ -210,7 +195,7 @@
       "whitelisted": false,
       "comment": "",
       "extra": {},
-      "score": 10.0,
+      "score": 9.0,
       "level": "MALICIOUS",
       "aliases": [],
       "occurrence_count": 1,
@@ -220,22 +205,32 @@
       "relationships": [
         {
           "target_key": "obs:email:attacker@evil-phishing.com",
-          "relationship_type": "related-to",
+          "relationship_type": "extraction",
           "direction": "outbound"
         },
         {
           "target_key": "obs:email:victim@company.com",
-          "relationship_type": "related-to",
+          "relationship_type": "extraction",
           "direction": "outbound"
         },
         {
           "target_key": "obs:url:https://evil-phishing.com/login",
-          "relationship_type": "related-to",
+          "relationship_type": "extraction",
           "direction": "outbound"
         },
         {
           "target_key": "obs:url:https://evil-phishing.com/verify",
-          "relationship_type": "related-to",
+          "relationship_type": "extraction",
+          "direction": "outbound"
+        },
+        {
+          "target_key": "obs:url:https://sketchy-site.net/invoice",
+          "relationship_type": "extraction",
+          "direction": "outbound"
+        },
+        {
+          "target_key": "obs:url:https://accounts.google.com/security",
+          "relationship_type": "extraction",
           "direction": "outbound"
         }
       ],
@@ -243,7 +238,7 @@
       "finding_links": [
         "fnd:email_analysis"
       ],
-      "score_display": "10.00"
+      "score_display": "9.00"
     },
     "obs:url:https://evil-phishing.com/login": {
       "type": "url",
@@ -254,7 +249,7 @@
       "whitelisted": false,
       "comment": "",
       "extra": {},
-      "score": 10.0,
+      "score": 9.0,
       "level": "MALICIOUS",
       "aliases": [],
       "occurrence_count": 1,
@@ -265,14 +260,14 @@
         {
           "target_key": "obs:domain:evil-phishing.com",
           "relationship_type": "related-to",
-          "direction": "outbound"
+          "direction": "bidirectional"
         }
       ],
       "key": "obs:url:https://evil-phishing.com/login",
       "finding_links": [
         "fnd:url_analysis"
       ],
-      "score_display": "10.00"
+      "score_display": "9.00"
     },
     "obs:url:https://evil-phishing.com/verify": {
       "type": "url",
@@ -283,7 +278,7 @@
       "whitelisted": false,
       "comment": "",
       "extra": {},
-      "score": 9.0,
+      "score": 8.5,
       "level": "MALICIOUS",
       "aliases": [],
       "occurrence_count": 1,
@@ -294,14 +289,64 @@
         {
           "target_key": "obs:domain:evil-phishing.com",
           "relationship_type": "related-to",
-          "direction": "outbound"
+          "direction": "bidirectional"
         }
       ],
       "key": "obs:url:https://evil-phishing.com/verify",
       "finding_links": [
         "fnd:url_analysis"
       ],
-      "score_display": "9.00"
+      "score_display": "8.50"
+    },
+    "obs:url:https://sketchy-site.net/invoice": {
+      "type": "url",
+      "subtype": null,
+      "namespace": null,
+      "value": "https://sketchy-site.net/invoice",
+      "internal": false,
+      "whitelisted": false,
+      "comment": "",
+      "extra": {},
+      "score": 4.5,
+      "level": "SUSPICIOUS",
+      "aliases": [],
+      "occurrence_count": 1,
+      "threat_intels": [
+        "ti:urlhaus:obs:url:https://sketchy-site.net/invoice"
+      ],
+      "relationships": [
+        {
+          "target_key": "obs:domain:sketchy-site.net",
+          "relationship_type": "related-to",
+          "direction": "bidirectional"
+        }
+      ],
+      "key": "obs:url:https://sketchy-site.net/invoice",
+      "finding_links": [
+        "fnd:url_analysis"
+      ],
+      "score_display": "4.50"
+    },
+    "obs:url:https://accounts.google.com/security": {
+      "type": "url",
+      "subtype": null,
+      "namespace": null,
+      "value": "https://accounts.google.com/security",
+      "internal": false,
+      "whitelisted": true,
+      "comment": "",
+      "extra": {},
+      "score": -2.0,
+      "level": "TRUSTED",
+      "aliases": [],
+      "occurrence_count": 1,
+      "threat_intels": [
+        "ti:internal whitelist:obs:url:https://accounts.google.com/security"
+      ],
+      "relationships": [],
+      "key": "obs:url:https://accounts.google.com/security",
+      "finding_links": [],
+      "score_display": "-2.00"
     },
     "obs:file:invoice.exe": {
       "type": "file",
@@ -322,8 +367,8 @@
       "relationships": [
         {
           "target_key": "obs:url:https://evil-phishing.com/login",
-          "relationship_type": "related-to",
-          "direction": "inbound"
+          "relationship_type": "extraction",
+          "direction": "outbound"
         },
         {
           "target_key": "obs:ipv4:185.220.101.50",
@@ -336,48 +381,6 @@
         "fnd:malware_detection"
       ],
       "score_display": "10.00"
-    },
-    "obs:domain:google.com": {
-      "type": "domain",
-      "subtype": null,
-      "namespace": null,
-      "value": "google.com",
-      "internal": false,
-      "whitelisted": true,
-      "comment": "",
-      "extra": {},
-      "score": -2.0,
-      "level": "TRUSTED",
-      "aliases": [],
-      "occurrence_count": 1,
-      "threat_intels": [
-        "ti:internal whitelist:obs:domain:google.com"
-      ],
-      "relationships": [],
-      "key": "obs:domain:google.com",
-      "finding_links": [],
-      "score_display": "-2.00"
-    },
-    "obs:domain:new-service.cloud": {
-      "type": "domain",
-      "subtype": null,
-      "namespace": null,
-      "value": "new-service.cloud",
-      "internal": false,
-      "whitelisted": false,
-      "comment": "",
-      "extra": {},
-      "score": 2.0,
-      "level": "NOTABLE",
-      "aliases": [],
-      "occurrence_count": 1,
-      "threat_intels": [
-        "ti:passive dns:obs:domain:new-service.cloud"
-      ],
-      "relationships": [],
-      "key": "obs:domain:new-service.cloud",
-      "finding_links": [],
-      "score_display": "2.00"
     }
   },
   "findings": {
@@ -386,7 +389,7 @@
       "description": "Phishing email analysis",
       "comment": "",
       "extra": {},
-      "score": 10.0,
+      "score": 9.0,
       "level": "MALICIOUS",
       "origin_investigation_id": "cyvest-visual-example",
       "observable_links": [
@@ -405,14 +408,14 @@
       ],
       "evidence_links": [],
       "key": "fnd:email_analysis",
-      "score_display": "10.00"
+      "score_display": "9.00"
     },
     "fnd:url_analysis": {
       "finding_name": "url_analysis",
       "description": "Malicious URLs found in email",
       "comment": "",
       "extra": {},
-      "score": 10.0,
+      "score": 9.0,
       "level": "MALICIOUS",
       "origin_investigation_id": "cyvest-visual-example",
       "observable_links": [
@@ -423,11 +426,15 @@
         {
           "observable_key": "obs:url:https://evil-phishing.com/verify",
           "propagation_mode": "LOCAL_ONLY"
+        },
+        {
+          "observable_key": "obs:url:https://sketchy-site.net/invoice",
+          "propagation_mode": "LOCAL_ONLY"
         }
       ],
       "evidence_links": [],
       "key": "fnd:url_analysis",
-      "score_display": "10.00"
+      "score_display": "9.00"
     },
     "fnd:infrastructure": {
       "finding_name": "infrastructure",
@@ -582,6 +589,28 @@
       "key": "ti:urlhaus:obs:url:https://evil-phishing.com/verify",
       "score_display": "8.50"
     },
+    "ti:urlhaus:obs:url:https://sketchy-site.net/invoice": {
+      "source": "URLhaus",
+      "observable_key": "obs:url:https://sketchy-site.net/invoice",
+      "comment": "Low-confidence redirect",
+      "extra": {},
+      "score": 4.5,
+      "level": "SUSPICIOUS",
+      "taxonomies": [],
+      "key": "ti:urlhaus:obs:url:https://sketchy-site.net/invoice",
+      "score_display": "4.50"
+    },
+    "ti:internal whitelist:obs:url:https://accounts.google.com/security": {
+      "source": "Internal Whitelist",
+      "observable_key": "obs:url:https://accounts.google.com/security",
+      "comment": "Known safe link",
+      "extra": {},
+      "score": -2.0,
+      "level": "TRUSTED",
+      "taxonomies": [],
+      "key": "ti:internal whitelist:obs:url:https://accounts.google.com/security",
+      "score_display": "-2.00"
+    },
     "ti:virustotal:obs:file:invoice.exe": {
       "source": "VirusTotal",
       "observable_key": "obs:file:invoice.exe",
@@ -592,28 +621,6 @@
       "taxonomies": [],
       "key": "ti:virustotal:obs:file:invoice.exe",
       "score_display": "10.00"
-    },
-    "ti:internal whitelist:obs:domain:google.com": {
-      "source": "Internal Whitelist",
-      "observable_key": "obs:domain:google.com",
-      "comment": "Known good domain",
-      "extra": {},
-      "score": -2.0,
-      "level": "TRUSTED",
-      "taxonomies": [],
-      "key": "ti:internal whitelist:obs:domain:google.com",
-      "score_display": "-2.00"
-    },
-    "ti:passive dns:obs:domain:new-service.cloud": {
-      "source": "Passive DNS",
-      "observable_key": "obs:domain:new-service.cloud",
-      "comment": "Recently registered domain",
-      "extra": {},
-      "score": 2.0,
-      "level": "NOTABLE",
-      "taxonomies": [],
-      "key": "ti:passive dns:obs:domain:new-service.cloud",
-      "score_display": "2.00"
     }
   },
   "enrichments": {},
@@ -641,7 +648,7 @@
         "fnd:email_analysis"
       ],
       "key": "tag:phishing:investigation:email",
-      "direct_score": 10.0,
+      "direct_score": 9.0,
       "direct_level": "MALICIOUS"
     },
     "tag:phishing:investigation:network": {
@@ -652,7 +659,7 @@
         "fnd:infrastructure"
       ],
       "key": "tag:phishing:investigation:network",
-      "direct_score": 19.5,
+      "direct_score": 18.5,
       "direct_level": "MALICIOUS"
     },
     "tag:phishing:investigation:malware": {
@@ -673,18 +680,17 @@
     "whitelisted_observables": 1,
     "observables_by_type": {
       "file": 2,
-      "domain": 4,
+      "domain": 2,
       "ipv4": 2,
       "email": 2,
       "artifact": 1,
-      "url": 2
+      "url": 4
     },
     "observables_by_level": {
       "INFO": 1,
       "MALICIOUS": 7,
-      "SUSPICIOUS": 2,
-      "TRUSTED": 2,
-      "NOTABLE": 1
+      "SUSPICIOUS": 3,
+      "TRUSTED": 2
     },
     "observables_by_type_and_level": {
       "file": {
@@ -693,9 +699,7 @@
       },
       "domain": {
         "MALICIOUS": 1,
-        "SUSPICIOUS": 1,
-        "TRUSTED": 1,
-        "NOTABLE": 1
+        "SUSPICIOUS": 1
       },
       "ipv4": {
         "MALICIOUS": 1,
@@ -709,7 +713,9 @@
         "MALICIOUS": 1
       },
       "url": {
-        "MALICIOUS": 2
+        "MALICIOUS": 2,
+        "SUSPICIOUS": 1,
+        "TRUSTED": 1
       }
     },
     "total_findings": 4,
@@ -734,14 +740,12 @@
       "EmailRep": 1,
       "Internal Whitelist": 2,
       "Email Gateway": 1,
-      "URLhaus": 2,
-      "Passive DNS": 1
+      "URLhaus": 3
     },
     "threat_intel_by_level": {
       "MALICIOUS": 8,
-      "SUSPICIOUS": 2,
-      "TRUSTED": 2,
-      "NOTABLE": 1
+      "SUSPICIOUS": 3,
+      "TRUSTED": 2
     },
     "total_tags": 5
   },
@@ -749,5 +753,5 @@
     "root_type": "file",
     "score_mode_obs": "max"
   },
-  "score_display": "39.50"
+  "score_display": "37.50"
 }

@@ -262,7 +262,7 @@ class ObservableProxy(_ReadOnlyProxy[Observable]):
     def relate_to(
         self,
         target: Observable | ObservableProxy | str,
-        relationship_type: RelationshipType,
+        relationship_type: RelationshipType | str,
         direction: RelationshipDirection | None = None,
     ) -> ObservableProxy:
         """Create a relationship to another observable."""

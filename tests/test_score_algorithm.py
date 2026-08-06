@@ -1010,3 +1010,61 @@ def test_root_propagates_to_findings_not_parents() -> None:
     # Finding should now get max of both observables (root=8.0, ip=5.0)
     assert finding.score == Decimal("8.0")
     assert finding.level == Cyvest.LVL.MALICIOUS
+
+
+def _build_shared_subtree(cv: Cyvest, reversed_branches: bool) -> tuple[Decimal, Decimal, Decimal]:
+    """Build parent → (branch_a, branch_b) → shared → leaf and return the three upper scores."""
+    parent = cv.observable_create(Cyvest.OBS.FILE, "report.eml")
+    branch_a = cv.observable_create(Cyvest.OBS.DOMAIN, "a.example")
+    cv.observable_add_threat_intel(branch_a.key, source="vt", score=Decimal("1.0"))
+    branch_b = cv.observable_create(Cyvest.OBS.DOMAIN, "b.example")
+    cv.observable_add_threat_intel(branch_b.key, source="vt", score=Decimal("2.0"))
+    shared = cv.observable_create(Cyvest.OBS.IPV4, "192.0.2.9")
+    cv.observable_add_threat_intel(shared.key, source="vt", score=Decimal("1.0"))
+    leaf = cv.observable_create(Cyvest.OBS.HASH, "MD5:deadbeef")
+    cv.observable_add_threat_intel(leaf.key, source="vt", score=Decimal("10.0"))
+
+    cv.observable_add_relationship(shared.key, leaf.key, "pivot", Cyvest.DIR.OUTBOUND)
+    for branch in ([branch_b, branch_a] if reversed_branches else [branch_a, branch_b]):
+        cv.observable_add_relationship(parent.key, branch.key, "extraction", Cyvest.DIR.OUTBOUND)
+        cv.observable_add_relationship(branch.key, shared.key, "pivot", Cyvest.DIR.OUTBOUND)
+
+    return parent.score, branch_a.score, branch_b.score
+
+
+def test_shared_subtree_counts_in_every_branch() -> None:
+    """An observable reachable from two branches expands fully in each of them."""
+    cv = Cyvest(score_mode_obs=ScoreMode.SUM)
+
+    parent_score, branch_a_score, branch_b_score = _build_shared_subtree(cv, reversed_branches=False)
+
+    # shared subtree = 1.0 + 10.0, so each branch carries it entirely
+    assert branch_a_score == Decimal("12.0")
+    assert branch_b_score == Decimal("13.0")
+    # The parent score stays compositional: max(TI) + sum(children)
+    assert parent_score == branch_a_score + branch_b_score
+
+
+def test_shared_subtree_score_is_independent_of_branch_order() -> None:
+    """Score must not depend on the order observables and relationships were inserted."""
+    direct = _build_shared_subtree(Cyvest(score_mode_obs=ScoreMode.SUM), reversed_branches=False)
+    reversed_order = _build_shared_subtree(Cyvest(score_mode_obs=ScoreMode.SUM), reversed_branches=True)
+
+    assert direct == reversed_order
+
+
+def test_relationship_cycle_is_cut_without_infinite_recursion() -> None:
+    """A cycle stops at the revisited ancestor, which keeps only its own threat intel."""
+    cv = Cyvest(score_mode_obs=ScoreMode.SUM)
+
+    first = cv.observable_create(Cyvest.OBS.DOMAIN, "x.example")
+    cv.observable_add_threat_intel(first.key, source="vt", score=Decimal("1.0"))
+    second = cv.observable_create(Cyvest.OBS.DOMAIN, "y.example")
+    cv.observable_add_threat_intel(second.key, source="vt", score=Decimal("2.0"))
+
+    cv.observable_add_relationship(first.key, second.key, "pivot", Cyvest.DIR.OUTBOUND)
+    cv.observable_add_relationship(second.key, first.key, "pivot", Cyvest.DIR.OUTBOUND)
+
+    # first = 1.0 + (2.0 + first truncated to its own TI 1.0)
+    assert first.score == Decimal("4.0")
+    assert second.score == Decimal("5.0")

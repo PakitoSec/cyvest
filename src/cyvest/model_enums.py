@@ -77,15 +77,27 @@ class RelationshipDirection(str, Enum):
 
 
 class RelationshipType(str, Enum):
-    """Relationship types supported by Cyvest."""
+    """
+    Relationship types supported by Cyvest.
 
+    The vocabulary describes the analyst pivot that produced the target from the
+    source, not an ontology of the entities themselves.
+    """
+
+    # The target was extracted from the source (URL in an email, hash of a file).
+    EXTRACTION = "extraction"
+    # The target was obtained by enriching the source (DNS, whois, threat intel, sandbox).
+    PIVOT = "pivot"
+    # The observables correlate but the deduction mechanism is not established.
     RELATED_TO = "related-to"
 
     def get_default_direction(self) -> RelationshipDirection:
         """
         Get the default direction for this relationship type.
         """
-        return RelationshipDirection.BIDIRECTIONAL
+        if self is RelationshipType.RELATED_TO:
+            return RelationshipDirection.BIDIRECTIONAL
+        return RelationshipDirection.OUTBOUND
 
 
 class PropagationMode(str, Enum):

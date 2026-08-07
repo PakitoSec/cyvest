@@ -77,7 +77,7 @@ When dependencies change upstream, re-run `uv sync --all-extras` (or `pip instal
 ## Optional Integrations
 
 - `mkdocs` + `mkdocs-material` for local docs previews (`mkdocs serve`)
-- `pyvis` via `pip install "cyvest[visualization]"` for the interactive network graph CLI
+- `@cyvest/cyvest-vis` for interactive graph rendering, see [JS packages](../js-packages.md)
 - Any asyncio, queue, or orchestration library—Cyvest stays synchronous but interoperates through shared context managers
 
 ---

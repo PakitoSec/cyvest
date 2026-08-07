@@ -1,15 +1,9 @@
 """
-Example: Network Visualization with Pyvis
+Example: Graph dataset for the @cyvest/cyvest-vis renderer
 
-This example demonstrates the network visualization feature that generates
-an interactive HTML graph showing observables and their relationships.
-
-The visualization uses the Rich color scheme:
-- Nodes are colored by security level (red=malicious, yellow=suspicious, green=safe, etc.)
-- Node sizes are based on scores (higher scores = larger nodes)
-- Node shapes represent observable types (diamonds=domains, dots=IPs, boxes=URLs, etc.)
-- Edges are colored by relationship direction (blue=outbound, pink=inbound, purple=bidirectional)
-- Edge labels show the relationship type
+Builds a rich investigation covering scores, levels, and relationship flows, then
+exports it as JSON. Feed the resulting file to the `@cyvest/cyvest-vis` React
+component to explore the graph interactively.
 """
 
 import tempfile
@@ -168,11 +162,6 @@ def main(no_audit_log: bool = False, output: Path | None = None) -> None:
     json_path = cv.io_save_json(output_path, include_audit_log=not no_audit_log)
     size_kb = Path(json_path).stat().st_size / 1024
     logger.info("[green]✓ Full json saved to: %s (%.2f KB)[/green]", json_path, size_kb)
-
-    # Generate and open network visualization
-    logger.info("[bold cyan]Generating Network Visualization...[/bold cyan]")
-    html_path = cv.display_network(open_browser=False)
-    logger.info(f"[green]✓ Full html visualization saved to: {html_path}[/green]")
 
     # Example: Export to markdown (with optional sections)
     logger.info("[bold cyan]Exporting to Markdown...[/bold cyan]")

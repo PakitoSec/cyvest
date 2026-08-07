@@ -39,7 +39,6 @@ from cyvest.io_serialization import (
     save_investigation_markdown,
     serialize_investigation,
 )
-from cyvest.io_visualization import generate_network_graph
 from cyvest.levels import Level
 from cyvest.model import (
     Enrichment,
@@ -1675,55 +1674,6 @@ class Cyvest:
                 logger.rich("INFO", renderables, width=150, prefix=False)
 
         display_threat_intel_query(self, ti_key, rich_print)
-
-    def display_network(
-        self,
-        output_dir: str | None = None,
-        open_browser: bool = True,
-        min_level: Level | None = None,
-        observable_types: list[ObservableType] | None = None,
-        physics: bool = True,
-        group_by_type: bool = False,
-        max_label_length: int = 60,
-        title: str = "Cyvest Investigation Network",
-    ) -> str:
-        """
-        Generate and display an interactive network graph visualization.
-
-        Creates an HTML file with a pyvis network graph showing observables as nodes
-        (colored by level, sized by score, shaped by type) and relationships as edges
-        (colored by direction, labeled by type).
-
-        Args:
-            output_dir: Directory to save HTML file (defaults to temp directory)
-            open_browser: Whether to automatically open the HTML file in a browser
-            min_level: Minimum security level to include (filters out lower levels)
-            observable_types: List of observable types to include (filters out others)
-            physics: Enable physics simulation for organic layout (default: False for static layout)
-            group_by_type: Group observables by type using hierarchical layout (default: False)
-            max_label_length: Maximum length for node labels before truncation (default: 60)
-            title: Title displayed in the generated HTML visualization
-
-        Returns:
-            Path to the generated HTML file
-
-        Examples:
-            >>> cv = Cyvest()
-            >>> # Create investigation with observables
-            >>> cv.display_network()
-            '/tmp/cyvest_12345/cyvest_network.html'
-        """
-        return generate_network_graph(
-            self,
-            output_dir=output_dir,
-            open_browser=open_browser,
-            min_level=min_level,
-            observable_types=observable_types,
-            physics=physics,
-            group_by_type=group_by_type,
-            max_label_length=max_label_length,
-            title=title,
-        )
 
     # Fluent helper entrypoints
 

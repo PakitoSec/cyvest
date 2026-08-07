@@ -218,9 +218,7 @@ class EmailReciever(BaseRule):
         cy.enrichment_create("receiver", {"receiver": ["ok"]}, context="from splunk")
         receiver = cy.observable(cy.OBS.EMAIL, "user@company.com")
         cy.root().relate_to(receiver, cy.REL.EXTRACTION)
-        cy.finding("receiver", "description", "> receiver").with_score(0.1).link_observable(receiver).tagged(
-            "emails"
-        )
+        cy.finding("receiver", "description", "> receiver").with_score(0.1).link_observable(receiver).tagged("emails")
 
         logger.info("Email receiver analysis complete")
 
@@ -364,9 +362,7 @@ class AttachmentTask(BaseRule):
 
             # Build file observable with hash observables
             file_obs = cy.observable(cy.OBS.FILE, filename)
-            hash_obs = cy.observable(cy.OBS.HASH, f"MD5:{md5_hash}").with_ti(
-                "VT", score, "MD5 hash analysis"
-            )
+            hash_obs = cy.observable(cy.OBS.HASH, f"MD5:{md5_hash}").with_ti("VT", score, "MD5 hash analysis")
             cy.root().relate_to(file_obs, cy.REL.EXTRACTION)
             hash_obs.relate_to(file_obs, cy.REL.EXTRACTION, direction=cy.DIR.INBOUND)
 
@@ -492,7 +488,6 @@ class AI(BaseRule):
 @click.command()
 @click_logger_params
 @click.option("-w", "--workers", type=int, default=1)
-@click.option("--browser", "browser", is_flag=True, default=False)
 @click.option("--stats", "stats", is_flag=True, default=False)
 @click.option("--audit", "audit", is_flag=True, default=False)
 @click.option(
@@ -503,7 +498,7 @@ class AI(BaseRule):
     help="Exclude audit log from JSON output for deterministic output",
 )
 @click.option("-o", "--output", type=click.Path(dir_okay=False, path_type=Path), default=None)
-def main(workers, browser, stats, audit, no_audit_log, output):
+def main(workers, stats, audit, no_audit_log, output):
     """Main execution demonstrating multi-threaded investigation."""
 
     # Prepare input data
@@ -561,7 +556,6 @@ def main(workers, browser, stats, audit, no_audit_log, output):
     cy.display_summary(show_audit_log=audit)
     if stats:
         cy.display_statistics()
-    cy.display_network(open_browser=browser)
 
     if output is not None:
         logger.info("[bold cyan]Generating json...[/bold cyan]")

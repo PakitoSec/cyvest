@@ -11,7 +11,7 @@ authors = [
 ]
 dependencies = [
     "click>=8",
-    "logurich[click]==1.0.0b2",
+    "logurich[click]==1.0.0",
     "pydantic>=2.12.5",
     "rich>=13",
     "typing-extensions>=4.15",
@@ -77,4 +77,4 @@ addopts = [
 ]
 
 [tool.uv.sources]
-logurich = { git = "https://github.com/PakitoSec/logurich.git", rev = "e40c371f705459b58d9f57c0249a357aacd0b74e" }
+logurich = { git = "https://github.com/PakitoSec/logurich.git", rev = "7326a60e7d55b9c8e90f669ff5901cb3193cb382" }

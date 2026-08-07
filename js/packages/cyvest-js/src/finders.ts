@@ -488,7 +488,7 @@ export function findFindingsForTag(
  * @returns Sorted array (new array, doesn't mutate input)
  */
 export function sortObservablesByScore(observables: Observable[]): Observable[] {
-  return [...observables].sort((a, b) => b.score - a.score);
+  return observables.toSorted((a, b) => b.score - a.score);
 }
 
 /**
@@ -498,7 +498,7 @@ export function sortObservablesByScore(observables: Observable[]): Observable[] 
  * @returns Sorted array (new array, doesn't mutate input)
  */
 export function sortFindingsByScore(findings: Finding[]): Finding[] {
-  return [...findings].sort((a, b) => b.score - a.score);
+  return findings.toSorted((a, b) => b.score - a.score);
 }
 
 /**
@@ -508,7 +508,7 @@ export function sortFindingsByScore(findings: Finding[]): Finding[] {
  * @returns Sorted array (new array, doesn't mutate input)
  */
 export function sortObservablesByLevel(observables: Observable[]): Observable[] {
-  return [...observables].sort(
+  return observables.toSorted(
     (a, b) => LEVEL_VALUES[b.level] - LEVEL_VALUES[a.level]
   );
 }
@@ -520,7 +520,7 @@ export function sortObservablesByLevel(observables: Observable[]): Observable[] 
  * @returns Sorted array (new array, doesn't mutate input)
  */
 export function sortFindingsByLevel(findings: Finding[]): Finding[] {
-  return [...findings].sort(
+  return findings.toSorted(
     (a, b) => LEVEL_VALUES[b.level] - LEVEL_VALUES[a.level]
   );
 }

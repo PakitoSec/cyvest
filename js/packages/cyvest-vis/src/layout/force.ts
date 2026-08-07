@@ -243,7 +243,7 @@ function calculateTopology(
       (total, candidate) => total + (crossWeights.get(crossKey(id, candidate)) ?? 0),
       0
     );
-    const remaining = [...rootBranches].sort(
+    const remaining = rootBranches.toSorted(
       (left, right) => totalCrossWeight(right) - totalCrossWeight(left) || left.localeCompare(right)
     );
     const ordered = [remaining.shift() as string];

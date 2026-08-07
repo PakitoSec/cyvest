@@ -324,7 +324,7 @@ docs = [
 [package.metadata]
 requires-dist = [
     { name = "click", specifier = ">=8" },
-    { name = "logurich", extras = ["click"], git = "https://github.com/PakitoSec/logurich.git?rev=e40c371f705459b58d9f57c0249a357aacd0b74e" },
+    { name = "logurich", extras = ["click"], git = "https://github.com/PakitoSec/logurich.git?rev=7326a60e7d55b9c8e90f669ff5901cb3193cb382" },
     { name = "pydantic", specifier = ">=2.12.5" },
     { name = "rich", specifier = ">=13" },
     { name = "typing-extensions", specifier = ">=4.15" },
@@ -485,8 +485,8 @@ wheels = [
 
 [[package]]
 name = "logurich"
-version = "1.0.0b2"
-source = { git = "https://github.com/PakitoSec/logurich.git?rev=e40c371f705459b58d9f57c0249a357aacd0b74e#e40c371f705459b58d9f57c0249a357aacd0b74e" }
+version = "1.0.0"
+source = { git = "https://github.com/PakitoSec/logurich.git?rev=7326a60e7d55b9c8e90f669ff5901cb3193cb382#7326a60e7d55b9c8e90f669ff5901cb3193cb382" }
 dependencies = [
     { name = "rich" },
 ]

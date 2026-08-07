@@ -167,11 +167,6 @@ class ObservableProxy(_ReadOnlyProxy[Observable]):
         """Findings that currently link to this observable."""
         return self._read_attr("finding_links")
 
-    def get_audit_events(self) -> tuple:
-        """Return audit events for this observable."""
-        events = self._get_investigation().get_audit_events(object_type="observable", object_key=self.key)
-        return tuple(events)
-
     def update_metadata(
         self,
         *,
@@ -346,11 +341,6 @@ class FindingProxy(_ReadOnlyProxy[Finding]):
     @property
     def evidence_links(self) -> list[EvidenceLink]:
         return self._read_attr("evidence_links")
-
-    def get_audit_events(self) -> tuple:
-        """Return audit events for this finding."""
-        events = self._get_investigation().get_audit_events(object_type="finding", object_key=self.key)
-        return tuple(events)
 
     def update_metadata(
         self,

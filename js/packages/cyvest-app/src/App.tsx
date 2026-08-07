@@ -1,5 +1,4 @@
 import type { CyvestInvestigation } from "@cyvest/cyvest-js";
-import { getStartedAt } from "@cyvest/cyvest-js";
 import {
   CyvestGraph,
   DARK_CYVEST_THEME,
@@ -75,8 +74,7 @@ export const App: React.FC = () => {
                   investigation.investigation_id}
               </h2>
               <p>
-                Started {getStartedAt(investigation) ?? "N/A"} · Schema{" "}
-                {investigation.schema_version}
+                Schema {investigation.schema_version}
               </p>
             </div>
             <dl className="app-metrics">

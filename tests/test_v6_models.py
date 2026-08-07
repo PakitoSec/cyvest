@@ -142,7 +142,6 @@ def test_migrate_v5_to_v6_rewrites_findings_and_preserves_email() -> None:
         "level": "NONE",
         "whitelisted": False,
         "whitelists": [],
-        "audit_log": [],
         "observables": {
             "obs:file:root": {
                 "type": "file",

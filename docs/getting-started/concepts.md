@@ -46,7 +46,7 @@ Each observable has:
 > instances rather than raw dataclasses. These proxies provide live scores/levels but raise an error if you
 > attempt to assign attributes. All mutations flow through the Investigation layer, so use the facade helpers
 > (`cv.observable_add_threat_intel`, `cv.observable_set_level`, …) or the fluent methods on the proxies themselves
-> (`with_ti`, `relate_to`, `link_observable`, `set_level`, etc.) so the score engine and audit log remain consistent.
+> (`with_ti`, `relate_to`, `link_observable`, `set_level`, etc.) so the score engine remains consistent.
 > Safe metadata fields (`comment`, `extra`, `internal`, etc.) can be updated via the dedicated `update_metadata()`
 > helpers on each proxy. Use `set_level()` to update the level without changing the score:
 >
@@ -370,36 +370,6 @@ Since `RELATED_TO` defaults to `BIDIRECTIONAL`, a relationship created without a
 explicit direction leaves both scores untouched. This is intended: a correlation
 with no established deduction mechanism has no reason to make a score propagate.
 `EXTRACTION` and `PIVOT` default to `OUTBOUND` and do propagate.
-
-### Audit Log
-
-All meaningful changes are recorded in a centralized, append-only audit log at the investigation level:
-
-```python
-# Observable score changes
-obs = cv.observable_create(cv.OBS.IPV4, "10.0.0.1")
-cv.observable_add_threat_intel(obs.key, "source1", score=Decimal("5.0"))
-cv.observable_add_threat_intel(obs.key, "source2", score=Decimal("8.0"))
-
-events = cv.investigation_get_audit_log()
-obs_score_events = [
-    event
-    for event in events
-    if event.object_key == obs.key and event.event_type.startswith("SCORE")
-]
-for event in obs_score_events:
-    print(event.timestamp, event.details["old_score"], "→", event.details["new_score"])
-    print("Level:", event.details["old_level"], "→", event.details["new_level"])
-    print("Reason:", event.reason)
-```
-
-**Audit Event Fields (score changes):**
-
-- Timestamp
-- Old/new score values
-- Old/new level values
-- Reason for change (threat intel, propagation, merge, manual, etc.)
-- Contributing investigation IDs when relevant (e.g., merges)
 
 Investigation names are optional, human-readable labels. They are serialized separately from `investigation_id` and are never used for scoring or propagation.
 

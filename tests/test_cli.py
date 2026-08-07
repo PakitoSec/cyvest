@@ -201,31 +201,6 @@ def test_display_summary_exclude_levels() -> None:
     assert "none_finding" in output_all
 
 
-def test_display_summary_audit_log_table() -> None:
-    """display_summary shows audit log when requested."""
-    from decimal import Decimal
-    from io import StringIO
-
-    from rich.console import Console
-
-    from cyvest.io_rich import display_summary
-
-    cv = Cyvest()
-    obs = cv.observable(Cyvest.OBS.URL, "https://example.com", internal=False)
-    obs.with_ti("virustotal", score=Decimal("6.0"), level=Cyvest.LVL.MALICIOUS)
-    cv.finding("score-finding", "test", "Score finding").with_score(Decimal("1.0"), reason="initial").with_score(
-        Decimal("2.0"), reason="bump"
-    )
-
-    output = StringIO()
-    console = Console(file=output, width=140)
-    display_summary(cv, console.print, show_graph=False, show_audit_log=True)
-    rendered = output.getvalue()
-
-    assert "Audit Log" in rendered
-    assert "virustotal" in rendered
-
-
 def test_cli_diff_no_differences(tmp_path: Path) -> None:
     """CLI 'diff' command succeeds for identical investigations."""
     from decimal import Decimal

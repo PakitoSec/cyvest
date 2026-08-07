@@ -6,7 +6,6 @@
   "level": "MALICIOUS",
   "whitelisted": false,
   "whitelists": [],
-  "audit_log": null,
   "observables": {
     "obs:artifact:root": {
       "type": "artifact",

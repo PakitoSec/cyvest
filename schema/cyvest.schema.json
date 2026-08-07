@@ -1,96 +1,5 @@
 {
   "$defs": {
-    "AuditEvent": {
-      "additionalProperties": true,
-      "description": "Centralized audit event for investigation-level changes.",
-      "properties": {
-        "event_id": {
-          "title": "Event Id",
-          "type": "string"
-        },
-        "timestamp": {
-          "format": "date-time",
-          "title": "Timestamp",
-          "type": "string"
-        },
-        "event_type": {
-          "title": "Event Type",
-          "type": "string"
-        },
-        "actor": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Actor"
-        },
-        "reason": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Reason"
-        },
-        "tool": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Tool"
-        },
-        "object_type": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Object Type"
-        },
-        "object_key": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Object Key"
-        },
-        "details": {
-          "additionalProperties": true,
-          "title": "Details",
-          "type": "object"
-        }
-      },
-      "required": [
-        "event_id",
-        "timestamp",
-        "event_type"
-      ],
-      "title": "AuditEvent",
-      "type": "object"
-    },
     "DataExtractionSchema": {
       "additionalProperties": false,
       "description": "Schema for data extraction metadata.",
@@ -926,21 +835,6 @@
       },
       "title": "Whitelists",
       "type": "array"
-    },
-    "audit_log": {
-      "anyOf": [
-        {
-          "items": {
-            "$ref": "#/$defs/AuditEvent"
-          },
-          "type": "array"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "description": "Append-only investigation audit log. Null when serialization disabled audit.",
-      "title": "Audit Log"
     },
     "observables": {
       "additionalProperties": {

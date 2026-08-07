@@ -166,9 +166,6 @@ cv.io_save_json("investigation.json")
 cv.io_save_markdown("report.md")
 # Hide observables while keeping aggregate stats/whitelists
 cv.io_save_markdown("redacted_report.md", include_observables=False)
-
-# For compact, deterministic JSON (useful for testing/diffing):
-cv.io_save_json("deterministic.json", include_audit_log=False)
 ```
 
 !!! tip "Filtering findings by severity"
@@ -181,7 +178,7 @@ cv.io_save_json("deterministic.json", include_audit_log=False)
     The docs assume you write to the project root, but automation pipelines typically point to `dist/` (JSON) and `reports/` (Markdown/PDF). Adjust paths to match your workflow.
 
 !!! note "Provenance fields in JSON"
-    Exports include `investigation_id`, optional `investigation_name`, and the investigation-level `audit_log`, plus finding origins (`origin_investigation_id`) and link fields (`observable_links`, `finding_links`) needed for scoring after merges.
+    Exports include `investigation_id`, optional `investigation_name`, plus finding origins (`origin_investigation_id`) and link fields (`observable_links`, `finding_links`) needed for scoring after merges.
 
 ---
 

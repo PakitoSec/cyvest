@@ -200,10 +200,6 @@ class Cyvest:
         """Set or clear the human-readable investigation name."""
         self._investigation.set_investigation_name(name, reason=reason)
 
-    def investigation_get_audit_log(self) -> tuple:
-        """Return the investigation-level audit log."""
-        return tuple(self._investigation.get_audit_log())
-
     def investigation_add_whitelist(
         self, identifier: str, name: str, justification: str | None = None
     ) -> InvestigationWhitelist:
@@ -1204,7 +1200,7 @@ class Cyvest:
 
     # Serialization and I/O methods
 
-    def io_save_json(self, filepath: str | Path, *, include_audit_log: bool = True) -> str:
+    def io_save_json(self, filepath: str | Path) -> str:
         """
         Save the investigation to a JSON file.
 
@@ -1212,8 +1208,6 @@ class Cyvest:
 
         Args:
             filepath: Path to save the JSON file (relative or absolute)
-            include_audit_log: Include audit log in output (default: True).
-                When False, audit_log is set to null for compact, deterministic output.
 
         Returns:
             Absolute path to the saved file as a string
@@ -1226,10 +1220,8 @@ class Cyvest:
             >>> cv = Cyvest()
             >>> path = cv.io_save_json("investigation.json")
             >>> print(path)  # /absolute/path/to/investigation.json
-            >>> # For compact, deterministic output:
-            >>> path = cv.io_save_json("output.json", include_audit_log=False)
         """
-        save_investigation_json(self._investigation, filepath, include_audit_log=include_audit_log)
+        save_investigation_json(self._investigation, filepath)
         return str(Path(filepath).resolve())
 
     def io_save_markdown(
@@ -1297,13 +1289,9 @@ class Cyvest:
             self._investigation, include_tags, include_enrichments, include_observables, exclude_levels
         )
 
-    def io_to_invest(self, *, include_audit_log: bool = True) -> InvestigationSchema:
+    def io_to_invest(self) -> InvestigationSchema:
         """
         Serialize the investigation to an InvestigationSchema.
-
-        Args:
-            include_audit_log: Include audit log in serialization (default: True).
-                When False, audit_log is set to None for compact, deterministic output.
 
         Returns:
             InvestigationSchema instance (use .model_dump() for dict)
@@ -1313,19 +1301,12 @@ class Cyvest:
             >>> schema = cv.io_to_invest()
             >>> print(schema.score, schema.level)
             >>> dict_data = schema.model_dump()  # defaults to by_alias=True
-            >>> # For compact, deterministic output:
-            >>> schema = cv.io_to_invest(include_audit_log=False)
-            >>> assert schema.audit_log is None
         """
-        return serialize_investigation(self._investigation, include_audit_log=include_audit_log)
+        return serialize_investigation(self._investigation)
 
-    def io_to_dict(self, *, include_audit_log: bool = True) -> dict[str, Any]:
+    def io_to_dict(self) -> dict[str, Any]:
         """
         Convert the investigation to a Python dictionary.
-
-        Args:
-            include_audit_log: Include audit log in output (default: True).
-                When False, audit_log is set to None for compact, deterministic output.
 
         Returns:
             Dictionary representation of the investigation
@@ -1334,11 +1315,8 @@ class Cyvest:
             >>> cv = Cyvest()
             >>> data = cv.io_to_dict()
             >>> print(data["score"], data["level"])
-            >>> # For compact, deterministic output:
-            >>> data = cv.io_to_dict(include_audit_log=False)
-            >>> assert data["audit_log"] is None
         """
-        return self.io_to_invest(include_audit_log=include_audit_log).model_dump(by_alias=True)
+        return self.io_to_invest().model_dump(by_alias=True)
 
     @staticmethod
     def io_load_json(filepath: str | Path) -> Cyvest:
@@ -1534,7 +1512,6 @@ class Cyvest:
         self,
         show_graph: bool = True,
         exclude_levels: Level | Iterable[Level] = Level.NONE,
-        show_audit_log: bool = False,
         rich_print: Callable[[Any], None] | None = None,
     ) -> None:
         """
@@ -1543,7 +1520,6 @@ class Cyvest:
         Args:
             show_graph: Whether to display the observable graph
             exclude_levels: Level(s) to omit from the report (default: Level.NONE)
-            show_audit_log: Whether to display the investigation audit log
             rich_print: Optional callable that takes a renderable and returns None
         """
         if rich_print is None:
@@ -1556,7 +1532,6 @@ class Cyvest:
             rich_print,
             show_graph=show_graph,
             exclude_levels=exclude_levels,
-            show_audit_log=show_audit_log,
         )
 
     def display_statistics(

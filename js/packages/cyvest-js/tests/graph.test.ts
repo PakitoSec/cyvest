@@ -26,15 +26,6 @@ function createGraphTestInvestigation(): CyvestInvestigation {
     score_display: "5.00",
     level: "MALICIOUS",
     whitelisted: false,
-    audit_log: [
-      {
-        event_id: "01HXYZTESTEVENT001",
-        timestamp: "2024-01-01T00:00:00Z",
-        event_type: "INVESTIGATION_STARTED",
-        object_type: "investigation",
-        object_key: "01HXYZGRAPHINVESTIGATION",
-      },
-    ],
     whitelists: [],
     observables: {
       "obs:file:msg1": {

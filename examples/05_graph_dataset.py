@@ -20,15 +20,8 @@ logger = get_logger(__name__)
 
 @click.command()
 @click_logger_params
-@click.option(
-    "--no-audit-log",
-    "no_audit_log",
-    is_flag=True,
-    default=False,
-    help="Exclude audit log from JSON output for deterministic output",
-)
 @click.option("-o", "--output", type=click.Path(dir_okay=False, path_type=Path), default=None)
-def main(no_audit_log: bool = False, output: Path | None = None) -> None:
+def main(output: Path | None = None) -> None:
     # Create a comprehensive investigation with various observables
     cv = Cyvest(
         investigation_id="cyvest-visual-example",
@@ -159,7 +152,7 @@ def main(no_audit_log: bool = False, output: Path | None = None) -> None:
     # Generate json
     logger.info("[bold cyan]Generating json...[/bold cyan]")
     output_path = output or (Path(tempfile.gettempdir()) / "cyvest_investigation.json")
-    json_path = cv.io_save_json(output_path, include_audit_log=not no_audit_log)
+    json_path = cv.io_save_json(output_path)
     size_kb = Path(json_path).stat().st_size / 1024
     logger.info("[green]✓ Full json saved to: %s (%.2f KB)[/green]", json_path, size_kb)
 

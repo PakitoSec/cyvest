@@ -19,7 +19,7 @@ in an audit log.
 | Scoring | Configurable score aggregation and level propagation across observable and Finding links |
 | Composition | Deterministic merging, shared context for parallel tasks, and investigation comparison |
 | Serialization | Versioned JSON schema, JSON/Markdown export, migration from v5, and generated TypeScript types |
-| Tooling | CLI inspection, statistics, IOC extraction, Rich output, and optional graph visualization |
+| Tooling | CLI inspection, statistics, IOC extraction, and Rich output |
 
 Cyvest 6 uses a strict `schema_version: "6.0.0"`. Existing v5 integrations
 should follow the [migration guide](docs/migration-v5-to-v6.md).
@@ -41,11 +41,8 @@ uv pip install -e .
 pip install -e .
 ```
 
-The optional visualization dependencies are available with:
-
-```bash
-pip install -e ".[visualization]"
-```
+Graph visualization is provided by the `@cyvest/cyvest-vis` React package, see
+[docs/js-packages.md](docs/js-packages.md).
 
 ## Quick Start
 
@@ -538,7 +535,7 @@ See the `examples/` directory for complete examples:
 - **02_urls_and_ips.py**: Network investigation with URLs and IPs
 - **03_merge_demo.py**: Multi-process investigation merging
 - **04_email.py**: Multi-threaded investigation with SharedInvestigationContext
-- **05_visualization.py**: Interactive HTML visualization showcasing scores, levels, and relationship flows
+- **05_graph_dataset.py**: Rich investigation exported as JSON for the `@cyvest/cyvest-vis` graph renderer
 - **06_compare_investigations.py**: Compare investigations with tolerance rules and visual diff output
 
 Run an example:
@@ -546,7 +543,7 @@ Run an example:
 ```bash
 python examples/01_email_basic.py
 python examples/04_email.py
-python examples/05_visualization.py
+python examples/05_graph_dataset.py
 ```
 
 ## CLI Usage
@@ -571,9 +568,6 @@ cyvest merge inv1.json inv2.json -o merged.json --stats
 
 # Merge and display rich summary
 cyvest merge inv1.json inv2.json -o merged.json -f rich --stats
-
-# Generate an interactive visualization (requires visualization extra)
-cyvest visualize investigation.json --min-level SUSPICIOUS --group-by-type
 
 # Extract observables (IOCs) from text
 echo "Check IP 192.168.1.1 and https://evil.com" | cyvest extract

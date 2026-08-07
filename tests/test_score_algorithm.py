@@ -1025,7 +1025,7 @@ def _build_shared_subtree(cv: Cyvest, reversed_branches: bool) -> tuple[Decimal,
     cv.observable_add_threat_intel(leaf.key, source="vt", score=Decimal("10.0"))
 
     cv.observable_add_relationship(shared.key, leaf.key, "pivot", Cyvest.DIR.OUTBOUND)
-    for branch in ([branch_b, branch_a] if reversed_branches else [branch_a, branch_b]):
+    for branch in [branch_b, branch_a] if reversed_branches else [branch_a, branch_b]:
         cv.observable_add_relationship(parent.key, branch.key, "extraction", Cyvest.DIR.OUTBOUND)
         cv.observable_add_relationship(branch.key, shared.key, "pivot", Cyvest.DIR.OUTBOUND)
 

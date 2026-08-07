@@ -18,7 +18,6 @@ import {
   getAllTags,
   getAllObservables,
   getCounts,
-  getStartedAt,
   getTagChildren,
   getTagDescendants,
   getTagAggregatedScore,
@@ -51,15 +50,6 @@ function createTestInvestigation(): CyvestInvestigation {
     score_display: "7.50",
     level: "MALICIOUS",
     whitelisted: false,
-    audit_log: [
-      {
-        event_id: "01HXYZTESTEVENT001",
-        timestamp: "2024-01-01T00:00:00Z",
-        event_type: "INVESTIGATION_STARTED",
-        object_type: "investigation",
-        object_key: "01HXYZTESTINVESTIGATION",
-      },
-    ],
     whitelists: [
       {
         identifier: "wl-1",
@@ -360,25 +350,6 @@ describe("Getters", () => {
       expect(counts.enrichments).toBe(1);
       expect(counts.tags).toBe(4);
       expect(counts.whitelists).toBe(1);
-    });
-  });
-
-  describe("getStartedAt", () => {
-    it("returns timestamp from INVESTIGATION_STARTED event", () => {
-      const startedAt = getStartedAt(inv);
-      expect(startedAt).toBe("2024-01-01T00:00:00Z");
-    });
-
-    it("returns undefined when no audit_log", () => {
-      const invWithoutAuditLog = { ...inv, audit_log: undefined };
-      const startedAt = getStartedAt(invWithoutAuditLog);
-      expect(startedAt).toBeUndefined();
-    });
-
-    it("returns undefined when no INVESTIGATION_STARTED event", () => {
-      const invWithEmptyLog = { ...inv, audit_log: [] };
-      const startedAt = getStartedAt(invWithEmptyLog);
-      expect(startedAt).toBeUndefined();
     });
   });
 });

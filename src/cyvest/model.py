@@ -71,22 +71,6 @@ def _format_score_decimal(value: Decimal | None, *, places: int = _DEFAULT_SCORE
         return str(value)
 
 
-class AuditEvent(BaseModel):
-    """Centralized audit event for investigation-level changes."""
-
-    model_config = ConfigDict(arbitrary_types_allowed=True, extra="allow")
-
-    event_id: str
-    timestamp: datetime
-    event_type: str
-    actor: str | None = None
-    reason: str | None = None
-    tool: str | None = None
-    object_type: str | None = None
-    object_key: str | None = None
-    details: dict[str, Any] = Field(default_factory=dict)
-
-
 class InvestigationWhitelist(BaseModel):
     """Represents a whitelist entry on an investigation."""
 

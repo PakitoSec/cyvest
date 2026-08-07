@@ -18,7 +18,6 @@ from cyvest import keys
 from cyvest.level_score_rules import recalculate_level_for_score
 from cyvest.levels import Level, normalize_level
 from cyvest.model import (
-    AuditEvent,
     Enrichment,
     Evidence,
     EvidenceLink,
@@ -108,15 +107,7 @@ class Investigation:
         """
         self.investigation_id = investigation_id or generate_ulid()
         self.investigation_name = investigation_name
-        self._audit_log: list[AuditEvent] = []
-        self._audit_enabled = True
-
-        # Record investigation start as the first event
-        self._record_event(
-            event_type="INVESTIGATION_STARTED",
-            object_type="investigation",
-            object_key=self.investigation_id,
-        )
+        self._started_at = datetime.now(timezone.utc)
 
         # Object collections
         self._observables: dict[str, Observable] = {}
@@ -148,49 +139,11 @@ class Investigation:
         self._observables[self._root_observable.key] = self._root_observable
         self._score_engine.register_observable(self._root_observable)
         self._stats.register_observable(self._root_observable)
-        self._record_event(
-            event_type="OBSERVABLE_CREATED",
-            object_type="observable",
-            object_key=self._root_observable.key,
-        )
-
-    def _record_event(
-        self,
-        *,
-        event_type: str,
-        object_type: str | None = None,
-        object_key: str | None = None,
-        reason: str | None = None,
-        actor: str | None = None,
-        tool: str | None = None,
-        details: dict[str, Any] | None = None,
-        timestamp: datetime | None = None,
-    ) -> AuditEvent | None:
-        if not self._audit_enabled:
-            return None
-
-        event = AuditEvent(
-            event_id=generate_ulid(),
-            timestamp=timestamp or datetime.now(timezone.utc),
-            event_type=event_type,
-            actor=actor,
-            reason=reason,
-            tool=tool,
-            object_type=object_type,
-            object_key=object_key,
-            details=deepcopy(details) if details else {},
-        )
-        self._audit_log.append(event)
-        return event
 
     @property
     def started_at(self) -> datetime:
-        """Return the investigation start time from the first event in the audit log."""
-        for event in self._audit_log:
-            if event.event_type == "INVESTIGATION_STARTED":
-                return event.timestamp
-        # Fallback if no INVESTIGATION_STARTED event (shouldn't happen)
-        return datetime.now(timezone.utc)
+        """Return the investigation start time."""
+        return self._started_at
 
     def _link_threat_intel_to_observable(self, observable: Observable, ti: ThreatIntel) -> None:
         if any(existing.key == ti.key for existing in observable.threat_intels):
@@ -232,21 +185,6 @@ class Investigation:
             return
         tag.findings.append(finding)
 
-    def _get_object_type(self, obj: Any) -> str | None:
-        if isinstance(obj, Observable):
-            return "observable"
-        if isinstance(obj, Finding):
-            return "finding"
-        if isinstance(obj, Evidence):
-            return "evidence"
-        if isinstance(obj, ThreatIntel):
-            return "threat_intel"
-        if isinstance(obj, Enrichment):
-            return "enrichment"
-        if isinstance(obj, Tag):
-            return "tag"
-        return None
-
     @staticmethod
     def _normalize_taxonomies(value: Any) -> list[Taxonomy]:
         if value is None:
@@ -274,7 +212,7 @@ class Investigation:
         event_type: str = "SCORE_CHANGED",
         contributing_investigation_ids: set[str] | None = None,
     ) -> bool:
-        """Apply a score change and emit an audit event."""
+        """Apply a score change."""
         if not isinstance(new_score, Decimal):
             new_score = Decimal(str(new_score))
 
@@ -287,27 +225,6 @@ class Investigation:
 
         obj.score = new_score
         obj.level = new_level
-
-        if event_type == "SCORE_RECALCULATED":
-            # Skip audit log entry for recalculated scores.
-            return True
-
-        details = {
-            "old_score": float(old_score),
-            "new_score": float(new_score),
-            "old_level": old_level.value,
-            "new_level": new_level.value,
-        }
-        if contributing_investigation_ids:
-            details["contributing_investigation_ids"] = sorted(contributing_investigation_ids)
-
-        self._record_event(
-            event_type=event_type,
-            object_type=self._get_object_type(obj),
-            object_key=getattr(obj, "key", None),
-            reason=reason,
-            details=details,
-        )
         return True
 
     def apply_level_change(
@@ -318,24 +235,13 @@ class Investigation:
         reason: str = "",
         event_type: str = "LEVEL_UPDATED",
     ) -> bool:
-        """Apply a level change and emit an audit event."""
+        """Apply a level change."""
         new_level = normalize_level(level)
         old_level = obj.level
         if new_level == old_level:
             return False
 
         obj.level = new_level
-        self._record_event(
-            event_type=event_type,
-            object_type=self._get_object_type(obj),
-            object_key=getattr(obj, "key", None),
-            reason=reason,
-            details={
-                "old_level": old_level.value,
-                "new_level": new_level.value,
-                "score": float(obj.score),
-            },
-        )
         return True
 
     def _update_observable_finding_links(self, observable_key: str) -> None:
@@ -363,41 +269,12 @@ class Investigation:
         for evidence_key in self._evidences:
             self._update_evidence_finding_links(evidence_key)
 
-    def get_audit_log(self) -> list[AuditEvent]:
-        """Return a deep copy of the audit log."""
-        return [event.model_copy(deep=True) for event in self._audit_log]
-
-    def get_audit_events(
-        self,
-        *,
-        object_type: str | None = None,
-        object_key: str | None = None,
-        event_type: str | None = None,
-    ) -> list[AuditEvent]:
-        """Filter audit events by optional object type/key and event type."""
-        events = self._audit_log
-        if object_type is not None:
-            events = [event for event in events if event.object_type == object_type]
-        if object_key is not None:
-            events = [event for event in events if event.object_key == object_key]
-        if event_type is not None:
-            events = [event for event in events if event.event_type == event_type]
-        return [event.model_copy(deep=True) for event in events]
-
     def set_investigation_name(self, name: str | None, *, reason: str | None = None) -> None:
         """Set or clear the human-readable investigation name."""
         name = str(name).strip() if name is not None else None
         if name == self.investigation_name:
             return
-        old_name = self.investigation_name
         self.investigation_name = name
-        self._record_event(
-            event_type="INVESTIGATION_NAME_UPDATED",
-            object_type="investigation",
-            object_key=self.investigation_id,
-            reason=reason,
-            details={"old_name": old_name, "new_name": name},
-        )
 
     def _merge_observable(self, existing: Observable, incoming: Observable) -> tuple[Observable, list]:
         """
@@ -758,11 +635,6 @@ class Investigation:
         self._score_engine.register_observable(obs)
         self._stats.register_observable(obs)
         self._update_observable_finding_links(obs.key)
-        self._record_event(
-            event_type="OBSERVABLE_CREATED",
-            object_type="observable",
-            object_key=obs.key,
-        )
         return obs, []
 
     def add_finding(self, finding: Finding) -> Finding:
@@ -796,11 +668,6 @@ class Investigation:
             self._update_observable_finding_links(link.observable_key)
         for link in finding.evidence_links:
             self._update_evidence_finding_links(link.evidence_key)
-        self._record_event(
-            event_type="FINDING_CREATED",
-            object_type="finding",
-            object_key=finding.key,
-        )
         return finding
 
     def add_evidence(self, evidence: Evidence) -> Evidence:
@@ -810,11 +677,6 @@ class Investigation:
         self._evidences[evidence.key] = evidence
         self._stats.register_evidence(evidence)
         self._update_evidence_finding_links(evidence.key)
-        self._record_event(
-            event_type="EVIDENCE_CREATED",
-            object_type="evidence",
-            object_key=evidence.key,
-        )
         return evidence
 
     def add_threat_intel(self, ti: ThreatIntel, observable: Observable) -> ThreatIntel:
@@ -832,17 +694,6 @@ class Investigation:
             merged_ti = self._merge_threat_intel(self._threat_intels[ti.key], ti)
             # Propagate score to observable
             self._score_engine.propagate_threat_intel_to_observable(merged_ti, observable)
-            self._record_event(
-                event_type="THREAT_INTEL_ATTACHED",
-                object_type="observable",
-                object_key=observable.key,
-                details={
-                    "threat_intel_key": merged_ti.key,
-                    "source": merged_ti.source,
-                    "score": merged_ti.score,
-                    "level": merged_ti.level,
-                },
-            )
             return merged_ti
 
         # Register new threat intel
@@ -855,17 +706,6 @@ class Investigation:
         # Propagate score
         self._score_engine.propagate_threat_intel_to_observable(ti, observable)
 
-        self._record_event(
-            event_type="THREAT_INTEL_ATTACHED",
-            object_type="observable",
-            object_key=observable.key,
-            details={
-                "threat_intel_key": ti.key,
-                "source": ti.source,
-                "score": ti.score,
-                "level": ti.level,
-            },
-        )
         return ti
 
     def add_threat_intel_taxonomy(self, threat_intel_key: str, taxonomy: Taxonomy) -> ThreatIntel:
@@ -932,11 +772,6 @@ class Investigation:
 
         # Register new enrichment
         self._enrichments[enrichment.key] = enrichment
-        self._record_event(
-            event_type="ENRICHMENT_CREATED",
-            object_type="enrichment",
-            object_key=enrichment.key,
-        )
         return enrichment
 
     def add_tag(self, tag: Tag) -> Tag:
@@ -962,12 +797,6 @@ class Investigation:
                 ancestor_tag = Tag(name=ancestor_name)
                 self._tags[ancestor_key] = ancestor_tag
                 self._stats.register_tag(ancestor_tag)
-                self._record_event(
-                    event_type="TAG_CREATED",
-                    object_type="tag",
-                    object_key=ancestor_key,
-                    details={"auto_created": True, "descendant": tag.name},
-                )
 
         # Add or merge the tag itself
         if tag.key in self._tags:
@@ -978,11 +807,6 @@ class Investigation:
         # Register new tag
         self._tags[tag.key] = tag
         self._stats.register_tag(tag)
-        self._record_event(
-            event_type="TAG_CREATED",
-            object_type="tag",
-            object_key=tag.key,
-        )
         return tag
 
     def add_relationship(
@@ -1045,17 +869,6 @@ class Investigation:
         # Add relationship using internal method
         self._create_relationship(source_obs, target_key, relationship_type, direction)
 
-        self._record_event(
-            event_type="RELATIONSHIP_CREATED",
-            object_type="observable",
-            object_key=source_obs.key,
-            details={
-                "target_key": target_key,
-                "relationship_type": relationship_type,
-                "direction": direction,
-            },
-        )
-
         # Recalculate scores after adding relationship
         self._score_engine.recalculate_all()
 
@@ -1102,15 +915,6 @@ class Investigation:
                     observable_key=observable_key,
                 )
                 self._update_observable_finding_links(observable_key)
-                self._record_event(
-                    event_type="FINDING_LINKED_TO_OBSERVABLE",
-                    object_type="finding",
-                    object_key=finding.key,
-                    details={
-                        "observable_key": observable_key,
-                        "propagation_mode": propagation_mode.value,
-                    },
-                )
                 is_effective = (
                     propagation_mode == PropagationMode.GLOBAL
                     or self.investigation_id == finding.origin_investigation_id
@@ -1133,12 +937,6 @@ class Investigation:
 
         if self._link_finding_to_evidence(finding, EvidenceLink(evidence_key=evidence_key)):
             self._update_evidence_finding_links(evidence_key)
-            self._record_event(
-                event_type="FINDING_LINKED_TO_EVIDENCE",
-                object_type="finding",
-                object_key=finding.key,
-                details={"evidence_key": evidence_key},
-            )
         return finding
 
     def add_finding_to_tag(self, tag_key: str, finding_key: str) -> Tag:
@@ -1165,12 +963,6 @@ class Investigation:
 
         if tag and finding:
             self._link_finding_to_tag(tag, finding)
-            self._record_event(
-                event_type="TAG_FINDING_ADDED",
-                object_type="tag",
-                object_key=tag.key,
-                details={"finding_key": finding.key},
-            )
 
         return tag
 
@@ -1326,14 +1118,11 @@ class Investigation:
         allowed_fields = rules["fields"]
         dict_fields = rules["dict_fields"]
 
-        changes: dict[str, dict[str, Any]] = {}
-
         for field, value in updates.items():
             if field not in allowed_fields:
                 raise ValueError(f"Field '{field}' is not mutable on {model_type}.")
             if value is None:
                 continue
-            old_value = deepcopy(getattr(target, field, None))
             if field == "level":
                 value = normalize_level(value)
             if model_type == "threat_intel" and field == "taxonomies":
@@ -1356,17 +1145,7 @@ class Investigation:
                     setattr(target, field, deepcopy(value))
             else:
                 setattr(target, field, value)
-            new_value = deepcopy(getattr(target, field, None))
-            if old_value != new_value:
-                changes[field] = {"old": old_value, "new": new_value}
 
-        if changes:
-            self._record_event(
-                event_type="METADATA_UPDATED",
-                object_type=model_type,
-                object_key=key,
-                details={"changes": changes},
-            )
         return target
 
     def get_all_observables(self) -> dict[str, Observable]:
@@ -1428,16 +1207,6 @@ class Investigation:
 
         entry = InvestigationWhitelist(identifier=identifier, name=name, justification=justification)
         self._whitelists[identifier] = entry
-        self._record_event(
-            event_type="WHITELIST_APPLIED",
-            object_type="investigation",
-            object_key=self.investigation_id,
-            details={
-                "identifier": identifier,
-                "name": name,
-                "justification": justification,
-            },
-        )
         return entry
 
     def remove_whitelist(self, identifier: str) -> bool:
@@ -1448,27 +1217,11 @@ class Investigation:
             True if removed, False if it did not exist.
         """
         removed = self._whitelists.pop(identifier, None)
-        if removed:
-            self._record_event(
-                event_type="WHITELIST_REMOVED",
-                object_type="investigation",
-                object_key=self.investigation_id,
-                details={"identifier": identifier},
-            )
         return removed is not None
 
     def clear_whitelists(self) -> None:
         """Remove all whitelist entries."""
-        if not self._whitelists:
-            return
-        removed = list(self._whitelists.keys())
         self._whitelists.clear()
-        self._record_event(
-            event_type="WHITELIST_CLEARED",
-            object_type="investigation",
-            object_key=self.investigation_id,
-            details={"identifiers": removed},
-        )
 
     def get_whitelists(self) -> list[InvestigationWhitelist]:
         """Return a copy of all whitelist entries."""
@@ -1549,17 +1302,6 @@ class Investigation:
             # Link the best starting node to root
             if best_node:
                 self._create_relationship(self._root_observable, best_node, RelationshipType.RELATED_TO)
-                self._record_event(
-                    event_type="RELATIONSHIP_CREATED",
-                    object_type="observable",
-                    object_key=self._root_observable.key,
-                    reason="Finalize relationships",
-                    details={
-                        "target_key": best_node,
-                        "relationship_type": RelationshipType.RELATED_TO.value,
-                        "direction": RelationshipType.RELATED_TO.get_default_direction().value,
-                    },
-                )
         self._score_engine.recalculate_all()
 
     def merge_investigation(self, other: Investigation) -> None:
@@ -1573,80 +1315,6 @@ class Investigation:
         Args:
             other: The investigation to merge
         """
-
-        def _diff_fields(before: dict[str, Any], after: dict[str, Any]) -> list[str]:
-            return [field for field, value in before.items() if value != after.get(field)]
-
-        def _snapshot_observable(obs: Observable) -> dict[str, Any]:
-            relationships = [
-                (
-                    rel.target_key,
-                    rel.relationship_type_name,
-                    rel.direction.value,
-                )
-                for rel in obs.relationships
-            ]
-            return {
-                "score": obs.score,
-                "level": obs.level,
-                "comment": obs.comment,
-                "extra": deepcopy(obs.extra),
-                "internal": obs.internal,
-                "whitelisted": obs.whitelisted,
-                "threat_intels": sorted(ti.key for ti in obs.threat_intels),
-                "relationships": sorted(relationships),
-            }
-
-        def _snapshot_finding(finding: Finding) -> dict[str, Any]:
-            links = [
-                (
-                    link.observable_key,
-                    link.propagation_mode.value,
-                )
-                for link in finding.observable_links
-            ]
-            return {
-                "score": finding.score,
-                "level": finding.level,
-                "comment": finding.comment,
-                "description": finding.description,
-                "extra": deepcopy(finding.extra),
-                "origin_investigation_id": finding.origin_investigation_id,
-                "observable_links": sorted(links),
-                "evidence_links": sorted(link.evidence_key for link in finding.evidence_links),
-            }
-
-        def _snapshot_evidence(evidence: Evidence) -> dict[str, Any]:
-            return {
-                "title": evidence.title,
-                "description": evidence.description,
-                "extra": deepcopy(evidence.extra),
-                "captured_at": evidence.captured_at,
-            }
-
-        def _snapshot_threat_intel(ti: ThreatIntel) -> dict[str, Any]:
-            return {
-                "score": ti.score,
-                "level": ti.level,
-                "comment": ti.comment,
-                "extra": deepcopy(ti.extra),
-                "taxonomies": deepcopy(ti.taxonomies),
-            }
-
-        def _snapshot_enrichment(enrichment: Enrichment) -> dict[str, Any]:
-            return {
-                "context": enrichment.context,
-                "data": deepcopy(enrichment.data),
-            }
-
-        def _snapshot_tag(tag: Tag) -> dict[str, Any]:
-            return {
-                "description": tag.description,
-                "findings": sorted(finding.key for finding in tag.findings),
-            }
-
-        merge_summary: list[dict[str, Any]] = []
-
         (
             incoming_observables,
             incoming_threat_intels,
@@ -1659,31 +1327,8 @@ class Investigation:
         # PASS 1: Merge observables and collect deferred relationships
         all_deferred_relationships = []
         for obs in incoming_observables.values():
-            existing = self._observables.get(obs.key)
-            before = _snapshot_observable(existing) if existing else None
             _, deferred = self.add_observable(obs)
             all_deferred_relationships.extend(deferred)
-            if existing:
-                after = _snapshot_observable(existing)
-                changed_fields = _diff_fields(before, after) if before else []
-                action = "merged" if changed_fields else "skipped"
-                merge_summary.append(
-                    {
-                        "object_type": "observable",
-                        "object_key": obs.key,
-                        "action": action,
-                        "changed_fields": changed_fields,
-                    }
-                )
-            else:
-                merge_summary.append(
-                    {
-                        "object_type": "observable",
-                        "object_key": obs.key,
-                        "action": "created",
-                        "changed_fields": [],
-                    }
-                )
 
         # PASS 2: Process deferred relationships now that all observables exist
         for source_key, rel in all_deferred_relationships:
@@ -1702,111 +1347,26 @@ class Investigation:
 
         # Merge threat intels (need to link to observables)
         for ti in incoming_threat_intels.values():
-            existing_ti = self._threat_intels.get(ti.key)
-            before = _snapshot_threat_intel(existing_ti) if existing_ti else None
             # Find the observable this TI belongs to
             observable = self._observables.get(ti.observable_key)
             if observable:
                 self.add_threat_intel(ti, observable)
-            if existing_ti:
-                after = _snapshot_threat_intel(existing_ti)
-                changed_fields = _diff_fields(before, after) if before else []
-                action = "merged" if changed_fields else "skipped"
-            else:
-                changed_fields = []
-                action = "created"
-            merge_summary.append(
-                {
-                    "object_type": "threat_intel",
-                    "object_key": ti.key,
-                    "action": action,
-                    "changed_fields": changed_fields,
-                }
-            )
 
         # Merge evidences before findings so all links have valid targets.
         for evidence in incoming_evidences.values():
-            existing_evidence = self._evidences.get(evidence.key)
-            before = _snapshot_evidence(existing_evidence) if existing_evidence else None
             self.add_evidence(evidence)
-            if existing_evidence:
-                after = _snapshot_evidence(existing_evidence)
-                changed_fields = _diff_fields(before, after) if before else []
-                action = "merged" if changed_fields else "skipped"
-            else:
-                changed_fields = []
-                action = "created"
-            merge_summary.append(
-                {
-                    "object_type": "evidence",
-                    "object_key": evidence.key,
-                    "action": action,
-                    "changed_fields": changed_fields,
-                }
-            )
 
         # Merge findings
         for finding in incoming_findings.values():
-            existing_finding = self._findings.get(finding.key)
-            before = _snapshot_finding(existing_finding) if existing_finding else None
             self.add_finding(finding)
-            if existing_finding:
-                after = _snapshot_finding(existing_finding)
-                changed_fields = _diff_fields(before, after) if before else []
-                action = "merged" if changed_fields else "skipped"
-            else:
-                changed_fields = []
-                action = "created"
-            merge_summary.append(
-                {
-                    "object_type": "finding",
-                    "object_key": finding.key,
-                    "action": action,
-                    "changed_fields": changed_fields,
-                }
-            )
 
         # Merge enrichments
         for enrichment in incoming_enrichments.values():
-            existing_enrichment = self._enrichments.get(enrichment.key)
-            before = _snapshot_enrichment(existing_enrichment) if existing_enrichment else None
             self.add_enrichment(enrichment)
-            if existing_enrichment:
-                after = _snapshot_enrichment(existing_enrichment)
-                changed_fields = _diff_fields(before, after) if before else []
-                action = "merged" if changed_fields else "skipped"
-            else:
-                changed_fields = []
-                action = "created"
-            merge_summary.append(
-                {
-                    "object_type": "enrichment",
-                    "object_key": enrichment.key,
-                    "action": action,
-                    "changed_fields": changed_fields,
-                }
-            )
 
         # Merge tags
         for tag in incoming_tags.values():
-            existing_tag = self._tags.get(tag.key)
-            before = _snapshot_tag(existing_tag) if existing_tag else None
             self.add_tag(tag)
-            if existing_tag:
-                after = _snapshot_tag(existing_tag)
-                changed_fields = _diff_fields(before, after) if before else []
-                action = "merged" if changed_fields else "skipped"
-            else:
-                changed_fields = []
-                action = "created"
-            merge_summary.append(
-                {
-                    "object_type": "tag",
-                    "object_key": tag.key,
-                    "action": action,
-                    "changed_fields": changed_fields,
-                }
-            )
 
         # Merge whitelists (other investigation overrides on identifier conflicts)
         for entry in other.get_whitelists():
@@ -1819,16 +1379,3 @@ class Investigation:
 
         # Final score recalculation
         self._score_engine.recalculate_all()
-
-        self._record_event(
-            event_type="INVESTIGATION_MERGED",
-            object_type="investigation",
-            object_key=self.investigation_id,
-            details={
-                "from_investigation_id": other.investigation_id,
-                "into_investigation_id": self.investigation_id,
-                "from_investigation_name": other.investigation_name,
-                "into_investigation_name": self.investigation_name,
-                "object_changes": merge_summary,
-            },
-        )

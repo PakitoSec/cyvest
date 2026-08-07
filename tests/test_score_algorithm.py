@@ -1,8 +1,7 @@
 """
 Tests for the reworked score algorithm.
 
-Tests MAX vs SUM modes, finding score calculation, hierarchical propagation,
-and audit log access.
+Tests MAX vs SUM modes, finding score calculation, and hierarchical propagation.
 """
 
 from decimal import Decimal
@@ -222,81 +221,6 @@ def test_finding_score_preserves_higher_current_score() -> None:
     # Finding score should now be max([3.0, 8.0, 5.0]) = 8.0
     assert finding.score == Decimal("8.0")
     assert finding.level == Cyvest.LVL.MALICIOUS
-
-
-def test_observable_score_audit_events() -> None:
-    """Observable score changes should appear in the audit log."""
-    cv = Cyvest()
-
-    # Create observable
-    obs = cv.observable_create(Cyvest.OBS.IPV4, "10.0.0.1")
-
-    # Initial audit log should have no score events for this observable.
-    events = [
-        event
-        for event in cv.investigation_get_audit_log()
-        if event.object_key == obs.key and event.event_type.startswith("SCORE")
-    ]
-    assert len(events) == 0
-
-    # Add threat intel (triggers score change)
-    cv.observable_add_threat_intel(obs.key, source="source1", score=Decimal("5.0"))
-
-    # Audit log should now have a score change entry.
-    events = [
-        event
-        for event in cv.investigation_get_audit_log()
-        if event.object_key == obs.key and event.event_type.startswith("SCORE")
-    ]
-    assert len(events) == 1
-    assert events[0].details["old_score"] == 0.0
-    assert events[0].details["new_score"] == 5.0
-    assert events[0].details["old_level"] == Cyvest.LVL.INFO.value
-    assert events[0].details["new_level"] == Cyvest.LVL.MALICIOUS.value
-    assert "source1" in (events[0].reason or "")
-
-    # Add another threat intel
-    cv.observable_add_threat_intel(obs.key, source="source2", score=Decimal("8.0"))
-
-    # Audit log should now have 2 entries
-    events = [
-        event
-        for event in cv.investigation_get_audit_log()
-        if event.object_key == obs.key and event.event_type.startswith("SCORE")
-    ]
-    assert len(events) == 2
-    assert events[1].details["old_score"] == 5.0
-    assert events[1].details["new_score"] == 8.0
-    assert "source2" in (events[1].reason or "")
-
-
-def test_finding_score_audit_events() -> None:
-    """Finding score changes should appear in the audit log."""
-    cv = Cyvest()
-
-    # Create finding
-    finding = cv.finding_create("finding1", "test", "Test finding")
-
-    events = [
-        event
-        for event in cv.investigation_get_audit_log()
-        if event.object_key == finding.key and event.event_type.startswith("SCORE")
-    ]
-    assert len(events) == 0
-
-    # Create observable and link to finding
-    obs = cv.observable_create(Cyvest.OBS.IPV4, "10.0.0.1")
-    cv.observable_add_threat_intel(obs.key, source="source1", score=Decimal("5.0"))
-    cv.finding_link_observable(finding.key, obs.key)
-
-    # Audit log should now have entries from score updates
-    events = [
-        event
-        for event in cv.investigation_get_audit_log()
-        if event.object_key == finding.key and event.event_type.startswith("SCORE")
-    ]
-    assert len(events) >= 1
-    assert any(entry.details.get("new_score") == 5.0 for entry in events)
 
 
 def test_score_propagation_through_hierarchy() -> None:
@@ -597,14 +521,6 @@ def test_safe_level_score_updates_with_frozen_level() -> None:
     # Score should update to 0 (max of -1.0 and 0), but level stays SAFE
     assert obs.score == Decimal("0")
     assert obs.level == Cyvest.LVL.SAFE  # Level frozen at SAFE even though score=0 would be INFO
-
-    # Verify audit log tracked the score change
-    events = [
-        event
-        for event in cv.investigation_get_audit_log()
-        if event.object_key == obs.key and event.event_type.startswith("SCORE")
-    ]
-    assert len(events) > 0
 
 
 def test_non_safe_levels_recalculate_and_can_downgrade() -> None:

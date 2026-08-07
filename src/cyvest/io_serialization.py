@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Any
 
 from cyvest import keys
 from cyvest.levels import Level, normalize_level
-from cyvest.model import AuditEvent, Enrichment, Evidence, Finding, Observable, Relationship, Tag, ThreatIntel
+from cyvest.model import Enrichment, Evidence, Finding, Observable, Relationship, Tag, ThreatIntel
 from cyvest.model_enums import ObservableType
 from cyvest.model_schema import InvestigationSchema
 from cyvest.score import ScoreMode
@@ -24,7 +24,7 @@ if TYPE_CHECKING:
     from cyvest.investigation import Investigation
 
 
-def serialize_investigation(inv: Investigation, *, include_audit_log: bool = True) -> InvestigationSchema:
+def serialize_investigation(inv: Investigation) -> InvestigationSchema:
     """
     Serialize a complete investigation to an InvestigationSchema.
 
@@ -33,8 +33,6 @@ def serialize_investigation(inv: Investigation, *, include_audit_log: bool = Tru
 
     Args:
         inv: Investigation to serialize
-        include_audit_log: Include audit log in serialization (default: True).
-            When False, audit_log is set to None for compact, deterministic output.
 
     Returns:
         InvestigationSchema instance (use .model_dump() for dict)
@@ -62,7 +60,6 @@ def serialize_investigation(inv: Investigation, *, include_audit_log: bool = Tru
         level=inv.get_global_level(),
         whitelisted=inv.is_whitelisted(),
         whitelists=list(inv.get_whitelists()),
-        audit_log=inv.get_audit_log() if include_audit_log else None,
         observables=observables,
         findings=findings,
         evidences=evidences,
@@ -79,17 +76,15 @@ def serialize_investigation(inv: Investigation, *, include_audit_log: bool = Tru
     return investigation
 
 
-def save_investigation_json(inv: Investigation, filepath: str | Path, *, include_audit_log: bool = True) -> None:
+def save_investigation_json(inv: Investigation, filepath: str | Path) -> None:
     """
     Save an investigation to a JSON file.
 
     Args:
         inv: Investigation to save
         filepath: Path to save the JSON file
-        include_audit_log: Include audit log in output (default: True).
-            When False, audit_log is set to null for compact, deterministic output.
     """
-    data = serialize_investigation(inv, include_audit_log=include_audit_log)
+    data = serialize_investigation(inv)
     with open(filepath, "w", encoding="utf-8") as f:
         f.write(data.model_dump_json(indent=2, by_alias=True))
 
@@ -308,8 +303,6 @@ def load_investigation_dict(data: dict[str, Any]) -> Cyvest:
         score_mode_obs=score_mode,
         investigation_id=investigation_id,
     )
-    cv._investigation._audit_enabled = False
-    cv._investigation._audit_log = []
 
     investigation_name = data.get("investigation_name")
     if isinstance(investigation_name, str):
@@ -481,15 +474,6 @@ def load_investigation_dict(data: dict[str, Any]) -> Cyvest:
     cv._investigation._rebuild_all_finding_links()
     cv._investigation._rebuild_all_evidence_finding_links()
 
-    audit_log = []
-    for event_info in data.get("audit_log", []) or []:
-        try:
-            audit_log.append(AuditEvent.model_validate(event_info))
-        except Exception:
-            continue
-    cv._investigation._audit_log = audit_log
-    cv._investigation._audit_enabled = True
-
     return cv
 
 
@@ -567,29 +551,6 @@ def migrate_v5_to_v6(data: dict[str, Any]) -> dict[str, Any]:
     for tag in migrated.get("tags", {}).values():
         old_finding_keys = tag.pop("checks", tag.get("findings", []))
         tag["findings"] = [finding_key_map.get(key, key) for key in old_finding_keys]
-
-    reference_map = {**observable_key_map, **threat_intel_key_map, **finding_key_map}
-
-    def rewrite_audit_value(value: Any) -> Any:
-        if isinstance(value, str):
-            return reference_map.get(value, value)
-        if isinstance(value, list):
-            return [rewrite_audit_value(item) for item in value]
-        if isinstance(value, dict):
-            rewritten: dict[str, Any] = {}
-            for key, item in value.items():
-                rewritten_key = key.replace("check", "finding")
-                rewritten[rewritten_key] = rewrite_audit_value(item)
-            return rewritten
-        return value
-
-    for event in migrated.get("audit_log", []) or []:
-        if event.get("object_type") == "check":
-            event["object_type"] = "finding"
-        if isinstance(event.get("event_type"), str):
-            event["event_type"] = event["event_type"].replace("CHECK", "FINDING")
-        event["object_key"] = reference_map.get(event.get("object_key"), event.get("object_key"))
-        event["details"] = rewrite_audit_value(event.get("details", {}))
 
     migrated.pop("stats", None)
     loaded = load_investigation_dict(migrated)

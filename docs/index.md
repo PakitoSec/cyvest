@@ -25,7 +25,7 @@ Build, score, and narrate cybersecurity investigations with a single fluent Pyth
 | Area | Why it matters | What to look at |
 | --- | --- | --- |
 | **Structured objects** | Model observables, findings, TI, tags, and enrichments with typed helpers | `cyvest.model`, [Concepts](getting-started/concepts.md#observables) |
-| **Deterministic scoring** | MAX/SUM propagation, centralized audit log, and automatic level classification | `cyvest.score`, [Scoring System](getting-started/concepts.md#scoring-system) |
+| **Deterministic scoring** | MAX/SUM propagation and automatic level classification | `cyvest.score`, [Scoring System](getting-started/concepts.md#scoring-system) |
 | **Fluent helpers** | Builder-style methods with deterministic keys and safe merges | `cyvest.cyvest`, [Quick Start](getting-started/quickstart.md#using-the-fluent-api) |
 | **Shared context** | Thread-safe fragments that can reconcile into a single story | `cyvest.shared.SharedInvestigationContext`, [Guide](shared-investigation-context.md) |
 | **Comparison** | Compare investigations with tolerance rules for regression testing | `cyvest.compare`, [Guide](comparing-investigations.md) |

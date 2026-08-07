@@ -531,21 +531,21 @@ class SharedInvestigationContext:
         )
         return str(Path(filepath).resolve())
 
-    def io_to_invest(self, *, include_audit_log: bool = True) -> InvestigationSchema:
-        return self._lock.run(self._io_to_invest_unlocked, include_audit_log)
+    def io_to_invest(self) -> InvestigationSchema:
+        return self._lock.run(self._io_to_invest_unlocked)
 
-    async def aio_to_invest(self, *, include_audit_log: bool = True) -> InvestigationSchema:
-        return await self._lock.arun(self._io_to_invest_unlocked, include_audit_log)
+    async def aio_to_invest(self) -> InvestigationSchema:
+        return await self._lock.arun(self._io_to_invest_unlocked)
 
-    def _io_to_invest_unlocked(self, include_audit_log: bool = True) -> InvestigationSchema:
-        return serialize_investigation(self._main_investigation, include_audit_log=include_audit_log)
+    def _io_to_invest_unlocked(self) -> InvestigationSchema:
+        return serialize_investigation(self._main_investigation)
 
-    def io_save_json(self, filepath: str | Path, *, include_audit_log: bool = True) -> str:
-        return self._lock.run(self._io_save_json_unlocked, filepath, include_audit_log)
+    def io_save_json(self, filepath: str | Path) -> str:
+        return self._lock.run(self._io_save_json_unlocked, filepath)
 
-    async def aio_save_json(self, filepath: str | Path, *, include_audit_log: bool = True) -> str:
-        return await self._lock.arun(self._io_save_json_unlocked, filepath, include_audit_log)
+    async def aio_save_json(self, filepath: str | Path) -> str:
+        return await self._lock.arun(self._io_save_json_unlocked, filepath)
 
-    def _io_save_json_unlocked(self, filepath: str | Path, include_audit_log: bool = True) -> str:
-        save_investigation_json(self._main_investigation, filepath, include_audit_log=include_audit_log)
+    def _io_save_json_unlocked(self, filepath: str | Path) -> str:
+        save_investigation_json(self._main_investigation, filepath)
         return str(Path(filepath).resolve())

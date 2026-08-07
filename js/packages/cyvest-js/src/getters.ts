@@ -379,29 +379,6 @@ export function getCounts(inv: CyvestInvestigation): InvestigationCounts {
   };
 }
 
-/**
- * Get the investigation start time from the event log.
- *
- * Looks for the INVESTIGATION_STARTED event and returns its timestamp.
- *
- * @param inv - The investigation
- * @returns The start timestamp string or undefined if not found
- *
- * @example
- * ```ts
- * const startedAt = getStartedAt(investigation);
- * if (startedAt) {
- *   console.log(`Started: ${startedAt}`);
- * }
- * ```
- */
-export function getStartedAt(inv: CyvestInvestigation): string | undefined {
-  const event = inv.audit_log?.find(
-    (e) => e.event_type === "INVESTIGATION_STARTED"
-  );
-  return event?.timestamp;
-}
-
 // ============================================================================
 // Tag Aggregation
 // ============================================================================

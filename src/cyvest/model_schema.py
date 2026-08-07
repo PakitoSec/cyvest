@@ -20,7 +20,6 @@ from pydantic import BaseModel, ConfigDict, Field, computed_field, field_seriali
 from cyvest.levels import Level
 from cyvest.model import (
     AliasDumpModel,
-    AuditEvent,
     Enrichment,
     Evidence,
     Finding,
@@ -114,10 +113,6 @@ class InvestigationSchema(AliasDumpModel):
         ...,
         description="List of whitelist entries applied to this investigation.",
     )
-    audit_log: list[AuditEvent] | None = Field(
-        default_factory=list,
-        description="Append-only investigation audit log. Null when serialization disabled audit.",
-    )
     observables: dict[str, Observable] = Field(
         ...,
         description="Observables keyed by their unique key.",
@@ -163,7 +158,6 @@ class InvestigationSchema(AliasDumpModel):
 
         v.setdefault("level", Level.NONE)
         v.setdefault("whitelists", [])
-        v.setdefault("audit_log", [])
         v.setdefault("observables", {})
         v.setdefault("findings", {})
         v.setdefault("evidences", {})

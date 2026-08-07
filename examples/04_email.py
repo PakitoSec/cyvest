@@ -489,16 +489,8 @@ class AI(BaseRule):
 @click_logger_params
 @click.option("-w", "--workers", type=int, default=1)
 @click.option("--stats", "stats", is_flag=True, default=False)
-@click.option("--audit", "audit", is_flag=True, default=False)
-@click.option(
-    "--no-audit-log",
-    "no_audit_log",
-    is_flag=True,
-    default=False,
-    help="Exclude audit log from JSON output for deterministic output",
-)
 @click.option("-o", "--output", type=click.Path(dir_okay=False, path_type=Path), default=None)
-def main(workers, stats, audit, no_audit_log, output):
+def main(workers, stats, output):
     """Main execution demonstrating multi-threaded investigation."""
 
     # Prepare input data
@@ -553,13 +545,13 @@ def main(workers, stats, audit, no_audit_log, output):
     # Display results
     logger.info("Investigation complete - displaying summary - score should be 36.1")
 
-    cy.display_summary(show_audit_log=audit)
+    cy.display_summary()
     if stats:
         cy.display_statistics()
 
     if output is not None:
         logger.info("[bold cyan]Generating json...[/bold cyan]")
-        json_path = cy.io_save_json(output, include_audit_log=not no_audit_log)
+        json_path = cy.io_save_json(output)
         size_kb = Path(json_path).stat().st_size / 1024
         logger.info("[green]✓ Full json saved to: %s (%.2f KB)[/green]", json_path, size_kb)
 

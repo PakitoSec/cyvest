@@ -8,8 +8,7 @@ as structured, serializable data.
 
 An investigation contains observables and their relationships, Findings,
 supporting Evidence, threat intelligence, enrichments, and tags. Cyvest maintains
-deterministic keys, calculates scores and security levels, and records mutations
-in an audit log.
+deterministic keys and calculates scores and security levels.
 
 ## Main capabilities
 
@@ -79,8 +78,7 @@ cv.io_save_json("investigation.json")
 ```
 
 Public model objects are exposed through read-only proxies. Mutations use the
-facade or fluent methods so score propagation, reverse links, and the audit log
-remain consistent.
+facade or fluent methods so score propagation and reverse links remain consistent.
 
 For deterministic reports and comparisons, pass an explicit
 `investigation_id` when creating the investigation.
@@ -360,16 +358,6 @@ cv = Cyvest(score_mode_obs=ScoreMode.SUM)  # accumulative children
 
 - `Investigation.investigation_id` is a stable ULID included in exports.
 - Findings keep a *canonical origin* (`origin_investigation_id`) for LOCAL_ONLY propagation; it is compared against the current investigation id.
-
-**Audit log**
-
-- All meaningful changes (including score/level changes) are recorded in the investigation-level audit log.
-- Per-object histories are not stored; use `cv.investigation_get_audit_log()` to review changes.
-- For compact, deterministic JSON output (useful for testing/diffing), exclude the audit log:
-  ```python
-  cv.io_save_json("output.json", include_audit_log=False)  # audit_log: null
-  cv.io_to_invest(include_audit_log=False)  # schema.audit_log is None
-  ```
 
 To force cross-investigation propagation for a specific link, use a GLOBAL link:
 
@@ -712,9 +700,8 @@ The repo includes a PNPM workspace under `js/` with three packages:
 - `@cyvest/cyvest-app`: Vite demo that bundles the JS packages with sample investigations.
 
 The JS packages track the generated schema; serialized investigations should include fields like
-`investigation_id`, `investigation_name`, `audit_log`, `score_display`, `finding_links`, and
-`observable_links`. The investigation start time is recorded as an `INVESTIGATION_STARTED` event
-in the `audit_log`.
+`investigation_id`, `investigation_name`, `score_display`, `finding_links`, and
+`observable_links`.
 
 See `docs/js-packages.md` for workspace commands and usage snippets.
 

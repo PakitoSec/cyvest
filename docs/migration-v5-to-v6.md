@@ -25,7 +25,7 @@ This guide covers both serialized investigations and Python integrations.
 | No required schema version | Exact `schema_version: "6.0.0"` |
 
 The scoring model, relationship propagation, tags, enrichments, threat
-intelligence, audit log, and immutable proxy behavior remain in place.
+intelligence, and immutable proxy behavior remain in place.
 
 ## 1. Upgrade Cyvest
 
@@ -63,7 +63,7 @@ The migration command:
 - renames the root `checks` collection to `findings`;
 - renames `check_name` to `finding_name`;
 - rewrites `chk:` keys to `fnd:` keys;
-- updates Finding references in tags and audit events;
+- updates Finding references in tags;
 - recalculates observable and threat-intelligence keys;
 - initializes `evidences` and every `evidence_links` collection;
 - preserves existing `EMAIL` observables;
@@ -97,7 +97,7 @@ assert cv.finding_get_all()
 ```
 
 Do not update keys with a global text replacement. Observable, threat
-intelligence, tag, and audit references must remain consistent; the migration
+intelligence, and tag references must remain consistent; the migration
 command performs those updates as one validated operation.
 
 ## 3. Rename Check APIs to Finding APIs

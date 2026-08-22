@@ -1,0 +1,547 @@
+{
+  "schema_version": "7.0.0",
+  "header": {
+    "investigation_id": "inv-fixture",
+    "name": "IR-1",
+    "root_key": "obs:file:__cyvest_root__",
+    "opened_at": "2026-08-13T16:26:25.138910Z",
+    "policy_version": "default-v1",
+    "engine_id": "basic-v1",
+    "fragment_ids": [
+      "inv-fixture"
+    ]
+  },
+  "policy_version": "default-v1",
+  "engine_id": "basic-v1",
+  "facts": {
+    "observables": {
+      "obs:file:__cyvest_root__": {
+        "key": "obs:file:__cyvest_root__",
+        "seq": "01KZXZ4FZKEFMMD1FZXKQXGKWD",
+        "asserted_at": "2026-08-13T16:26:25.139112Z",
+        "occurred_at": null,
+        "source": {
+          "name": "cyvest",
+          "source_class": "internal_tool"
+        },
+        "fragment_id": "inv-fixture",
+        "external_id": null,
+        "evidence_keys": [],
+        "type": "file",
+        "subtype": null,
+        "namespace": null,
+        "value": "__cyvest_root__",
+        "internal": false,
+        "comment": "Root observable for investigation",
+        "extra": {
+          "case": "IR-1"
+        },
+        "aliases": [],
+        "occurrences": {}
+      },
+      "obs:url:hxxp://bad.example/x": {
+        "key": "obs:url:hxxp://bad.example/x",
+        "seq": "01KZXZ4FZKX6GKRFQZSJKCNP4S",
+        "asserted_at": "2026-08-13T16:26:25.139182Z",
+        "occurred_at": null,
+        "source": {
+          "name": "cyvest",
+          "source_class": "internal_tool"
+        },
+        "fragment_id": "inv-fixture",
+        "external_id": null,
+        "evidence_keys": [],
+        "type": "url",
+        "subtype": null,
+        "namespace": null,
+        "value": "hxxp://bad.example/x",
+        "internal": false,
+        "comment": "",
+        "extra": {},
+        "aliases": [],
+        "occurrences": {
+          "inv-fixture": 1
+        }
+      },
+      "obs:ipv4:203.0.113.50": {
+        "key": "obs:ipv4:203.0.113.50",
+        "seq": "01KZXZ4FZKCRD9SFJRV1TMADZ8",
+        "asserted_at": "2026-08-13T16:26:25.139214Z",
+        "occurred_at": null,
+        "source": {
+          "name": "cyvest",
+          "source_class": "internal_tool"
+        },
+        "fragment_id": "inv-fixture",
+        "external_id": null,
+        "evidence_keys": [],
+        "type": "ipv4",
+        "subtype": null,
+        "namespace": null,
+        "value": "203.0.113.50",
+        "internal": false,
+        "comment": "",
+        "extra": {},
+        "aliases": [],
+        "occurrences": {
+          "inv-fixture": 1
+        }
+      },
+      "obs:domain:cdn.partner.example": {
+        "key": "obs:domain:cdn.partner.example",
+        "seq": "01KZXZ4FZK47Q9XRT0SNY6R9S9",
+        "asserted_at": "2026-08-13T16:26:25.139236Z",
+        "occurred_at": null,
+        "source": {
+          "name": "cyvest",
+          "source_class": "internal_tool"
+        },
+        "fragment_id": "inv-fixture",
+        "external_id": null,
+        "evidence_keys": [],
+        "type": "domain",
+        "subtype": null,
+        "namespace": null,
+        "value": "cdn.partner.example",
+        "internal": false,
+        "comment": "",
+        "extra": {},
+        "aliases": [],
+        "occurrences": {
+          "inv-fixture": 1
+        }
+      }
+    },
+    "relations": {
+      "rel:extraction:obs:ipv4:203.0.113.50>obs:url:hxxp://bad.example/x": {
+        "key": "rel:extraction:obs:ipv4:203.0.113.50>obs:url:hxxp://bad.example/x",
+        "seq": "01KZXZ4FZKXZ10929B1N5WW4ZN",
+        "asserted_at": "2026-08-13T16:26:25.139288Z",
+        "occurred_at": null,
+        "source": {
+          "name": "cyvest",
+          "source_class": "internal_tool"
+        },
+        "fragment_id": "inv-fixture",
+        "external_id": null,
+        "evidence_keys": [],
+        "source_key": "obs:ipv4:203.0.113.50",
+        "target_key": "obs:url:hxxp://bad.example/x",
+        "kind": "extraction",
+        "observed_at": null,
+        "confidence": 1.0,
+        "comment": ""
+      },
+      "rel:related-to:obs:file:__cyvest_root__>obs:ipv4:203.0.113.50": {
+        "key": "rel:related-to:obs:file:__cyvest_root__>obs:ipv4:203.0.113.50",
+        "seq": "01KZXZ4FZKWED4FBJA24WJJMW5",
+        "asserted_at": "2026-08-13T16:26:25.139549Z",
+        "occurred_at": null,
+        "source": {
+          "name": "cyvest",
+          "source_class": "internal_tool"
+        },
+        "fragment_id": "inv-fixture",
+        "external_id": null,
+        "evidence_keys": [],
+        "source_key": "obs:file:__cyvest_root__",
+        "target_key": "obs:ipv4:203.0.113.50",
+        "kind": "related-to",
+        "observed_at": null,
+        "confidence": 1.0,
+        "comment": ""
+      },
+      "rel:related-to:obs:file:__cyvest_root__>obs:domain:cdn.partner.example": {
+        "key": "rel:related-to:obs:file:__cyvest_root__>obs:domain:cdn.partner.example",
+        "seq": "01KZXZ4FZK04DT16S2FVDHP28V",
+        "asserted_at": "2026-08-13T16:26:25.139564Z",
+        "occurred_at": null,
+        "source": {
+          "name": "cyvest",
+          "source_class": "internal_tool"
+        },
+        "fragment_id": "inv-fixture",
+        "external_id": null,
+        "evidence_keys": [],
+        "source_key": "obs:file:__cyvest_root__",
+        "target_key": "obs:domain:cdn.partner.example",
+        "kind": "related-to",
+        "observed_at": null,
+        "confidence": 1.0,
+        "comment": ""
+      }
+    },
+    "signals": {
+      "ti:virustotal:obs:url:hxxp://bad.example/x": {
+        "subject_key": "obs:url:hxxp://bad.example/x",
+        "verdict": "MALICIOUS",
+        "confidence": 1.0,
+        "weight": 6.0,
+        "key": "ti:virustotal:obs:url:hxxp://bad.example/x",
+        "seq": "01KZXZ4FZKW78KTQ653RJ97HKN",
+        "asserted_at": "2026-08-13T16:26:25.139253Z",
+        "occurred_at": null,
+        "source": {
+          "name": "virustotal",
+          "source_class": "vendor_feed"
+        },
+        "fragment_id": "inv-fixture",
+        "external_id": null,
+        "evidence_keys": [],
+        "kind": "threat_intel",
+        "observed_at": null,
+        "labels": [],
+        "payload": {},
+        "source_class": "vendor_feed",
+        "taxonomies": [],
+        "comment": ""
+      },
+      "ti:virustotal:obs:domain:cdn.partner.example": {
+        "subject_key": "obs:domain:cdn.partner.example",
+        "verdict": "MALICIOUS",
+        "confidence": 1.0,
+        "weight": 8.0,
+        "key": "ti:virustotal:obs:domain:cdn.partner.example",
+        "seq": "01KZXZ4FZKSAEVWR4FR728CT67",
+        "asserted_at": "2026-08-13T16:26:25.139272Z",
+        "occurred_at": null,
+        "source": {
+          "name": "virustotal",
+          "source_class": "vendor_feed"
+        },
+        "fragment_id": "inv-fixture",
+        "external_id": null,
+        "evidence_keys": [],
+        "kind": "threat_intel",
+        "observed_at": null,
+        "labels": [],
+        "payload": {},
+        "source_class": "vendor_feed",
+        "taxonomies": [],
+        "comment": ""
+      }
+    },
+    "evidences": {
+      "evd:sha256:8f41cb9dbe2b87ea315620b64aa3c84f131c2429f0e9368aaf8362e343dd7b5f": {
+        "key": "evd:sha256:8f41cb9dbe2b87ea315620b64aa3c84f131c2429f0e9368aaf8362e343dd7b5f",
+        "seq": "01KZXZ4FZKGJ93Q69NZQVYXV14",
+        "asserted_at": "2026-08-13T16:26:25.139452Z",
+        "occurred_at": null,
+        "source": {
+          "name": "cyvest",
+          "source_class": "internal_tool"
+        },
+        "fragment_id": "inv-fixture",
+        "external_id": null,
+        "evidence_keys": [],
+        "evidence_type": "enrichment",
+        "title": "whois",
+        "content": {
+          "registrar": "x"
+        },
+        "uri": null,
+        "captured_at": null
+      }
+    },
+    "findings": {
+      "fnd:url_in_body:obs:url:hxxp://bad.example/x": {
+        "subject_key": "obs:url:hxxp://bad.example/x",
+        "verdict": "INFO",
+        "confidence": 1.0,
+        "weight": null,
+        "key": "fnd:url_in_body:obs:url:hxxp://bad.example/x",
+        "seq": "01KZXZ4FZKYX8VPN6X8CEZRT45",
+        "asserted_at": "2026-08-13T16:26:25.139342Z",
+        "occurred_at": null,
+        "source": {
+          "name": "cyvest",
+          "source_class": "internal_tool"
+        },
+        "fragment_id": "inv-fixture",
+        "external_id": null,
+        "evidence_keys": [],
+        "rule_id": "url_in_body",
+        "rule_version": "1",
+        "name": "URL in body",
+        "comment": "",
+        "status": "EVALUATED",
+        "observable_links": [
+          {
+            "observable_key": "obs:url:hxxp://bad.example/x",
+            "scope": "ALL"
+          }
+        ],
+        "labels": [],
+        "extra": {}
+      },
+      "fnd:spf_pass:obs:url:hxxp://bad.example/x": {
+        "subject_key": "obs:url:hxxp://bad.example/x",
+        "verdict": "SAFE",
+        "confidence": 1.0,
+        "weight": 4.0,
+        "key": "fnd:spf_pass:obs:url:hxxp://bad.example/x",
+        "seq": "01KZXZ4FZKVSXEAM4PRHX17RFB",
+        "asserted_at": "2026-08-13T16:26:25.139384Z",
+        "occurred_at": null,
+        "source": {
+          "name": "cyvest",
+          "source_class": "internal_tool"
+        },
+        "fragment_id": "inv-fixture",
+        "external_id": null,
+        "evidence_keys": [],
+        "rule_id": "spf_pass",
+        "rule_version": "1",
+        "name": "SPF valide",
+        "comment": "",
+        "status": "EVALUATED",
+        "observable_links": [
+          {
+            "observable_key": "obs:url:hxxp://bad.example/x",
+            "scope": "ALL"
+          }
+        ],
+        "labels": [],
+        "extra": {}
+      },
+      "fnd:not_applicable:inv-fixture": {
+        "subject_key": "inv-fixture",
+        "verdict": "INFO",
+        "confidence": 1.0,
+        "weight": null,
+        "key": "fnd:not_applicable:inv-fixture",
+        "seq": "01KZXZ4FZKX4V4FY2PPRTVTQDE",
+        "asserted_at": "2026-08-13T16:26:25.139395Z",
+        "occurred_at": null,
+        "source": {
+          "name": "cyvest",
+          "source_class": "internal_tool"
+        },
+        "fragment_id": "inv-fixture",
+        "external_id": null,
+        "evidence_keys": [],
+        "rule_id": "not_applicable",
+        "rule_version": "1",
+        "name": "Non applicable",
+        "comment": "",
+        "status": "NOT_APPLICABLE",
+        "observable_links": [],
+        "labels": [],
+        "extra": {}
+      }
+    },
+    "events": {}
+  },
+  "decisions": {
+    "dec:allowlisted:obs:domain:cdn.partner.example": {
+      "key": "dec:allowlisted:obs:domain:cdn.partner.example",
+      "seq": "01KZXZ4FZKTTS4Y4PHR9NM1ZC8",
+      "asserted_at": "2026-08-13T16:26:25.139411Z",
+      "occurred_at": null,
+      "source": {
+        "name": "alice",
+        "source_class": "org_analyst"
+      },
+      "fragment_id": "inv-fixture",
+      "external_id": null,
+      "evidence_keys": [],
+      "target_key": "obs:domain:cdn.partner.example",
+      "kind": "ALLOWLISTED",
+      "justification": "CDN partenaire"
+    }
+  },
+  "tags": {
+    "tag:phishing": {
+      "key": "tag:phishing",
+      "seq": "01KZXZ4FZKE2GBN15ZPN4KFE1E",
+      "asserted_at": "2026-08-13T16:26:25.139356Z",
+      "occurred_at": null,
+      "source": {
+        "name": "cyvest",
+        "source_class": "internal_tool"
+      },
+      "fragment_id": "inv-fixture",
+      "external_id": null,
+      "evidence_keys": [],
+      "name": "phishing",
+      "description": "",
+      "finding_keys": [
+        "fnd:url_in_body:obs:url:hxxp://bad.example/x"
+      ]
+    }
+  },
+  "report": {
+    "engine_id": "basic-v1",
+    "policy_version": "default-v1",
+    "investigation": {
+      "key": "inv-fixture",
+      "verdict": "MALICIOUS",
+      "confidence": 1.0,
+      "score": 12.0,
+      "contributions": [
+        {
+          "source_key": "fnd:url_in_body:obs:url:hxxp://bad.example/x",
+          "label": "finding",
+          "value": 6.0,
+          "retained": true,
+          "detail": ""
+        },
+        {
+          "source_key": "fnd:spf_pass:obs:url:hxxp://bad.example/x",
+          "label": "finding",
+          "value": 6.0,
+          "retained": true,
+          "detail": ""
+        }
+      ],
+      "suppressed_by_decision": false,
+      "raw": {}
+    },
+    "findings": {
+      "fnd:url_in_body:obs:url:hxxp://bad.example/x": {
+        "key": "fnd:url_in_body:obs:url:hxxp://bad.example/x",
+        "verdict": "MALICIOUS",
+        "confidence": 1.0,
+        "score": 6.0,
+        "contributions": [
+          {
+            "source_key": "obs:url:hxxp://bad.example/x",
+            "label": "link \u00b7 ALL",
+            "value": 6.0,
+            "retained": true,
+            "detail": ""
+          }
+        ],
+        "suppressed_by_decision": false,
+        "raw": {},
+        "status": "EVALUATED",
+        "own_term_suppressed": false,
+        "counted": true
+      },
+      "fnd:spf_pass:obs:url:hxxp://bad.example/x": {
+        "key": "fnd:spf_pass:obs:url:hxxp://bad.example/x",
+        "verdict": "MALICIOUS",
+        "confidence": 1.0,
+        "score": 6.0,
+        "contributions": [
+          {
+            "source_key": "fnd:spf_pass:obs:url:hxxp://bad.example/x",
+            "label": "rule floor \u00b7 SAFE",
+            "value": -4.0,
+            "retained": false,
+            "detail": "outweighed by a linked observable"
+          },
+          {
+            "source_key": "obs:url:hxxp://bad.example/x",
+            "label": "link \u00b7 ALL",
+            "value": 6.0,
+            "retained": true,
+            "detail": ""
+          }
+        ],
+        "suppressed_by_decision": false,
+        "raw": {},
+        "status": "EVALUATED",
+        "own_term_suppressed": true,
+        "counted": true
+      },
+      "fnd:not_applicable:inv-fixture": {
+        "key": "fnd:not_applicable:inv-fixture",
+        "verdict": "INFO",
+        "confidence": 1.0,
+        "score": null,
+        "contributions": [],
+        "suppressed_by_decision": false,
+        "raw": {},
+        "status": "NOT_APPLICABLE",
+        "own_term_suppressed": false,
+        "counted": false
+      }
+    },
+    "observables": {
+      "obs:url:hxxp://bad.example/x@ALL": {
+        "key": "obs:url:hxxp://bad.example/x",
+        "verdict": "MALICIOUS",
+        "confidence": 1.0,
+        "score": 6.0,
+        "contributions": [
+          {
+            "source_key": "ti:virustotal:obs:url:hxxp://bad.example/x",
+            "label": "virustotal \u00b7 MALICIOUS",
+            "value": 6.0,
+            "retained": true,
+            "detail": ""
+          }
+        ],
+        "suppressed_by_decision": false,
+        "raw": {},
+        "scope": {
+          "scope": "ALL",
+          "fragment_id": null
+        }
+      },
+      "obs:file:__cyvest_root__@ALL": {
+        "key": "obs:file:__cyvest_root__",
+        "verdict": "INFO",
+        "confidence": 1.0,
+        "score": 0.0,
+        "contributions": [],
+        "suppressed_by_decision": false,
+        "raw": {},
+        "scope": {
+          "scope": "ALL",
+          "fragment_id": null
+        }
+      },
+      "obs:ipv4:203.0.113.50@ALL": {
+        "key": "obs:ipv4:203.0.113.50",
+        "verdict": "MALICIOUS",
+        "confidence": 1.0,
+        "score": 6.0,
+        "contributions": [
+          {
+            "source_key": "rel:extraction:obs:ipv4:203.0.113.50>obs:url:hxxp://bad.example/x",
+            "label": "extraction \u2192 obs:url:hxxp://bad.example/x",
+            "value": 6.0,
+            "retained": true,
+            "detail": ""
+          }
+        ],
+        "suppressed_by_decision": false,
+        "raw": {},
+        "scope": {
+          "scope": "ALL",
+          "fragment_id": null
+        }
+      },
+      "obs:domain:cdn.partner.example@ALL": {
+        "key": "obs:domain:cdn.partner.example",
+        "verdict": "SAFE",
+        "confidence": 1.0,
+        "score": -1.0,
+        "contributions": [
+          {
+            "source_key": "ti:virustotal:obs:domain:cdn.partner.example",
+            "label": "virustotal \u00b7 MALICIOUS",
+            "value": 8.0,
+            "retained": false,
+            "detail": ""
+          },
+          {
+            "source_key": "dec:allowlisted:obs:domain:cdn.partner.example",
+            "label": "decision \u00b7 ALLOWLISTED",
+            "value": -1.0,
+            "retained": true,
+            "detail": "CDN partenaire"
+          }
+        ],
+        "suppressed_by_decision": true,
+        "raw": {},
+        "scope": {
+          "scope": "ALL",
+          "fragment_id": null
+        }
+      }
+    }
+  }
+}

@@ -5,7 +5,6 @@ Demonstrates basic usage of Cyvest for analyzing a suspicious email.
 """
 
 import tempfile
-from decimal import Decimal
 from pathlib import Path
 
 from logurich import get_logger, init_logger
@@ -22,38 +21,38 @@ def main() -> None:
 
     # Create email-related observables using the fluent proxy interface
     sender_email = cv.observable(cv.OBS.EMAIL, "suspicious@phishing-domain.com", internal=False).with_ti(
-        "internal_db", score=Decimal("0"), comment="Unknown sender"
+        "internal_db", weight=0, comment="Unknown sender"
     )
 
     # Create URL observables
     phishing_url = (
         cv.observable(cv.OBS.URL, "https://fake-bank-login.com/verify", internal=False)
-        .with_ti("virustotal", score=Decimal("8.5"), level=cv.LVL.MALICIOUS, comment="Known phishing URL")
-        .with_ti("urlscan", score=Decimal("7.0"), level=cv.LVL.MALICIOUS, comment="Malicious content detected")
+        .with_ti("virustotal", weight=8.5, comment="Known phishing URL")
+        .with_ti("urlscan", weight=7.0, comment="Malicious content detected")
         .relate_to(cv.root(), cv.REL.RELATED_TO)
     )
 
     # Create domain observable
     domain = cv.observable(cv.OBS.DOMAIN, "fake-bank-login.com", internal=False).with_ti(
-        "dns_lookup", score=Decimal("0"), comment="Recently registered domain (2 days old)"
+        "dns_lookup", weight=0, comment="Recently registered domain (2 days old)"
     )
 
     # Link URL to domain
-    cv.observable_add_relationship(phishing_url.key, domain.key, cv.REL.RELATED_TO)
+    cv.observable_add_relation(phishing_url.key, domain.key, cv.REL.RELATED_TO)
 
     # Create findings
     sender_finding = cv.finding_create(
         "sender_verification",
         "Verify sender authenticity",
         comment="Sender domain not in known contacts. SPF finding failed.",
-        score=Decimal("3.5"),
+        weight=3.5,
     )
 
     url_finding = cv.finding_create(
         "url_analysis",
         "Analyze URLs in email body",
         comment="Found phishing URL attempting to steal credentials",
-        score=Decimal("8.5"),
+        weight=8.5,
     )
 
     # Link findings to observables
@@ -65,10 +64,11 @@ def main() -> None:
     cv.tag_add_finding(email_tag.key, sender_finding.key)
     cv.tag_add_finding(email_tag.key, url_finding.key)
 
-    # Add enrichment
-    cv.enrichment_create(
-        "email_headers",
-        {
+    # The v6 enrichment is an evidence type now.
+    cv.evidence_create(
+        "enrichment",
+        title="email_headers",
+        content={
             "from": "suspicious@phishing-domain.com",
             "to": "victim@company.com",
             "subject": "Urgent: Verify Your Account",

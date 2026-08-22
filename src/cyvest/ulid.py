@@ -34,3 +34,24 @@ def generate_ulid(*, timestamp_ms: int | None = None) -> str:
         chars.append(_CROCKFORD_BASE32_ALPHABET[value & 0x1F])
         value >>= 5
     return "".join(reversed(chars))
+
+
+_DECODE_TABLE = {char: index for index, char in enumerate(_CROCKFORD_BASE32_ALPHABET)}
+
+
+def decode_ulid_timestamp(ulid: str) -> int:
+    """
+    Extract the millisecond timestamp embedded in a ULID.
+
+    Used to check that a fact's ``asserted_at`` agrees with the ordering of its ``seq``.
+    """
+    if len(ulid) != 26:
+        raise ValueError("ULID must be 26 characters long")
+    value = 0
+    for char in ulid[:10]:
+        digit = _DECODE_TABLE.get(char.upper())
+        if digit is None:
+            raise ValueError(f"Invalid ULID character: {char!r}")
+        value = (value << 5) | digit
+    # The first 10 characters carry 50 bits: the 48-bit timestamp plus 2 zero padding bits.
+    return value & ((1 << 48) - 1)

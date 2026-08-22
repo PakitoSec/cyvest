@@ -11,7 +11,7 @@ authors = [
 ]
 dependencies = [
     "click>=8",
-    "logurich[click]==1.0.0",
+    "logurich[click]>=1.0.0",
     "pydantic>=2.12.5",
     "rich>=13",
     "typing-extensions>=4.15",

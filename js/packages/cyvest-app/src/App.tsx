@@ -1,4 +1,11 @@
-import type { CyvestInvestigation } from "@cyvest/cyvest-js";
+import {
+  getAllEvidences,
+  getAllFindings,
+  getAllObservables,
+  getGlobalScore,
+  getGlobalVerdict,
+  type Investigation,
+} from "@cyvest/cyvest-js";
 import {
   CyvestGraph,
   DARK_CYVEST_THEME,
@@ -9,7 +16,7 @@ import { loadInvestigation, INVESTIGATIONS, type InvestigationKey } from "./api"
 
 export const App: React.FC = () => {
   const [investigation, setInvestigation] =
-    useState<CyvestInvestigation | null>(null);
+    useState<Investigation | null>(null);
   const [selectedKey, setSelectedKey] =
     useState<InvestigationKey>("cyvest_visual");
   const [error, setError] = useState<string | null>(null);
@@ -70,33 +77,32 @@ export const App: React.FC = () => {
           <section className="app-summary">
             <div>
               <h2>
-                {investigation.investigation_name ??
-                  investigation.investigation_id}
+                {investigation.header.name || investigation.header.investigation_id}
               </h2>
               <p>
-                Schema {investigation.schema_version}
+                Schema {investigation.schema_version} · engine {investigation.report.engine_id}
               </p>
             </div>
             <dl className="app-metrics">
               <div>
-                <dt>Level</dt>
-                <dd>{investigation.level}</dd>
+                <dt>Verdict</dt>
+                <dd>{getGlobalVerdict(investigation)}</dd>
               </div>
               <div>
                 <dt>Score</dt>
-                <dd>{investigation.score_display}</dd>
+                <dd>{getGlobalScore(investigation).toFixed(2)}</dd>
               </div>
               <div>
                 <dt>Observables</dt>
-                <dd>{Object.keys(investigation.observables).length}</dd>
+                <dd>{Object.keys(getAllObservables(investigation)).length}</dd>
               </div>
               <div>
                 <dt>Findings</dt>
-                <dd>{Object.keys(investigation.findings).length}</dd>
+                <dd>{Object.keys(getAllFindings(investigation)).length}</dd>
               </div>
               <div>
                 <dt>Evidence</dt>
-                <dd>{Object.keys(investigation.evidences).length}</dd>
+                <dd>{Object.keys(getAllEvidences(investigation)).length}</dd>
               </div>
             </dl>
           </section>

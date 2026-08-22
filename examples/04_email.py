@@ -14,7 +14,7 @@ import click
 from logurich import get_logger
 from logurich.opt_click import click_logger_params
 
-from cyvest import Cyvest
+from cyvest import Cyvest, keys
 from cyvest.shared import SharedInvestigationContext
 
 logger = get_logger(__name__)
@@ -170,7 +170,7 @@ class EmailFrom(BaseRule):
         cy.root().relate_to(obs, cy.REL.EXTRACTION)
 
         # Create finding for header analysis
-        cy.finding("from", "test email vt 10", "> ok boys").link_observable(obs).tagged("emails")
+        cy.finding("from", "test email vt 10", comment="> ok boys").link_observable(obs).tagged("emails")
 
         logger.info(f"Email header analysis complete: {obs.key}")
 
@@ -196,7 +196,7 @@ class EmailFromBIS(BaseRule):
         obs = cy.observable(cy.OBS.EMAIL, from_addr).with_ti("PROOFPOINT", 5, "> test")
 
         # Create finding for header analysis
-        (cy.finding("from-proofpoint", "test email vt 10", "> ok boys").link_observable(obs).tagged("emails"))
+        (cy.finding("from-proofpoint", "test email vt 10", comment="> ok boys").link_observable(obs).tagged("emails"))
 
         logger.info(f"Email header analysis complete: {obs.key}")
 
@@ -215,10 +215,12 @@ class EmailReciever(BaseRule):
         """Analyze email body and build investigation fragment."""
         logger.info("Analyzing email receiver")
 
-        cy.enrichment_create("receiver", {"receiver": ["ok"]}, context="from splunk")
+        cy.evidence_create("enrichment", title="receiver", content={"receiver": ["ok"]}, source="splunk")
         receiver = cy.observable(cy.OBS.EMAIL, "user@company.com")
         cy.root().relate_to(receiver, cy.REL.EXTRACTION)
-        cy.finding("receiver", "description", "> receiver").with_score(0.1).link_observable(receiver).tagged("emails")
+        cy.finding("receiver", "description", comment="> receiver").with_weight(0.1).link_observable(receiver).tagged(
+            "emails"
+        )
 
         logger.info("Email receiver analysis complete")
 
@@ -279,7 +281,7 @@ class BodiesUrlTask(BaseRule):
             logger.info("[bold red]Finding Score: %s[/bold red]", chk.score)
 
         logger.info(f"Bodies URLs analysis complete: {len(urls_with_scores)} URLs processed")
-        logger.info("[bold red]Tag Score: %s[/bold red]", tag.get_aggregated_score())
+        logger.info("[bold red]Tag Score: %s[/bold red]", tag.aggregated_score)
 
 
 class BodiesDomainTask(BaseRule):
@@ -320,14 +322,14 @@ class BodiesDomainTask(BaseRule):
             # Create finding and link to tag
             chk = (
                 cy.finding(f"body-domain-{domain}", f"Domain analysis {domain}", comment=f"> score: {score}")
-                .link_observable(domain_obs, propagation_mode=cy.PROP.GLOBAL)
+                .link_observable(domain_obs, scope=cy.SCOPE.ALL)
                 .tagged(tag)
             )
 
             logger.info("[bold red]Finding Score: %s[/bold red]", chk.score)
 
         logger.info(f"Bodies DOMAINS analysis complete: {len(domains_with_scores)} DOMAINS processed")
-        logger.info("[bold red]Tag Score: %s[/bold red]", tag.get_aggregated_score())
+        logger.info("[bold red]Tag Score: %s[/bold red]", tag.aggregated_score)
 
 
 class AttachmentTask(BaseRule):
@@ -364,7 +366,7 @@ class AttachmentTask(BaseRule):
             file_obs = cy.observable(cy.OBS.FILE, filename)
             hash_obs = cy.observable(cy.OBS.HASH, f"MD5:{md5_hash}").with_ti("VT", score, "MD5 hash analysis")
             cy.root().relate_to(file_obs, cy.REL.EXTRACTION)
-            hash_obs.relate_to(file_obs, cy.REL.EXTRACTION, direction=cy.DIR.INBOUND)
+            file_obs.relate_to(hash_obs, cy.REL.EXTRACTION)
 
             # Add threat intel based on score
             if score >= 5:
@@ -416,23 +418,30 @@ class AggregatedRiskTask(BaseRule):
         sender_email = self.shared_context.observable_get(Cyvest.OBS.EMAIL, "noreply@domainmalicious.com")
         malicious_domain = self.shared_context.observable_get(Cyvest.OBS.DOMAIN, "domainmalicious.com")
 
-        url_findings = self.shared_context.observables_list_by_type(Cyvest.OBS.URL)
-        attachment_findings = self.shared_context.observables_list_by_type(Cyvest.OBS.FILE)
+        url_observables = self.shared_context.observables_list_by_type(Cyvest.OBS.URL)
+        attachment_observables = self.shared_context.observables_list_by_type(Cyvest.OBS.FILE)
+
+        # Scores live in the report, never on the facts, so read them there.
+        report = self.shared_context.report
+
+        def score_of(observable) -> Decimal:
+            result = report.observable(observable.key)
+            return Decimal(str(result.score)) if result is not None else Decimal("0")
 
         # Calculate composite risk score
         risk_score = Decimal("0")
         risk_indicators = []
 
         # Factor 3: URL threats (medium weight)
-        if url_findings:
-            max_url_score = max((finding.score for finding in url_findings), default=Decimal("0"))
+        if url_observables:
+            max_url_score = max((score_of(obs) for obs in url_observables), default=Decimal("0"))
             if max_url_score > 0:
                 risk_score += max_url_score * Decimal("0.2")  # 20% weight
                 risk_indicators.append(f"Suspicious URLs detected (max score: {max_url_score})")
 
         # Factor 4: Attachment threats (high weight)
-        if attachment_findings:
-            max_attachment_score = max((finding.score for finding in attachment_findings), default=Decimal("0"))
+        if attachment_observables:
+            max_attachment_score = max((score_of(obs) for obs in attachment_observables), default=Decimal("0"))
             if max_attachment_score >= 5:
                 risk_score += max_attachment_score * Decimal("0.5")  # 50% weight
                 risk_indicators.append(f"Malicious attachment detected (score: {max_attachment_score})")
@@ -448,13 +457,13 @@ class AggregatedRiskTask(BaseRule):
         comment += ">\n"
         comment += "> **Component Analysis:**\n"
         comment += f"> - Header findings: {len([c for c in [from_finding, receiver_finding] if c])}\n"
-        comment += f"> - URL findings: {len(url_findings)}\n"
-        comment += f"> - Attachment findings: {len(attachment_findings)}\n"
+        comment += f"> - URL findings: {len(url_observables)}\n"
+        comment += f"> - Attachment findings: {len(attachment_observables)}\n"
 
         # Create aggregated finding
         aggregated_finding = cy.finding(
             "email_risk_aggregated", "Aggregated Email Risk Assessment", comment=comment
-        ).with_score(risk_score)
+        ).with_weight(risk_score)
 
         # Link all relevant observables to the aggregated finding
         if sender_email:
@@ -474,8 +483,8 @@ class AI(BaseRule):
     order = 1000
 
     def run(self, cy: Cyvest) -> None:
-        """Calculate aggregated risk score based on all previous findings."""
-        cy.finding("ai", "AI Analysis", score=0, level=cy.LVL.MALICIOUS).tagged(
+        """Conclude on the case: top the total up to MALICIOUS, without re-counting the evidence."""
+        cy.conclusion("ai", "AI Analysis", verdict=cy.VERDICT.MALICIOUS).tagged(
             cy.tag("risk_assessment:ai", "AI Analysis Tag")
         )
 
@@ -536,14 +545,15 @@ def main(workers, stats, output):
 
     # Finalize relationships
     cy.finalize_relationships()
-    cy._investigation._score_engine.recalculate_all()
+    # No recalculation call: the report is derived on read and the cache drops on every append.
 
-    c = cy.finding_get("fnd:email_risk_aggregated")
+    c = cy.finding_get(keys.generate_finding_key("email_risk_aggregated", cy.observable_get_root().key))
     if c is not None:
         logger.info(c.comment)
 
-    # Display results
-    logger.info("Investigation complete - displaying summary - score should be 36.1")
+    # 35.1 with --workers 1: the aggregated task then sees every other fragment already
+    # reconciled. Run it in parallel and its own weight legitimately varies.
+    logger.info("Investigation complete - displaying summary - score should be 35.1")
 
     cy.display_summary()
     if stats:

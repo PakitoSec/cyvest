@@ -1,573 +1,556 @@
 """
-Serialization and deserialization for Cyvest investigations.
+Serialization and chained migrations.
 
-Provides JSON export/import and Markdown generation for LLM consumption.
+Migrations are **pure ``dict -> dict``** transforms. v6 ended its v5 migration by round-tripping
+through the live object model, which tied it to models that no longer exist; nothing here
+instantiates a fact until the very end.
+
+Two traps are handled explicitly, and both are the same mistake: reading the *readable* field
+instead of the *authoritative* one.
+
+- Read ``score`` before ``level``. In v6 only the score propagates; the level is cosmetic and may
+  contradict it, so migrating from the level inverts the sign on real data.
+- Read ``direction`` before ``relationship_type``. It is the direction that governed propagation,
+  and v6 allows ``EXTRACTION`` + ``BIDIRECTIONAL`` — an extraction that propagates nothing.
 """
 
 from __future__ import annotations
 
 import json
-from copy import deepcopy
-from decimal import Decimal
+import re
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
-from cyvest import keys
-from cyvest.levels import Level, normalize_level
-from cyvest.model import Enrichment, Evidence, Finding, Observable, Relationship, Tag, ThreatIntel
-from cyvest.model_enums import ObservableType
-from cyvest.model_schema import InvestigationSchema
-from cyvest.score import ScoreMode
+from cyvest.enums import DecisionKind, RelationKind, Scope, SourceClass, Status, Verdict
+from cyvest.evaluation.projection import verdict_from_score
+from cyvest.facts import (
+    Decision,
+    Evidence,
+    Finding,
+    Observable,
+    ObservableLink,
+    Relation,
+    SourceRef,
+    Tag,
+    ThreatIntel,
+)
+from cyvest.facts.store import FactStore, InvestigationHeader
+from cyvest.investigation import Investigation
+from cyvest.model_schema import SCHEMA_VERSION, FactsSchema, InvestigationSchema
+from cyvest.ulid import generate_ulid
 
-if TYPE_CHECKING:
-    from cyvest.cyvest import Cyvest
-    from cyvest.investigation import Investigation
+MIGRATION_SOURCE = SourceRef(name="migration", source_class=SourceClass.ORG_POLICY)
+
+_SEMVER = re.compile(r"^\d+\.\d+\.\d+$")
+
+# v6 levels that leave the verdict axis entirely.
+_LEVEL_TO_VERDICT = {
+    "TRUSTED": Verdict.SAFE,
+    "SAFE": Verdict.SAFE,
+    "INFO": Verdict.INFO,
+    "NOTABLE": Verdict.NOTABLE,
+    "SUSPICIOUS": Verdict.SUSPICIOUS,
+    "MALICIOUS": Verdict.MALICIOUS,
+}
 
 
-def serialize_investigation(inv: Investigation) -> InvestigationSchema:
-    """
-    Serialize a complete investigation to an InvestigationSchema.
+# --------------------------------------------------------------------------- serialize
 
-    Uses InvestigationSchema for validation and automatic serialization via
-    Pydantic's field_serializer decorators.
 
-    Args:
-        inv: Investigation to serialize
-
-    Returns:
-        InvestigationSchema instance (use .model_dump() for dict)
-    """
-    inv._rebuild_all_finding_links()
-    inv._rebuild_all_evidence_finding_links()
-    observables = dict(inv.get_all_observables())
-    threat_intels = dict(inv.get_all_threat_intels())
-    enrichments = dict(inv.get_all_enrichments())
-    tags = dict(inv.get_all_tags())
-
-    # Get all findings
-    findings = dict(inv.get_all_findings())
-    evidences = dict(inv.get_all_evidences())
-
-    # Get root type
-    root = inv.get_root()
-    root_type_value = root.obs_type.value
-
-    # Build and validate using Pydantic model
-    investigation = InvestigationSchema(
-        investigation_id=inv.investigation_id,
-        investigation_name=inv.investigation_name,
-        score=inv.get_global_score(),
-        level=inv.get_global_level(),
-        whitelisted=inv.is_whitelisted(),
-        whitelists=list(inv.get_whitelists()),
-        observables=observables,
-        findings=findings,
-        evidences=evidences,
-        threat_intels=threat_intels,
-        enrichments=enrichments,
-        tags=tags,
-        stats=inv.get_statistics(),
-        data_extraction={
-            "root_type": root_type_value,
-            "score_mode_obs": inv._score_engine._score_mode_obs.value,
-        },
+def serialize_investigation(investigation: Investigation) -> InvestigationSchema:
+    """Build the serialized document, report included — it is a required key."""
+    store = investigation.store
+    return InvestigationSchema(
+        header=store.header,
+        policy_version=investigation.policy.version,
+        engine_id=store.header.engine_id,
+        facts=FactsSchema(
+            observables=dict(store.observables),
+            relations=dict(store.relations),
+            signals={key: signal for key, signal in store.signals.items() if isinstance(signal, ThreatIntel)},
+            evidences=dict(store.evidences),
+            findings=dict(store.findings),
+        ),
+        decisions=dict(store.decisions),
+        tags=dict(store.tags),
+        report=investigation.report,
     )
 
-    return investigation
+
+def investigation_to_dict(investigation: Investigation) -> dict[str, Any]:
+    """Dump **by alias**: the JSON schema is generated by alias, so the document must match it."""
+    return serialize_investigation(investigation).model_dump(mode="json", by_alias=True)
 
 
-def save_investigation_json(inv: Investigation, filepath: str | Path) -> None:
+def save_investigation_json(investigation: Investigation, filepath: str | Path) -> None:
+    """Trailing newline included, so a generated fixture does not fight `end-of-file-fixer`."""
+    Path(filepath).write_text(
+        json.dumps(investigation_to_dict(investigation), indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+
+
+# --------------------------------------------------------------------------- markdown
+
+
+def generate_markdown_report(investigation: Investigation, *, include_tags: bool = True) -> str:
     """
-    Save an investigation to a JSON file.
+    A human-readable report.
 
-    Args:
-        inv: Investigation to save
-        filepath: Path to save the JSON file
+    Every figure comes from the report, and each one travels with the engine that produced it —
+    comparing scores across engines is meaningless, so the id is never dropped.
     """
-    data = serialize_investigation(inv)
-    with open(filepath, "w", encoding="utf-8") as f:
-        f.write(data.model_dump_json(indent=2, by_alias=True))
+    report = investigation.report
+    header = investigation.store.header
+    lines: list[str] = [
+        f"# {header.name or header.investigation_id}",
+        "",
+        f"- **Score**: {report.investigation.score:.2f} ({report.investigation.verdict.value})",
+        f"- **Engine**: `{report.engine_id}` · policy `{report.policy_version}`",
+        f"- **Opened**: {header.opened_at.isoformat()}",
+        "",
+    ]
 
-
-def generate_markdown_report(
-    inv: Investigation,
-    include_tags: bool = False,
-    include_enrichments: bool = False,
-    include_observables: bool = True,
-    exclude_levels: set[Level] | None = None,
-) -> str:
-    """
-    Generate a Markdown report of the investigation for LLM consumption.
-
-    Args:
-        inv: Investigation
-        include_tags: Include tags section in the report (default: False)
-        include_enrichments: Include enrichments section in the report (default: False)
-        include_observables: Include observables section in the report (default: True)
-        exclude_levels: Set of levels to exclude from findings section (default: {Level.NONE})
-
-    Returns:
-        Markdown formatted report
-    """
-    if exclude_levels is None:
-        exclude_levels = {Level.NONE}
-
-    lines = []
-
-    # Header
-    lines.append("# Cybersecurity Investigation Report")
-    lines.append("")
-    if getattr(inv, "investigation_name", None):
-        lines.append(f"**Investigation Name:** {inv.investigation_name}")
-    lines.append(f"**Global Score:** {inv.get_global_score():.2f}")
-    lines.append(f"**Global Level:** {inv.get_global_level().name}")
-    whitelists = inv.get_whitelists()
-    whitelist_status = "Yes" if whitelists else "No"
-    lines.append(f"**Whitelisted Investigation:** {whitelist_status}")
-    if whitelists:
-        lines.append(f"**Whitelist Entries:** {len(whitelists)}")
-    lines.append("")
-
-    # Statistics
-    lines.append("## Statistics")
-    lines.append("")
-    stats = inv.get_statistics()
-    lines.append(f"- **Total Observables:** {stats.total_observables}")
-    lines.append(f"- **Internal Observables:** {stats.internal_observables}")
-    lines.append(f"- **External Observables:** {stats.external_observables}")
-    lines.append(f"- **Whitelisted Observables:** {stats.whitelisted_observables}")
-    lines.append(f"- **Total Findings:** {stats.total_findings}")
-    lines.append(f"- **Applied Findings:** {stats.applied_findings}")
-    lines.append(f"- **Total Evidences:** {stats.total_evidences}")
-    lines.append(f"- **Total Threat Intel:** {stats.total_threat_intel}")
-    lines.append("")
-
-    # Whitelists
-    if whitelists:
-        lines.append("## Whitelists")
-        lines.append("")
-        for entry in whitelists:
-            lines.append(f"- **{entry.identifier}** - {entry.name}")
-            if entry.justification:
-                lines.append(f"  - Justification: {entry.justification}")
+    decisions = investigation.get_all_decisions()
+    if decisions:
+        lines += ["## Decisions", "", "| Target | Kind | By | Justification |", "|---|---|---|---|"]
+        for decision in decisions.values():
+            lines.append(
+                f"| `{decision.target_key}` | {decision.kind.value} | {decision.source.name} "
+                f"| {decision.justification or ''} |"
+            )
         lines.append("")
 
-    # Findings
-    lines.append("## Findings")
-    lines.append("")
-    for finding in inv.get_all_findings().values():
-        if finding.level not in exclude_levels:
-            lines.append(f"- **{finding.finding_name}**: Score: {finding.score_display}, Level: {finding.level.name}")
-            lines.append(f"  - Description: {finding.description}")
-            if finding.comment:
-                lines.append(f"  - Comment: {finding.comment}")
-            if finding.evidence_links:
-                lines.append("  - Evidences:")
-                for link in finding.evidence_links:
-                    evidence = inv.get_evidence(link.evidence_key)
-                    if evidence:
-                        lines.append(f"    - {evidence.title} ({evidence.evidence_type}, source: {evidence.source})")
+    lines += ["## Findings", "", "| Rule | Score | Verdict | Status |", "|---|---|---|---|"]
+    for key, finding in sorted(investigation.get_all_findings().items()):
+        result = report.finding(key)
+        if result is None:
+            continue
+        score = "—" if result.score is None else f"{result.score:.2f}"
+        lines.append(
+            f"| {finding.name or finding.rule_id} | {score} | {result.verdict.value} | {result.status.value} |"
+        )
     lines.append("")
 
-    # Observables
-    if include_observables and inv.get_all_observables():
-        lines.append("## Observables")
-        lines.append("")
-        for obs in inv.get_all_observables().values():
-            lines.append(f"### {obs.obs_type}: {obs.value}")
-            lines.append(f"- **Key:** {obs.key}")
-            lines.append(f"- **Score:** {obs.score_display}")
-            lines.append(f"- **Level:** {obs.level.name}")
-            lines.append(f"- **Internal:** {obs.internal}")
-            lines.append(f"- **Whitelisted:** {obs.whitelisted}")
-            if obs.subtype:
-                subtype = obs.subtype.value if hasattr(obs.subtype, "value") else obs.subtype
-                lines.append(f"- **Subtype:** {subtype}")
-            if obs.namespace:
-                lines.append(f"- **Namespace:** {obs.namespace}")
-            if obs.comment:
-                lines.append(f"- **Comment:** {obs.comment}")
-            if obs.relationships:
-                lines.append("- **Relationships:**")
-                for rel in obs.relationships:
-                    direction_symbol = {
-                        "outbound": "→",
-                        "inbound": "←",
-                        "bidirectional": "↔",
-                    }.get(rel.direction if isinstance(rel.direction, str) else rel.direction.value, "→")
-                    lines.append(f"  - {rel.relationship_type} {direction_symbol} {rel.target_key}")
-            if obs.threat_intels:
-                lines.append("- **Threat Intelligence:**")
-                for ti in obs.threat_intels:
-                    lines.append(f"  - {ti.source}: Score {ti.score_display}, Level {ti.level.name}")
-                    if ti.comment:
-                        lines.append(f"    - {ti.comment}")
-            lines.append("")
+    lines += ["## Observables", "", "| Type | Value | Score | Verdict |", "|---|---|---|---|"]
+    for key, observable in sorted(investigation.get_all_observables().items()):
+        if key == header.root_key:
+            continue
+        result = report.observable(key)
+        score = "—" if result is None or result.score is None else f"{result.score:.2f}"
+        verdict = result.verdict.value if result else "INFO"
+        lines.append(f"| {observable.obs_type} | `{observable.value}` | {score} | {verdict} |")
+    lines.append("")
 
-    # Enrichments
-    if include_enrichments and inv.get_all_enrichments():
-        lines.append("## Enrichments")
+    if include_tags and investigation.get_all_tags():
+        lines += ["## Tags", "", "| Tag | Aggregated score |", "|---|---|"]
+        for tag in sorted(investigation.get_all_tags().values(), key=lambda t: t.name):
+            lines.append(f"| {tag.name} | {investigation.get_tag_aggregated_score(tag.name):.2f} |")
         lines.append("")
-        for enr in inv.get_all_enrichments().values():
-            lines.append(f"### {enr.name}")
-            if enr.context:
-                lines.append(f"- **Context:** {enr.context}")
-            lines.append(f"- **Data:** {json.dumps(enr.data, indent=2)}")
-            lines.append("")
-
-    # Tags
-    if include_tags and inv.get_all_tags():
-        lines.append("## Tags")
-        lines.append("")
-        for tag in inv.get_all_tags().values():
-            lines.append(f"### {tag.name}")
-            lines.append(f"- **Description:** {tag.description}")
-            lines.append(f"- **Direct Score:** {tag.get_direct_score():.2f}")
-            lines.append(f"- **Aggregated Score:** {inv.get_tag_aggregated_score(tag.name):.2f}")
-            lines.append(f"- **Aggregated Level:** {inv.get_tag_aggregated_level(tag.name).name}")
-            lines.append(f"- **Direct Findings:** {len(tag.findings)}")
-            lines.append("")
 
     return "\n".join(lines)
 
 
-def save_investigation_markdown(
-    inv: Investigation,
-    filepath: str | Path,
-    include_tags: bool = False,
-    include_enrichments: bool = False,
-    include_observables: bool = True,
-    exclude_levels: set[Level] | None = None,
-) -> None:
+def save_investigation_markdown(investigation: Investigation, filepath: str | Path, **kwargs: Any) -> str:
+    Path(filepath).write_text(generate_markdown_report(investigation, **kwargs).rstrip("\n") + "\n", encoding="utf-8")
+    return str(filepath)
+
+
+# --------------------------------------------------------------------------- load
+
+
+def detect_schema_version(data: dict[str, Any]) -> str:
     """
-    Save an investigation as a Markdown report.
+    Read the declared version, or fall back to ``"5"`` for documents that predate versioning.
 
-    Args:
-        inv: Investigation to save
-        filepath: Path to save the Markdown file
-        include_tags: Include tags section in the report (default: False)
-        include_enrichments: Include enrichments section in the report (default: False)
-        include_observables: Include observables section in the report (default: True)
-        exclude_levels: Set of levels to exclude from findings section (default: {Level.NONE})
+    Any well-formed ``major.minor.patch`` is returned as-is — including versions newer than this
+    library, which must be *refused* rather than mistaken for an ancient document.
     """
-    markdown = generate_markdown_report(inv, include_tags, include_enrichments, include_observables, exclude_levels)
-    with open(filepath, "w", encoding="utf-8") as f:
-        f.write(markdown)
+    version = str(data.get("schema_version", "")).strip()
+    return version if _SEMVER.match(version) else "5"
 
 
-def load_investigation_dict(data: dict[str, Any]) -> Cyvest:
+def _version_tuple(version: str) -> tuple[int, int]:
+    major, minor, *_ = version.split(".")
+    return int(major), int(minor)
+
+
+def _check_readable(version: str) -> None:
     """
-    Load an investigation from a dictionary (parsed JSON) into a Cyvest object.
+    Upward compatibility only: we read older documents, never newer ones.
 
-    Args:
-        data: Dictionary containing the serialized investigation data
-
-    Returns:
-        Reconstructed Cyvest investigation
+    Because of this rule a minor bump never needs a migration — fields added in 7.x are optional
+    and carry defaults — which is what lets parsing stay strict.
     """
-    from cyvest.cyvest import Cyvest
-    from cyvest.investigation import Investigation
+    if _version_tuple(version) > _version_tuple(SCHEMA_VERSION):
+        raise ValueError(f"Document schema {version} is newer than this library ({SCHEMA_VERSION}); upgrade cyvest.")
 
-    schema_version = data.get("schema_version")
-    if schema_version != "6.0.0":
+
+def load_investigation_dict(data: dict[str, Any], *, migrate: bool = False) -> Investigation:
+    """Rebuild an investigation. Migration is opt-in — no silent upgrade."""
+    version = detect_schema_version(data)
+    # Refuse a newer document before anything else: migrating it would be nonsense.
+    _check_readable(version)
+
+    if version != SCHEMA_VERSION:
+        if not migrate:
+            raise ValueError(
+                f"Document schema is {version}, this library reads {SCHEMA_VERSION}. "
+                "Pass migrate=True or run 'cyvest migrate'."
+            )
+        data = migrate_to_current(data)
+
+    document = InvestigationSchema.model_validate(data)
+
+    investigation = Investigation.__new__(Investigation)
+    investigation.policy = _policy_for(document.policy_version)
+    investigation.investigation_id = document.header.investigation_id
+    investigation.fragment_id = document.header.investigation_id
+    investigation.started_at = document.header.opened_at
+    investigation.store = FactStore(document.header)
+    investigation._report = None
+
+    for collection in (
+        document.facts.observables,
+        document.facts.relations,
+        document.facts.signals,
+        document.facts.evidences,
+        document.facts.findings,
+        document.decisions,
+        document.tags,
+    ):
+        investigation.store.extend(collection.values())
+
+    return investigation
+
+
+def _policy_for(policy_version: str) -> Any:
+    from cyvest.policy import DEFAULT_POLICY
+
+    if policy_version != DEFAULT_POLICY.version:
         raise ValueError(
-            f"Unsupported or missing schema_version {schema_version!r}; "
-            "run 'cyvest migrate INPUT -o OUTPUT' for Cyvest 5.x documents."
+            f"Unknown policy version {policy_version!r}. v7 ships a single policy; custom policies are not persisted."
         )
+    return DEFAULT_POLICY
 
-    investigation_id = data.get("investigation_id")
-    if not isinstance(investigation_id, str) or not investigation_id.strip():
-        raise ValueError("Serialized investigation must include 'investigation_id'.")
 
-    root_data = data.get("root_data")
-    extraction = data.get("data_extraction", {})
+def load_investigation_json(filepath: str | Path, *, migrate: bool = False) -> Investigation:
+    return load_investigation_dict(json.loads(Path(filepath).read_text(encoding="utf-8")), migrate=migrate)
 
-    root_type_raw = extraction.get("root_type")
-    try:
-        root_type = ObservableType.normalize_root_type(root_type_raw)
-    except (TypeError, ValueError):
-        root_type = ObservableType.FILE
 
-    score_mode_raw = extraction.get("score_mode_obs")
-    try:
-        score_mode = ScoreMode(score_mode_raw) if score_mode_raw else ScoreMode.MAX
-    except (TypeError, ValueError):
-        score_mode = ScoreMode.MAX
+# --------------------------------------------------------------------------- migrations
 
-    cv = Cyvest(root_data=root_data, root_type=root_type, score_mode_obs=score_mode)
 
-    # Reset internal state to avoid default root pollution
-    cv._investigation = Investigation(
-        root_data,
-        root_type=root_type,
-        score_mode_obs=score_mode,
-        investigation_id=investigation_id,
+def _iso(value: Any, fallback: datetime) -> datetime:
+    if isinstance(value, datetime):
+        return value if value.tzinfo else value.replace(tzinfo=UTC)
+    if isinstance(value, str):
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return fallback
+        return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
+    return fallback
+
+
+def _envelope(fragment_id: str, asserted_at: datetime, source: SourceRef = MIGRATION_SOURCE) -> dict[str, Any]:
+    return {
+        "asserted_at": asserted_at,
+        "seq": generate_ulid(timestamp_ms=int(asserted_at.timestamp() * 1000)),
+        "source": source,
+        "fragment_id": fragment_id,
+    }
+
+
+def _judgment_from_v6(payload: dict[str, Any]) -> dict[str, Any]:
+    """
+    Derive ``(verdict, weight, confidence)`` from a v6 record.
+
+    The score is authoritative; the level only speaks when there is no score, since a v6 record
+    may carry a level that contradicts its own score.
+    """
+    raw_score = payload.get("score")
+    score = float(raw_score) if raw_score is not None else 0.0
+    if score != 0.0:
+        return {"verdict": verdict_from_score(score), "weight": abs(score), "confidence": 1.0}
+
+    level = str(payload.get("level", "INFO")).upper()
+    return {"verdict": _LEVEL_TO_VERDICT.get(level, Verdict.INFO), "weight": 0.0, "confidence": 1.0}
+
+
+def _migrate_v5_to_v6(data: dict[str, Any]) -> dict[str, Any]:
+    """Pure dict transform: inline the defaults v6 used to add through its models."""
+    migrated = dict(data)
+    migrated["schema_version"] = "6.0.0"
+    migrated.pop("stats", None)
+
+    for observable in (migrated.get("observables") or {}).values():
+        observable.setdefault("internal", True)
+        observable.setdefault("whitelisted", False)
+        observable.setdefault("comment", "")
+        observable.setdefault("extra", {})
+        observable.setdefault("aliases", [])
+        observable.setdefault("occurrence_count", 1)
+        observable.setdefault("relationships", [])
+        observable.setdefault("threat_intels", [])
+
+    for finding in (migrated.get("findings") or {}).values():
+        finding.setdefault("comment", "")
+        finding.setdefault("extra", {})
+        finding.setdefault("observable_links", [])
+
+    return migrated
+
+
+def _migrate_v6_to_v7(data: dict[str, Any]) -> dict[str, Any]:
+    """Turn a v6 document into a v7 one, preserving its numbers exactly."""
+    fragment_id = str(data.get("investigation_id") or generate_ulid())
+    opened_at = _iso(data.get("started_at"), datetime.now(UTC))
+    envelope = _envelope(fragment_id, opened_at)
+
+    observables: dict[str, Any] = {}
+    relations: dict[str, Any] = {}
+    signals: dict[str, Any] = {}
+    findings: dict[str, Any] = {}
+    decisions: dict[str, Any] = {}
+    evidences: dict[str, Any] = {}
+    tags: dict[str, Any] = {}
+
+    root_key = None
+    for key, payload in (data.get("observables") or {}).items():
+        if payload.get("value") == "root":
+            root_key = key
+        observable = Observable(
+            type=payload.get("type") or payload.get("obs_type"),
+            subtype=payload.get("subtype"),
+            namespace=payload.get("namespace"),
+            value=payload["value"],
+            internal=bool(payload.get("internal", True)),
+            comment=payload.get("comment", ""),
+            extra=payload.get("extra") or {},
+            occurrences={fragment_id: int(payload.get("occurrence_count", 1))},
+            **envelope,
+        )
+        observables[observable.key] = observable
+
+        if payload.get("whitelisted"):
+            decision = Decision(
+                target_key=observable.key,
+                kind=DecisionKind.ALLOWLISTED,
+                justification="migrated from v6 whitelisted flag",
+                **envelope,
+            )
+            decisions[decision.key] = decision
+
+        for raw in payload.get("relationships") or []:
+            relation = _migrate_relationship(raw, source_key=key, envelope=envelope)
+            if relation is not None:
+                relations[relation.key] = relation
+
+    for key, payload in (data.get("threat_intels") or {}).items():
+        subject_key = payload.get("observable_key") or _subject_from_ti_key(key)
+        if subject_key is None:
+            continue
+        signal = ThreatIntel(
+            subject_key=subject_key,
+            source=SourceRef(name=payload.get("source", "unknown"), source_class=SourceClass.VENDOR_FEED),
+            taxonomies=tuple(
+                item.get("name", "") if isinstance(item, dict) else str(item)
+                for item in (payload.get("taxonomies") or [])
+            ),
+            comment=payload.get("comment", ""),
+            asserted_at=envelope["asserted_at"],
+            seq=envelope["seq"],
+            fragment_id=fragment_id,
+            **_judgment_from_v6(payload),
+        )
+        signals[signal.key] = signal
+
+    for payload in (data.get("evidences") or {}).values():
+        evidence = Evidence(
+            evidence_type=payload.get("evidence_type", "artifact"),
+            title=payload.get("title", ""),
+            content=payload.get("content"),
+            uri=payload.get("uri"),
+            external_id=payload.get("external_id"),
+            source=SourceRef(name=payload.get("source", "legacy"), source_class=SourceClass.INTERNAL_TOOL),
+            asserted_at=envelope["asserted_at"],
+            seq=envelope["seq"],
+            fragment_id=fragment_id,
+        )
+        evidences[evidence.key] = evidence
+
+    # v6 enrichments are evidence that happened to have a dedicated type.
+    for payload in (data.get("enrichments") or {}).values():
+        evidence = Evidence(
+            evidence_type="enrichment",
+            title=payload.get("name", ""),
+            content=payload.get("data"),
+            source=SourceRef(
+                name=payload.get("context") or "legacy",
+                source_class=SourceClass.INTERNAL_TOOL,
+            ),
+            asserted_at=envelope["asserted_at"],
+            seq=envelope["seq"],
+            fragment_id=fragment_id,
+        )
+        evidences[evidence.key] = evidence
+
+    for payload in (data.get("findings") or {}).values():
+        links = tuple(
+            ObservableLink(
+                observable_key=link["observable_key"],
+                scope=Scope.ALL if str(link.get("propagation_mode", "")).upper() == "GLOBAL" else Scope.OWN_FRAGMENT,
+            )
+            for link in payload.get("observable_links") or []
+        )
+        judgment = _judgment_from_v6(payload)
+        # A v6 finding stuck at NONE never applied; keep it visible but out of the arithmetic.
+        status = Status.NOT_APPLICABLE if str(payload.get("level", "")).upper() == "NONE" else Status.EVALUATED
+        finding = Finding(
+            rule_id=payload.get("finding_name", "unknown"),
+            name=payload.get("description", ""),
+            comment=payload.get("comment", ""),
+            subject_key=links[0].observable_key if links else (root_key or fragment_id),
+            observable_links=links,
+            status=status,
+            extra=payload.get("extra") or {},
+            evidence_keys=tuple(link["evidence_key"] for link in payload.get("evidence_links") or []),
+            asserted_at=envelope["asserted_at"],
+            seq=envelope["seq"],
+            source=MIGRATION_SOURCE,
+            fragment_id=fragment_id,
+            **judgment,
+        )
+        findings[finding.key] = finding
+
+    for payload in (data.get("tags") or {}).values():
+        tag = Tag(
+            name=payload["name"],
+            description=payload.get("description", ""),
+            finding_keys=tuple(
+                item["key"] if isinstance(item, dict) else str(item) for item in payload.get("findings") or []
+            ),
+            **envelope,
+        )
+        tags[tag.key] = tag
+
+    for payload in data.get("whitelists") or []:
+        target = payload.get("identifier")
+        if target in observables:
+            decision = Decision(
+                target_key=target,
+                kind=DecisionKind.ALLOWLISTED,
+                justification=payload.get("justification"),
+                **envelope,
+            )
+            decisions[decision.key] = decision
+
+    header = InvestigationHeader(
+        investigation_id=fragment_id,
+        name=str(data.get("investigation_name") or ""),
+        root_key=root_key,
+        opened_at=opened_at,
+        policy_version="default-v1",
+        engine_id="basic-v1",
+        fragment_ids=(fragment_id,),
     )
 
-    investigation_name = data.get("investigation_name")
-    if isinstance(investigation_name, str):
-        cv._investigation.investigation_name = investigation_name
+    document = InvestigationSchema(
+        header=header,
+        facts=FactsSchema(
+            observables=observables,
+            relations=relations,
+            signals=signals,
+            evidences=evidences,
+            findings=findings,
+        ),
+        decisions=decisions,
+        tags=tags,
+        report=_empty_report(header),
+    )
+    migrated = document.model_dump(mode="json", by_alias=True)
 
-    # Load whitelists using Pydantic validation
-    whitelists = data.get("whitelists") or []
-    for whitelist_info in whitelists:
-        try:
-            identifier = str(whitelist_info.get("identifier", "")).strip()
-            name = str(whitelist_info.get("name", "")).strip()
-            if identifier and name:
-                cv._investigation.add_whitelist(
-                    identifier,
-                    name,
-                    whitelist_info.get("justification"),
-                )
-        except ValueError:
-            continue
-
-    # Observables - leverage Pydantic model_validate (two-pass so root can merge after others exist)
-    new_root_key = cv._investigation.get_root().key
-    root_obs_info: dict[str, Any] | None = None
-    other_obs_infos: list[dict[str, Any]] = []
-    for obs_info in data.get("observables", {}).values():
-        obs_key = obs_info.get("key", "")
-        if obs_key == new_root_key:
-            root_obs_info = obs_info
-            continue
-        other_obs_infos.append(obs_info)
-
-    for obs_info in other_obs_infos:
-        # Prepare data for Pydantic validation
-        obs_data = {
-            "obs_type": obs_info.get("type", "unknown"),
-            "subtype": obs_info.get("subtype"),
-            "namespace": obs_info.get("namespace"),
-            "value": obs_info.get("value", ""),
-            "internal": obs_info.get("internal", True),
-            "whitelisted": obs_info.get("whitelisted", False),
-            "comment": obs_info.get("comment", ""),
-            "extra": obs_info.get("extra", {}),
-            "score": Decimal(str(obs_info.get("score", 0))),
-            "level": obs_info.get("level", "INFO"),
-            "aliases": obs_info.get("aliases", []),
-            "occurrence_count": obs_info.get("occurrence_count", 1),
-            "key": obs_info.get("key", ""),
-            "relationships": [Relationship.model_validate(rel) for rel in obs_info.get("relationships", [])],
-        }
-        obs = Observable.model_validate(obs_data)
-        cv._investigation.add_observable(obs)
-
-    if root_obs_info is not None:
-        # Merge serialized root into the live root (preserves relationships, etc.).
-        root_data = {
-            "obs_type": root_obs_info.get("type", root_type),
-            "subtype": root_obs_info.get("subtype"),
-            "namespace": root_obs_info.get("namespace"),
-            "value": "root",
-            "internal": root_obs_info.get("internal", False),
-            "whitelisted": root_obs_info.get("whitelisted", False),
-            "comment": root_obs_info.get("comment", ""),
-            "extra": root_obs_info.get("extra", root_data),
-            "score": Decimal(str(root_obs_info.get("score", 0))),
-            "level": root_obs_info.get("level", "INFO"),
-            "aliases": root_obs_info.get("aliases", []),
-            "occurrence_count": root_obs_info.get("occurrence_count", 1),
-            "key": new_root_key,
-            "relationships": [Relationship.model_validate(rel) for rel in root_obs_info.get("relationships", [])],
-        }
-        root_obs = Observable.model_validate(root_data)
-        merged_root, _ = cv._investigation.add_observable(root_obs)
-        # Loading merges serialized root data into the fresh root created by Cyvest().
-        # Preserve the serialized occurrence count instead of counting the loader-created root.
-        merged_root.occurrence_count = root_obs.occurrence_count
-
-    # Threat intel - leverage Pydantic model_validate
-    for ti_info in data.get("threat_intels", {}).values():
-        raw_taxonomies = ti_info.get("taxonomies", []) or []
-        normalized_taxonomies: list[Any] = []
-        for taxonomy in raw_taxonomies:
-            if isinstance(taxonomy, dict) and "level" in taxonomy:
-                taxonomy = dict(taxonomy)
-                taxonomy["level"] = normalize_level(taxonomy["level"])
-            normalized_taxonomies.append(taxonomy)
-
-        ti_data = {
-            "source": ti_info.get("source", ""),
-            "observable_key": ti_info.get("observable_key", ""),
-            "comment": ti_info.get("comment", ""),
-            "extra": ti_info.get("extra", {}),
-            "score": Decimal(str(ti_info.get("score", 0))),
-            "level": ti_info.get("level", "INFO"),
-            "taxonomies": normalized_taxonomies,
-            "key": ti_info.get("key", ""),
-        }
-        ti = ThreatIntel.model_validate(ti_data)
-        observable = cv._investigation.get_observable(ti.observable_key)
-        if observable:
-            cv._investigation.add_threat_intel(ti, observable)
-
-    # Evidences
-    for evidence_info in data.get("evidences", {}).values():
-        evidence = Evidence.model_validate(evidence_info)
-        cv._investigation.add_evidence(evidence)
-
-    # Findings - leverage Pydantic model_validate
-    for finding_info in data.get("findings", {}).values():
-        raw_links = finding_info.get("observable_links", []) or []
-        normalized_links = []
-        for link in raw_links:
-            if isinstance(link, dict):
-                normalized_links.append(
-                    {
-                        "observable_key": link.get("observable_key", ""),
-                        "propagation_mode": link.get("propagation_mode", "LOCAL_ONLY"),
-                    }
-                )
-            else:
-                normalized_links.append(link)
-        finding_data = {
-            "finding_name": finding_info.get("finding_name", ""),
-            "description": finding_info.get("description", ""),
-            "comment": finding_info.get("comment", ""),
-            "extra": finding_info.get("extra", {}),
-            "score": Decimal(str(finding_info.get("score", 0))),
-            "level": finding_info.get("level", "NONE"),
-            "origin_investigation_id": (
-                finding_info.get("origin_investigation_id") or cv._investigation.investigation_id
-            ),
-            "observable_links": normalized_links,
-            "evidence_links": finding_info.get("evidence_links", []),
-            "key": finding_info.get("key", ""),
-        }
-        finding = Finding.model_validate(finding_data)
-        cv._investigation.add_finding(finding)
-
-    # Enrichments - leverage Pydantic model_validate
-    for enr_info in data.get("enrichments", {}).values():
-        enr_data = {
-            "name": enr_info.get("name", ""),
-            "data": enr_info.get("data", {}),
-            "context": enr_info.get("context", ""),
-            "key": enr_info.get("key", ""),
-        }
-        enrichment = Enrichment.model_validate(enr_data)
-        cv._investigation.add_enrichment(enrichment)
-
-    # Tags
-    def build_tag(tag_info: dict[str, Any]) -> Tag:
-        tag_data = {
-            "name": tag_info.get("name", ""),
-            "description": tag_info.get("description", ""),
-            "key": tag_info.get("key", ""),
-        }
-        tag = Tag.model_validate(tag_data)
-        tag = cv._investigation.add_tag(tag)
-
-        for finding_key in tag_info.get("findings", []):
-            finding = cv._investigation.get_finding(finding_key)
-            if finding:
-                cv._investigation.add_finding_to_tag(tag.key, finding.key)
-
-        return tag
-
-    for tag_info in data.get("tags", {}).values():
-        build_tag(tag_info)
-
-    cv._investigation._rebuild_all_finding_links()
-    cv._investigation._rebuild_all_evidence_finding_links()
-
-    return cv
+    # The report is derived, so rebuild it from the migrated facts rather than trusting v6's.
+    rebuilt = load_investigation_dict(migrated)
+    migrated["report"] = rebuilt.report.model_dump(mode="json", by_alias=True)
+    return migrated
 
 
-def _backfill_v6_observable_defaults(data: dict[str, Any]) -> dict[str, Any]:
-    """Backfill defaults added after the initial v6 schema release."""
-    for raw_observable in data.get("observables", {}).values():
-        if isinstance(raw_observable, dict):
-            raw_observable.setdefault("aliases", [])
+def _empty_report(header: InvestigationHeader) -> Any:
+    from cyvest.evaluation.report import InvestigationResult, Report
 
-    return data
-
-
-def migrate_v5_to_v6(data: dict[str, Any]) -> dict[str, Any]:
-    """Migrate a serialized Cyvest 5.x investigation to the strict 6.0.0 format."""
-    if data.get("schema_version") == "6.0.0":
-        return _backfill_v6_observable_defaults(deepcopy(data))
-
-    migrated = deepcopy(data)
-    migrated["schema_version"] = "6.0.0"
-
-    observable_key_map: dict[str, str] = {}
-    migrated_observables: dict[str, dict[str, Any]] = {}
-    for old_key, raw_observable in migrated.get("observables", {}).items():
-        observable = dict(raw_observable)
-        observable.setdefault("subtype", None)
-        observable.setdefault("namespace", None)
-        observable.setdefault("aliases", [])
-        new_key = keys.generate_observable_key(
-            str(observable.get("type", "unknown")),
-            str(observable.get("value", "")),
-            subtype=observable.get("subtype"),
-            namespace=observable.get("namespace"),
-        )
-        observable_key_map[old_key] = new_key
-        observable["key"] = new_key
-        migrated_observables[new_key] = observable
-
-    for observable in migrated_observables.values():
-        for relationship in observable.get("relationships", []) or []:
-            target_key = relationship.get("target_key")
-            if target_key in observable_key_map:
-                relationship["target_key"] = observable_key_map[target_key]
-    migrated["observables"] = migrated_observables
-
-    threat_intel_key_map: dict[str, str] = {}
-    migrated_threat_intels: dict[str, dict[str, Any]] = {}
-    for old_key, raw_ti in migrated.get("threat_intels", {}).items():
-        ti = dict(raw_ti)
-        ti["observable_key"] = observable_key_map.get(ti.get("observable_key"), ti.get("observable_key"))
-        new_key = keys.generate_threat_intel_key(str(ti.get("source", "")), str(ti.get("observable_key", "")))
-        threat_intel_key_map[old_key] = new_key
-        ti["key"] = new_key
-        migrated_threat_intels[new_key] = ti
-    migrated["threat_intels"] = migrated_threat_intels
-
-    finding_key_map: dict[str, str] = {}
-    source_findings = migrated.pop("checks", migrated.get("findings", {}))
-    migrated_findings: dict[str, dict[str, Any]] = {}
-    for old_key, raw_finding in source_findings.items():
-        finding = dict(raw_finding)
-        finding_name = finding.pop("check_name", finding.get("finding_name", ""))
-        finding["finding_name"] = finding_name
-        new_key = keys.generate_finding_key(str(finding_name))
-        finding_key_map[old_key] = new_key
-        finding["key"] = new_key
-        finding["evidence_links"] = []
-        for link in finding.get("observable_links", []) or []:
-            if isinstance(link, dict):
-                old_observable_key = link.get("observable_key")
-                link["observable_key"] = observable_key_map.get(old_observable_key, old_observable_key)
-        migrated_findings[new_key] = finding
-    migrated["findings"] = migrated_findings
-    migrated["evidences"] = {}
-
-    for tag in migrated.get("tags", {}).values():
-        old_finding_keys = tag.pop("checks", tag.get("findings", []))
-        tag["findings"] = [finding_key_map.get(key, key) for key in old_finding_keys]
-
-    migrated.pop("stats", None)
-    loaded = load_investigation_dict(migrated)
-    return serialize_investigation(loaded._investigation).model_dump(mode="json", by_alias=True)
+    return Report(
+        engine_id=header.engine_id,
+        policy_version=header.policy_version,
+        investigation=InvestigationResult(key=header.investigation_id, score=0.0),
+    )
 
 
-def load_investigation_json(filepath: str | Path) -> Cyvest:
+def _subject_from_ti_key(key: str) -> str | None:
+    """``ti:{source}:{observable_key}`` — the observable key is everything past the source."""
+    parts = key.split(":", 2)
+    return parts[2] if len(parts) == 3 else None
+
+
+def _migrate_relationship(raw: dict[str, Any], *, source_key: str, envelope: dict[str, Any]) -> Relation | None:
     """
-    Load an investigation from a JSON file into a Cyvest object.
+    ⚠ Read ``direction`` first.
 
-    Args:
-        filepath: Path to the JSON file
-
-    Returns:
-        Reconstructed Cyvest investigation
+    v6 does not forbid ``EXTRACTION`` + ``BIDIRECTIONAL``, and that combination propagated
+    nothing. Reading the type first would make it propagate in v7 — a silent parity break.
     """
-    with open(filepath, encoding="utf-8") as handle:
-        data = json.load(handle)
+    target_key = raw.get("target_key")
+    if not target_key:
+        return None
 
-    return load_investigation_dict(data)
+    direction = str(raw.get("direction", "outbound")).lower()
+    raw_type = str(raw.get("relationship_type", "related-to")).lower()
+
+    if direction == "bidirectional":
+        kind, parent, child = RelationKind.RELATED_TO, source_key, target_key
+    elif direction == "inbound":
+        kind, parent, child = RelationKind(raw_type), target_key, source_key
+    else:
+        kind, parent, child = RelationKind(raw_type), source_key, target_key
+
+    return Relation(
+        source_key=parent,
+        target_key=child,
+        kind=kind,
+        comment=raw.get("comment", ""),
+        **envelope,
+    )
+
+
+_MIGRATIONS = {
+    "5": ("6.0.0", _migrate_v5_to_v6),
+    "6.0.0": ("7.0.0", _migrate_v6_to_v7),
+}
+
+
+def migrate_to_current(data: dict[str, Any]) -> dict[str, Any]:
+    """Chain migrations up to the current schema, so a 5.x document upgrades in one call."""
+    version = detect_schema_version(data)
+    migrated = data
+    while version != SCHEMA_VERSION:
+        step = _MIGRATIONS.get(version)
+        if step is None:
+            raise ValueError(f"No migration path from schema version {version!r}")
+        target, transform = step
+        migrated = transform(migrated)
+        version = target
+    return migrated
+
+
+__all__ = [
+    "SCHEMA_VERSION",
+    "detect_schema_version",
+    "investigation_to_dict",
+    "load_investigation_dict",
+    "load_investigation_json",
+    "migrate_to_current",
+    "save_investigation_json",
+    "serialize_investigation",
+]

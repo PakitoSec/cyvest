@@ -1,168 +1,70 @@
 """
-Pydantic models for JSON Schema generation of serialized Cyvest investigations.
+The serialized shape of an investigation.
 
-These models describe the output structure of `serialize_investigation()` and other
-serialization functions. They are used with `model_json_schema(mode='serialization')`
-to generate JSON Schema that matches the actual serialized output.
+Two decisions govern this module.
 
-Entity types reference the runtime models directly from `model.py`. When generating
-schemas with `mode='serialization'`, Pydantic respects field_serializer decorators
-and produces schemas matching the actual model_dump() output.
+The document is **self-contained**: ``report`` is always present and required, so a JavaScript
+consumer reads results instead of reimplementing an engine. The size overhead is accepted.
+
+The document is **read forward only**: a 7.1 library reads a 7.0 document, a 7.0 library refuses
+a 7.1 one. That is what lets ``additionalProperties`` stay locked and parsing stay strict.
+
+Design constraint for 7.2: fact collections stay maps ``{key: object}``. Superseded versions will
+go into a sibling ``facts.history`` key — turning a map into ``{key: [objects]}`` would break
+every existing document.
 """
 
 from __future__ import annotations
 
-from decimal import Decimal
-from typing import Annotated, Any, Literal
+from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, computed_field, field_serializer, model_validator
+from pydantic import BaseModel, ConfigDict, Field
 
-from cyvest.levels import Level
-from cyvest.model import (
-    AliasDumpModel,
-    Enrichment,
-    Evidence,
-    Finding,
-    InvestigationWhitelist,
-    Observable,
-    Tag,
-    ThreatIntel,
-    _format_score_decimal,
-)
-from cyvest.model_enums import ObservableType
-from cyvest.score import ScoreMode
+from cyvest.evaluation.report import Report
+from cyvest.facts.decision import Decision
+from cyvest.facts.evidence import Evidence
+from cyvest.facts.finding import Finding
+from cyvest.facts.observable import Observable
+from cyvest.facts.relation import Relation
+from cyvest.facts.signal import ThreatIntel
+from cyvest.facts.store import InvestigationHeader
+from cyvest.facts.tag import Tag
+
+SCHEMA_VERSION = "7.0.0"
+SCHEMA_ID = "https://cyvest.io/schema/investigation-7.json"
 
 
-class StatisticsSchema(BaseModel):
-    """
-    Schema for investigation statistics.
+class FactsSchema(BaseModel):
+    """The fact collections, each keyed by its semantic key."""
 
-    Mirrors the output of `InvestigationStats.get_summary()`.
-    """
+    model_config = ConfigDict(extra="forbid")
 
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-    total_observables: Annotated[int, Field(ge=0)]
-    internal_observables: Annotated[int, Field(ge=0)]
-    external_observables: Annotated[int, Field(ge=0)]
-    whitelisted_observables: Annotated[int, Field(ge=0)]
-    observables_by_type: dict[str, Annotated[int, Field(ge=0)]] = Field(default_factory=dict)
-    observables_by_level: dict[str, Annotated[int, Field(ge=0)]] = Field(default_factory=dict)
-    observables_by_type_and_level: dict[str, dict[str, Annotated[int, Field(ge=0)]]] = Field(default_factory=dict)
-    total_findings: Annotated[int, Field(ge=0)]
-    applied_findings: Annotated[int, Field(ge=0)]
-    findings_by_level: dict[str, list[str]] = Field(default_factory=dict)
-    total_evidences: Annotated[int, Field(ge=0)]
-    evidences_by_type: dict[str, Annotated[int, Field(ge=0)]] = Field(default_factory=dict)
-    evidences_by_source: dict[str, Annotated[int, Field(ge=0)]] = Field(default_factory=dict)
-    total_threat_intel: Annotated[int, Field(ge=0)]
-    threat_intel_by_source: dict[str, Annotated[int, Field(ge=0)]] = Field(default_factory=dict)
-    threat_intel_by_level: dict[str, Annotated[int, Field(ge=0)]] = Field(default_factory=dict)
-    total_tags: Annotated[int, Field(ge=0)]
+    observables: dict[str, Observable] = Field(default_factory=dict)
+    relations: dict[str, Relation] = Field(default_factory=dict)
+    # Discriminated on ``kind`` from day one: adding the discriminator later would force a
+    # migration of every serialized document.
+    signals: dict[str, ThreatIntel] = Field(default_factory=dict)
+    evidences: dict[str, Evidence] = Field(default_factory=dict)
+    findings: dict[str, Finding] = Field(default_factory=dict)
+    # Reserved for imported EDR/SIEM timelines. Costs an empty dict, states the intent.
+    events: dict[str, Any] = Field(default_factory=dict)
 
 
-class DataExtractionSchema(BaseModel):
-    """Schema for data extraction metadata."""
+class InvestigationSchema(BaseModel):
+    """A complete serialized investigation."""
 
-    model_config = ConfigDict(extra="forbid", frozen=True)
+    model_config = ConfigDict(extra="forbid", json_schema_extra={"$id": SCHEMA_ID})
 
-    root_type: Literal[ObservableType.FILE, ObservableType.ARTIFACT] | None = Field(
-        default=None,
-        description="Root observable type used during data extraction.",
-    )
-    score_mode_obs: ScoreMode = Field(
-        description="Observable score aggregation mode: 'max' takes highest score, 'sum' adds all scores.",
-    )
+    schema_version: Literal["7.0.0"] = Field(default=SCHEMA_VERSION)
+    header: InvestigationHeader = Field(...)
+    policy_version: str = Field(default="default-v1")
+    engine_id: str = Field(default="basic-v1")
+
+    facts: FactsSchema = Field(default_factory=FactsSchema)
+    decisions: dict[str, Decision] = Field(default_factory=dict)
+    tags: dict[str, Tag] = Field(default_factory=dict)
+
+    report: Report = Field(...)
 
 
-class InvestigationSchema(AliasDumpModel):
-    """
-    Schema for a complete serialized investigation.
-
-    This model describes the output of `serialize_investigation()` from
-    `cyvest.io_serialization`. It is the top-level schema for exported investigations.
-
-    Entity types reference the runtime models directly. When generating schemas with
-    `mode='serialization'`, Pydantic respects field_serializer decorators and produces
-    schemas matching the actual model_dump() output.
-    """
-
-    model_config = ConfigDict(
-        extra="forbid",
-        frozen=True,
-        json_schema_extra={
-            "$schema": "https://json-schema.org/draft/2020-12/schema",
-            "$id": "https://cyvest.io/schema/investigation.json",
-            "title": "Cyvest Investigation",
-        },
-    )
-
-    schema_version: Literal["6.0.0"] = "6.0.0"
-    investigation_id: str = Field(..., description="Stable investigation identity (ULID).")
-    investigation_name: str | None = Field(
-        default=None,
-        description="Optional human-readable investigation name.",
-    )
-    score: Decimal = Field(..., description="Global investigation score.")
-    level: Level = Field(
-        ...,
-        description="Security level classification from NONE (lowest) to MALICIOUS (highest).",
-    )
-    whitelisted: bool = Field(description="Whether the investigation is whitelisted.")
-    whitelists: list[InvestigationWhitelist] = Field(
-        ...,
-        description="List of whitelist entries applied to this investigation.",
-    )
-    observables: dict[str, Observable] = Field(
-        ...,
-        description="Observables keyed by their unique key.",
-    )
-    findings: dict[str, Finding] = Field(
-        ...,
-        description="Findings keyed by their unique key.",
-    )
-    evidences: dict[str, Evidence] = Field(
-        ...,
-        description="Evidence objects keyed by their unique key.",
-    )
-    threat_intels: dict[str, ThreatIntel] = Field(
-        ...,
-        description="Threat intelligence entries keyed by their unique key.",
-    )
-    enrichments: dict[str, Enrichment] = Field(
-        ...,
-        description="Enrichment entries keyed by their unique key.",
-    )
-    tags: dict[str, Tag] = Field(
-        ...,
-        description="Tags keyed by their unique key.",
-    )
-    stats: StatisticsSchema = Field(description="Investigation statistics summary.")
-    data_extraction: DataExtractionSchema = Field(description="Data extraction metadata.")
-
-    @field_serializer("score")
-    def serialize_score(self, v: Decimal) -> float:
-        return float(v)
-
-    @computed_field(return_type=str)
-    @property
-    def score_display(self) -> str:
-        """Global investigation score formatted as fixed-point x.xx."""
-        return _format_score_decimal(self.score)
-
-    @model_validator(mode="before")
-    @classmethod
-    def ensure_defaults(cls, v: Any) -> Any:
-        if not isinstance(v, dict):
-            return v
-
-        v.setdefault("level", Level.NONE)
-        v.setdefault("whitelists", [])
-        v.setdefault("observables", {})
-        v.setdefault("findings", {})
-        v.setdefault("evidences", {})
-        v.setdefault("threat_intels", {})
-        v.setdefault("enrichments", {})
-        v.setdefault("tags", {})
-
-        return v
+__all__ = ["SCHEMA_ID", "SCHEMA_VERSION", "FactsSchema", "InvestigationSchema"]

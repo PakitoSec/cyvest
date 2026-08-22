@@ -8,8 +8,8 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from cyvest.model import ObservableAlias, ObservableIdentity
-from cyvest.model_enums import ObservableSubtype, ObservableType
+from cyvest.enums import ObservableSubtype, ObservableType
+from cyvest.facts import ObservableAlias, ObservableIdentity
 
 ObservableSourceType = tuple[ObservableType | str, ObservableSubtype | str | None]
 

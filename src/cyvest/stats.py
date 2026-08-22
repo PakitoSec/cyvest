@@ -1,311 +1,222 @@
 """
-Statistics and aggregation engine for Cyvest investigations.
+Statistics, computed rather than accumulated.
 
-Provides live counters and aggregations for observables, findings, threat intel,
-and other investigation metrics.
+v6 kept counters up to date through ``register_*`` calls, which meant the numbers could drift
+from the facts. Here everything is derived from the store and the report on demand, so drift is
+impossible by construction.
+
+Counts follow the same exclusion rule as the score: a finding whose status is not ``EVALUATED``
+— or one that was dismissed — stays visible but leaves both the numerator *and* the denominator.
 """
 
 from __future__ import annotations
 
-from collections import defaultdict
+from collections import Counter, defaultdict
 
-from cyvest.levels import Level
-from cyvest.model import Evidence, Finding, Observable, Tag, ThreatIntel
-from cyvest.model_schema import StatisticsSchema
+from pydantic import BaseModel, ConfigDict, Field
+
+from cyvest.enums import DecisionKind, Verdict
+from cyvest.evaluation.report import Report
+from cyvest.facts.observable import Observable
+from cyvest.facts.signal import ThreatIntel
+from cyvest.facts.store import FactStore
+
+# Bands used to summarize confidence; boundaries match the Confidence ordinals.
+_CONFIDENCE_BANDS = (("low", 0.5), ("medium", 0.85), ("high", 1.01))
+
+
+class StatisticsSchema(BaseModel):
+    """A snapshot of the investigation's shape."""
+
+    model_config = ConfigDict(frozen=True)
+
+    total_observables: int = Field(default=0)
+    internal_observables: int = Field(default=0)
+    external_observables: int = Field(default=0)
+    allowlisted_observables: int = Field(default=0)
+    observables_by_type: dict[str, int] = Field(default_factory=dict)
+    observables_by_verdict: dict[Verdict, int] = Field(default_factory=dict)
+
+    total_findings: int = Field(default=0)
+    evaluated_findings: int = Field(default=0)
+    findings_by_verdict: dict[Verdict, int] = Field(default_factory=dict)
+    findings_by_confidence_band: dict[str, int] = Field(default_factory=dict)
+
+    total_signals: int = Field(default=0)
+    signals_by_source: dict[str, int] = Field(default_factory=dict)
+    signals_by_verdict: dict[Verdict, int] = Field(default_factory=dict)
+
+    total_evidences: int = Field(default=0)
+    evidences_by_type: dict[str, int] = Field(default_factory=dict)
+
+    total_relations: int = Field(default=0)
+    relations_by_kind: dict[str, int] = Field(default_factory=dict)
+
+    total_decisions: int = Field(default=0)
+    decisions_by_kind: dict[DecisionKind, int] = Field(default_factory=dict)
+
+    total_tags: int = Field(default=0)
+
+
+def _confidence_band(confidence: float) -> str:
+    for name, ceiling in _CONFIDENCE_BANDS:
+        if confidence < ceiling:
+            return name
+    return _CONFIDENCE_BANDS[-1][0]
 
 
 class InvestigationStats:
-    """
-    Tracks and aggregates statistics for an investigation.
+    """Read-only view computing counts from a store and its report."""
 
-    Provides real-time metrics about observables, findings, threat intel,
-    and other investigation components.
-    """
+    def __init__(self, store: FactStore, report: Report) -> None:
+        self.store = store
+        self.report = report
 
-    def __init__(self) -> None:
-        """Initialize statistics tracking."""
-        self._observables: dict[str, Observable] = {}
-        self._findings: dict[str, Finding] = {}
-        self._evidences: dict[str, Evidence] = {}
-        self._threat_intels: dict[str, ThreatIntel] = {}
-        self._tags: dict[str, Tag] = {}
-
-    def register_observable(self, observable: Observable) -> None:
-        """
-        Register an observable for statistics tracking.
-
-        Args:
-            observable: Observable to track
-        """
-        self._observables[observable.key] = observable
-
-    def register_finding(self, finding: Finding) -> None:
-        """
-        Register a finding for statistics tracking.
-
-        Args:
-            finding: Finding to track
-        """
-        self._findings[finding.key] = finding
-
-    def register_evidence(self, evidence: Evidence) -> None:
-        """Register evidence for statistics tracking."""
-        self._evidences[evidence.key] = evidence
-
-    def register_threat_intel(self, ti: ThreatIntel) -> None:
-        """
-        Register threat intel for statistics tracking.
-
-        Args:
-            ti: Threat intel to track
-        """
-        self._threat_intels[ti.key] = ti
-
-    def register_tag(self, tag: Tag) -> None:
-        """
-        Register a tag for statistics tracking.
-
-        Args:
-            tag: Tag to track
-        """
-        self._tags[tag.key] = tag
-
-    def get_observable_count_by_type(self) -> dict[str, int]:
-        """
-        Get count of observables by type.
-
-        Returns:
-            Dictionary mapping observable type to count
-        """
-        counts: dict[str, int] = defaultdict(int)
-        for obs in self._observables.values():
-            counts[obs.obs_type] += 1
-        return dict(counts)
-
-    def get_observable_count_by_level(self, obs_type: str | None = None) -> dict[Level, int]:
-        """
-        Get count of observables by level, optionally filtered by type.
-
-        Args:
-            obs_type: Optional observable type to filter by
-
-        Returns:
-            Dictionary mapping level to count
-        """
-        counts: dict[Level, int] = defaultdict(int)
-        for obs in self._observables.values():
-            if obs_type is None or obs.obs_type == obs_type:
-                counts[obs.level] += 1
-        return dict(counts)
-
-    def get_observable_count_by_type_and_level(self) -> dict[str, dict[Level, int]]:
-        """
-        Get count of observables by type and level.
-
-        Returns:
-            Nested dictionary: {type: {level: count}}
-        """
-        counts: dict[str, dict[Level, int]] = defaultdict(lambda: defaultdict(int))
-        for obs in self._observables.values():
-            counts[obs.obs_type][obs.level] += 1
-        # Convert defaultdicts to regular dicts
-        return {k: dict(v) for k, v in counts.items()}
+    # --- observables
 
     def get_total_observable_count(self) -> int:
-        """
-        Get total number of observables.
-
-        Returns:
-            Total observable count
-        """
-        return len(self._observables)
+        return len(self.store.observables)
 
     def get_internal_observable_count(self) -> int:
-        """
-        Get count of internal observables.
-
-        Returns:
-            Count of internal observables
-        """
-        return sum(1 for obs in self._observables.values() if obs.internal)
+        return sum(1 for obs in self.store.observables.values() if obs.internal)
 
     def get_external_observable_count(self) -> int:
-        """
-        Get count of external observables.
+        return sum(1 for obs in self.store.observables.values() if not obs.internal)
 
-        Returns:
-            Count of external observables
-        """
-        return sum(1 for obs in self._observables.values() if not obs.internal)
+    def get_allowlisted_observable_count(self) -> int:
+        return sum(
+            1
+            for key in self.store.observables
+            if any(d.kind is DecisionKind.ALLOWLISTED for d in self.store.decisions_for(key))
+        )
 
-    def get_whitelisted_observable_count(self) -> int:
-        """
-        Get count of whitelisted observables.
+    def get_observable_count_by_type(self) -> dict[str, int]:
+        counter: Counter[str] = Counter()
+        for observable in self.store.observables.values():
+            counter[self._type_of(observable)] += 1
+        return dict(counter)
 
-        Returns:
-            Count of whitelisted observables
-        """
-        return sum(1 for obs in self._observables.values() if obs.whitelisted)
+    def get_observable_count_by_verdict(self, obs_type: str | None = None) -> dict[Verdict, int]:
+        counter: Counter[Verdict] = Counter()
+        for key, observable in self.store.observables.items():
+            if obs_type is not None and self._type_of(observable) != obs_type:
+                continue
+            result = self.report.observable(key)
+            counter[result.verdict if result is not None else Verdict.INFO] += 1
+        return dict(counter)
 
-    def get_finding_count_by_level(self) -> dict[Level, int]:
-        """
-        Get count of findings by level.
+    def get_observable_count_by_type_and_verdict(self) -> dict[str, dict[Verdict, int]]:
+        nested: dict[str, Counter[Verdict]] = defaultdict(Counter)
+        for key, observable in self.store.observables.items():
+            result = self.report.observable(key)
+            nested[self._type_of(observable)][result.verdict if result is not None else Verdict.INFO] += 1
+        return {obs_type: dict(counts) for obs_type, counts in nested.items()}
 
-        Returns:
-            Dictionary mapping level to count
-        """
-        counts: dict[Level, int] = defaultdict(int)
-        for finding in self._findings.values():
-            counts[finding.level] += 1
-        return dict(counts)
-
-    def get_finding_keys_by_level(self) -> dict[Level, list[str]]:
-        """
-        Get finding keys grouped by level.
-
-        Returns:
-            Dictionary mapping level to list of finding keys
-        """
-        keys: dict[Level, list[str]] = defaultdict(list)
-        for finding in self._findings.values():
-            keys[finding.level].append(finding.key)
-        return dict(keys)
-
-    def get_applied_finding_count(self) -> int:
-        """
-        Get count of findings that were applied (level != NONE).
-
-        Returns:
-            Count of applied findings
-        """
-        return sum(1 for finding in self._findings.values() if finding.level != Level.NONE)
-
-    def get_total_finding_count(self) -> int:
-        """
-        Get total number of findings.
-
-        Returns:
-            Total finding count
-        """
-        return len(self._findings)
-
-    def get_evidence_count_by_type(self) -> dict[str, int]:
-        counts: dict[str, int] = defaultdict(int)
-        for evidence in self._evidences.values():
-            counts[evidence.evidence_type] += 1
-        return dict(counts)
-
-    def get_evidence_count_by_source(self) -> dict[str, int]:
-        counts: dict[str, int] = defaultdict(int)
-        for evidence in self._evidences.values():
-            counts[evidence.source] += 1
-        return dict(counts)
-
-    def get_threat_intel_count(self) -> int:
-        """
-        Get total number of threat intel sources queried.
-
-        Returns:
-            Total threat intel count
-        """
-        return len(self._threat_intels)
-
-    def get_threat_intel_count_by_source(self) -> dict[str, int]:
-        """
-        Get count of threat intel by source.
-
-        Returns:
-            Dictionary mapping source name to count
-        """
-        counts: dict[str, int] = defaultdict(int)
-        for ti in self._threat_intels.values():
-            counts[ti.source] += 1
-        return dict(counts)
-
-    def get_threat_intel_count_by_level(self) -> dict[Level, int]:
-        """
-        Get count of threat intel by level.
-
-        Returns:
-            Dictionary mapping level to count
-        """
-        counts: dict[Level, int] = defaultdict(int)
-        for ti in self._threat_intels.values():
-            counts[ti.level] += 1
-        return dict(counts)
-
-    def get_tag_count(self) -> int:
-        """
-        Get total number of tags.
-
-        Returns:
-            Total tag count
-        """
-        return len(self._tags)
-
-    def get_findings_by_level(self, level: Level) -> list[Finding]:
-        """
-        Get all findings with a specific level.
-
-        Args:
-            level: Level to filter by
-
-        Returns:
-            List of findings with the specified level
-        """
-        return [finding for finding in self._findings.values() if finding.level == level]
-
-    def get_observables_by_level(self, level: Level) -> list[Observable]:
-        """
-        Get all observables with a specific level.
-
-        Args:
-            level: Level to filter by
-
-        Returns:
-            List of observables with the specified level
-        """
-        return [obs for obs in self._observables.values() if obs.level == level]
+    def get_observables_by_verdict(self, verdict: Verdict) -> list[Observable]:
+        return [
+            observable
+            for key, observable in self.store.observables.items()
+            if (result := self.report.observable(key)) is not None and result.verdict is verdict
+        ]
 
     def get_observables_by_type(self, obs_type: str) -> list[Observable]:
-        """
-        Get all observables of a specific type.
+        return [obs for obs in self.store.observables.values() if self._type_of(obs) == obs_type]
 
-        Args:
-            obs_type: Type to filter by
+    # --- findings
 
-        Returns:
-            List of observables with the specified type
-        """
-        return [obs for obs in self._observables.values() if obs.obs_type == obs_type]
+    def get_total_finding_count(self) -> int:
+        return len(self.store.findings)
+
+    def get_applied_finding_count(self) -> int:
+        """Findings that actually take part — the denominator of every ratio."""
+        return sum(1 for result in self.report.findings.values() if result.counted)
+
+    def get_finding_count_by_verdict(self) -> dict[Verdict, int]:
+        counter: Counter[Verdict] = Counter()
+        for result in self.report.findings.values():
+            if result.counted:
+                counter[result.verdict] += 1
+        return dict(counter)
+
+    def get_finding_keys_by_verdict(self) -> dict[Verdict, list[str]]:
+        grouped: dict[Verdict, list[str]] = defaultdict(list)
+        for key, result in self.report.findings.items():
+            if result.counted:
+                grouped[result.verdict].append(key)
+        return dict(grouped)
+
+    def get_finding_count_by_confidence_band(self) -> dict[str, int]:
+        counter: Counter[str] = Counter()
+        for result in self.report.findings.values():
+            if result.counted:
+                counter[_confidence_band(result.confidence)] += 1
+        return dict(counter)
+
+    # --- signals
+
+    def get_signal_count(self) -> int:
+        return len(self.store.signals)
+
+    def get_signal_count_by_source(self) -> dict[str, int]:
+        counter: Counter[str] = Counter()
+        for signal in self.store.signals.values():
+            counter[signal.source.name] += 1
+        return dict(counter)
+
+    def get_signal_count_by_verdict(self) -> dict[Verdict, int]:
+        counter: Counter[Verdict] = Counter()
+        for signal in self.store.signals.values():
+            counter[signal.verdict] += 1
+        return dict(counter)
+
+    def get_threat_intels_by_source(self, source: str) -> list[ThreatIntel]:
+        return [
+            signal
+            for signal in self.store.signals.values()
+            if isinstance(signal, ThreatIntel) and signal.source.name == source
+        ]
+
+    # --- the rest
+
+    def get_evidence_count_by_type(self) -> dict[str, int]:
+        return dict(Counter(evidence.evidence_type for evidence in self.store.evidences.values()))
+
+    def get_relation_count_by_kind(self) -> dict[str, int]:
+        return dict(Counter(relation.kind.value for relation in self.store.relations.values()))
+
+    def get_decision_count_by_kind(self) -> dict[DecisionKind, int]:
+        return dict(Counter(decision.kind for decision in self.store.decisions.values()))
+
+    def get_tag_count(self) -> int:
+        return len(self.store.tags)
 
     def get_summary(self) -> StatisticsSchema:
-        """
-        Get a comprehensive summary of all statistics.
-
-        Returns:
-            StatisticsSchema instance with all statistics
-        """
-
         return StatisticsSchema(
             total_observables=self.get_total_observable_count(),
             internal_observables=self.get_internal_observable_count(),
             external_observables=self.get_external_observable_count(),
-            whitelisted_observables=self.get_whitelisted_observable_count(),
+            allowlisted_observables=self.get_allowlisted_observable_count(),
             observables_by_type=self.get_observable_count_by_type(),
-            observables_by_level={str(k): v for k, v in self.get_observable_count_by_level().items()},
-            observables_by_type_and_level={
-                obs_type: {str(lvl): count for lvl, count in levels.items()}
-                for obs_type, levels in self.get_observable_count_by_type_and_level().items()
-            },
+            observables_by_verdict=self.get_observable_count_by_verdict(),
             total_findings=self.get_total_finding_count(),
-            applied_findings=self.get_applied_finding_count(),
-            findings_by_level={str(k): v for k, v in self.get_finding_keys_by_level().items()},
-            total_evidences=len(self._evidences),
+            evaluated_findings=self.get_applied_finding_count(),
+            findings_by_verdict=self.get_finding_count_by_verdict(),
+            findings_by_confidence_band=self.get_finding_count_by_confidence_band(),
+            total_signals=self.get_signal_count(),
+            signals_by_source=self.get_signal_count_by_source(),
+            signals_by_verdict=self.get_signal_count_by_verdict(),
+            total_evidences=len(self.store.evidences),
             evidences_by_type=self.get_evidence_count_by_type(),
-            evidences_by_source=self.get_evidence_count_by_source(),
-            total_threat_intel=self.get_threat_intel_count(),
-            threat_intel_by_source=self.get_threat_intel_count_by_source(),
-            threat_intel_by_level={str(k): v for k, v in self.get_threat_intel_count_by_level().items()},
+            total_relations=len(self.store.relations),
+            relations_by_kind=self.get_relation_count_by_kind(),
+            total_decisions=len(self.store.decisions),
+            decisions_by_kind=self.get_decision_count_by_kind(),
             total_tags=self.get_tag_count(),
         )
+
+    @staticmethod
+    def _type_of(observable: Observable) -> str:
+        return observable.obs_type.value if hasattr(observable.obs_type, "value") else str(observable.obs_type)
+
+
+__all__ = ["InvestigationStats", "StatisticsSchema"]

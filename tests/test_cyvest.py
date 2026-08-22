@@ -1,935 +1,250 @@
-"""
-Tests for the Cyvest facade.
-"""
+"""The public facade, exercised the way a caller actually uses it."""
 
-import tempfile
-from decimal import Decimal
-from pathlib import Path
+from __future__ import annotations
 
 import pytest
 
-from cyvest import Cyvest
-
-
-def test_cyvest_initialization() -> None:
-    """Test Cyvest initialization."""
-    cv = Cyvest(root_data={"test": "data"})
-    root = cv.observable_get_root()
-    assert root is not None
-    assert root.obs_type == "file"
-
-
-def test_cyvest_deterministic_investigation_id() -> None:
-    """Test that investigation_id parameter sets deterministic ID."""
-    # Without investigation_id, a ULID is auto-generated
-    cv_auto = Cyvest()
-    assert cv_auto._investigation.investigation_id is not None
-    assert len(cv_auto._investigation.investigation_id) == 26  # ULID length
-
-    # With investigation_id, the provided ID is used
-    cv_custom = Cyvest(investigation_id="my-custom-id")
-    assert cv_custom._investigation.investigation_id == "my-custom-id"
-
-    # Verify it persists through JSON serialization
-    schema = cv_custom.io_to_invest()
-    assert schema.investigation_id == "my-custom-id"
-
-    # Verify roundtrip through JSON save/load
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
-        temp_path = f.name
-
-    try:
-        cv_custom.io_save_json(temp_path)
-        cv_loaded = Cyvest.io_load_json(temp_path)
-        assert cv_loaded._investigation.investigation_id == "my-custom-id"
-    finally:
-        Path(temp_path).unlink(missing_ok=True)
-
-
-def test_observable_creation() -> None:
-    """Test creating observables via facade."""
-    cv = Cyvest()
-    obs = cv.observable_create(Cyvest.OBS.URL, "https://example.com", internal=False)
-    assert obs.obs_type == "url"
-    assert obs.value == "https://example.com"
-    assert obs.internal is False
-    # Should be registered
-    assert cv.observable_get(obs.key) is not None
-
-
-def test_observable_retrieval() -> None:
-    """Test retrieving observables."""
-    cv = Cyvest()
-    obs = cv.observable_create(Cyvest.OBS.IPV4, "10.0.0.1")
-    retrieved = cv.observable_get(obs.key)
-    assert retrieved is not None
-    assert retrieved.key == obs.key
-
-
-def test_facade_getters_accept_component_parameters() -> None:
-    """Facade getters should accept key components where available."""
-    cv = Cyvest()
-
-    obs = cv.observable_create(Cyvest.OBS.URL, "https://example.com")
-    assert cv.observable_get(Cyvest.OBS.URL, "https://example.com") is not None
-    assert cv.observable_get(cv.OBS.URL, "https://example.com") is not None
-    assert cv.observable_get(obs.key) is not None
-
-    finding = cv.finding_create("finding_id", "desc")
-    assert cv.finding_get(finding.key) is not None
-
-    tag = cv.tag_create("path:to:tag")
-    assert cv.tag_get("path:to:tag") is not None
-    assert cv.tag_get(tag.key) is not None
-
-    enr = cv.enrichment_create("metadata", {"key": "value"})
-    assert cv.enrichment_get("metadata") is not None
-    assert cv.enrichment_get(enr.key) is not None
-
-    enr_ctx = cv.enrichment_create("metadata_ctx", {"k": "v"}, context="source")
-    assert cv.enrichment_get("metadata_ctx", "source") is not None
-    assert cv.enrichment_get(enr_ctx.key) is not None
-
-
-def test_threat_intel_addition() -> None:
-    """Test adding threat intel to observable."""
-    cv = Cyvest()
-    obs = cv.observable_create(Cyvest.OBS.ARTIFACT, "abc123")
-    ti = cv.observable_add_threat_intel(obs.key, source="virustotal", score=Decimal("8.0"), comment="Malicious")
-    assert ti is not None
-    assert ti.source == "virustotal"
-    assert ti.score == Decimal("8.0")
-    assert obs.score == Decimal("8.0")  # Should propagate
-
-
-def test_threat_intel_binding() -> None:
-    """Test binding unbound threat intel to observable."""
-    cv = Cyvest()
-    obs = cv.observable_create(Cyvest.OBS.DOMAIN, "example.com")
-    draft = cv.threat_intel_draft(source="vt", score=Decimal("4.2"))
-
-    bound = cv.observable_with_ti_draft(obs.key, draft)
-    assert bound is not None
-    assert draft.observable_key == obs.key
-    assert bound.key == draft.key
-    assert {ti.key for ti in obs.threat_intels} == {draft.key}
-
-
-def test_string_levels_are_accepted_by_api() -> None:
-    """Cyvest APIs should accept string level values."""
-    cv = Cyvest()
-    obs = cv.observable_create(Cyvest.OBS.DOMAIN, "example.com", level="safe")
-    assert obs.level == Cyvest.LVL.SAFE
-
-    finding = cv.finding_create("string_level", "desc", level="notable")
-    assert finding.level == Cyvest.LVL.NOTABLE
-
-    ti = cv.observable_add_threat_intel(obs.key, source="vt", score=Decimal("5.0"), level="malicious")
-    assert ti is not None
-    assert ti.level == Cyvest.LVL.MALICIOUS
-
-    cv.observable_set_level(obs.key, "trusted")
-    assert cv.observable_get_all()[obs.key].level == Cyvest.LVL.TRUSTED
-
-
-def test_finding_creation() -> None:
-    """Test creating findings."""
-    cv = Cyvest()
-    finding = cv.finding_create("test_finding", "Test description", score=Decimal("5.0"))
-    assert finding.finding_name == "test_finding"
-    assert finding.score == Decimal("5.0")
-    assert cv.finding_get(finding.key) is not None
-
-
-def test_finding_observable_linking() -> None:
-    """Test linking observables to findings."""
-    cv = Cyvest()
-    obs = cv.observable_create(Cyvest.OBS.URL, "https://bad.com")
-    finding = cv.finding_create("url_finding", "Finding URL")
-    cv.finding_link_observable(finding.key, obs.key)
-    assert any(link.observable_key == obs.key for link in finding.observable_links)
-
-
-def test_tag_creation() -> None:
-    """Test creating tags."""
-    cv = Cyvest()
-    tag = cv.tag_create("network:analysis", "Network analysis tag")
-    assert tag.name == "network:analysis"
-    assert cv.tag_get(tag.key) is not None
+from cyvest import Cyvest, Verdict
+
+
+def build_email_case() -> Cyvest:
+    cv = Cyvest(root_data={"type": "email"}, investigation_name="IR-2431")
+    url = cv.observable_create(cv.OBS.URL, "hxxp://bad.example/x")
+    cv.observable_add_threat_intel(url, "virustotal", verdict=cv.VERDICT.MALICIOUS, weight=6.0)
+    finding = cv.finding_create("url_in_body", "URL in body", subject=url)
+    cv.finding_link_observable(finding.key, url.key, cv.SCOPE.ALL)
+    return cv
+
+
+class TestFacade:
+    def test_a_full_case_scores_end_to_end(self) -> None:
+        cv = build_email_case()
+        assert cv.get_global_score() == 6.0
+        assert cv.get_global_verdict() is Verdict.MALICIOUS
+
+    def test_the_root_is_reachable_and_scores_nothing(self) -> None:
+        cv = build_email_case()
+        assert cv.root().key == cv.observable_get_root().key
+        assert cv.root().score == 0.0
+
+    def test_observables_are_deduplicated_by_identity(self) -> None:
+        cv = Cyvest()
+        first = cv.observable_create(cv.OBS.IPV4, "1.2.3.4")
+        second = cv.observable_create(cv.OBS.IPV4, "1.2.3.4")
+        assert first.key == second.key
+        assert len(cv.observable_get_all()) == 2  # the root plus this one
+
+    def test_observable_get_accepts_a_key_or_an_identity(self) -> None:
+        cv = Cyvest()
+        created = cv.observable_create(cv.OBS.DOMAIN, "bad.example")
+        assert cv.observable_get(created.key).key == created.key
+        assert cv.observable_get(cv.OBS.DOMAIN, "bad.example").key == created.key
+        assert cv.observable_get(cv.OBS.DOMAIN, "unknown.example") is None
+
+    def test_proxies_refuse_assignment(self) -> None:
+        cv = build_email_case()
+        with pytest.raises(AttributeError, match="read-only"):
+            cv.root().value = "tampered"
+
+
+class TestFluentDsl:
+    def test_chaining_reads_like_the_analysis(self) -> None:
+        cv = Cyvest()
+        url = cv.observable(cv.OBS.URL, "hxxp://bad.example")
+        url.with_ti(cv.threat_intel_draft("proofpoint", verdict=cv.VERDICT.MALICIOUS, weight=cv.WEIGHT.HIGH))
+
+        cv.tag_create("phishing")
+        finding = cv.finding("url_in_body", "URL in body", subject=url)
+        finding.link_observable(url, cv.SCOPE.ALL).tagged("tag:phishing")
+
+        assert cv.get_global_verdict() is Verdict.MALICIOUS
+        assert cv.tag_get("phishing").aggregated_score == cv.WEIGHT.HIGH.value
+
+    def test_relations_need_no_direction_argument(self) -> None:
+        cv = Cyvest()
+        parent = cv.observable(cv.OBS.FILE, "invoice.pdf", subtype="path", namespace="host-1")
+        child = cv.observable(cv.OBS.URL, "hxxp://bad.example")
+        cv.observable_add_threat_intel(child, "virustotal", verdict=cv.VERDICT.MALICIOUS, weight=6.0)
+        parent.relate_to(child, cv.REL.EXTRACTION)
+
+        assert parent.score == 6.0
+
+
+class TestDecisions:
+    def test_allowlisting_reads_as_a_declared_act(self) -> None:
+        cv = build_email_case()
+        url = cv.observable_get(cv.OBS.URL, "hxxp://bad.example/x")
+        decision = cv.decision_create(url, cv.DECISION.ALLOWLISTED, justification="CDN partenaire", decided_by="alice")
+
+        assert decision.decided_by == "alice"
+        assert decision.justification == "CDN partenaire"
+        assert url.verdict is Verdict.SAFE
+        assert url.allowlisted is True
+
+    def test_confirming_a_finding_beats_a_clean_graph(self) -> None:
+        cv = Cyvest()
+        url = cv.observable(cv.OBS.URL, "hxxp://unknown.example")
+        finding = cv.finding("manual", "Analyste", subject=url).link_observable(url, cv.SCOPE.ALL)
+        finding.confirm("confirmé par l'analyse mémoire")
+
+        assert cv.get_global_verdict() is Verdict.MALICIOUS
+
+    def test_dismissing_keeps_it_visible_but_uncounted(self) -> None:
+        cv = build_email_case()
+        finding = next(iter(cv.finding_get_all().values()))
+        finding.dismiss("faux positif")
+
+        assert cv.finding_get(finding.key) is not None
+        assert cv.get_global_score() == 0.0
+
+
+class TestVerdictSemantics:
+    def test_asserted_and_computed_verdicts_are_distinct(self) -> None:
+        cv = Cyvest()
+        url = cv.observable(cv.OBS.URL, "hxxp://bad.example")
+        cv.observable_add_threat_intel(url, "virustotal", verdict=cv.VERDICT.MALICIOUS, weight=6.0)
+        finding = cv.finding("spf_pass", "SPF valide", subject=url, verdict=cv.VERDICT.SAFE, weight=4.0)
+        finding.link_observable(url, cv.SCOPE.ALL)
+
+        assert finding.verdict is Verdict.SAFE
+        assert finding.computed_verdict is Verdict.MALICIOUS
+        assert finding.own_term_suppressed is True
+
+    def test_stating_a_verdict_alone_is_enough(self) -> None:
+        cv = Cyvest()
+        cv.finding("ceo_impersonation", "Usurpation", verdict=cv.VERDICT.MALICIOUS)
+        assert cv.get_global_verdict() is Verdict.MALICIOUS
+
+    def test_stating_a_weight_alone_is_enough_through_the_fluent_path_too(self) -> None:
+        """
+        ``with_weight`` used to leave the verdict at ``INFO``, which claims nothing.
+
+        The finding then scored 0 despite carrying a weight — the same footgun the facade already
+        avoided, reached through the other door.
+        """
+        cv = Cyvest()
+        finding = cv.finding("suspicious_macro").with_weight(8.5)
 
+        result = cv.get_report().finding(finding.key)
+        assert result.score == pytest.approx(8.5)
+        assert result.verdict is Verdict.MALICIOUS
 
-def test_tag_finding_addition() -> None:
-    """Test adding findings to tags."""
-    cv = Cyvest()
-    finding = cv.finding_create("c1", "d1")
-    tag = cv.tag_create("test_tag")
-    cv.tag_add_finding(tag.key, finding.key)
-    assert any(c.key == finding.key for c in tag.findings)
-
-
-def test_enrichment_creation() -> None:
-    """Test creating enrichments."""
-    cv = Cyvest()
-    enr = cv.enrichment_create("metadata", {"key": "value"})
-    assert enr.name == "metadata"
-    assert enr.data == {"key": "value"}
-    assert cv.enrichment_get(enr.key) is not None
-
-
-def test_global_score_calculation() -> None:
-    """Test global score calculation."""
-    cv = Cyvest()
-    cv.finding_create("c1", "s1", "d1", score=Decimal("3.0"))
-    cv.finding_create("c2", "s2", "d2", score=Decimal("5.0"))
-    assert cv.get_global_score() == Decimal("8.0")
-    assert cv.get_global_level() == Cyvest.LVL.MALICIOUS
-
-
-def test_statistics() -> None:
-    """Test statistics gathering."""
-    cv = Cyvest()
-    cv.observable_create(Cyvest.OBS.URL, "https://example.com")
-    cv.observable_create(Cyvest.OBS.IPV4, "192.168.1.1")
-    cv.finding_create("c1", "network", "desc")
-    stats = cv.get_statistics()
-    assert stats.total_observables >= 2  # Plus root
-    assert stats.total_findings == 1
-
-
-def test_investigation_whitelisting_flag() -> None:
-    """Investigation can hold multiple whitelist entries and remove them."""
-    cv = Cyvest()
-    assert cv.investigation_is_whitelisted() is False
-    assert cv.investigation_get_whitelists() == ()
-
-    cv.investigation_add_whitelist("id-1", "False positive", "Sandbox reason")
-    cv.investigation_add_whitelist("id-2", "Customer allowlist")
+
+class TestConclusions:
+    """The facade's entry point for an analysis that concludes rather than accumulates."""
+
+    def test_a_conclusion_tops_the_total_up_to_its_verdict(self) -> None:
+        cv = Cyvest()
+        cv.finding("spf_fail", "SPF invalide", verdict=cv.VERDICT.SUSPICIOUS, weight=3.2)
+        conclusion = cv.conclusion("ai_review", "Analyse IA", verdict=cv.VERDICT.MALICIOUS)
+
+        assert cv.get_global_score() == 5.0
+        assert conclusion.is_conclusion is True
+        assert conclusion.effect is cv.EFFECT.FLOOR
+        assert conclusion.applied_floor == pytest.approx(1.8)
 
-    whitelists = cv.investigation_get_whitelists()
-    assert len(whitelists) == 2
-    assert any(entry.identifier == "id-1" and entry.justification == "Sandbox reason" for entry in whitelists)
-    assert cv.investigation_is_whitelisted() is True
+    def test_a_conclusion_that_changes_nothing_says_so(self) -> None:
+        cv = Cyvest()
+        cv.finding("known_malware", "Malware connu", verdict=cv.VERDICT.MALICIOUS, weight=8.0)
+        conclusion = cv.conclusion("ai_review", "Analyse IA", verdict=cv.VERDICT.MALICIOUS)
 
-    removed = cv.investigation_remove_whitelist("id-1")
-    assert removed is True
-    assert len(cv.investigation_get_whitelists()) == 1
+        assert cv.get_global_score() == 8.0
+        assert conclusion.applied_floor == 0.0
 
-    cv.investigation_clear_whitelists()
-    assert cv.investigation_is_whitelisted() is False
-    assert cv.investigation_get_whitelists() == ()
+    def test_a_conclusion_has_no_score_of_its_own(self) -> None:
+        cv = Cyvest()
+        conclusion = cv.conclusion("ai_review", verdict=cv.VERDICT.MALICIOUS)
 
+        assert cv.get_report().finding(conclusion.key).score is None
+        assert conclusion.applied_floor == 5.0
 
-def test_investigation_merge() -> None:
-    """Test merging investigations."""
-    cv1 = Cyvest()
-    cv1.observable_create(Cyvest.OBS.URL, "https://example.com")
-    cv1.finding_create("c1", "s1", "d1", score=Decimal("3.0"))
+    def test_weighting_a_conclusion_is_refused(self) -> None:
+        cv = Cyvest()
+        conclusion = cv.conclusion("ai_review", verdict=cv.VERDICT.MALICIOUS)
 
-    cv2 = Cyvest()
-    cv2.observable_create(Cyvest.OBS.IPV4, "192.168.1.1")
-    cv2.finding_create("c2", "s2", "d2", score=Decimal("2.0"))
+        with pytest.raises(ValueError, match="never from a weight"):
+            conclusion.with_weight(8.5)
 
-    # Merge cv2 into cv1
-    cv1.merge_investigation(cv2)
+    def test_but_changing_a_weight_never_flips_a_stated_conclusion(self) -> None:
+        cv = Cyvest()
+        finding = cv.finding("known_good", verdict=cv.VERDICT.SAFE).with_weight(2.0)
 
-    # Should have observables from both (plus roots)
-    all_obs = cv1.observable_get_all()
-    assert len(all_obs) >= 3
-    all_findings = cv1.finding_get_all()
-    assert len(all_findings) == 2
-    assert cv1.get_global_score() == Decimal("5.0")
+        assert cv.get_report().finding(finding.key).score == pytest.approx(-2.0)
+        assert finding.verdict is Verdict.SAFE
 
+    def test_a_verdict_worth_nothing_is_expressible_and_visible(self) -> None:
+        """
+        v6 allowed the same statement but displayed only the label.
 
-def test_merge_investigation_copies_incoming_objects() -> None:
-    """Merged investigations should not share object references."""
-    cv_main = Cyvest()
-    cv_other = Cyvest()
-    obs = cv_other.observable_create(Cyvest.OBS.IPV4, "192.0.2.1")
+        Here the divergence is readable in three places: the asserted verdict, the computed one,
+        and a named contribution worth zero.
+        """
+        cv = Cyvest()
+        finding = cv.finding("ai_analysis", verdict=cv.VERDICT.MALICIOUS, weight=0.0)
 
-    cv_main.merge_investigation(cv_other)
+        result = cv.get_report().finding(finding.key)
+        assert finding.verdict is Verdict.MALICIOUS
+        assert finding.computed_verdict is Verdict.INFO
+        assert result.score == pytest.approx(0.0)
+        assert [(c.label, c.value) for c in result.contributions] == [("rule floor · MALICIOUS", 0.0)]
 
-    assert cv_other.observable_get(obs.key) is not None
-    assert len(cv_other.observable_get(obs.key).threat_intels) == 0
+    def test_an_analyst_verdict_on_an_observable_stays_attributable(self) -> None:
+        cv = Cyvest()
+        url = cv.observable(cv.OBS.URL, "hxxp://bad.example")
+        signal = cv.observable_set_verdict(url, cv.VERDICT.SUSPICIOUS, source="alice")
 
-    cv_main.observable_add_threat_intel(obs.key, source="source1", score=Decimal("9.0"))
+        assert signal.source == "alice"
+        assert url.verdict is Verdict.SUSPICIOUS
 
-    assert len(cv_other.observable_get(obs.key).threat_intels) == 0
 
+class TestMerge:
+    def test_the_reference_scenario_through_the_facade(self) -> None:
+        left = Cyvest(investigation_id="i1")
+        url_left = left.observable(left.OBS.URL, "hxxp://bad.example/x")
+        left.observable_add_threat_intel(url_left, "proofpoint", verdict=left.VERDICT.MALICIOUS, weight=2.0)
+        f1 = left.finding("url_in_body", subject=url_left).link_observable(url_left)
 
-def test_root_observable() -> None:
-    """Test root observable access."""
-    cv = Cyvest()
-    root = cv.observable_get_root()
-    assert root is not None
-    # Root should be accessible through API
-    retrieved = cv.observable_get(root.key)
-    assert retrieved is not None
-    assert retrieved.key == root.key
+        right = Cyvest(investigation_id="i2")
+        url_right = right.observable(right.OBS.URL, "hxxp://bad.example/x")
+        right.observable_add_threat_intel(url_right, "virustotal", verdict=right.VERDICT.MALICIOUS, weight=3.0)
+        f2 = right.finding("url_reputation", subject=url_right).link_observable(url_right)
 
+        left.merge_investigation(right)
 
-def test_relationship_with_direction() -> None:
-    """Test adding relationships with direction via Cyvest API."""
-    cv = Cyvest()
-    obs1 = cv.observable_create(Cyvest.OBS.URL, "https://example.com")
-    obs2 = cv.observable_create(Cyvest.OBS.IPV4, "192.168.1.1")
+        assert left.finding_get(f1.key).score == 2.0
+        assert left.finding_get(f2.key).score == 3.0
+        assert left.observable_get(url_left.key).score == 3.0
+        assert left.get_global_score() == 5.0
 
-    # Default direction (bidirectional)
-    cv.observable_add_relationship(obs1.key, obs2.key, "related-to")
-    assert obs1.relationships[0].direction == Cyvest.DIR.BIDIRECTIONAL
+    def test_seeing_an_artifact_twice_counts_twice(self) -> None:
+        cv = Cyvest()
+        cv.observable_create("url", "https://x.test")
+        cv.observable_create("url", "https://x.test")
+        observable = cv.observable_create("url", "https://x.test")
 
-    # Explicit outbound
-    cv.observable_add_relationship(obs1.key, obs2.key, "related-to", "outbound")
-    assert obs1.relationships[1].direction == Cyvest.DIR.OUTBOUND
+        assert observable.occurrence_count == 3
 
-    # Explicit inbound
-    cv.observable_add_relationship(obs1.key, obs2.key, "related-to", "inbound")
-    assert obs1.relationships[2].direction == Cyvest.DIR.INBOUND
+    def test_but_re_merging_a_fragment_does_not_inflate_the_tally(self) -> None:
+        """
+        Occurrence counters are per fragment and merged by max.
 
+        Without that, a pipeline that merges the same fragment twice would report an artifact as
+        twice as prevalent as it is — and merging would stop being idempotent.
+        """
+        fragment = Cyvest(investigation_id="frag-1")
+        fragment.observable_create("url", "https://y.test")
+        fragment.observable_create("url", "https://y.test")
 
-def test_relationship_semantic_defaults_via_api() -> None:
-    """Test that Cyvest API uses semantic defaults for relationship directions."""
-    cv = Cyvest()
-    obs1 = cv.observable_create(Cyvest.OBS.URL, "https://example.com")
-    obs2 = cv.observable_create(Cyvest.OBS.IPV4, "192.168.1.1")
+        target = Cyvest(investigation_id="target")
+        target.merge_investigation(fragment)
+        target.merge_investigation(fragment)
 
-    # No direction specified - uses BIDIRECTIONAL by default
-    cv.observable_add_relationship(obs1.key, obs2.key, Cyvest.REL.RELATED_TO)
-    assert obs1.relationships[0].direction == Cyvest.DIR.BIDIRECTIONAL
+        assert target.observable_get("obs:url:https://y.test").occurrence_count == 2
 
 
-def test_finalize_relationships_single_orphan() -> None:
-    """Test that finalize_relationships links single orphan observables to root."""
-    cv = Cyvest()
-    root = cv.observable_get_root()
+class TestEngines:
+    def test_the_registry_is_exposed_and_resolves_aliases(self) -> None:
+        assert Cyvest.ENGINES()["basic"] == "basic-v1"
 
-    # Create an observable with no relationships
-    orphan = cv.observable_create(Cyvest.OBS.IPV4, "192.168.1.1")
-
-    # Finalize relationships
-    cv.finalize_relationships()
-
-    # Root should now have a relationship to the orphan
-    root_targets = {rel.target_key for rel in root.relationships}
-    assert orphan.key in root_targets
-
-    # Check that the relationship type is RELATED_TO
-    orphan_rel = next(rel for rel in root.relationships if rel.target_key == orphan.key)
-    assert orphan_rel.relationship_type == Cyvest.REL.RELATED_TO
-
-
-def test_finalize_relationships_orphan_subgraph() -> None:
-    """Test that finalize_relationships links orphan sub-graphs to root."""
-    cv = Cyvest()
-    root = cv.observable_get_root()
-
-    # Create a connected sub-graph: obs1 -> obs2 -> obs3
-    obs1 = cv.observable_create(Cyvest.OBS.IPV4, "10.0.0.1")
-    obs2 = cv.observable_create(Cyvest.OBS.DOMAIN, "example.com")
-    obs3 = cv.observable_create(Cyvest.OBS.URL, "https://example.com/path")
-
-    cv.observable_add_relationship(obs1.key, obs2.key, Cyvest.REL.RELATED_TO)
-    cv.observable_add_relationship(obs2.key, obs3.key, Cyvest.REL.RELATED_TO)
-
-    # This sub-graph is not connected to root
-    # Finalize should link the starting node (obs1) to root
-    cv.finalize_relationships()
-
-    # Root should have a relationship to obs1 (the starting node)
-    root_targets = {rel.target_key for rel in root.relationships}
-    assert obs1.key in root_targets
-
-    # obs2 and obs3 should NOT be directly linked to root
-    assert obs2.key not in root_targets
-    assert obs3.key not in root_targets
-
-
-def test_finalize_relationships_multiple_orphan_subgraphs() -> None:
-    """Test that finalize_relationships handles multiple orphan sub-graphs."""
-    cv = Cyvest()
-    root = cv.observable_get_root()
-
-    # First sub-graph: sg1_a -> sg1_b
-    sg1_a = cv.observable_create(Cyvest.OBS.IPV4, "10.0.0.1")
-    sg1_b = cv.observable_create(Cyvest.OBS.DOMAIN, "sub1.com")
-    cv.observable_add_relationship(sg1_a.key, sg1_b.key, Cyvest.REL.RELATED_TO)
-
-    # Second sub-graph: sg2_a -> sg2_b -> sg2_c
-    sg2_a = cv.observable_create(Cyvest.OBS.IPV4, "10.0.0.2")
-    sg2_b = cv.observable_create(Cyvest.OBS.DOMAIN, "sub2.com")
-    sg2_c = cv.observable_create(Cyvest.OBS.URL, "https://sub2.com")
-    cv.observable_add_relationship(sg2_a.key, sg2_b.key, Cyvest.REL.RELATED_TO)
-    cv.observable_add_relationship(sg2_b.key, sg2_c.key, Cyvest.REL.RELATED_TO)
-
-    # Third isolated orphan
-    sg3_orphan = cv.observable_create(Cyvest.OBS.ARTIFACT, "abc123")
-
-    cv.finalize_relationships()
-
-    # Root should link to the starting node of each sub-graph
-    root_targets = {rel.target_key for rel in root.relationships}
-    assert sg1_a.key in root_targets  # Starting node of sub-graph 1
-    assert sg2_a.key in root_targets  # Starting node of sub-graph 2
-    assert sg3_orphan.key in root_targets  # Isolated orphan
-
-    # Non-starting nodes should not be directly linked
-    assert sg1_b.key not in root_targets
-    assert sg2_b.key not in root_targets
-    assert sg2_c.key not in root_targets
-
-
-def test_finalize_relationships_preconnected_graph() -> None:
-    """Test that finalize_relationships doesn't modify already connected graphs."""
-    cv = Cyvest()
-    root = cv.observable_get_root()
-
-    # Create a graph already connected to root
-    obs1 = cv.observable_create(Cyvest.OBS.IPV4, "10.0.0.1")
-    obs2 = cv.observable_create(Cyvest.OBS.DOMAIN, "example.com")
-
-    # Connect to root
-    cv.observable_add_relationship(root.key, obs1.key, Cyvest.REL.RELATED_TO)
-    cv.observable_add_relationship(obs1.key, obs2.key, Cyvest.REL.RELATED_TO)
-
-    # Count relationships before finalize
-    rel_count_before = len(root.relationships)
-
-    cv.finalize_relationships()
-
-    # Should not add any new relationships since everything is connected
-    assert len(root.relationships) == rel_count_before
-
-
-def test_finalize_relationships_complex_subgraph_selection() -> None:
-    """Test that finalize_relationships selects the best starting node in complex sub-graphs."""
-    cv = Cyvest()
-    root = cv.observable_get_root()
-
-    # Create a sub-graph with multiple potential starting nodes
-    # Structure: source -> hub1 -> leaf1
-    #                  -> hub2 -> leaf2
-    source = cv.observable_create(Cyvest.OBS.IPV4, "10.0.0.1")
-    hub1 = cv.observable_create(Cyvest.OBS.DOMAIN, "hub1.com")
-    hub2 = cv.observable_create(Cyvest.OBS.DOMAIN, "hub2.com")
-    leaf1 = cv.observable_create(Cyvest.OBS.URL, "https://hub1.com/page")
-    leaf2 = cv.observable_create(Cyvest.OBS.URL, "https://hub2.com/page")
-
-    cv.observable_add_relationship(source.key, hub1.key, Cyvest.REL.RELATED_TO)
-    cv.observable_add_relationship(source.key, hub2.key, Cyvest.REL.RELATED_TO)
-    cv.observable_add_relationship(hub1.key, leaf1.key, Cyvest.REL.RELATED_TO)
-    cv.observable_add_relationship(hub2.key, leaf2.key, Cyvest.REL.RELATED_TO)
-
-    cv.finalize_relationships()
-
-    # Root should link to 'source' as it has no incoming edges and multiple outgoing
-    root_targets = {rel.target_key for rel in root.relationships}
-    assert source.key in root_targets
-
-    # Other nodes should not be directly linked to root
-    assert hub1.key not in root_targets
-    assert hub2.key not in root_targets
-    assert leaf1.key not in root_targets
-    assert leaf2.key not in root_targets
-
-
-def test_merge_safe_observable_preserves_safe_with_low_score() -> None:
-    """Test that merging SAFE observable with low-score incoming preserves SAFE."""
-    cv1 = Cyvest()
-    # Create SAFE observable in first investigation
-    obs1 = cv1.observable_create(Cyvest.OBS.DOMAIN, "trusted.example.com", score=0, level=Cyvest.LVL.SAFE)
-    assert obs1.level == Cyvest.LVL.SAFE
-
-    cv2 = Cyvest()
-    # Create same observable with INFO level (score=0) in second investigation
-    obs2 = cv2.observable_create(Cyvest.OBS.DOMAIN, "trusted.example.com", score=0, level=Cyvest.LVL.INFO)
-    cv2.observable_add_threat_intel(obs2.key, source="ti_source", score=Decimal("0"))
-    assert obs2.level == Cyvest.LVL.INFO
-
-    # Merge cv2 into cv1
-    cv1.merge_investigation(cv2)
-
-    # SAFE level should be preserved
-    merged_obs = cv1.observable_get(obs1.key)
-    assert merged_obs.level == Cyvest.LVL.SAFE
-    assert merged_obs.score == Decimal("0")
-
-
-def test_merge_safe_observable_with_trusted_score() -> None:
-    """Test that merging SAFE observable with TRUSTED-level incoming preserves SAFE."""
-    cv1 = Cyvest()
-    # Create SAFE observable
-    obs1 = cv1.observable_create(Cyvest.OBS.DOMAIN, "trusted.example.com", score=0, level=Cyvest.LVL.SAFE)
-
-    cv2 = Cyvest()
-    # Create same observable with negative score (TRUSTED level)
-    obs2 = cv2.observable_create(Cyvest.OBS.DOMAIN, "trusted.example.com")
-    cv2.observable_add_threat_intel(obs2.key, source="ti_source", score=Decimal("-1.0"))
-    assert obs2.level == Cyvest.LVL.TRUSTED
-
-    # Merge cv2 into cv1
-    cv1.merge_investigation(cv2)
-
-    # SAFE level should be preserved
-    merged_obs = cv1.observable_get(obs1.key)
-    assert merged_obs.level == Cyvest.LVL.SAFE
-    # Score updates to reflect merged TI (max of TI sources = -1.0)
-    assert merged_obs.score == Decimal("-1.0")
-
-
-def test_merge_safe_observable_upgrades_with_notable() -> None:
-    """Test that merging SAFE observable with NOTABLE-level incoming upgrades to NOTABLE."""
-    cv1 = Cyvest()
-    # Create SAFE observable
-    obs1 = cv1.observable_create(Cyvest.OBS.DOMAIN, "trusted.example.com", score=0, level=Cyvest.LVL.SAFE)
-
-    cv2 = Cyvest()
-    # Create same observable with NOTABLE level
-    obs2 = cv2.observable_create(Cyvest.OBS.DOMAIN, "trusted.example.com")
-    cv2.observable_add_threat_intel(obs2.key, source="ti_source", score=Decimal("2.0"))
-    assert obs2.level == Cyvest.LVL.NOTABLE
-
-    # Merge cv2 into cv1
-    cv1.merge_investigation(cv2)
-
-    # Should upgrade to NOTABLE
-    merged_obs = cv1.observable_get(obs1.key)
-    assert merged_obs.level == Cyvest.LVL.NOTABLE
-    assert merged_obs.score == Decimal("2.0")
-
-
-def test_merge_safe_observable_upgrades_with_malicious() -> None:
-    """Test that merging SAFE observable with MALICIOUS-level incoming upgrades to MALICIOUS."""
-    cv1 = Cyvest()
-    # Create SAFE observable
-    obs1 = cv1.observable_create(Cyvest.OBS.DOMAIN, "trusted.example.com", score=0, level=Cyvest.LVL.SAFE)
-
-    cv2 = Cyvest()
-    # Create same observable with MALICIOUS level
-    obs2 = cv2.observable_create(Cyvest.OBS.DOMAIN, "trusted.example.com")
-    cv2.observable_add_threat_intel(obs2.key, source="ti_source", score=Decimal("6.0"))
-    assert obs2.level == Cyvest.LVL.MALICIOUS
-
-    # Merge cv2 into cv1
-    cv1.merge_investigation(cv2)
-
-    # Should upgrade to MALICIOUS
-    merged_obs = cv1.observable_get(obs1.key)
-    assert merged_obs.level == Cyvest.LVL.MALICIOUS
-    assert merged_obs.score == Decimal("6.0")
-
-
-def test_merge_non_safe_explicit_level_normal_behavior() -> None:
-    """Test that merging keeps the highest score/derived level."""
-    cv1 = Cyvest()
-    # Create observable and raise its score to SUSPICIOUS.
-    obs1 = cv1.observable_create(Cyvest.OBS.DOMAIN, "test.example.com")
-    cv1.observable_set_level(obs1.key, Cyvest.LVL.SUSPICIOUS)
-    cv1.observable_add_threat_intel(obs1.key, source="source1", score=Decimal("4.0"))
-
-    cv2 = Cyvest()
-    # Create same observable with lower score
-    obs2 = cv2.observable_create(Cyvest.OBS.DOMAIN, "test.example.com")
-    cv2.observable_add_threat_intel(obs2.key, source="source2", score=Decimal("2.0"))
-
-    # Merge cv2 into cv1
-    cv1.merge_investigation(cv2)
-
-    merged_obs = cv1.observable_get(obs1.key)
-    # Score should be max(4.0, 2.0) = 4.0
-    assert merged_obs.score == Decimal("4.0")
-    # Level stays SUSPICIOUS (score=4.0 => SUSPICIOUS)
-    assert merged_obs.level == Cyvest.LVL.SUSPICIOUS
-
-
-def test_observable_proxy_is_read_only() -> None:
-    """Observable proxies should block direct attribute mutation."""
-    cv = Cyvest()
-    obs = cv.observable_create(Cyvest.OBS.IPV4, "203.0.113.5")
-
-    with pytest.raises(AttributeError):
-        obs.score = Decimal("5")  # type: ignore[misc]
-
-    cv.observable_add_threat_intel(obs.key, source="source1", score=Decimal("4.0"))
-    assert obs.score == Decimal("4.0")
-
-
-def test_finding_proxy_is_read_only() -> None:
-    """Finding proxies should only change through Cyvest services."""
-    cv = Cyvest()
-    finding_proxy = cv.finding("chk-1", "scoped", "desc").with_score(Decimal("2.0"))
-
-    with pytest.raises(AttributeError):
-        finding_proxy.score = Decimal("3.0")  # type: ignore[misc]
-
-    cv.finding_update_score(finding_proxy.key, Decimal("3.0"))
-    assert finding_proxy.score == Decimal("3.0")
-
-
-def test_io_save_load_json_roundtrip() -> None:
-    """Test saving and loading investigation from JSON."""
-    # Create investigation with various components
-    cv = Cyvest()
-    obs1 = cv.observable_create(Cyvest.OBS.IPV4, "192.168.1.1", internal=False)
-    cv.observable_add_threat_intel(obs1.key, source="virustotal", score=Decimal("7.5"), comment="Malicious IP")
-
-    obs2 = cv.observable_create(Cyvest.OBS.DOMAIN, "evil.com", internal=False)
-    cv.observable_add_threat_intel(obs2.key, source="urlscan", score=Decimal("8.0"))
-
-    cv.observable_add_relationship(obs1.key, obs2.key, "related-to")
-
-    finding = cv.finding_create("malware_finding", "Detected malware communication", score=Decimal("9.0"))
-    cv.finding_link_observable(finding.key, obs1.key)
-
-    cv.enrichment_create("whois", {"registrar": "Evil Corp"}, context="Domain registration")
-
-    # Save to temp file
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
-        temp_path = f.name
-
-    try:
-        saved_path = cv.io_save_json(temp_path)
-        assert Path(saved_path).exists()
-
-        # Load and verify
-        loaded_cv = Cyvest.io_load_json(temp_path)
-
-        # Verify observables
-        assert len(loaded_cv.observable_get_all()) == len(cv.observable_get_all())
-        loaded_obs1 = loaded_cv.observable_get(obs1.key)
-        assert loaded_obs1 is not None
-        assert loaded_obs1.value == "192.168.1.1"
-        assert loaded_obs1.score == Decimal("7.5")
-
-        # Verify threat intel
-        assert len(loaded_cv.threat_intel_get_all()) == len(cv.threat_intel_get_all())
-
-        # Verify findings
-        assert len(loaded_cv.finding_get_all()) == len(cv.finding_get_all())
-        loaded_finding = loaded_cv.finding_get(finding.key)
-        assert loaded_finding is not None
-        assert loaded_finding.finding_name == "malware_finding"
-        assert any(link.observable_key == obs1.key for link in loaded_finding.observable_links)
-
-        # Verify enrichments
-        assert len(loaded_cv.enrichment_get_all()) == len(cv.enrichment_get_all())
-
-        # Verify scores match
-        assert loaded_cv.get_global_score() == cv.get_global_score()
-        assert loaded_cv.get_global_level() == cv.get_global_level()
-    finally:
-        Path(temp_path).unlink(missing_ok=True)
-
-
-def test_io_save_json_returns_absolute_path() -> None:
-    """Test that io_save_json returns absolute path."""
-    cv = Cyvest()
-
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
-        temp_path = f.name
-
-    try:
-        # Use relative path notation
-        relative_path = Path(temp_path).name
-        saved_path = cv.io_save_json(relative_path)
-
-        # Should return absolute path
-        assert Path(saved_path).is_absolute()
-        assert saved_path.endswith(relative_path)
-    finally:
-        # Clean up both the relative and absolute paths
-        Path(relative_path).unlink(missing_ok=True)
-        Path(temp_path).unlink(missing_ok=True)
-
-
-def test_io_save_markdown_returns_absolute_path() -> None:
-    """Test that io_save_markdown returns absolute path."""
-    cv = Cyvest()
-    cv.observable_create(Cyvest.OBS.IPV4, "10.0.0.1")
-
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
-        temp_path = f.name
-
-    try:
-        saved_path = cv.io_save_markdown(temp_path)
-
-        # Should return absolute path
-        assert Path(saved_path).is_absolute()
-        assert Path(saved_path).exists()
-
-        # Verify content
-        content = Path(saved_path).read_text()
-        assert "# Cybersecurity Investigation Report" in content
-        assert "10.0.0.1" in content
-    finally:
-        Path(temp_path).unlink(missing_ok=True)
-
-
-def test_io_to_invest_serialization() -> None:
-    """Test InvestigationSchema serialization contains expected fields."""
-    cv = Cyvest()
-    obs = cv.observable_create(Cyvest.OBS.URL, "https://malicious.com")
-    cv.observable_add_threat_intel(obs.key, source="virustotal", score=Decimal("6.0"))
-    cv.finding_create("url_finding", "network", "URL analysis")
-
-    schema = cv.io_to_invest()
-
-    # Verify all expected fields exist via attribute access
-    assert hasattr(schema, "investigation_id")
-    assert hasattr(schema, "score")
-    assert hasattr(schema, "level")
-    assert hasattr(schema, "observables")
-    assert hasattr(schema, "findings")
-    assert hasattr(schema, "threat_intels")
-    assert hasattr(schema, "enrichments")
-    assert hasattr(schema, "tags")
-    assert hasattr(schema, "stats")
-    assert hasattr(schema, "whitelists")
-
-    # Verify values
-    assert schema.score >= 0
-    assert schema.level in Cyvest.LVL
-
-    # Test model_dump() for dict compatibility
-    data = schema.model_dump(by_alias=True)
-    assert "investigation_id" in data
-    assert "score" in data
-    assert "observables" in data
-
-    # Verify data structure
-    assert isinstance(data["observables"], dict)
-    assert isinstance(data["findings"], dict)
-    assert isinstance(data["threat_intels"], dict)
-    assert isinstance(data["whitelists"], list)
-
-    # Verify content
-    assert obs.key in data["observables"]
-    assert data["observables"][obs.key]["value"] == "https://malicious.com"
-
-
-def test_io_to_markdown_generates_report() -> None:
-    """Test Markdown report generation."""
-    cv = Cyvest()
-    obs = cv.observable_create(Cyvest.OBS.DOMAIN, "test.com", internal=False)
-    cv.observable_add_threat_intel(obs.key, source="abuse.ch", score=Decimal("5.0"))
-    finding = cv.finding_create("domain_finding", "DNS analysis", score=Decimal("4.0"), level=Cyvest.LVL.SUSPICIOUS)
-    cv.finding_link_observable(finding.key, obs.key)
-
-    markdown = cv.io_to_markdown()
-
-    # Verify markdown structure
-    assert "# Cybersecurity Investigation Report" in markdown
-    assert "## Statistics" in markdown
-    assert "## Observables" in markdown
-    assert "## Findings" in markdown
-
-    # Verify content
-    assert "test.com" in markdown
-    assert "abuse.ch" in markdown
-    assert "DNS analysis" in markdown
-    assert "domain_finding" in markdown
-
-
-def test_io_load_json_with_nonexistent_file() -> None:
-    """Test that loading nonexistent file raises FileNotFoundError."""
-    with pytest.raises(FileNotFoundError):
-        Cyvest.io_load_json("/nonexistent/path/to/file.json")
-
-
-def test_io_save_json_with_invalid_path() -> None:
-    """Test that saving to invalid path raises OSError."""
-    cv = Cyvest()
-
-    # Try to write to a directory that doesn't exist
-    with pytest.raises(OSError):
-        cv.io_save_json("/nonexistent/directory/investigation.json")
-
-
-# ── threat_intel_from_report ──────────────────────────────────────────
-
-
-def test_threat_intel_from_report_basic() -> None:
-    """Valid report dict returns an unbound ThreatIntel with rounded score."""
-    cv = Cyvest()
-    report = {
-        "source": "virustotal",
-        "score": 4.256,
-        "level": "SUSPICIOUS",
-        "comment": "Detected by 12 engines",
-        "extra": {"engines": 12},
-        "taxonomies": [{"level": "SUSPICIOUS", "name": "VT", "value": "12/70"}],
-    }
-    ti = cv.io_load_threat_intel_draft(report)
-
-    assert ti.source == "virustotal"
-    assert ti.score == Decimal("4.26")  # rounded
-    assert ti.level.value == "SUSPICIOUS"
-    assert ti.comment == "Detected by 12 engines"
-    assert ti.extra == {"engines": 12}
-    assert ti.observable_key == ""
-    assert len(ti.taxonomies) == 1
-    assert ti.taxonomies[0].name == "VT"
-
-
-def test_threat_intel_from_report_invalid_type() -> None:
-    """Non-dict input raises TypeError."""
-    cv = Cyvest()
-    with pytest.raises(TypeError, match="report must be a dict"):
-        cv.io_load_threat_intel_draft("not a dict")  # type: ignore[arg-type]
-    with pytest.raises(TypeError, match="report must be a dict"):
-        cv.io_load_threat_intel_draft(42)  # type: ignore[arg-type]
-
-
-def test_threat_intel_from_report_validation_error() -> None:
-    """Missing required score raises ValidationError."""
-    from pydantic import ValidationError
-
-    cv = Cyvest()
-    with pytest.raises(ValidationError):
-        cv.io_load_threat_intel_draft({"source": "test"})
-
-
-def test_threat_intel_from_report_preprocessor() -> None:
-    """Preprocessor callback can modify data before validation."""
-    cv = Cyvest()
-
-    def force_safe(data: dict) -> dict:
-        data["level"] = "SAFE"
-        data["score"] = 0.0
-        return data
-
-    ti = cv.io_load_threat_intel_draft(
-        {"source": "misp", "score": 7.5, "level": "MALICIOUS"},
-        preprocessor=force_safe,
-    )
-    assert ti.level.value == "SAFE"
-    assert ti.score == Decimal("0.00")
-
-
-def test_threat_intel_from_report_safe_getter_triggers() -> None:
-    """safe_getter + safe_values overrides level/score to SAFE/0 when matched."""
-    report = {
-        "source": "misp",
-        "score": 7.5,
-        "level": "MALICIOUS",
-        "extra": {"task_name": "MISP.analyzer.DBWarningList"},
-    }
-    ti = Cyvest.io_load_threat_intel_draft(
-        report,
-        safe_getter=lambda d: d.get("extra", {}).get("task_name", ""),
-        safe_values=["MISP.analyzer.DBWarningList", "MISP.analyzer.SearchWarningList"],
-    )
-    assert ti.level.value == "SAFE"
-    assert ti.score == Decimal("0.00")
-
-
-def test_threat_intel_from_report_safe_getter_no_match() -> None:
-    """safe_getter that doesn't match keeps original level/score."""
-    report = {
-        "source": "misp",
-        "score": 7.5,
-        "level": "MALICIOUS",
-        "extra": {"task_name": "MISP.analyzer.SomeOtherTask"},
-    }
-    ti = Cyvest.io_load_threat_intel_draft(
-        report,
-        safe_getter=lambda d: d.get("extra", {}).get("task_name", ""),
-        safe_values=["MISP.analyzer.DBWarningList"],
-    )
-    assert ti.level.value == "MALICIOUS"
-    assert ti.score == Decimal("7.50")
-
-
-def test_threat_intel_from_report_safe_getter_already_safe() -> None:
-    """safe_getter match with level already SAFE keeps SAFE (no double override)."""
-    report = {
-        "source": "misp",
-        "score": 0.0,
-        "level": "SAFE",
-        "extra": {"task_name": "MISP.analyzer.DBWarningList"},
-    }
-    ti = Cyvest.io_load_threat_intel_draft(
-        report,
-        safe_getter=lambda d: d.get("extra", {}).get("task_name", ""),
-        safe_values=["MISP.analyzer.DBWarningList"],
-    )
-    assert ti.level.value == "SAFE"
-    assert ti.score == Decimal("0.00")
-
-
-def test_threat_intel_from_report_safe_values_without_getter_raises() -> None:
-    """safe_values without safe_getter raises ValueError."""
-    with pytest.raises(ValueError, match="safe_values requires safe_getter"):
-        Cyvest.io_load_threat_intel_draft(
-            {"source": "test", "score": 1.0},
-            safe_values=["something"],
-        )
-
-
-def test_threat_intel_from_report_does_not_mutate_input() -> None:
-    """Original report dict is not modified."""
-    cv = Cyvest()
-    report = {"source": "test", "score": 3.0}
-    original = dict(report)
-
-    def mutating_preprocessor(data: dict) -> dict:
-        data["level"] = "MALICIOUS"
-        return data
-
-    cv.io_load_threat_intel_draft(report, preprocessor=mutating_preprocessor)
-    assert report == original
-
-
-def test_threat_intel_from_report_attach_to_observable() -> None:
-    """Round-trip: from_report → observable_with_ti_draft → TI attached and scored."""
-    cv = Cyvest()
-    obs = cv.observable_create("domain", "evil.example.com")
-    ti = cv.io_load_threat_intel_draft({"source": "abuse.ch", "score": 8.0})
-
-    bound = cv.observable_with_ti_draft(obs, ti)
-    assert bound.source == "abuse.ch"
-    assert bound.score == Decimal("8.00")
-
-    refreshed = cv.observable_get(obs.key)
-    assert refreshed is not None
-    assert refreshed.score >= Decimal("8.00")
-
-
-def test_threat_intel_from_report_preprocessor_then_safe_getter() -> None:
-    """Preprocessor runs first, then safe_getter evaluates the modified data."""
-    report = {
-        "source": "misp",
-        "score": 6.0,
-        "level": "MALICIOUS",
-        "extra": {"raw_task": "DBWarningList"},
-    }
-
-    # Preprocessor normalises task_name so safe_getter can match it
-    def normalise(data: dict) -> dict:
-        raw = data.get("extra", {}).get("raw_task", "")
-        data.setdefault("extra", {})["task_name"] = f"MISP.analyzer.{raw}"
-        return data
-
-    ti = Cyvest.io_load_threat_intel_draft(
-        report,
-        preprocessor=normalise,
-        safe_getter=lambda d: d.get("extra", {}).get("task_name", ""),
-        safe_values=["MISP.analyzer.DBWarningList"],
-    )
-    assert ti.level.value == "SAFE"
-    assert ti.score == Decimal("0.00")
-
-
-def test_threat_intel_from_report_safe_getter_with_info_level_unchanged() -> None:
-    """safe_getter match with level=INFO keeps INFO (not overridden to SAFE)."""
-    report = {
-        "source": "misp",
-        "score": 0.0,
-        "level": "INFO",
-        "extra": {"task_name": "MISP.analyzer.SearchWarningList"},
-    }
-    ti = Cyvest.io_load_threat_intel_draft(
-        report,
-        safe_getter=lambda d: d.get("extra", {}).get("task_name", ""),
-        safe_values=["MISP.analyzer.SearchWarningList"],
-    )
-    assert ti.level.value == "INFO"
-    assert ti.score == Decimal("0.00")
+    def test_the_report_records_the_resolved_engine_id(self) -> None:
+        assert Cyvest(engine="basic").get_report().engine_id == "basic-v1"

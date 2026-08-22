@@ -1,711 +1,561 @@
 """
-Read-only proxy wrappers for Cyvest model objects.
+Read-only views over facts, with the derived values pulled from the report.
 
-These lightweight proxies expose investigation state to callers without allowing
-them to mutate the underlying dataclasses directly. Each proxy stores only the
-object key and looks up the live model instance inside the investigation on
-every attribute access, ensuring that the latest score engine computations are
-visible while keeping mutations confined to Cyvest services.
+A proxy holds a key, not an object: facts are immutable and superseded rather than edited, so
+resolving on every access is what keeps a proxy from going stale. Fluent methods append new facts
+and return a proxy on the result.
+
+``.level`` is gone — the ``Verdict`` *is* the level, and keeping two names for one value would
+reintroduce the confusion v7 exists to remove.
 """
 
 from __future__ import annotations
 
-from copy import deepcopy
-from decimal import Decimal
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
-from cyvest import keys
-from cyvest.levels import Level
-from cyvest.model import (
-    Enrichment,
+from cyvest.enums import DecisionKind, Effect, RelationKind, Scope, SourceClass, Status, Verdict
+from cyvest.evaluation import ResolvedScope
+from cyvest.evaluation.projection import verdict_from_score
+from cyvest.evaluation.report import Contribution, FindingResult, ObservableResult
+from cyvest.facts import (
+    Decision,
     Evidence,
-    EvidenceLink,
+    Fact,
     Finding,
+    Label,
     Observable,
     ObservableAlias,
-    ObservableLink,
-    ObservableSubtype,
-    ObservableType,
-    Relationship,
+    SourceRef,
     Tag,
-    Taxonomy,
     ThreatIntel,
 )
-from cyvest.model_enums import PropagationMode, RelationshipDirection, RelationshipType
 
 if TYPE_CHECKING:
     from cyvest.investigation import Investigation
 
-_T = TypeVar("_T")
+_T = TypeVar("_T", bound=Fact)
 
 
 class ModelNotFoundError(RuntimeError):
-    """Raised when a proxy points to an object that no longer exists."""
+    """Raised when a proxy points at a key the store no longer holds."""
 
 
 class _ReadOnlyProxy(Generic[_T]):
-    """Base helper for wrapping model objects."""
+    """Base view. Attribute assignment is refused so a caller cannot fake an edit."""
 
-    __slots__ = ("__investigation", "__key")
+    __slots__ = ("_investigation", "_key")
 
     def __init__(self, investigation: Investigation, key: str) -> None:
-        object.__setattr__(self, "_ReadOnlyProxy__investigation", investigation)
-        object.__setattr__(self, "_ReadOnlyProxy__key", key)
+        object.__setattr__(self, "_investigation", investigation)
+        object.__setattr__(self, "_key", key)
 
     @property
     def key(self) -> str:
-        """Return the stable object key."""
-        return object.__getattribute__(self, "_ReadOnlyProxy__key")
+        return self._key
 
-    def _get_investigation(self) -> Investigation:
-        return object.__getattribute__(self, "_ReadOnlyProxy__investigation")
+    @property
+    def investigation(self) -> Investigation:
+        return self._investigation
 
-    def _resolve(self) -> _T:  # pragma: no cover - overridden in subclasses
+    def _resolve(self) -> _T:  # pragma: no cover - overridden
         raise NotImplementedError
 
-    def _read_attr(self, name: str):
-        """Resolve and deep-copy a public attribute from the model."""
-        model = self._resolve()
-        value = getattr(model, name)
-        if callable(value):
-            raise AttributeError(
-                f"Method '{name}' is not available on read-only proxies. Use Cyvest services for mutations."
-            )
-        return deepcopy(value)
-
-    def __setattr__(self, name: str, value) -> None:  # noqa: ANN001
-        """Prevent attribute mutation."""
-        raise AttributeError(f"{self.__class__.__name__} is read-only. Use Cyvest APIs to modify investigation data.")
+    def __setattr__(self, name: str, value: Any) -> None:
+        raise AttributeError(f"{type(self).__name__} is read-only; facts are superseded, not edited")
 
     def __delattr__(self, name: str) -> None:
-        raise AttributeError(f"{self.__class__.__name__} is read-only. Use Cyvest APIs to modify investigation data.")
+        raise AttributeError(f"{type(self).__name__} is read-only")
 
-    def _call_readonly(self, method: str, *args, **kwargs):
-        """Invoke a model method in read-only mode and deepcopy the result."""
-        model = self._resolve()
-        attr = getattr(model, method, None)
-        if attr is None or not callable(attr):
-            raise AttributeError(f"{self.__class__.__name__} exposes no method '{method}'")
-        return deepcopy(attr(*args, **kwargs))
+    def __eq__(self, other: object) -> bool:
+        return isinstance(other, type(self)) and other.key == self.key
+
+    def __hash__(self) -> int:
+        return hash((type(self).__name__, self._key))
 
     def __repr__(self) -> str:
-        model = self._resolve()
-        return f"{self.__class__.__name__}(key={self.key!r}, type={model.__class__.__name__})"
+        return f"{type(self).__name__}(key={self._key!r})"
+
+
+class _JudgedProxy(_ReadOnlyProxy[_T]):
+    """Shared read side for facts that carry a judgment."""
+
+    __slots__ = ()
+
+    @property
+    def verdict(self) -> Verdict:
+        """The **asserted** verdict. The computed one lives on the result."""
+        return self._resolve().verdict
+
+    @property
+    def confidence(self) -> float:
+        return self._resolve().confidence
+
+    @property
+    def weight(self) -> float | None:
+        return self._resolve().weight
+
+    @property
+    def subject_key(self) -> str:
+        return self._resolve().subject_key
 
 
 class ObservableProxy(_ReadOnlyProxy[Observable]):
-    """Read-only proxy over an observable."""
+    """An observable, plus its result in a chosen scope."""
 
-    def _resolve(self):
-        observable = self._get_investigation().get_observable(self.key)
-        if observable is None:
-            raise ModelNotFoundError(f"Observable '{self.key}' no longer exists in this investigation.")
-        return observable
+    __slots__ = ()
+
+    def _resolve(self) -> Observable:
+        found = self._investigation.get_observable(self._key)
+        if found is None:
+            raise ModelNotFoundError(f"Observable no longer in the store: {self._key}")
+        return found
 
     @property
-    def obs_type(self) -> ObservableType | str:
-        return self._read_attr("obs_type")
+    def obs_type(self):  # noqa: ANN201 - mirrors the fact's own union type
+        return self._resolve().obs_type
 
     @property
     def value(self) -> str:
-        return self._read_attr("value")
+        return self._resolve().value
 
     @property
-    def subtype(self) -> ObservableSubtype | str | None:
-        return self._read_attr("subtype")
+    def subtype(self):  # noqa: ANN201
+        return self._resolve().subtype
 
     @property
     def namespace(self) -> str | None:
-        return self._read_attr("namespace")
+        return self._resolve().namespace
 
     @property
     def internal(self) -> bool:
-        return self._read_attr("internal")
-
-    @property
-    def whitelisted(self) -> bool:
-        return self._read_attr("whitelisted")
+        return self._resolve().internal
 
     @property
     def comment(self) -> str:
-        return self._read_attr("comment")
+        return self._resolve().comment
 
     @property
     def extra(self) -> dict[str, Any]:
-        return self._read_attr("extra")
+        return self._resolve().extra
 
     @property
-    def score(self) -> Decimal:
-        return self._read_attr("score")
-
-    @property
-    def score_display(self) -> str:
-        return self._read_attr("score_display")
-
-    @property
-    def level(self) -> Level:
-        return self._read_attr("level")
-
-    @property
-    def aliases(self) -> list[ObservableAlias]:
-        return self._read_attr("aliases")
+    def aliases(self) -> tuple[ObservableAlias, ...]:
+        return self._resolve().aliases
 
     @property
     def occurrence_count(self) -> int:
-        return self._read_attr("occurrence_count")
+        return self._resolve().occurrence_count
+
+    def result(self, scope: ResolvedScope | None = None) -> ObservableResult | None:
+        return self._investigation.report.observable(self._key, scope)
+
+    @property
+    def score(self) -> float:
+        result = self.result()
+        return result.score if result is not None and result.score is not None else 0.0
+
+    @property
+    def verdict(self) -> Verdict:
+        """Computed, not asserted: an observable states nothing by itself."""
+        result = self.result()
+        return result.verdict if result is not None else Verdict.INFO
+
+    @property
+    def contributions(self) -> tuple[Contribution, ...]:
+        result = self.result()
+        return result.contributions if result is not None else ()
+
+    @property
+    def allowlisted(self) -> bool:
+        return any(d.kind is DecisionKind.ALLOWLISTED for d in self._investigation.get_decisions(self._key))
 
     @property
     def threat_intels(self) -> list[ThreatIntel]:
-        return self._read_attr("threat_intels")
-
-    @property
-    def relationships(self) -> list[Relationship]:
-        return self._read_attr("relationships")
-
-    @property
-    def finding_links(self) -> list[str]:
-        """Findings that currently link to this observable."""
-        return self._read_attr("finding_links")
-
-    def update_metadata(
-        self,
-        *,
-        comment: str | None = None,
-        extra: dict[str, Any] | None = None,
-        internal: bool | None = None,
-        whitelisted: bool | None = None,
-        merge_extra: bool = True,
-    ) -> ObservableProxy:
-        """
-        Update mutable metadata fields on the observable.
-
-        Args:
-            comment: Optional comment override.
-            extra: Dictionary to merge into (or replace) ``extra``.
-            internal: Whether the observable is an internal asset.
-            whitelisted: Whether the observable is whitelisted.
-            merge_extra: When False, replaces ``extra`` entirely.
-        """
-        updates: dict[str, Any] = {}
-        if comment is not None:
-            updates["comment"] = comment
-        if extra is not None:
-            updates["extra"] = extra
-        if internal is not None:
-            updates["internal"] = internal
-        if whitelisted is not None:
-            updates["whitelisted"] = whitelisted
-
-        if not updates:
-            return self
-
-        dict_merge = {"extra": merge_extra} if extra is not None else None
-        self._get_investigation().update_model_metadata("observable", self.key, updates, dict_merge=dict_merge)
-        return self
-
-    def set_level(self, level: Level, reason: str | None = None) -> ObservableProxy:
-        """Set the level without changing score."""
-        observable = self._resolve()
-        self._get_investigation().apply_level_change(observable, level, reason=reason or "Manual level update")
-        return self
+        return [s for s in self._investigation.store.signals_for(self._key) if isinstance(s, ThreatIntel)]
 
     def with_ti(
         self,
-        source: str,
-        score: Decimal | float,
+        threat_intel: ThreatIntel | dict[str, Any] | str,
+        weight: float | None = None,
         comment: str = "",
-        extra: dict[str, Any] | None = None,
-        level: Level | None = None,
-        taxonomies: list[Taxonomy | dict[str, Any]] | None = None,
+        *,
+        verdict: Verdict | str | None = None,
+        confidence: float = 1.0,
+        source_class: SourceClass = SourceClass.VENDOR_FEED,
+        **kwargs: Any,
     ) -> ObservableProxy:
         """
-        Attach threat intelligence to this observable.
+        Attach a signal and return the observable, so calls chain.
+
+        Accepts a built ``ThreatIntel``, a draft dict, or the short form ``with_ti("VT", 6.0)``.
+        In the short form the verdict is **derived from the weight's own band** — the two are the
+        same scale since v7 merged ``Level`` into ``Verdict``, so stating both would be redundant.
         """
-        observable = self._resolve()
-        ti_kwargs: dict[str, Any] = {
-            "source": source,
-            "observable_key": self.key,
-            "comment": comment,
-            "extra": extra or {},
-            "score": Decimal(str(score)),
-            "taxonomies": taxonomies or [],
-        }
-        if level is not None:
-            ti_kwargs["level"] = level
-        ti = ThreatIntel(**ti_kwargs)
-        self._get_investigation().add_threat_intel(ti, observable)
+        if isinstance(threat_intel, str):
+            resolved_weight = 0.0 if weight is None else float(weight)
+            threat_intel = ThreatIntel(
+                subject_key=self._key,
+                verdict=Verdict(verdict)
+                if isinstance(verdict, str)
+                else (verdict or verdict_from_score(resolved_weight)),
+                weight=abs(resolved_weight),
+                confidence=confidence,
+                comment=comment,
+                source=SourceRef(name=threat_intel, source_class=source_class),
+                fragment_id=self._investigation.fragment_id,
+                **kwargs,
+            )
+        elif isinstance(threat_intel, dict):
+            draft = dict(threat_intel)
+            source_name = draft.pop("source")
+            draft_class = draft.pop("source_class", source_class)
+            threat_intel = ThreatIntel(
+                subject_key=self._key,
+                source=SourceRef(name=source_name, source_class=draft_class),
+                fragment_id=self._investigation.fragment_id,
+                **draft,
+            )
+        self._investigation.add_threat_intel(threat_intel)
         return self
 
-    def with_ti_draft(self, draft: ThreatIntel) -> ThreatIntelProxy:
-        """
-        Attach a threat intel draft to this observable.
-        """
-        if not isinstance(draft, ThreatIntel):
-            raise TypeError("Threat intel draft must be a ThreatIntel instance.")
-        if draft.observable_key and draft.observable_key != self.key:
-            raise ValueError("Threat intel is already bound to a different observable.")
-
-        observable = self._resolve()
-        draft.observable_key = self.key
-        expected_key = keys.generate_threat_intel_key(draft.source, self.key)
-        if not draft.key or draft.key != expected_key:
-            draft.key = expected_key
-
-        result = self._get_investigation().add_threat_intel(draft, observable)
-        return ThreatIntelProxy(self._get_investigation(), result.key)
+    def signal(self, source: str) -> ThreatIntelProxy | None:
+        """The signal this observable holds from a given source, if any."""
+        for candidate in self.threat_intels:
+            if candidate.source.name == source:
+                return ThreatIntelProxy(self._investigation, candidate.key)
+        return None
 
     def relate_to(
         self,
-        target: Observable | ObservableProxy | str,
-        relationship_type: RelationshipType | str,
-        direction: RelationshipDirection | None = None,
+        target: ObservableProxy | Observable | str,
+        kind: RelationKind | str = RelationKind.RELATED_TO,
+        **kwargs: Any,
     ) -> ObservableProxy:
-        """Create a relationship to another observable."""
-        if isinstance(target, ObservableProxy):
-            resolved_target: Observable | str = target.key
-        elif isinstance(target, Observable):
-            resolved_target = target
-        elif isinstance(target, str):
-            resolved_target = target
-        else:
-            raise TypeError("Target must be an observable key, ObservableProxy, or Observable instance.")
-
-        self._get_investigation().add_relationship(self.key, resolved_target, relationship_type, direction)
+        target_key = target.key if isinstance(target, (ObservableProxy, Observable)) else target
+        self._investigation.add_relation(self._key, target_key, kind, **kwargs)
         return self
 
-    def link_finding(
-        self,
-        finding: Finding | FindingProxy | str,
-        *,
-        propagation_mode: PropagationMode = PropagationMode.LOCAL_ONLY,
-    ) -> ObservableProxy:
-        """Link this observable to a finding."""
-        if isinstance(finding, FindingProxy):
-            finding_key = finding.key
-        elif isinstance(finding, Finding):
-            finding_key = finding.key
-        elif isinstance(finding, str):
-            finding_key = finding
-        else:
-            raise TypeError("Finding must provide a key.")
+    def allowlist(self, justification: str | None = None) -> ObservableProxy:
+        self._investigation.add_decision(self._key, DecisionKind.ALLOWLISTED, justification=justification)
+        return self
 
-        self._get_investigation().link_finding_observable(finding_key, self.key, propagation_mode=propagation_mode)
+    def blocklist(self, justification: str | None = None) -> ObservableProxy:
+        self._investigation.add_decision(self._key, DecisionKind.BLOCKLISTED, justification=justification)
         return self
 
 
-class FindingProxy(_ReadOnlyProxy[Finding]):
-    """Read-only proxy over a finding."""
+class FindingProxy(_JudgedProxy[Finding]):
+    """A finding, plus its result."""
 
-    def _resolve(self):
-        finding = self._get_investigation().get_finding(self.key)
-        if finding is None:
-            raise ModelNotFoundError(f"Finding '{self.key}' no longer exists in this investigation.")
-        return finding
+    __slots__ = ()
 
-    @property
-    def finding_name(self) -> str:
-        return self._read_attr("finding_name")
+    def _resolve(self) -> Finding:
+        found = self._investigation.get_finding(self._key)
+        if found is None:
+            raise ModelNotFoundError(f"Finding no longer in the store: {self._key}")
+        return found
 
     @property
-    def description(self) -> str:
-        return self._read_attr("description")
+    def rule_id(self) -> str:
+        return self._resolve().rule_id
+
+    @property
+    def name(self) -> str:
+        finding = self._resolve()
+        return finding.name or finding.rule_id
 
     @property
     def comment(self) -> str:
-        return self._read_attr("comment")
+        return self._resolve().comment
 
     @property
     def extra(self) -> dict[str, Any]:
-        return self._read_attr("extra")
+        return self._resolve().extra
 
     @property
-    def score(self) -> Decimal:
-        return self._read_attr("score")
+    def status(self) -> Status:
+        return self._resolve().status
 
     @property
-    def score_display(self) -> str:
-        return self._read_attr("score_display")
+    def effect(self) -> Effect:
+        return self._resolve().effect
 
     @property
-    def level(self) -> Level:
-        return self._read_attr("level")
+    def is_conclusion(self) -> bool:
+        return self._resolve().effect is Effect.FLOOR
 
     @property
-    def origin_investigation_id(self) -> str:
-        return self._read_attr("origin_investigation_id")
+    def observable_links(self) -> tuple:
+        return self._resolve().observable_links
 
     @property
-    def observable_links(self) -> list[ObservableLink]:
-        return self._read_attr("observable_links")
+    def evidence_keys(self) -> tuple[str, ...]:
+        return self._resolve().evidence_keys
 
     @property
-    def evidence_links(self) -> list[EvidenceLink]:
-        return self._read_attr("evidence_links")
+    def labels(self) -> tuple[Label, ...]:
+        return self._resolve().labels
 
-    def update_metadata(
-        self,
-        *,
-        comment: str | None = None,
-        description: str | None = None,
-        extra: dict[str, Any] | None = None,
-        merge_extra: bool = True,
-    ) -> FindingProxy:
-        """Update mutable metadata on the finding."""
-        updates: dict[str, Any] = {}
-        if comment is not None:
-            updates["comment"] = comment
-        if description is not None:
-            updates["description"] = description
-        if extra is not None:
-            updates["extra"] = extra
+    def result(self) -> FindingResult | None:
+        return self._investigation.report.finding(self._key)
 
-        if not updates:
-            return self
+    @property
+    def score(self) -> float:
+        """The finding's own magnitude — always ``0.0`` for a conclusion, see :attr:`applied_floor`."""
+        result = self.result()
+        return result.score if result is not None and result.score is not None else 0.0
 
-        dict_merge = {"extra": merge_extra} if extra is not None else None
-        self._get_investigation().update_model_metadata("finding", self.key, updates, dict_merge=dict_merge)
-        return self
+    @property
+    def applied_floor(self) -> float:
+        """How much this conclusion actually lifted the total; ``0.0`` once the verdict was reached."""
+        if not self.is_conclusion:
+            return 0.0
+        for contribution in self._investigation.report.investigation.contributions:
+            if contribution.source_key == self._key and contribution.label.startswith("conclusion floor"):
+                return contribution.value
+        return 0.0
 
-    def set_level(self, level: Level, reason: str | None = None) -> FindingProxy:
-        """Set the level without changing score."""
-        finding = self._resolve()
-        self._get_investigation().apply_level_change(finding, level, reason=reason or "Manual level update")
-        return self
+    @property
+    def computed_verdict(self) -> Verdict:
+        """What the engine concluded, as opposed to :attr:`verdict`, which is what the rule claims."""
+        result = self.result()
+        return result.verdict if result is not None else Verdict.INFO
 
-    def tagged(self, *tags: Tag | TagProxy | str) -> FindingProxy:
-        """Add this finding to one or more tags (auto-creates tags from strings)."""
-        investigation = self._get_investigation()
-        for tag in tags:
-            if isinstance(tag, TagProxy):
-                tag_key = tag.key
-            elif isinstance(tag, Tag):
-                tag_key = tag.key
-            elif isinstance(tag, str):
-                # Auto-create tag if it doesn't exist
-                tag_key = keys.generate_tag_key(tag)
-                if investigation.get_tag(tag_key) is None:
-                    investigation.add_tag(Tag(name=tag, findings=[], key=tag_key))
-            else:
-                raise TypeError("Tag must provide a key.")
+    @property
+    def contributions(self) -> tuple[Contribution, ...]:
+        result = self.result()
+        return result.contributions if result is not None else ()
 
-            investigation.add_finding_to_tag(tag_key, self.key)
-        return self
+    @property
+    def own_term_suppressed(self) -> bool:
+        """True when the rule's own claim was outweighed by one of its observables."""
+        result = self.result()
+        return result.own_term_suppressed if result is not None else False
 
     def link_observable(
         self,
-        observable: Observable | ObservableProxy | str,
-        *,
-        propagation_mode: PropagationMode = PropagationMode.LOCAL_ONLY,
+        observable: ObservableProxy | Observable | str,
+        scope: Scope | str = Scope.OWN_FRAGMENT,
     ) -> FindingProxy:
-        """Link an observable to this finding."""
-        if isinstance(observable, ObservableProxy):
-            observable_key = observable.key
-        elif isinstance(observable, Observable):
-            observable_key = observable.key
-        elif isinstance(observable, str):
-            observable_key = observable
-        else:
-            raise TypeError("Observable must provide a key.")
-
-        self._get_investigation().link_finding_observable(self.key, observable_key, propagation_mode=propagation_mode)
+        key = observable.key if isinstance(observable, (ObservableProxy, Observable)) else observable
+        self._investigation.link_finding_observable(self._key, key, scope)
         return self
 
-    def link_evidence(self, evidence: Evidence | EvidenceProxy | str) -> FindingProxy:
-        """Link evidence to this finding."""
-        if isinstance(evidence, EvidenceProxy):
-            evidence_key = evidence.key
-        elif isinstance(evidence, Evidence):
-            evidence_key = evidence.key
-        elif isinstance(evidence, str):
-            evidence_key = evidence
-        else:
-            raise TypeError("Evidence must provide a key.")
-        self._get_investigation().link_finding_evidence(self.key, evidence_key)
+    def link_evidence(self, evidence: EvidenceProxy | Evidence | str) -> FindingProxy:
+        key = evidence.key if isinstance(evidence, (EvidenceProxy, Evidence)) else evidence
+        self._investigation.link_finding_evidence(self._key, key)
         return self
 
-    def with_score(self, score: Decimal | float, reason: str = "") -> FindingProxy:
-        """Update the finding's score."""
-        finding = self._resolve()
-        self._get_investigation().apply_score_change(finding, Decimal(str(score)), reason=reason)
+    def tagged(self, *tags: TagProxy | Tag | str) -> FindingProxy:
+        """Tag by name or key; an unknown name is created, ancestors included."""
+        from cyvest import keys as key_utils
+        from cyvest.facts import Tag as TagFact
+
+        for tag in tags:
+            if isinstance(tag, (TagProxy, Tag)):
+                key = tag.key
+            else:
+                key = tag if tag.startswith("tag:") else key_utils.generate_tag_key(tag)
+                if self._investigation.get_tag(key) is None:
+                    name = key.removeprefix("tag:")
+                    self._investigation.add_tag(
+                        TagFact(
+                            name=name,
+                            source=self._resolve().source,
+                            fragment_id=self._investigation.fragment_id,
+                        )
+                    )
+            self._investigation.add_finding_to_tag(key, self._key)
+        return self
+
+    def with_weight(self, weight: float) -> FindingProxy:
+        """
+        Set the weight, and let it name the verdict when none was stated.
+
+        Without this, ``finding("x").with_weight(8.5)`` would keep the default ``INFO`` — a
+        verdict that claims nothing, so the finding would score ``0`` despite carrying a weight of
+        8.5. An explicit verdict is left alone: changing a magnitude must not flip a conclusion.
+
+        A negative weight names an exculpatory verdict; the magnitude stored stays unsigned, the
+        sign living in the verdict alone. Weighting a conclusion is refused by the model.
+        """
+        current = self._resolve()
+        updates: dict[str, Any] = {"weight": abs(float(weight))}
+        if current.verdict is Verdict.INFO:
+            updates["verdict"] = verdict_from_score(float(weight))
+        self._investigation.supersede(current, **updates)
+        return self
+
+    def set_verdict(self, verdict: Verdict | str, confidence: float | None = None) -> FindingProxy:
+        updates: dict[str, Any] = {"verdict": Verdict(verdict) if isinstance(verdict, str) else verdict}
+        if confidence is not None:
+            updates["confidence"] = float(confidence)
+        self._investigation.supersede(self._resolve(), **updates)
+        return self
+
+    def confirm(self, justification: str | None = None) -> FindingProxy:
+        self._investigation.add_decision(self._key, DecisionKind.CONFIRMED, justification=justification)
+        return self
+
+    def dismiss(self, justification: str | None = None) -> FindingProxy:
+        self._investigation.add_decision(self._key, DecisionKind.DISMISSED, justification=justification)
         return self
 
 
-class EvidenceProxy(_ReadOnlyProxy[Evidence]):
-    """Read-only proxy over structured evidence."""
+class ThreatIntelProxy(_JudgedProxy[ThreatIntel]):
+    """A threat-intel signal."""
 
-    def _resolve(self):
-        evidence = self._get_investigation().get_evidence(self.key)
-        if evidence is None:
-            raise ModelNotFoundError(f"Evidence '{self.key}' no longer exists in this investigation.")
-        return evidence
+    __slots__ = ()
 
-    @property
-    def evidence_type(self) -> str:
-        return self._read_attr("evidence_type")
-
-    @property
-    def title(self) -> str:
-        return self._read_attr("title")
-
-    @property
-    def description(self) -> str:
-        return self._read_attr("description")
+    def _resolve(self) -> ThreatIntel:
+        found = self._investigation.get_threat_intel(self._key)
+        if found is None:
+            raise ModelNotFoundError(f"Threat intel no longer in the store: {self._key}")
+        return found
 
     @property
     def source(self) -> str:
-        return self._read_attr("source")
+        return self._resolve().source.name
 
     @property
-    def external_id(self) -> str | None:
-        return self._read_attr("external_id")
+    def source_class(self):  # noqa: ANN201
+        return self._resolve().source_class
 
     @property
-    def content(self) -> Any | None:
-        return self._read_attr("content")
-
-    @property
-    def uri(self) -> str | None:
-        return self._read_attr("uri")
-
-    @property
-    def captured_at(self):
-        return self._read_attr("captured_at")
-
-    @property
-    def extra(self) -> dict[str, Any]:
-        return self._read_attr("extra")
-
-    @property
-    def finding_links(self) -> list[str]:
-        return self._read_attr("finding_links")
-
-    def link_finding(self, finding: Finding | FindingProxy | str) -> EvidenceProxy:
-        if isinstance(finding, FindingProxy):
-            finding_key = finding.key
-        elif isinstance(finding, Finding):
-            finding_key = finding.key
-        elif isinstance(finding, str):
-            finding_key = finding
-        else:
-            raise TypeError("Finding must provide a key.")
-        self._get_investigation().link_finding_evidence(finding_key, self.key)
-        return self
-
-    def update_metadata(
-        self,
-        *,
-        title: str | None = None,
-        description: str | None = None,
-        extra: dict[str, Any] | None = None,
-        merge_extra: bool = True,
-    ) -> EvidenceProxy:
-        updates = {
-            key: value
-            for key, value in {
-                "title": title,
-                "description": description,
-                "extra": extra,
-            }.items()
-            if value is not None
-        }
-        if updates:
-            dict_merge = {"extra": merge_extra} if extra is not None else None
-            self._get_investigation().update_model_metadata(
-                "evidence",
-                self.key,
-                updates,
-                dict_merge=dict_merge,
-            )
-        return self
-
-
-class TagProxy(_ReadOnlyProxy[Tag]):
-    """Read-only proxy over a tag."""
-
-    def _resolve(self):
-        tag = self._get_investigation().get_tag(self.key)
-        if tag is None:
-            raise ModelNotFoundError(f"Tag '{self.key}' no longer exists in this investigation.")
-        return tag
-
-    @property
-    def name(self) -> str:
-        return self._read_attr("name")
-
-    @property
-    def description(self) -> str:
-        return self._read_attr("description")
-
-    @property
-    def findings(self) -> list[Finding]:
-        return self._read_attr("findings")
-
-    def get_direct_score(self):
-        """Return the direct score (findings in this tag only, no hierarchy)."""
-        return self._call_readonly("get_direct_score")
-
-    def get_direct_level(self):
-        """Return the direct level (from direct score only, no hierarchy)."""
-        return self._call_readonly("get_direct_level")
-
-    def get_aggregated_score(self):
-        """Return the aggregated score including all descendant tags."""
-        tag = self._resolve()
-        return self._get_investigation().get_tag_aggregated_score(tag.name)
-
-    def get_aggregated_level(self):
-        """Return the aggregated level including all descendant tags."""
-        tag = self._resolve()
-        return self._get_investigation().get_tag_aggregated_level(tag.name)
-
-    def add_finding(self, finding: Finding | FindingProxy | str) -> TagProxy:
-        """Add a finding to this tag."""
-        if isinstance(finding, FindingProxy):
-            finding_key = finding.key
-        elif isinstance(finding, Finding):
-            finding_key = finding.key
-        elif isinstance(finding, str):
-            finding_key = finding
-        else:
-            raise TypeError("Finding must provide a key.")
-
-        self._get_investigation().add_finding_to_tag(self.key, finding_key)
-        return self
-
-    def __enter__(self) -> TagProxy:
-        """Context manager entry returning self."""
-        return self
-
-    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
-        """Context manager exit (no-op)."""
-        return None
-
-    def update_metadata(self, *, description: str | None = None) -> TagProxy:
-        """Update mutable metadata on the tag."""
-        if description is None:
-            return self
-        self._get_investigation().update_model_metadata("tag", self.key, {"description": description})
-        return self
-
-
-class ThreatIntelProxy(_ReadOnlyProxy[ThreatIntel]):
-    """Read-only proxy over a threat intel entry."""
-
-    def _resolve(self):
-        ti = self._get_investigation().get_threat_intel(self.key)
-        if ti is None:
-            raise ModelNotFoundError(f"Threat intel '{self.key}' no longer exists in this investigation.")
-        return ti
-
-    @property
-    def source(self) -> str:
-        return self._read_attr("source")
-
-    @property
-    def observable_key(self) -> str:
-        return self._read_attr("observable_key")
+    def taxonomies(self) -> tuple[str, ...]:
+        return self._resolve().taxonomies
 
     @property
     def comment(self) -> str:
-        return self._read_attr("comment")
+        return self._resolve().comment
 
     @property
-    def extra(self) -> dict[str, Any]:
-        return self._read_attr("extra")
+    def payload(self) -> dict[str, Any]:
+        return self._resolve().payload
 
     @property
-    def score(self) -> Decimal:
-        return self._read_attr("score")
+    def observed_at(self):  # noqa: ANN201
+        return self._resolve().observed_at
+
+
+class EvidenceProxy(_ReadOnlyProxy[Evidence]):
+    """A captured artefact."""
+
+    __slots__ = ()
+
+    def _resolve(self) -> Evidence:
+        found = self._investigation.get_evidence(self._key)
+        if found is None:
+            raise ModelNotFoundError(f"Evidence no longer in the store: {self._key}")
+        return found
 
     @property
-    def score_display(self) -> str:
-        return self._read_attr("score_display")
+    def evidence_type(self) -> str:
+        return self._resolve().evidence_type
 
     @property
-    def level(self) -> Level:
-        return self._read_attr("level")
+    def title(self) -> str:
+        return self._resolve().title
 
     @property
-    def taxonomies(self) -> list[Taxonomy]:
-        return self._read_attr("taxonomies")
+    def content(self) -> Any:
+        return self._resolve().content
 
-    def add_taxonomy(self, *, level: Level, name: str, value: str) -> ThreatIntelProxy:
-        """Add or replace a taxonomy by name."""
-        taxonomy = Taxonomy(level=level, name=name, value=value)
-        self._get_investigation().add_threat_intel_taxonomy(self.key, taxonomy)
-        return self
+    @property
+    def uri(self) -> str | None:
+        return self._resolve().uri
 
-    def remove_taxonomy(self, name: str) -> ThreatIntelProxy:
-        """Remove a taxonomy by name."""
-        self._get_investigation().remove_threat_intel_taxonomy(self.key, name)
-        return self
-
-    def update_metadata(
-        self,
-        *,
-        comment: str | None = None,
-        extra: dict[str, Any] | None = None,
-        merge_extra: bool = True,
-    ) -> ThreatIntelProxy:
-        """Update mutable metadata on the threat intel entry."""
-        updates: dict[str, Any] = {}
-        if comment is not None:
-            updates["comment"] = comment
-        if extra is not None:
-            updates["extra"] = extra
-
-        if not updates:
-            return self
-
-        dict_merge = {"extra": merge_extra} if extra is not None else None
-        self._get_investigation().update_model_metadata("threat_intel", self.key, updates, dict_merge=dict_merge)
-        return self
-
-    def set_level(self, level: Level, reason: str | None = None) -> ThreatIntelProxy:
-        """Set the level without changing score."""
-        ti = self._resolve()
-        self._get_investigation().apply_level_change(ti, level, reason=reason or "Manual level update")
-        return self
+    @property
+    def source(self) -> str:
+        return self._resolve().source.name
 
 
-class EnrichmentProxy(_ReadOnlyProxy[Enrichment]):
-    """Read-only proxy over an enrichment."""
+class TagProxy(_ReadOnlyProxy[Tag]):
+    """A tag, with its scores read from the report."""
 
-    def _resolve(self):
-        enrichment = self._get_investigation().get_enrichment(self.key)
-        if enrichment is None:
-            raise ModelNotFoundError(f"Enrichment '{self.key}' no longer exists in this investigation.")
-        return enrichment
+    __slots__ = ()
+
+    def _resolve(self) -> Tag:
+        found = self._investigation.get_tag(self._key)
+        if found is None:
+            raise ModelNotFoundError(f"Tag no longer in the store: {self._key}")
+        return found
 
     @property
     def name(self) -> str:
-        return self._read_attr("name")
+        return self._resolve().name
 
     @property
-    def data(self) -> dict[str, Any]:
-        return self._read_attr("data")
+    def description(self) -> str:
+        return self._resolve().description
 
     @property
-    def context(self) -> str:
-        return self._read_attr("context")
+    def finding_keys(self) -> tuple[str, ...]:
+        """Keys, not objects: a tag references findings, it does not own copies of them."""
+        return self._resolve().finding_keys
 
-    def update_metadata(
-        self,
-        *,
-        context: str | None = None,
-        data: dict[str, Any] | None = None,
-        merge_data: bool = True,
-    ) -> EnrichmentProxy:
-        """Update mutable metadata on the enrichment."""
-        updates: dict[str, Any] = {}
-        if context is not None:
-            updates["context"] = context
-        if data is not None:
-            updates["data"] = data
+    @property
+    def direct_score(self) -> float:
+        return self._investigation.get_tag_direct_score(self.name)
 
-        if not updates:
-            return self
+    @property
+    def aggregated_score(self) -> float:
+        return self._investigation.get_tag_aggregated_score(self.name)
 
-        dict_merge = {"data": merge_data} if data is not None else None
-        self._get_investigation().update_model_metadata("enrichment", self.key, updates, dict_merge=dict_merge)
-        return self
+    @property
+    def aggregated_verdict(self) -> Verdict:
+        return self._investigation.get_tag_aggregated_verdict(self.name)
+
+    def children(self) -> list[TagProxy]:
+        return [TagProxy(self._investigation, tag.key) for tag in self._investigation.get_tag_children(self.name)]
+
+    def descendants(self) -> list[TagProxy]:
+        return [TagProxy(self._investigation, tag.key) for tag in self._investigation.get_tag_descendants(self.name)]
+
+    def ancestors(self) -> list[TagProxy]:
+        return [TagProxy(self._investigation, tag.key) for tag in self._investigation.get_tag_ancestors(self.name)]
+
+
+class DecisionProxy(_ReadOnlyProxy[Decision]):
+    """A named override, kept visible so the report can explain what was overridden."""
+
+    __slots__ = ()
+
+    def _resolve(self) -> Decision:
+        found = self._investigation.store.decisions.get(self._key)
+        if found is None:
+            raise ModelNotFoundError(f"Decision no longer in the store: {self._key}")
+        return found
+
+    @property
+    def target_key(self) -> str:
+        return self._resolve().target_key
+
+    @property
+    def kind(self) -> DecisionKind:
+        return self._resolve().kind
+
+    @property
+    def justification(self) -> str | None:
+        return self._resolve().justification
+
+    @property
+    def decided_by(self) -> str:
+        """Who decided, read from the fact envelope rather than a duplicated field."""
+        return self._resolve().source.name
+
+    @property
+    def decided_at(self):  # noqa: ANN201
+        fact = self._resolve()
+        return fact.occurred_at or fact.asserted_at
+
+
+__all__ = [
+    "DecisionProxy",
+    "EvidenceProxy",
+    "FindingProxy",
+    "ModelNotFoundError",
+    "ObservableProxy",
+    "TagProxy",
+    "ThreatIntelProxy",
+]

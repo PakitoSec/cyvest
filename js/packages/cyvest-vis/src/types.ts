@@ -1,4 +1,4 @@
-import type { CyvestInvestigation, Level, RelationshipDirection } from "@cyvest/cyvest-js";
+import type { Investigation, Verdict } from "@cyvest/cyvest-js";
 import type { Core, EdgeSingular, NodeSingular } from "cytoscape";
 
 export interface CyvestThemeTokens {
@@ -129,9 +129,9 @@ export type CyvestRelationshipProfileOverrides = Record<
 export interface CyvestGraphFilterState {
   query: string;
   observableTypes: string[];
-  levels: Level[];
-  relationshipTypes: string[];
-  scope: "all" | "internal" | "external" | "whitelisted";
+  verdicts: Verdict[];
+  relationKinds: string[];
+  scope: "all" | "internal" | "external" | "allowlisted";
 }
 
 export type CyvestGraphControls = "full" | "compact" | "none";
@@ -150,15 +150,16 @@ export interface CyEdgeSelectEvent {
   edgeId: string;
   sourceId: string;
   targetId: string;
-  relationshipType?: string;
+  relationKind?: string;
   relationshipFamily?: CyvestRelationshipFamily;
-  direction?: RelationshipDirection;
+  /** How much the source trusts this pivot; drives edge opacity. */
+  confidence?: number;
   data: Record<string, unknown>;
   element: EdgeSingular;
 }
 
 export interface CyvestBaseViewProps {
-  investigation: CyvestInvestigation;
+  investigation: Investigation;
   height?: number | string;
   width?: number | string;
   className?: string;
@@ -194,10 +195,10 @@ export interface ObservableCyNodeData extends Record<string, unknown> {
   displayLabel: string;
   labelFull: string;
   observableType: string;
-  level: Level;
+  verdict: Verdict;
   score: number;
   isRoot: boolean;
-  whitelisted: boolean;
+  allowlisted: boolean;
   internal: boolean;
   shape: "ellipse" | "round-rectangle" | "rectangle" | "diamond";
   width: number;
@@ -211,8 +212,10 @@ export interface ObservableCyNodeData extends Record<string, unknown> {
 
 export interface ObservableCyEdgeData extends Record<string, unknown> {
   id: string;
-  relationshipType: string;
-  direction: RelationshipDirection;
+  relationKind: string;
+  confidence: number;
+  /** True when the report credits this edge with an actual contribution. */
+  carriedScore: boolean;
   relationshipFamily: CyvestRelationshipFamily;
   relationshipLabel: string;
   color: string;

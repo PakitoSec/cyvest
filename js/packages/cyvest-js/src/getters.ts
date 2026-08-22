@@ -1,474 +1,211 @@
 /**
- * Getter utilities for retrieving entities from a Cyvest Investigation.
+ * Entity getters.
  *
- * These functions provide type-safe access to observables, findings, threat intel,
- * enrichments, and tags by their keys.
+ * Everything derived is read from `report`, never recomputed: a v7 document is self-contained
+ * precisely so no JavaScript package has to reimplement a scoring rule. If a value the UI needs
+ * is missing here, it belongs in the report — not in a helper.
  */
 
 import type {
-  CyvestInvestigation,
-  Observable,
-  Finding,
+  Decision,
   Evidence,
-  ThreatIntel,
-  Enrichment,
+  Finding,
+  FindingResult,
+  Investigation,
+  InvestigationResult,
+  Observable,
+  ObservableResult,
+  Relation,
   Tag,
-  Level,
-} from "./types.generated";
-import { generateObservableKey, generateFindingKey, generateTagKey, isTagChildOf } from "./keys";
-import { getLevelFromScore } from "./levels";
+  ThreatIntel,
+  Verdict,
+} from "./types";
 
-/**
- * Get an observable by its key.
- *
- * @param inv - The investigation to search
- * @param key - Observable key (e.g., "obs:ipv4:192.168.1.1")
- * @returns The observable or undefined if not found
- *
- * @example
- * ```ts
- * const obs = getObservable(investigation, "obs:ipv4:192.168.1.1");
- * if (obs) {
- *   console.log(obs.value, obs.level);
- * }
- * ```
- */
-export function getObservable(
-  inv: CyvestInvestigation,
-  key: string
-): Observable | undefined {
-  return inv.observables[key];
+/** Index used by the report to key an observable result by key *and* resolved scope. */
+export function observableIndex(observableKey: string, scope?: { scope?: string; fragment_id?: string | null }): string {
+  if (!scope || scope.scope === "ALL") return `${observableKey}@ALL`;
+  return `${observableKey}@fragment:${scope.fragment_id}`;
 }
 
-/**
- * Get an observable by type and value.
- *
- * @param inv - The investigation to search
- * @param type - Observable type (e.g., "ipv4", "url")
- * @param value - Observable value
- * @returns The observable or undefined if not found
- *
- * @example
- * ```ts
- * const obs = getObservableByTypeValue(investigation, "ipv4", "192.168.1.1");
- * ```
- */
-export function getObservableByTypeValue(
-  inv: CyvestInvestigation,
-  type: string,
-  value: string,
-  subtype?: string,
-  namespace?: string
-): Observable | undefined {
-  return inv.observables[generateObservableKey(type, value, subtype, namespace)];
+// --- facts
+
+export function getObservable(inv: Investigation, key: string): Observable | undefined {
+  return inv.facts?.observables?.[key];
 }
 
-/**
- * Get the root observable of the investigation.
- *
- * The root observable is identified using the `root_type` from data extraction
- * metadata combined with value="root".
- *
- * @param inv - The investigation
- * @returns The root observable, or undefined if not found
- *
- * @example
- * ```ts
- * const root = getRootObservable(investigation);
- * if (root) {
- *   console.log(`Root: ${root.type} = ${root.value}`);
- * }
- * ```
- */
-export function getRootObservable(inv: CyvestInvestigation): Observable | undefined {
-  const rootType = inv.data_extraction.root_type;
-  if (!rootType) {
-    return undefined;
-  }
-  const rootKey = generateObservableKey(rootType, "root");
-  return inv.observables[rootKey];
+export function getAllObservables(inv: Investigation): Record<string, Observable> {
+  return inv.facts?.observables ?? {};
 }
 
-/**
- * Get a finding by its key.
- *
- * @param inv - The investigation to search
- * @param key - Finding key (e.g., "fnd:sender_verification:email_headers")
- * @returns The finding or undefined if not found
- *
- * @example
- * ```ts
- * const finding = getFinding(investigation, "fnd:sender_verification:email_headers");
- * ```
- */
-export function getFinding(
-  inv: CyvestInvestigation,
-  key: string
-): Finding | undefined {
-  return inv.findings[key];
+export function getRootObservable(inv: Investigation): Observable | undefined {
+  const rootKey = inv.header?.root_key;
+  return rootKey ? getObservable(inv, rootKey) : undefined;
 }
 
-/**
- * Get a finding by its name.
- *
- * @param inv - The investigation to search
- * @param findingName - Finding name
- * @returns The finding or undefined if not found
- *
- * @example
- * ```ts
- * const finding = getFindingByName(investigation, "sender_verification");
- * ```
- */
-export function getFindingByName(
-  inv: CyvestInvestigation,
-  findingName: string
-): Finding | undefined {
-  const key = generateFindingKey(findingName);
-  return inv.findings[key];
+export function getRelation(inv: Investigation, key: string): Relation | undefined {
+  return inv.facts?.relations?.[key];
 }
 
-/**
- * Get all findings as an array.
- *
- * @param inv - The investigation
- * @returns Array of all findings
- *
- * @example
- * ```ts
- * const allFindings = getAllFindings(investigation);
- * console.log(`Total findings: ${allFindings.length}`);
- * ```
- */
-export function getAllFindings(inv: CyvestInvestigation): Finding[] {
-  return Object.values(inv.findings);
+export function getAllRelations(inv: Investigation): Record<string, Relation> {
+  return inv.facts?.relations ?? {};
 }
 
-export function getEvidence(
-  inv: CyvestInvestigation,
-  key: string
-): Evidence | undefined {
-  return inv.evidences[key];
+export function getThreatIntel(inv: Investigation, key: string): ThreatIntel | undefined {
+  return inv.facts?.signals?.[key];
 }
 
-export function getAllEvidences(inv: CyvestInvestigation): Evidence[] {
-  return Object.values(inv.evidences);
+export function getAllThreatIntels(inv: Investigation): Record<string, ThreatIntel> {
+  return inv.facts?.signals ?? {};
 }
 
-/**
- * Get a threat intel entry by its key.
- *
- * @param inv - The investigation to search
- * @param key - Threat intel key (e.g., "ti:virustotal:obs:ipv4:192.168.1.1")
- * @returns The threat intel or undefined if not found
- */
-export function getThreatIntel(
-  inv: CyvestInvestigation,
-  key: string
-): ThreatIntel | undefined {
-  return inv.threat_intels[key];
+/** Signals attached to one observable. */
+export function getThreatIntelsFor(inv: Investigation, observableKey: string): ThreatIntel[] {
+  return Object.values(getAllThreatIntels(inv)).filter((signal) => signal.subject_key === observableKey);
 }
 
-/**
- * Get a threat intel entry by source and observable key.
- *
- * @param inv - The investigation to search
- * @param source - Threat intel source name
- * @param observableKey - Key of the related observable
- * @returns The threat intel or undefined if not found
- */
-export function getThreatIntelBySourceObservable(
-  inv: CyvestInvestigation,
-  source: string,
-  observableKey: string
-): ThreatIntel | undefined {
-  const normalizedSource = source.trim().toLowerCase();
+export function getFinding(inv: Investigation, key: string): Finding | undefined {
+  return inv.facts?.findings?.[key];
+}
 
-  for (const ti of Object.values(inv.threat_intels)) {
-    if (
-      ti.source.toLowerCase() === normalizedSource &&
-      ti.observable_key === observableKey
-    ) {
-      return ti;
+export function getAllFindings(inv: Investigation): Record<string, Finding> {
+  return inv.facts?.findings ?? {};
+}
+
+export function getEvidence(inv: Investigation, key: string): Evidence | undefined {
+  return inv.facts?.evidences?.[key];
+}
+
+export function getAllEvidences(inv: Investigation): Record<string, Evidence> {
+  return inv.facts?.evidences ?? {};
+}
+
+/** The v6 `Enrichment` is just an evidence type; filter instead of a dedicated accessor. */
+export function getEvidencesByType(inv: Investigation, evidenceType: string): Evidence[] {
+  return Object.values(getAllEvidences(inv)).filter((evidence) => evidence.evidence_type === evidenceType);
+}
+
+export function getDecision(inv: Investigation, key: string): Decision | undefined {
+  return inv.decisions?.[key];
+}
+
+export function getAllDecisions(inv: Investigation): Record<string, Decision> {
+  return inv.decisions ?? {};
+}
+
+export function getDecisionsFor(inv: Investigation, targetKey: string): Decision[] {
+  return Object.values(getAllDecisions(inv)).filter((decision) => decision.target_key === targetKey);
+}
+
+export function isAllowlisted(inv: Investigation, observableKey: string): boolean {
+  return getDecisionsFor(inv, observableKey).some((decision) => decision.kind === "ALLOWLISTED");
+}
+
+export function getTag(inv: Investigation, key: string): Tag | undefined {
+  return inv.tags?.[key];
+}
+
+export function getTagByName(inv: Investigation, name: string): Tag | undefined {
+  return getTag(inv, `tag:${name.trim().toLowerCase()}`);
+}
+
+export function getAllTags(inv: Investigation): Record<string, Tag> {
+  return inv.tags ?? {};
+}
+
+// --- results
+
+export function getInvestigationResult(inv: Investigation): InvestigationResult {
+  return inv.report.investigation;
+}
+
+export function getObservableResult(
+  inv: Investigation,
+  observableKey: string,
+  scope?: { scope?: string; fragment_id?: string | null },
+): ObservableResult | undefined {
+  return inv.report.observables?.[observableIndex(observableKey, scope)];
+}
+
+export function getFindingResult(inv: Investigation, findingKey: string): FindingResult | undefined {
+  return inv.report.findings?.[findingKey];
+}
+
+export function getObservableScore(inv: Investigation, observableKey: string): number {
+  return getObservableResult(inv, observableKey)?.score ?? 0;
+}
+
+export function getObservableVerdict(inv: Investigation, observableKey: string): Verdict {
+  return (getObservableResult(inv, observableKey)?.verdict as Verdict) ?? "INFO";
+}
+
+export function getFindingScore(inv: Investigation, findingKey: string): number {
+  return getFindingResult(inv, findingKey)?.score ?? 0;
+}
+
+export function getFindingVerdict(inv: Investigation, findingKey: string): Verdict {
+  return (getFindingResult(inv, findingKey)?.verdict as Verdict) ?? "INFO";
+}
+
+export function getGlobalScore(inv: Investigation): number {
+  return inv.report.investigation.score ?? 0;
+}
+
+export function getGlobalVerdict(inv: Investigation): Verdict {
+  return (inv.report.investigation.verdict as Verdict) ?? "INFO";
+}
+
+/** True when a decision or a stronger link overrode the computed value. */
+export function wasSuppressed(inv: Investigation, key: string): boolean {
+  const finding = getFindingResult(inv, key);
+  if (finding) return Boolean(finding.suppressed_by_decision || finding.own_term_suppressed);
+  return Boolean(getObservableResult(inv, key)?.suppressed_by_decision);
+}
+
+/** Findings a tag points at, plus those of every descendant tag. */
+export function getTagFindingKeys(inv: Investigation, tagName: string): string[] {
+  const prefix = `${tagName}:`;
+  const keys = new Set<string>();
+  for (const tag of Object.values(getAllTags(inv))) {
+    if (tag.name === tagName || tag.name.startsWith(prefix)) {
+      for (const key of tag.finding_keys ?? []) keys.add(key);
     }
   }
-  return undefined;
+  return [...keys];
 }
 
 /**
- * Get all threat intel entries as an array.
+ * A tag's aggregated score.
  *
- * @param inv - The investigation
- * @returns Array of all threat intel entries
+ * This sums values the engine produced; it does not re-derive them. Uncounted findings — not
+ * applicable, pending or dismissed — are absent from the sum *and* from any ratio built on it.
  */
-export function getAllThreatIntels(inv: CyvestInvestigation): ThreatIntel[] {
-  return Object.values(inv.threat_intels);
+export function getTagAggregatedScore(inv: Investigation, tagName: string): number {
+  return getTagFindingKeys(inv, tagName).reduce((total, key) => {
+    const result = getFindingResult(inv, key);
+    return result?.counted ? total + (result.score ?? 0) : total;
+  }, 0);
 }
 
-/**
- * Get an enrichment by its key.
- *
- * @param inv - The investigation to search
- * @param key - Enrichment key (e.g., "enr:whois_data")
- * @returns The enrichment or undefined if not found
- */
-export function getEnrichment(
-  inv: CyvestInvestigation,
-  key: string
-): Enrichment | undefined {
-  return inv.enrichments[key];
-}
-
-/**
- * Get an enrichment by name.
- *
- * @param inv - The investigation to search
- * @param name - Enrichment name
- * @returns The first matching enrichment or undefined if not found
- */
-export function getEnrichmentByName(
-  inv: CyvestInvestigation,
-  name: string
-): Enrichment | undefined {
-  const normalizedName = name.trim().toLowerCase();
-
-  for (const enr of Object.values(inv.enrichments)) {
-    if (enr.name.toLowerCase() === normalizedName) {
-      return enr;
-    }
-  }
-  return undefined;
-}
-
-/**
- * Get all enrichments as an array.
- *
- * @param inv - The investigation
- * @returns Array of all enrichments
- */
-export function getAllEnrichments(inv: CyvestInvestigation): Enrichment[] {
-  return Object.values(inv.enrichments);
-}
-
-/**
- * Get a tag by its key.
- *
- * @param inv - The investigation to search
- * @param key - Tag key (e.g., "tag:header:auth")
- * @returns The tag or undefined if not found
- *
- * @example
- * ```ts
- * const tag = getTag(investigation, "tag:header:auth");
- * if (tag) {
- *   console.log(tag.name, tag.direct_level);
- * }
- * ```
- */
-export function getTag(
-  inv: CyvestInvestigation,
-  key: string
-): Tag | undefined {
-  return inv.tags[key];
-}
-
-/**
- * Get a tag by its name.
- *
- * @param inv - The investigation to search
- * @param name - Tag name (e.g., "header:auth:dkim")
- * @returns The tag or undefined if not found
- *
- * @example
- * ```ts
- * const tag = getTagByName(investigation, "header:auth:dkim");
- * ```
- */
-export function getTagByName(
-  inv: CyvestInvestigation,
-  name: string
-): Tag | undefined {
-  const key = generateTagKey(name);
-  return inv.tags[key];
-}
-
-/**
- * Get all tags as an array.
- *
- * @param inv - The investigation
- * @returns Array of all tags
- *
- * @example
- * ```ts
- * const allTags = getAllTags(investigation);
- * console.log(`Total tags: ${allTags.length}`);
- * ```
- */
-export function getAllTags(inv: CyvestInvestigation): Tag[] {
-  return Object.values(inv.tags);
-}
-
-/**
- * Get all observables as an array.
- *
- * @param inv - The investigation
- * @returns Array of all observables
- */
-export function getAllObservables(inv: CyvestInvestigation): Observable[] {
-  return Object.values(inv.observables);
-}
-
-/**
- * Get all whitelists from the investigation.
- *
- * @param inv - The investigation
- * @returns Array of all whitelists
- */
-export function getWhitelists(inv: CyvestInvestigation) {
-  return inv.whitelists;
-}
-
-/**
- * Get the investigation statistics.
- *
- * @param inv - The investigation
- * @returns Statistics object
- */
-export function getStats(inv: CyvestInvestigation) {
-  return inv.stats;
-}
-
-/**
- * Get the data extraction configuration.
- *
- * @param inv - The investigation
- * @returns Data extraction config
- */
-export function getDataExtraction(inv: CyvestInvestigation) {
-  return inv.data_extraction;
-}
-
-/**
- * Count entities in the investigation.
- */
 export interface InvestigationCounts {
   observables: number;
-  findings: number;
+  relations: number;
+  signals: number;
   evidences: number;
-  threatIntels: number;
-  enrichments: number;
+  findings: number;
+  evaluatedFindings: number;
+  decisions: number;
   tags: number;
-  whitelists: number;
 }
 
-/**
- * Get counts of all entities in the investigation.
- *
- * @param inv - The investigation
- * @returns Object with counts for each entity type
- */
-export function getCounts(inv: CyvestInvestigation): InvestigationCounts {
+export function getCounts(inv: Investigation): InvestigationCounts {
   return {
-    observables: Object.keys(inv.observables).length,
-    findings: getAllFindings(inv).length,
-    evidences: getAllEvidences(inv).length,
-    threatIntels: Object.keys(inv.threat_intels).length,
-    enrichments: Object.keys(inv.enrichments).length,
-    tags: getAllTags(inv).length,
-    whitelists: inv.whitelists.length,
+    observables: Object.keys(getAllObservables(inv)).length,
+    relations: Object.keys(getAllRelations(inv)).length,
+    signals: Object.keys(getAllThreatIntels(inv)).length,
+    evidences: Object.keys(getAllEvidences(inv)).length,
+    findings: Object.keys(getAllFindings(inv)).length,
+    evaluatedFindings: Object.values(inv.report.findings ?? {}).filter((result) => result.counted).length,
+    decisions: Object.keys(getAllDecisions(inv)).length,
+    tags: Object.keys(getAllTags(inv)).length,
   };
-}
-
-// ============================================================================
-// Tag Aggregation
-// ============================================================================
-
-/**
- * Get direct child tags of a given tag.
- *
- * @param inv - The investigation
- * @param tagName - Parent tag name
- * @returns Array of direct child tags
- *
- * @example
- * ```ts
- * const children = getTagChildren(investigation, "bodies");
- * // Returns tags like "bodies:urls", "bodies:domains" (but not "bodies:urls:something")
- * ```
- */
-export function getTagChildren(inv: CyvestInvestigation, tagName: string): Tag[] {
-  return Object.values(inv.tags).filter((tag) => isTagChildOf(tag.name, tagName));
-}
-
-/**
- * Get all descendant tags of a given tag (any depth).
- *
- * @param inv - The investigation
- * @param tagName - Ancestor tag name
- * @returns Array of all descendant tags
- *
- * @example
- * ```ts
- * const descendants = getTagDescendants(investigation, "bodies");
- * // Returns all tags starting with "bodies:"
- * ```
- */
-export function getTagDescendants(inv: CyvestInvestigation, tagName: string): Tag[] {
-  const prefix = tagName + ":";
-  return Object.values(inv.tags).filter((tag) => tag.name.startsWith(prefix));
-}
-
-/**
- * Get the aggregated score for a tag including all descendant tags.
- *
- * The aggregated score includes:
- * - The tag's direct_score (from its direct findings)
- * - Recursively, the aggregated scores of all child tags
- *
- * @param inv - The investigation
- * @param tagName - Name of the tag
- * @returns Total aggregated score, or 0 if tag not found
- *
- * @example
- * ```ts
- * const score = getTagAggregatedScore(investigation, "bodies");
- * // Includes scores from bodies, bodies:urls, bodies:domains, etc.
- * ```
- */
-export function getTagAggregatedScore(inv: CyvestInvestigation, tagName: string): number {
-  const tag = getTagByName(inv, tagName);
-  if (!tag) {
-    return 0;
-  }
-
-  // Start with direct score
-  let total = tag.direct_score;
-
-  // Add scores from direct children (they will recursively add their children)
-  const children = getTagChildren(inv, tagName);
-  for (const child of children) {
-    total += getTagAggregatedScore(inv, child.name);
-  }
-
-  return total;
-}
-
-/**
- * Get the aggregated level for a tag including all descendant tags.
- *
- * The level is calculated from the aggregated score using the standard
- * score-to-level mapping.
- *
- * @param inv - The investigation
- * @param tagName - Name of the tag
- * @returns Level based on aggregated score
- *
- * @example
- * ```ts
- * const level = getTagAggregatedLevel(investigation, "bodies");
- * // Returns "MALICIOUS" if aggregated score >= 5, etc.
- * ```
- */
-export function getTagAggregatedLevel(inv: CyvestInvestigation, tagName: string): Level {
-  return getLevelFromScore(getTagAggregatedScore(inv, tagName));
 }

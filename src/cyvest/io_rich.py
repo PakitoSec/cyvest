@@ -1,974 +1,316 @@
 """
-Rich console output for Cyvest investigations.
+Rich rendering.
 
-Provides formatted display of investigation results using the Rich library.
+Pure display: this layer reads the report and never recomputes a value. It is also the layer
+that *may* read the clock — showing that a decision is nineteen months old changes nothing to the
+score, whereas letting the evaluator consult the clock would make an archived report drift.
 """
 
 from __future__ import annotations
 
-import json
-from collections.abc import Callable, Iterable
-from decimal import Decimal, InvalidOperation
-from typing import TYPE_CHECKING, Any
+from collections.abc import Callable, Sequence
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
-from rich.align import Align
-from rich.console import Group
-from rich.markup import escape
+from rich.console import Console, Group
 from rich.panel import Panel
-from rich.rule import Rule
 from rich.table import Table
+from rich.text import Text
 from rich.tree import Tree
 
-from cyvest.levels import Level, get_color_level, get_color_score, get_level_from_score, normalize_level
-from cyvest.model import Observable, Relationship, RelationshipDirection, _format_score_decimal
+from cyvest.enums import DecisionKind, Effect, Status, Verdict
+from cyvest.evaluation.report import Contribution, Report
+from cyvest.stats import InvestigationStats
 
 if TYPE_CHECKING:
-    from cyvest.cyvest import Cyvest
+    from cyvest.compare import DiffItem
+    from cyvest.investigation import Investigation
+
+VERDICT_STYLES: dict[Verdict, str] = {
+    Verdict.SAFE: "bright_green",
+    Verdict.INFO: "cyan",
+    Verdict.NOTABLE: "yellow",
+    Verdict.SUSPICIOUS: "dark_orange",
+    Verdict.MALICIOUS: "red",
+}
+
+DECISION_LABELS: dict[DecisionKind, str] = {
+    DecisionKind.ALLOWLISTED: "ALLOWLISTED",
+    DecisionKind.BLOCKLISTED: "BLOCKLISTED",
+    DecisionKind.CONFIRMED: "CONFIRMED",
+    DecisionKind.DISMISSED: "DISMISSED",
+}
 
 
-def _normalize_exclude_levels(levels: Level | Iterable[Level]) -> set[Level]:
-    base_excluded: set[Level] = {Level.NONE}
-    if levels is None:
-        return base_excluded
-    if isinstance(levels, Level):
-        return base_excluded | {levels}
-    if isinstance(levels, str):
-        return base_excluded | {normalize_level(levels)}
-
-    collected = list(levels)
-    if not collected:
-        return set()
-
-    normalized: set[Level] = set()
-    for level in collected:
-        normalized.add(normalize_level(level) if isinstance(level, str) else level)
-    return base_excluded | normalized
+def verdict_text(verdict: Verdict) -> Text:
+    return Text(verdict.value, style=VERDICT_STYLES.get(verdict, "white"))
 
 
-def _sort_key_by_score(item: Any) -> tuple[Decimal, str]:
-    score = getattr(item, "score", 0)
-    try:
-        decimal_score = Decimal(score)
-    except (TypeError, ValueError, InvalidOperation):
-        decimal_score = Decimal(0)
-
-    item_name = getattr(item, "finding_name", "")
-    return (-decimal_score, item_name)
+def _score(value: float | None) -> str:
+    return "—" if value is None else f"{value:.2f}"
 
 
-def _get_direction_symbol(rel: Relationship, reversed_edge: bool) -> str:
-    """Return an arrow indicating direction relative to traversal."""
-    direction = rel.direction
-    if isinstance(direction, str):
-        try:
-            direction = RelationshipDirection(direction)
-        except ValueError:
-            direction = RelationshipDirection.OUTBOUND
-
-    symbol_map = {
-        RelationshipDirection.OUTBOUND: "→",
-        RelationshipDirection.INBOUND: "←",
-        RelationshipDirection.BIDIRECTIONAL: "↔",
-    }
-    symbol = symbol_map.get(direction, "→")
-    if reversed_edge and direction != RelationshipDirection.BIDIRECTIONAL:
-        symbol = "←" if direction == RelationshipDirection.OUTBOUND else "→"
-    return symbol
+def _applied_floor(report: Report, finding_key: str) -> float:
+    for contribution in report.investigation.contributions:
+        if contribution.source_key == finding_key and contribution.label.startswith("conclusion floor"):
+            return contribution.value
+    return 0.0
 
 
-def _build_observable_tree(
-    parent_tree: Tree,
-    obs: Any,
-    *,
-    all_observables: dict[str, Any],
-    reverse_relationships: dict[str, list[tuple[Any, Relationship]]],
-    visited: set[str],
-    rel_info: str = "",
-) -> None:
-    if obs.key in visited:
-        return
-    visited.add(obs.key)
+def _age(moment: datetime) -> str:
+    """Display-only: how long ago something was decided. Never touches a score."""
+    months = (datetime.now(UTC) - moment).days // 30
+    if months >= 24:
+        return f"il y a {months // 12} ans"
+    if months >= 1:
+        return f"il y a {months} mois"
+    return "récemment"
 
-    color_level = get_color_level(obs.level)
-    color_score = get_color_score(obs.score)
 
-    linked_findings = ""
-    if obs.finding_links:
-        findings_str = "[cyan], [/cyan]".join(escape(finding_id) for finding_id in obs.finding_links)
-        linked_findings = f"[cyan][[/cyan]{findings_str}[cyan]][/cyan] "
+def _decision_badges(investigation: Investigation, key: str) -> Text:
+    badge = Text()
+    for decision in investigation.get_decisions(key):
+        badge.append(" ")
+        badge.append(
+            f"[{DECISION_LABELS[decision.kind]}]",
+            style="bold green" if decision.kind in (DecisionKind.ALLOWLISTED, DecisionKind.DISMISSED) else "bold red",
+        )
+        when = decision.occurred_at or decision.asserted_at
+        badge.append(f" {decision.source.name} · {_age(when)}", style="dim")
+        if decision.justification:
+            badge.append(f" « {decision.justification} »", style="dim italic")
+    return badge
 
-    whitelisted_str = " [green]WHITELISTED[/green]" if obs.whitelisted else ""
 
-    obs_info = (
-        f"{rel_info}{linked_findings}[bold]{obs.key}[/bold] "
-        f"[{color_score}]{obs.score_display}[/{color_score}] "
-        f"[{color_level}]{obs.level.name}[/{color_level}]"
-        f"{whitelisted_str}"
-    )
+def build_summary(investigation: Investigation, *, show_graph: bool = False) -> Group:
+    report = investigation.report
+    header = investigation.store.header
 
-    child_tree = parent_tree.add(obs_info)
+    title = Text(header.name or header.investigation_id, style="bold")
+    title.append("  ")
+    title.append(_score(report.investigation.score), style="bold")
+    title.append("  ")
+    title.append(verdict_text(report.investigation.verdict))
+    # The engine id always travels with the score: comparing scores across engines is meaningless.
+    title.append(f"   [{report.engine_id} · {report.policy_version}]", style="dim")
 
-    # Add outbound children
-    for rel in obs.relationships:
-        child_obs = all_observables.get(rel.target_key)
-        if child_obs:
-            direction_symbol = _get_direction_symbol(rel, reversed_edge=False)
-            rel_label = f"[dim]{rel.relationship_type_name}[/dim] {direction_symbol} "
-            _build_observable_tree(
-                child_tree,
-                child_obs,
-                all_observables=all_observables,
-                reverse_relationships=reverse_relationships,
-                visited=visited,
-                rel_info=rel_label,
-            )
+    findings = Table(title="Findings", expand=True, title_justify="left")
+    findings.add_column("Rule")
+    findings.add_column("Score", justify="right")
+    findings.add_column("Verdict")
+    findings.add_column("Conf.", justify="right")
+    findings.add_column("Status")
+    findings.add_column("")
 
-    # Add inbound children (observables pointing to this one)
-    for source_obs, rel in reverse_relationships.get(obs.key, []):
-        if source_obs.key == obs.key:
+    for key, finding in sorted(investigation.get_all_findings().items()):
+        result = report.finding(key)
+        if result is None:
             continue
-        direction_symbol = _get_direction_symbol(rel, reversed_edge=True)
-        rel_label = f"[dim]{rel.relationship_type_name}[/dim] {direction_symbol} "
-        _build_observable_tree(
-            child_tree,
-            source_obs,
-            all_observables=all_observables,
-            reverse_relationships=reverse_relationships,
-            visited=visited,
-            rel_info=rel_label,
+        notes = _decision_badges(investigation, key)
+        if result.own_term_suppressed:
+            notes.append(" contredit par un observable", style="dim italic")
+        if finding.effect is Effect.FLOOR:
+            applied = _applied_floor(report, key)
+            note = f" conclusion · +{applied:.2f} sur le total" if applied > 0 else " conclusion · verdict déjà atteint"
+            notes.append(note, style="dim italic")
+        findings.add_row(
+            finding.name or finding.rule_id,
+            _score(result.score),
+            verdict_text(result.verdict),
+            f"{result.confidence:.2f}",
+            Text(result.status.value, style="dim" if result.status is not Status.EVALUATED else ""),
+            notes,
         )
 
+    observables = Table(title="Observables", expand=True, title_justify="left")
+    observables.add_column("Type")
+    observables.add_column("Value", overflow="fold")
+    observables.add_column("Score", justify="right")
+    observables.add_column("Verdict")
+    observables.add_column("")
 
-def display_summary(
-    cv: Cyvest,
-    rich_print: Callable[[Any], None],
-    show_graph: bool = True,
-    exclude_levels: Level | Iterable[Level] = Level.NONE,
-) -> None:
-    """
-    Display a comprehensive summary of the investigation using Rich.
-
-    Args:
-        cv: Cyvest investigation to display
-        rich_print: A rich renderable handler that is called with renderables for output
-        show_graph: Whether to display the observable graph
-        exclude_levels: Level(s) to omit from the report (default: Level.NONE)
-    """
-
-    resolved_excluded_levels = _normalize_exclude_levels(exclude_levels)
-
-    all_findings = cv.finding_get_all().values()
-    filtered_findings = [c for c in all_findings if c.level not in resolved_excluded_levels]
-    applied_findings = sum(1 for c in filtered_findings if c.level != Level.NONE)
-
-    excluded_caption = ""
-    if resolved_excluded_levels:
-        excluded_names = ", ".join(level.name for level in sorted(resolved_excluded_levels, key=lambda lvl: lvl.value))
-        excluded_caption = f" (excluding: {excluded_names})"
-
-    caption_parts = [
-        f"Total Findings: {len(cv.finding_get_all())}",
-        f"Displayed: {len(filtered_findings)}{excluded_caption}",
-        f"Applied: {applied_findings}",
-    ]
-
-    table = Table(
-        title="Investigation Report",
-        caption=" | ".join(caption_parts),
-    )
-    table.add_column("Name")
-    table.add_column("Score", justify="right")
-    table.add_column("Level", justify="center")
-
-    # Findings by level section
-    rule = Rule(f"[bold magenta]FINDINGS[/bold magenta]: {len(cv.finding_get_all())} findings")
-    table.add_row(rule, "-", "-")
-
-    for level_enum in sorted(Level, reverse=True):
-        if level_enum in resolved_excluded_levels:
+    for key, observable in sorted(investigation.get_all_observables().items()):
+        if key == header.root_key:
             continue
-        findings = [c for c in cv.finding_get_all().values() if c.level == level_enum]
-        findings = sorted(findings, key=_sort_key_by_score)
-        if findings:
-            color_level = get_color_level(level_enum)
-            level_rule = Align(
-                f"[bold {color_level}]{level_enum.name}: {len(findings)} finding(s)[/bold {color_level}]",
-                align="center",
-            )
-            table.add_row(level_rule, "-", "-")
+        result = report.observable(key)
+        observables.add_row(
+            str(observable.obs_type),
+            observable.value,
+            _score(result.score if result else None),
+            verdict_text(result.verdict if result else Verdict.INFO),
+            _decision_badges(investigation, key),
+        )
 
-            for finding in findings:
-                color_score = get_color_score(finding.score)
-                name = f"  {finding.finding_name}"
-                score = f"[{color_score}]{finding.score_display}[/{color_score}]"
-                level = f"[{color_level}]{finding.level.name}[/{color_level}]"
-                table.add_row(name, score, level)
-
-    # Tags section (if any)
-    all_tags = cv.tag_get_all()
-    if all_tags:
-        table.add_section()
-        rule = Rule(f"[bold magenta]TAGS[/bold magenta]: {len(all_tags)} tags")
-        table.add_row(rule, "-", "-")
-
-        for tag in sorted(all_tags.values(), key=lambda t: t.name):
-            agg_score = tag.get_aggregated_score()
-            agg_level = tag.get_aggregated_level()
-            color_level = get_color_level(agg_level)
-            color_score = get_color_score(agg_score)
-
-            name = f"  {tag.name}"
-            score = f"[{color_score}]{agg_score:.2f}[/{color_score}]"
-            level = f"[{color_level}]{agg_level.name}[/{color_level}]"
-            table.add_row(name, score, level)
-
-    # Enrichments section (if any)
-    if cv.enrichment_get_all():
-        table.add_section()
-        rule = Rule(f"[bold magenta]ENRICHMENTS[/bold magenta]: {len(cv.enrichment_get_all())} enrichments")
-        table.add_row(rule, "-", "-")
-
-        for enr in cv.enrichment_get_all().values():
-            table.add_row(f"  {enr.name}", "-", "-")
-
-    # Statistics section
-    table.add_section()
-    rule = Rule("[bold magenta]STATISTICS[/bold magenta]")
-    table.add_row(rule, "-", "-")
-
-    stats = cv.get_statistics()
-    stat_items = [
-        ("Total Observables", stats.total_observables),
-        ("Internal Observables", stats.internal_observables),
-        ("External Observables", stats.external_observables),
-        ("Whitelisted Observables", stats.whitelisted_observables),
-        ("Total Threat Intel", stats.total_threat_intel),
+    parts = [
+        Panel(title, border_style=VERDICT_STYLES.get(report.investigation.verdict, "white")),
+        findings,
+        observables,
     ]
-
-    for stat_name, stat_value in stat_items:
-        table.add_row(f"  {stat_name}", str(stat_value), "-")
-
-    # Global score footer
-    global_score = cv.get_global_score()
-    global_level = cv.get_global_level()
-    color_level = get_color_level(global_level)
-    color_score = get_color_score(global_score)
-
-    table.add_section()
-    table.add_row(
-        Align("[bold]GLOBAL SCORE[/bold]", align="center"),
-        f"[{color_score}]{global_score:.2f}[/{color_score}]",
-        f"[{color_level}]{global_level.name}[/{color_level}]",
-    )
-
-    # Print table
-    rich_print(table)
-
-    # Observable graph (if requested)
-    if show_graph and cv.observable_get_all():
-        tree = Tree("Observables", hide_root=True)
-
-        # Precompute reverse relationships to traverse observables that only
-        # appear as targets (e.g., child → parent links).
-        all_observables = cv.observable_get_all()
-        reverse_relationships: dict[str, list[tuple[Observable, Relationship]]] = {}
-        for source_obs in all_observables.values():
-            for rel in source_obs.relationships:
-                reverse_relationships.setdefault(rel.target_key, []).append((source_obs, rel))
-
-        # Start from root
-        root = cv.observable_get_root()
-        if root:
-            _build_observable_tree(
-                tree,
-                root,
-                all_observables=all_observables,
-                reverse_relationships=reverse_relationships,
-                visited=set(),
-            )
-
-        rich_print(tree)
+    if show_graph:
+        parts.append(build_graph(investigation))
+    return Group(*parts)
 
 
-def display_statistics(cv: Cyvest, rich_print: Callable[[Any], None]) -> None:
-    """
-    Display detailed statistics about the investigation.
+def build_graph(investigation: Investigation) -> Tree:
+    """Walk down from the root; ``source_key`` is the parent, so no direction to interpret."""
+    header = investigation.store.header
+    report = investigation.report
+    tree = Tree(Text("investigation", style="bold"))
 
-    Args:
-        cv: Cyvest investigation
-        rich_print: A rich renderable handler that is called with renderables for output
-    """
-    stats = cv.get_statistics()
+    def label(key: str) -> Text:
+        observable = investigation.get_observable(key)
+        result = report.observable(key)
+        text = Text(f"{observable.obs_type} ", style="dim") if observable else Text()
+        text.append(observable.value if observable else key)
+        if result is not None:
+            text.append(f"  {_score(result.score)} ", style="dim")
+            text.append(verdict_text(result.verdict))
+        return text
 
-    # Observable statistics table
-    obs_table = Table(title="Observable Statistics")
-    obs_table.add_column("Type", style="cyan")
-    obs_table.add_column("Total", justify="right")
-    obs_table.add_column("INFO", justify="right", style="cyan")
-    obs_table.add_column("NOTABLE", justify="right", style="yellow")
-    obs_table.add_column("SUSPICIOUS", justify="right", style="orange3")
-    obs_table.add_column("MALICIOUS", justify="right", style="red")
-
-    obs_by_type_level = stats.observables_by_type_and_level
-    for obs_type, count in stats.observables_by_type.items():
-        levels = obs_by_type_level.get(obs_type, {})
-        obs_table.add_row(
-            obs_type.upper(),
-            str(count),
-            str(levels.get("INFO", 0)),
-            str(levels.get("NOTABLE", 0)),
-            str(levels.get("SUSPICIOUS", 0)),
-            str(levels.get("MALICIOUS", 0)),
-        )
-
-    rich_print(obs_table)
-
-    # Finding statistics table
-    rich_print("")
-    finding_table = Table(title="Finding Statistics")
-    finding_table.add_column("Level", style="cyan")
-    finding_table.add_column("Count", justify="right")
-
-    for level, count in stats.findings_by_level.items():
-        finding_table.add_row(level, str(count))
-
-    rich_print(finding_table)
-
-    if stats.total_evidences > 0:
-        rich_print("")
-        evidence_table = Table(title="Evidence Statistics")
-        evidence_table.add_column("Type", style="cyan")
-        evidence_table.add_column("Count", justify="right")
-        for evidence_type, count in stats.evidences_by_type.items():
-            evidence_table.add_row(evidence_type, str(count))
-        rich_print(evidence_table)
-
-    # Threat intel statistics
-    if stats.total_threat_intel > 0:
-        rich_print("")
-        ti_table = Table(title="Threat Intelligence Statistics")
-        ti_table.add_column("Source", style="cyan")
-        ti_table.add_column("Count", justify="right")
-
-        for source, count in stats.threat_intel_by_source.items():
-            ti_table.add_row(source, str(count))
-
-        rich_print(ti_table)
-
-
-def _format_level_score(
-    level: Level | None,
-    score: Decimal | None,
-    score_rule: str | None = None,
-) -> str:
-    """Format level and score for display."""
-    if level is None and score is None and not score_rule:
-        return "[dim]-[/dim]"
-
-    parts: list[str] = []
-    if level:
-        color = get_color_level(level)
-        parts.append(f"[{color}]{level.name}[/{color}]")
-
-    if score_rule:
-        parts.append(score_rule)
-    elif score is not None:
-        color = get_color_score(score)
-        parts.append(f"[{color}]{_format_score_decimal(score)}[/{color}]")
-
-    return " ".join(parts) if parts else "[dim]-[/dim]"
-
-
-def display_diff(
-    diffs: list,
-    rich_print: Callable[[Any], None],
-    title: str = "Diff",
-) -> None:
-    """
-    Display investigation diff in a rich table with tree structure.
-
-    Args:
-        diffs: List of DiffItem objects representing differences
-        rich_print: A rich renderable handler called with renderables for output
-        title: Title for the diff table
-    """
-    # Import here to avoid circular dependency
-    from cyvest.compare import DiffStatus
-
-    # Count diffs by status
-    added = sum(1 for d in diffs if d.status == DiffStatus.ADDED)
-    removed = sum(1 for d in diffs if d.status == DiffStatus.REMOVED)
-    mismatch = sum(1 for d in diffs if d.status == DiffStatus.MISMATCH)
-
-    # Build caption with combined legend and counts
-    caption = (
-        f"[green]+ {added}[/green] added | [red]- {removed}[/red] removed | [yellow]\u2717 {mismatch}[/yellow] mismatch"
-    )
-
-    table = Table(title=title, caption=caption)
-    table.add_column("Key")
-    table.add_column("Expected", justify="center")
-    table.add_column("Actual", justify="center")
-    table.add_column("Status", justify="center", width=8)
-
-    status_styles = {
-        DiffStatus.ADDED: "green",
-        DiffStatus.REMOVED: "red",
-        DiffStatus.MISMATCH: "yellow",
-    }
-
-    for idx, diff in enumerate(diffs):
-        # Add section separator between findings (except before first)
-        if idx > 0:
-            table.add_section()
-
-        status_style = status_styles.get(diff.status, "white")
-
-        # Finding row (main row)
-        expected_str = _format_level_score(diff.expected_level, diff.expected_score, diff.expected_score_rule)
-        actual_str = _format_level_score(diff.actual_level, diff.actual_score)
-
-        table.add_row(
-            escape(diff.key),
-            expected_str,
-            actual_str,
-            f"[{status_style}]{diff.status.value}[/{status_style}]",
-        )
-
-        # Observable rows (indented with └──)
-        for obs_idx, obs in enumerate(diff.observable_diffs):
-            is_last_obs = obs_idx == len(diff.observable_diffs) - 1
-            obs_prefix = "└──" if is_last_obs else "├──"
-
-            obs_label = obs.observable_key
-            obs_expected = _format_level_score(obs.expected_level, obs.expected_score)
-            obs_actual = _format_level_score(obs.actual_level, obs.actual_score)
-
-            table.add_row(
-                f"{obs_prefix} [cyan]{escape(obs_label)}[/cyan]",
-                obs_expected,
-                obs_actual,
-                "",
-            )
-
-            # Threat intel rows (indented further with │   └── or     └──)
-            for ti_idx, ti in enumerate(obs.threat_intel_diffs):
-                is_last_ti = ti_idx == len(obs.threat_intel_diffs) - 1
-                # Use │ continuation if not last observable, else spaces
-                continuation = "│   " if not is_last_obs else "    "
-                ti_prefix = "└──" if is_last_ti else "├──"
-
-                ti_expected = _format_level_score(ti.expected_level, ti.expected_score)
-                ti_actual = _format_level_score(ti.actual_level, ti.actual_score)
-
-                table.add_row(
-                    f"{continuation}{ti_prefix} [magenta]{escape(ti.source)}[/magenta]",
-                    ti_expected,
-                    ti_actual,
-                    "",
-                )
-
-    rich_print(table)
-
-
-def _format_extra_data(extra: dict[str, Any]) -> str:
-    """Format extra data as a compact JSON string."""
-    if not extra:
-        return "[dim]-[/dim]"
-    try:
-        return escape(json.dumps(extra, indent=2, default=str))
-    except (TypeError, ValueError):
-        return escape(str(extra))
-
-
-def _build_ti_tree_for_observable(
-    ti_list: list,
-    parent_tree: Tree,
-) -> None:
-    """Build a tree of threat intel entries for an observable."""
-    for ti in ti_list:
-        color_level = get_color_level(ti.level)
-        color_score = get_color_score(ti.score)
-        ti_label = (
-            f"[magenta]{escape(ti.source)}[/magenta] "
-            f"[{color_score}]{ti.score_display}[/{color_score}] "
-            f"[bold {color_level}]{ti.level.name}[/bold {color_level}]"
-        )
-        ti_node = parent_tree.add(ti_label)
-
-        # Add taxonomies as children
-        if ti.taxonomies:
-            for tax in ti.taxonomies:
-                tax_color = get_color_level(tax.level)
-                tax_label = f"[{tax_color}]{tax.level.name}[/{tax_color}] {escape(tax.name)}: {escape(tax.value)}"
-                ti_node.add(tax_label)
-
-        # Add comment if present
-        if ti.comment:
-            ti_node.add(f"[dim]Comment:[/dim] {escape(ti.comment)}")
-
-
-def _build_relationship_tree_depth(
-    obs_key: str,
-    all_observables: dict[str, Any],
-    all_threat_intels: dict[str, Any],
-    max_depth: int,
-) -> Tree:
-    """Build a tree showing relationships up to max_depth with scores and levels."""
-    tree = Tree(f"[bold]Relationships[/bold] (depth={max_depth})")
-
-    if max_depth < 1:
-        tree.add("[dim]No relationships (depth=0)[/dim]")
-        return tree
-
-    obs = all_observables.get(obs_key)
-    if not obs:
-        return tree
-
-    # Build reverse relationship map
-    reverse_relationships: dict[str, list[tuple[Any, Relationship]]] = {}
-    for source_obs in all_observables.values():
-        for rel in source_obs.relationships:
-            reverse_relationships.setdefault(rel.target_key, []).append((source_obs, rel))
-
-    visited: set[str] = {obs_key}
-
-    def _add_relationships(current_obs: Any, parent_tree: Tree, depth: int) -> None:
-        if depth > max_depth:
-            return
-
-        # Outbound relationships
-        for rel in current_obs.relationships:
-            target_obs = all_observables.get(rel.target_key)
-            if not target_obs or target_obs.key in visited:
+    def walk(key: str, node: Tree, seen: set[str]) -> None:
+        for relation in investigation.store.child_relations(key):
+            if relation.target_key in seen:
                 continue
+            seen.add(relation.target_key)
+            child = node.add(label(relation.target_key))
+            child.label.append(f"  ({relation.kind.value})", style="dim italic")
+            walk(relation.target_key, child, seen)
 
-            visited.add(target_obs.key)
-            direction_symbol = _get_direction_symbol(rel, reversed_edge=False)
-            color_level = get_color_level(target_obs.level)
-            color_score = get_color_score(target_obs.score)
-
-            rel_label = (
-                f"{direction_symbol} [dim]{rel.relationship_type_name}[/dim] "
-                f"[bold]{escape(target_obs.key)}[/bold] "
-                f"[{color_score}]{target_obs.score_display}[/{color_score}] "
-                f"[bold {color_level}]{target_obs.level.name}[/bold {color_level}]"
-            )
-            child_node = parent_tree.add(rel_label)
-
-            if depth < max_depth:
-                _add_relationships(target_obs, child_node, depth + 1)
-
-        # Inbound relationships
-        for source_obs, rel in reverse_relationships.get(current_obs.key, []):
-            if source_obs.key == current_obs.key or source_obs.key in visited:
-                continue
-
-            visited.add(source_obs.key)
-            direction_symbol = _get_direction_symbol(rel, reversed_edge=True)
-            color_level = get_color_level(source_obs.level)
-            color_score = get_color_score(source_obs.score)
-
-            rel_label = (
-                f"{direction_symbol} [dim]{rel.relationship_type_name}[/dim] "
-                f"[bold]{escape(source_obs.key)}[/bold] "
-                f"[{color_score}]{source_obs.score_display}[/{color_score}] "
-                f"[bold {color_level}]{source_obs.level.name}[/bold {color_level}]"
-            )
-            child_node = parent_tree.add(rel_label)
-
-            if depth < max_depth:
-                _add_relationships(source_obs, child_node, depth + 1)
-
-    _add_relationships(obs, tree, 1)
-
+    if header.root_key:
+        walk(header.root_key, tree, {header.root_key})
     return tree
 
 
-def display_finding_query(
-    cv: Cyvest,
-    finding_key: str,
-    rich_print: Callable[[Any], None],
-) -> None:
-    """
-    Display detailed information about a finding.
+def build_statistics(investigation: Investigation) -> Table:
+    stats = InvestigationStats(investigation.store, investigation.report).get_summary()
+    table = Table(title="Statistics", expand=True, title_justify="left")
+    table.add_column("Metric")
+    table.add_column("Value", justify="right")
 
-    Args:
-        cv: Cyvest investigation
-        finding_key: Key of the finding to display
-        rich_print: Rich renderable handler
+    rows = [
+        ("Observables", stats.total_observables),
+        ("  internal", stats.internal_observables),
+        ("  allowlisted", stats.allowlisted_observables),
+        ("Relations", stats.total_relations),
+        ("Signals", stats.total_signals),
+        ("Evidences", stats.total_evidences),
+        ("Findings", stats.total_findings),
+        ("  counted", stats.evaluated_findings),
+        ("Decisions", stats.total_decisions),
+        ("Tags", stats.total_tags),
+    ]
+    for label, value in rows:
+        table.add_row(label, str(value))
+    return table
 
-    Raises:
-        KeyError: If finding not found
-    """
-    finding = cv.finding_get(finding_key)
-    if finding is None:
-        raise KeyError(f"Finding '{finding_key}' not found in investigation.")
 
-    color_level = get_color_level(finding.level)
-    color_score = get_color_score(finding.score)
+def build_explanation(investigation: Investigation, key: str) -> Table:
+    """Show what moved the needle — including the terms that were overridden."""
+    table = Table(title=f"Explanation · {key}", expand=True, title_justify="left")
+    table.add_column("Contribution")
+    table.add_column("Value", justify="right")
+    table.add_column("Retained")
+    table.add_column("Detail", overflow="fold")
 
-    # Build info table
-    table = Table(show_header=False, box=None)
-    table.add_column("Field", style="cyan")
-    table.add_column("Value")
-
-    table.add_row("Key", f"[bold]{escape(finding.key)}[/bold]")
-    table.add_row("Name", escape(finding.finding_name))
-    table.add_row("Description", escape(finding.description) if finding.description else "[dim]-[/dim]")
-    table.add_row(
-        "Score",
-        f"[bold {color_score}]{finding.score_display}[/bold {color_score}]",
-    )
-    table.add_row(
-        "Level",
-        f"[bold {color_level}]{finding.level.name}[/bold {color_level}]",
-    )
-    table.add_row("Comment", escape(finding.comment) if finding.comment else "[dim]-[/dim]")
-    table.add_row(
-        "Origin Investigation",
-        escape(finding.origin_investigation_id) if finding.origin_investigation_id else "[dim]-[/dim]",
-    )
-
-    # Extra data
-    if finding.extra:
-        table.add_row("Extra", _format_extra_data(finding.extra))
-
-    rich_print(
-        Panel(
-            table,
-            title=f"[bold]Finding:[/bold] {escape(finding.finding_name)}",
-            border_style="blue",
-            expand=False,
+    contributions: tuple[Contribution, ...] = investigation.explain(key)
+    for contribution in contributions:
+        table.add_row(
+            contribution.label,
+            f"{contribution.value:.2f}",
+            Text("yes", style="green") if contribution.retained else Text("no", style="dim"),
+            contribution.detail,
         )
-    )
-
-    # Linked observables tree
-    observable_links = finding.observable_links
-    if observable_links:
-        all_observables = cv.observable_get_all()
-
-        tree = Tree("[bold]Linked Observables[/bold]")
-
-        for link in observable_links:
-            obs = all_observables.get(link.observable_key)
-            if not obs:
-                tree.add(f"[dim]{escape(link.observable_key)} (not found)[/dim]")
-                continue
-
-            obs_color_level = get_color_level(obs.level)
-            obs_color_score = get_color_score(obs.score)
-            whitelisted_str = " [green]WHITELISTED[/green]" if obs.whitelisted else ""
-            prop_mode = f" [dim]({link.propagation_mode.value})[/dim]" if hasattr(link, "propagation_mode") else ""
-
-            obs_label = (
-                f"[bold]{escape(obs.key)}[/bold] "
-                f"[{obs_color_score}]{obs.score_display}[/{obs_color_score}] "
-                f"[bold {obs_color_level}]{obs.level.name}[/bold {obs_color_level}]"
-                f"{whitelisted_str}{prop_mode}"
-            )
-            obs_node = tree.add(obs_label)
-
-            # Add threat intel for this observable
-            for ti in obs.threat_intels:
-                ti_color_level = get_color_level(ti.level)
-                ti_color_score = get_color_score(ti.score)
-                ti_label = (
-                    f"[magenta]{escape(ti.source)}[/magenta] "
-                    f"[{ti_color_score}]{ti.score_display}[/{ti_color_score}] "
-                    f"[bold {ti_color_level}]{ti.level.name}[/bold {ti_color_level}]"
-                )
-                obs_node.add(ti_label)
-
-        rich_print(Panel(tree, border_style="green", expand=False))
-
-    evidence_links = finding.evidence_links
-    if evidence_links:
-        evidences = cv.evidence_get_all()
-        tree = Tree("[bold]Linked Evidences[/bold]")
-        for link in evidence_links:
-            evidence = evidences.get(link.evidence_key)
-            if evidence is None:
-                tree.add(f"[dim]{escape(link.evidence_key)} (not found)[/dim]")
-                continue
-            tree.add(
-                f"[bold]{escape(evidence.title)}[/bold] "
-                f"[dim]{escape(evidence.evidence_type)} · {escape(evidence.source)}[/dim]"
-            )
-        rich_print(Panel(tree, border_style="cyan", expand=False))
+    return table
 
 
-def display_observable_query(
-    cv: Cyvest,
-    observable_key: str,
-    rich_print: Callable[[Any], None],
+def build_timeline(investigation: Investigation, **kwargs: object) -> Table:
+    table = Table(title="Timeline", expand=True, title_justify="left")
+    table.add_column("When")
+    table.add_column("Kind")
+    table.add_column("Title", overflow="fold")
+    table.add_column("Salience")
+
+    for entry in investigation.timeline(**kwargs):
+        table.add_row(
+            entry.when.strftime("%Y-%m-%d %H:%M"),
+            entry.kind,
+            entry.title,
+            Text(entry.salience.value, style="bold" if entry.salience.value == "key" else "dim"),
+        )
+    return table
+
+
+def build_diff(diffs: Sequence[DiffItem], *, title: str = "Investigation diff") -> Table:
+    """Render a comparison as a table. An empty diff still produces a table, saying so."""
+    table = Table(title=title, show_lines=False)
+    table.add_column("", width=2)
+    table.add_column("Finding")
+    table.add_column("Expected")
+    table.add_column("Actual")
+    table.add_column("Observables")
+
+    if not diffs:
+        table.add_row("", Text("no difference", style="green"), "", "", "")
+        return table
+
+    for item in diffs:
+        style = {"+": "green", "-": "red", "\u2717": "yellow"}[item.status.value]
+        expected = item.expected_score_rule or _score_verdict(item.expected_score, item.expected_verdict)
+        if item.expected_score_rule and item.expected_verdict:
+            expected = f"{item.expected_score_rule} / {item.expected_verdict.value}"
+        table.add_row(
+            Text(item.status.value, style=style),
+            item.rule_id or item.key,
+            expected,
+            _score_verdict(item.actual_score, item.actual_verdict),
+            "\n".join(
+                f"{diff.value or diff.observable_key}: "
+                f"{_score_verdict(diff.expected_score, diff.expected_verdict)} \u2192 "
+                f"{_score_verdict(diff.actual_score, diff.actual_verdict)}"
+                for diff in item.observable_diffs
+            ),
+        )
+    return table
+
+
+def _score_verdict(score: float | None, verdict: Verdict | None) -> str:
+    if score is None and verdict is None:
+        return "\u2014"
+    parts = []
+    if score is not None:
+        parts.append(f"{score:g}")
+    if verdict is not None:
+        parts.append(verdict.value)
+    return " / ".join(parts)
+
+
+def display_diff(
+    diffs: Sequence[DiffItem],
+    printer: Callable[[object], None] | None = None,
     *,
-    depth: int = 1,
+    title: str = "Investigation diff",
 ) -> None:
-    """
-    Display detailed information about an observable.
-
-    Args:
-        cv: Cyvest investigation
-        observable_key: Key of the observable to display
-        rich_print: Rich renderable handler
-        depth: Relationship traversal depth (default 1)
-
-    Raises:
-        KeyError: If observable not found
-    """
-    obs = cv.observable_get(observable_key)
-    if obs is None:
-        raise KeyError(f"Observable '{observable_key}' not found in investigation.")
-
-    color_level = get_color_level(obs.level)
-    color_score = get_color_score(obs.score)
-
-    # Build info table
-    obs_type_str = obs.obs_type.value if hasattr(obs.obs_type, "value") else str(obs.obs_type)
-    table = Table(show_header=False, box=None)
-    table.add_column("Field", style="cyan")
-    table.add_column("Value")
-
-    table.add_row("Key", f"[bold]{escape(obs.key)}[/bold]")
-    table.add_row("Type", escape(obs_type_str))
-    if obs.subtype:
-        subtype = obs.subtype.value if hasattr(obs.subtype, "value") else str(obs.subtype)
-        table.add_row("Subtype", escape(subtype))
-    if obs.namespace:
-        table.add_row("Namespace", escape(obs.namespace))
-    table.add_row("Value", escape(obs.value))
-    table.add_row(
-        "Score",
-        f"[bold {color_score}]{obs.score_display}[/bold {color_score}]",
-    )
-    table.add_row(
-        "Level",
-        f"[bold {color_level}]{obs.level.name}[/bold {color_level}]",
-    )
-    table.add_row("Internal", "[green]Yes[/green]" if obs.internal else "[yellow]No[/yellow]")
-    table.add_row("Whitelisted", "[green]Yes[/green]" if obs.whitelisted else "[dim]No[/dim]")
-    table.add_row("Comment", escape(obs.comment) if obs.comment else "[dim]-[/dim]")
-
-    # Finding links
-    if obs.finding_links:
-        findings_str = ", ".join(escape(ck) for ck in obs.finding_links)
-        table.add_row("Linked Findings", f"[cyan]{findings_str}[/cyan]")
-
-    # Extra data
-    if obs.extra:
-        table.add_row("Extra", _format_extra_data(obs.extra))
-
-    rich_print(
-        Panel(
-            table,
-            title=f"[bold]Observable:[/bold] {escape(obs_type_str)}",
-            border_style="green",
-            expand=False,
-        )
-    )
-
-    # Build score breakdown, threat intel, and relationships panel
-    all_observables = cv.observable_get_all()
-    renderables = []
-
-    # Get score mode from investigation
-    score_mode = "MAX"
-    try:
-        score_mode = cv._investigation._score_engine._score_mode_obs.value.upper()
-    except AttributeError:
-        pass
-
-    # Score breakdown table
-    ti_scores: list[Decimal] = []
-    child_scores: list[Decimal] = []
-
-    if obs.threat_intels or obs.relationships:
-        score_table = Table(title=f"[bold]Score Breakdown[/bold] (mode: {score_mode})")
-        score_table.add_column("Source", style="cyan")
-        score_table.add_column("Score", justify="right")
-        score_table.add_column("Level", justify="center")
-        score_table.add_column("Type", style="dim")
-
-        # Add threat intel contributions
-        for ti in obs.threat_intels:
-            ti_color_score = get_color_score(ti.score)
-            ti_color_level = get_color_level(ti.level)
-            score_table.add_row(
-                escape(ti.key),
-                f"[{ti_color_score}]{ti.score_display}[/{ti_color_score}]",
-                f"[{ti_color_level}]{ti.level.name}[/{ti_color_level}]",
-                "threat_intel",
-            )
-            ti_scores.append(ti.score)
-
-        # Add child observable contributions (OUTBOUND relationships)
-        for rel in obs.relationships:
-            if rel.direction == RelationshipDirection.OUTBOUND:
-                child = all_observables.get(rel.target_key)
-                if child and child.value != "root":
-                    child_color_score = get_color_score(child.score)
-                    child_color_level = get_color_level(child.level)
-                    score_table.add_row(
-                        escape(child.key),
-                        f"[{child_color_score}]{child.score_display}[/{child_color_score}]",
-                        f"[{child_color_level}]{child.level.name}[/{child_color_level}]",
-                        "child",
-                    )
-                    child_scores.append(child.score)
-
-        # Add computed total row
-        if ti_scores or child_scores:
-            score_table.add_section()
-            if score_mode == "MAX":
-                computed = max(ti_scores + child_scores, default=Decimal("0"))
-                mode_label = "Computed (MAX)"
-            else:
-                max_ti = max(ti_scores, default=Decimal("0"))
-                sum_children = sum(child_scores, Decimal("0"))
-                computed = max_ti + sum_children
-                mode_label = "Computed (SUM)"
-
-            computed_color_score = get_color_score(computed)
-            computed_level = get_level_from_score(computed)
-            computed_color_level = get_color_level(computed_level)
-            score_table.add_row(
-                f"[bold]{mode_label}[/bold]",
-                f"[bold {computed_color_score}]{_format_score_decimal(computed)}[/bold {computed_color_score}]",
-                f"[bold {computed_color_level}]{computed_level.name}[/bold {computed_color_level}]",
-                "",
-            )
-            renderables.append(score_table)
-
-    # Threat intelligence tree
-    if obs.threat_intels:
-        if renderables:
-            renderables.append("")
-        ti_tree = Tree("[bold]Threat Intelligence[/bold]")
-        _build_ti_tree_for_observable(obs.threat_intels, ti_tree)
-        renderables.append(ti_tree)
-
-    # Relationships tree
-    if depth > 0:
-        rel_tree = _build_relationship_tree_depth(
-            observable_key,
-            all_observables,
-            cv.threat_intel_get_all(),
-            depth,
-        )
-        if renderables:
-            renderables.append("")
-        renderables.append(rel_tree)
-
-    if renderables:
-        rich_print(Panel(Group(*renderables), border_style="magenta", expand=False))
+    """Print a diff, either to a console or through a caller-supplied printer (a logger, typically)."""
+    table = build_diff(diffs, title=title)
+    if printer is not None:
+        printer(table)
     else:
-        rich_print("[dim]No score contributions (no threat intel or child observables)[/dim]")
+        print_renderable(table)
 
 
-def display_threat_intel_query(
-    cv: Cyvest,
-    ti_key: str,
-    rich_print: Callable[[Any], None],
-) -> None:
-    """
-    Display detailed information about a threat intel entry.
+def print_renderable(renderable: object, console: Console | None = None) -> None:
+    (console or Console()).print(renderable)
 
-    Args:
-        cv: Cyvest investigation
-        ti_key: Key of the threat intel to display
-        rich_print: Rich renderable handler
 
-    Raises:
-        KeyError: If threat intel not found
-    """
-    ti = cv.threat_intel_get(ti_key)
-    if ti is None:
-        raise KeyError(f"Threat intel '{ti_key}' not found in investigation.")
-
-    color_level = get_color_level(ti.level)
-    color_score = get_color_score(ti.score)
-
-    # Build info table
-    table = Table(show_header=False, box=None)
-    table.add_column("Field", style="cyan")
-    table.add_column("Value")
-
-    table.add_row("Key", f"[bold]{escape(ti.key)}[/bold]")
-    table.add_row("Source", f"[magenta]{escape(ti.source)}[/magenta]")
-    table.add_row("Observable", f"[cyan]{escape(ti.observable_key)}[/cyan]")
-    table.add_row(
-        "Score",
-        f"[bold {color_score}]{ti.score_display}[/bold {color_score}]",
-    )
-    table.add_row(
-        "Level",
-        f"[bold {color_level}]{ti.level.name}[/bold {color_level}]",
-    )
-    table.add_row("Comment", escape(ti.comment) if ti.comment else "[dim]-[/dim]")
-
-    rich_print(
-        Panel(
-            table,
-            title=f"[bold]Threat Intel:[/bold] {escape(ti.source)}",
-            border_style="magenta",
-            expand=False,
-        )
-    )
-
-    # Taxonomies tree
-    if ti.taxonomies:
-        tax_tree = Tree("[bold]Taxonomies[/bold]")
-        for tax in ti.taxonomies:
-            tax_color = get_color_level(tax.level)
-            tax_label = (
-                f"[{tax_color}]{tax.level.name}[/{tax_color}] {escape(tax.name)}: [bold]{escape(tax.value)}[/bold]"
-            )
-            tax_tree.add(tax_label)
-        rich_print(tax_tree)
-
-    # Extra data
-    if ti.extra:
-        extra_str = _format_extra_data(ti.extra)
-        extra_panel = Panel(
-            extra_str,
-            title="[bold]Extra Data[/bold]",
-            border_style="dim",
-        )
-        rich_print(extra_panel)
-
-    # Show linked observable info
-    obs = cv.observable_get(ti.observable_key)
-    if obs:
-        obs_color_level = get_color_level(obs.level)
-        obs_color_score = get_color_score(obs.score)
-        obs_type_str = obs.obs_type.value if hasattr(obs.obs_type, "value") else str(obs.obs_type)
-
-        obs_table = Table(
-            show_header=False,
-            box=None,
-        )
-        obs_table.add_column("Field", style="cyan")
-        obs_table.add_column("Value")
-
-        obs_table.add_row("Key", f"[bold]{escape(obs.key)}[/bold]")
-        obs_table.add_row("Type", escape(obs_type_str))
-        obs_table.add_row("Value", escape(obs.value))
-        obs_table.add_row(
-            "Score",
-            f"[{obs_color_score}]{obs.score_display}[/{obs_color_score}]",
-        )
-        obs_table.add_row(
-            "Level",
-            f"[{obs_color_level}]{obs.level.name}[/{obs_color_level}]",
-        )
-
-        # Combine table and threat intel tree in one panel
-        if obs.threat_intels:
-            obs_ti_tree = Tree("[bold]Threat Intelligence[/bold]")
-            _build_ti_tree_for_observable(obs.threat_intels, obs_ti_tree)
-            content = Group(obs_table, "", obs_ti_tree)
-        else:
-            content = obs_table
-
-        rich_print(Panel(content, title="[bold]Linked Observable[/bold]", border_style="green", expand=False))
+__all__ = [
+    "VERDICT_STYLES",
+    "build_diff",
+    "build_explanation",
+    "build_graph",
+    "build_statistics",
+    "build_summary",
+    "build_timeline",
+    "display_diff",
+    "print_renderable",
+    "verdict_text",
+]

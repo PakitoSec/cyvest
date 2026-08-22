@@ -1,318 +1,273 @@
 """
-Comparison module for Cyvest investigations.
+Comparing two investigations.
 
-Provides functionality to compare two investigations with optional tolerance rules,
-identifying differences in findings, observables, and threat intelligence.
+Purely structural: this module reads the two reports and never re-derives a score. It also
+refuses to compare results produced by different engines — a `basic-v1` score and a future
+`bayesian-v1` score are not on the same scale, so a diff between them would be meaningless.
 """
 
 from __future__ import annotations
 
 import re
-from decimal import Decimal
 from enum import Enum
 from typing import TYPE_CHECKING
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from cyvest.keys import generate_finding_key
-from cyvest.levels import Level
+from cyvest.enums import Verdict
 
 if TYPE_CHECKING:
     from cyvest.cyvest import Cyvest
-    from cyvest.proxies import FindingProxy
+
+_RULE = re.compile(r"(>=|<=|>|<|==|!=)\s*(-?\d+\.?\d*)")
+
+_OPERATORS = {
+    ">=": lambda a, b: a >= b,
+    "<=": lambda a, b: a <= b,
+    ">": lambda a, b: a > b,
+    "<": lambda a, b: a < b,
+    "==": lambda a, b: a == b,
+    "!=": lambda a, b: a != b,
+}
+
+
+class EngineMismatchError(RuntimeError):
+    """Raised when two investigations were scored by different engines."""
 
 
 class DiffStatus(str, Enum):
-    """Status indicating the type of difference found."""
-
     ADDED = "+"
     REMOVED = "-"
-    MISMATCH = "\u2717"  # ✗
+    MISMATCH = "\u2717"
 
 
 class ExpectedResult(BaseModel):
-    """Tolerance rule for a specific finding."""
+    """
+    A tolerance rule for one finding.
 
-    finding_name: str | None = None
+    ``verdict`` pins the conclusion; ``score`` expresses a band (``">= 0.01"``, ``"< 3"``), which
+    is what makes a test survive a policy tweak that shifts magnitudes without changing meaning.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    rule_id: str | None = None
     key: str | None = None
-    level: Level | None = None
-    score: str | None = None  # Tolerance rule: ">= 0.01", "< 3", "== 1.0"
-    ignore: set[DiffStatus] | None = None  # Statuses to ignore: ADDED, REMOVED, MISMATCH
+    verdict: Verdict | None = None
+    score: str | None = None
+    ignore: set[DiffStatus] | None = None
 
     @model_validator(mode="after")
-    def validate_key_or_name(self) -> ExpectedResult:
-        if not self.finding_name and not self.key:
-            raise ValueError("Either finding_name or key must be provided")
-        # Derive key from finding_name if not provided
-        if self.finding_name and not self.key:
-            self.key = generate_finding_key(self.finding_name)
+    def _need_a_target(self) -> ExpectedResult:
+        if not self.rule_id and not self.key:
+            raise ValueError("Either rule_id or key must be provided")
         return self
 
-    model_config = {"extra": "forbid"}
-
-
-class ThreatIntelDiff(BaseModel):
-    """Diff info for threat intel attached to an observable."""
-
-    source: str
-    expected_score: Decimal | None = None
-    expected_level: Level | None = None
-    actual_score: Decimal | None = None
-    actual_level: Level | None = None
+    def matches(self, key: str, rule_id: str) -> bool:
+        return self.key == key if self.key else self.rule_id == rule_id
 
 
 class ObservableDiff(BaseModel):
-    """Diff info for an observable linked to a finding."""
+    """How one linked observable differs between the two runs."""
+
+    model_config = ConfigDict(frozen=True)
 
     observable_key: str
-    obs_type: str
-    value: str
-    expected_score: Decimal | None = None
-    expected_level: Level | None = None
-    actual_score: Decimal | None = None
-    actual_level: Level | None = None
-    threat_intel_diffs: list[ThreatIntelDiff] = Field(default_factory=list)
+    value: str = ""
+    expected_score: float | None = None
+    expected_verdict: Verdict | None = None
+    actual_score: float | None = None
+    actual_verdict: Verdict | None = None
 
 
 class DiffItem(BaseModel):
-    """A single difference found between investigations."""
+    """A single difference between two investigations."""
+
+    model_config = ConfigDict(frozen=True)
 
     status: DiffStatus
     key: str
-    finding_name: str
-    # Expected values (from expected investigation or rule)
-    expected_level: Level | None = None
-    expected_score: Decimal | None = None
-    expected_score_rule: str | None = None  # e.g., ">= 1.0"
-    # Actual values
-    actual_level: Level | None = None
-    actual_score: Decimal | None = None
-    # Linked observables with their diffs
-    observable_diffs: list[ObservableDiff] = Field(default_factory=list)
+    rule_id: str = ""
+    expected_verdict: Verdict | None = None
+    expected_score: float | None = None
+    expected_score_rule: str | None = None
+    actual_verdict: Verdict | None = None
+    actual_score: float | None = None
+    observable_diffs: tuple[ObservableDiff, ...] = Field(default=())
 
 
-def parse_score_rule(rule: str) -> tuple[str, Decimal]:
-    """
-    Parse score rule like '>= 0.01' into (operator, value).
-
-    Args:
-        rule: A score rule string (e.g., ">= 0.01", "< 3", "== 1.0")
-
-    Returns:
-        Tuple of (operator, threshold)
-
-    Raises:
-        ValueError: If the rule format is invalid
-    """
-    match = re.match(r"(>=|<=|>|<|==|!=)\s*(-?\d+\.?\d*)", rule.strip())
+def parse_score_rule(rule: str) -> tuple[str, float]:
+    match = _RULE.match(rule.strip())
     if not match:
         raise ValueError(f"Invalid score rule: {rule}")
-    return match.group(1), Decimal(match.group(2))
+    return match.group(1), float(match.group(2))
 
 
-def evaluate_score_rule(actual_score: Decimal, rule: str) -> bool:
-    """
-    Check if actual_score satisfies the rule.
-
-    Args:
-        actual_score: The score to evaluate
-        rule: A score rule string (e.g., ">= 0.01")
-
-    Returns:
-        True if the score satisfies the rule, False otherwise
-    """
+def evaluate_score_rule(actual_score: float, rule: str) -> bool:
     operator, threshold = parse_score_rule(rule)
-    ops = {
-        ">=": lambda a, b: a >= b,
-        "<=": lambda a, b: a <= b,
-        ">": lambda a, b: a > b,
-        "<": lambda a, b: a < b,
-        "==": lambda a, b: a == b,
-        "!=": lambda a, b: a != b,
-    }
-    return ops[operator](actual_score, threshold)
+    return _OPERATORS[operator](actual_score, threshold)
+
+
+def _observable_diffs(actual: Cyvest, expected: Cyvest, finding_key: str) -> tuple[ObservableDiff, ...]:
+    finding = actual._investigation.get_finding(finding_key)
+    if finding is None:
+        return ()
+    diffs: list[ObservableDiff] = []
+    for link in finding.observable_links:
+        actual_result = actual.get_report().observable(link.observable_key)
+        expected_result = expected.get_report().observable(link.observable_key)
+        if actual_result is None and expected_result is None:
+            continue
+        if actual_result and expected_result and actual_result.score == expected_result.score:
+            continue
+        observable = actual._investigation.get_observable(link.observable_key)
+        diffs.append(
+            ObservableDiff(
+                observable_key=link.observable_key,
+                value=observable.value if observable else "",
+                expected_score=expected_result.score if expected_result else None,
+                expected_verdict=expected_result.verdict if expected_result else None,
+                actual_score=actual_result.score if actual_result else None,
+                actual_verdict=actual_result.verdict if actual_result else None,
+            )
+        )
+    return tuple(diffs)
 
 
 def compare_investigations(
     actual: Cyvest,
     expected: Cyvest | None = None,
     result_expected: list[ExpectedResult] | None = None,
+    *,
+    allow_engine_mismatch: bool = False,
 ) -> list[DiffItem]:
     """
-    Compare two investigations with optional tolerance rules.
+    Diff two investigations, or check one against tolerance rules.
 
-    Args:
-        actual: The investigation to validate (actual results)
-        expected: The reference investigation (expected results), optional
-        result_expected: Tolerance rules for specific findings
-
-    Returns:
-        List of DiffItem for all differences found
+    Raises :class:`EngineMismatchError` when the two reports come from different engines, unless
+    the caller says otherwise — scores from different engines are not comparable.
     """
+    actual_report = actual.get_report()
+
+    if expected is not None and not allow_engine_mismatch:
+        expected_report = expected.get_report()
+        if actual_report.engine_id != expected_report.engine_id:
+            raise EngineMismatchError(
+                f"Cannot compare a {actual_report.engine_id} report with a {expected_report.engine_id} one; "
+                "scores from different engines are not on the same scale."
+            )
+
     diffs: list[DiffItem] = []
-    rules = {r.key: r for r in (result_expected or [])}
+    rules = result_expected or []
 
-    actual_findings = actual.finding_get_all()
-    expected_findings = expected.finding_get_all() if expected else {}
+    if expected is not None:
+        diffs.extend(_diff_against_investigation(actual, expected))
 
-    all_keys = set(actual_findings.keys()) | set(expected_findings.keys())
-
-    for key in sorted(all_keys):
-        actual_finding = actual_findings.get(key)
-        expected_finding = expected_findings.get(key)
-        rule = rules.get(key)
-
-        if actual_finding and not expected_finding:
-            # Finding added in actual - skip if rule ignores ADDED
-            if rule and rule.ignore and DiffStatus.ADDED in rule.ignore:
-                continue
-            diffs.append(
-                _create_diff_item(
-                    status=DiffStatus.ADDED,
-                    actual_finding=actual_finding,
-                    actual_cv=actual,
-                    expected_cv=expected,
-                )
-            )
-        elif expected_finding and not actual_finding:
-            # Finding removed from actual - skip if rule ignores REMOVED
-            if rule and rule.ignore and DiffStatus.REMOVED in rule.ignore:
-                continue
-            diffs.append(
-                _create_diff_item(
-                    status=DiffStatus.REMOVED,
-                    expected_finding=expected_finding,
-                    rule=rule,
-                    expected_cv=expected,
-                )
-            )
-        else:
-            # Finding exists in both - compare values
-            if _is_mismatch(expected_finding, actual_finding, rule):
-                # Skip if rule ignores MISMATCH
-                if rule and rule.ignore and DiffStatus.MISMATCH in rule.ignore:
-                    continue
-                diffs.append(
-                    _create_diff_item(
-                        status=DiffStatus.MISMATCH,
-                        expected_finding=expected_finding,
-                        actual_finding=actual_finding,
-                        rule=rule,
-                        actual_cv=actual,
-                        expected_cv=expected,
-                    )
-                )
+    for rule in rules:
+        diffs.extend(_check_rule(actual, rule))
 
     return diffs
 
 
-def _is_mismatch(
-    expected: FindingProxy,
-    actual: FindingProxy,
-    rule: ExpectedResult | None,
-) -> bool:
-    """Check if there's a mismatch, considering tolerance rules."""
-    # If scores and levels are equal, no mismatch
-    if expected.score == actual.score and expected.level == actual.level:
-        return False
+def _diff_against_investigation(actual: Cyvest, expected: Cyvest) -> list[DiffItem]:
+    diffs: list[DiffItem] = []
+    actual_findings = actual._investigation.get_all_findings()
+    expected_findings = expected._investigation.get_all_findings()
 
-    # If there's a tolerance rule with score condition
-    if rule and rule.score:
-        # If actual satisfies the rule, it's OK (not a mismatch)
-        if evaluate_score_rule(actual.score, rule.score):
-            return False
+    for key in sorted(set(actual_findings) | set(expected_findings)):
+        in_actual, in_expected = key in actual_findings, key in expected_findings
+        actual_result = actual.get_report().finding(key)
+        expected_result = expected.get_report().finding(key)
 
-    # Scores/levels differ and no tolerance allows it
-    return True
+        if in_actual and not in_expected:
+            diffs.append(
+                DiffItem(
+                    status=DiffStatus.ADDED,
+                    key=key,
+                    rule_id=actual_findings[key].rule_id,
+                    actual_score=actual_result.score if actual_result else None,
+                    actual_verdict=actual_result.verdict if actual_result else None,
+                )
+            )
+        elif in_expected and not in_actual:
+            diffs.append(
+                DiffItem(
+                    status=DiffStatus.REMOVED,
+                    key=key,
+                    rule_id=expected_findings[key].rule_id,
+                    expected_score=expected_result.score if expected_result else None,
+                    expected_verdict=expected_result.verdict if expected_result else None,
+                )
+            )
+        elif (
+            actual_result
+            and expected_result
+            and (actual_result.score != expected_result.score or actual_result.verdict is not expected_result.verdict)
+        ):
+            diffs.append(
+                DiffItem(
+                    status=DiffStatus.MISMATCH,
+                    key=key,
+                    rule_id=actual_findings[key].rule_id,
+                    expected_score=expected_result.score,
+                    expected_verdict=expected_result.verdict,
+                    actual_score=actual_result.score,
+                    actual_verdict=actual_result.verdict,
+                    observable_diffs=_observable_diffs(actual, expected, key),
+                )
+            )
+    return diffs
 
 
-def _create_diff_item(
-    status: DiffStatus,
-    actual_finding: FindingProxy | None = None,
-    expected_finding: FindingProxy | None = None,
-    rule: ExpectedResult | None = None,
-    actual_cv: Cyvest | None = None,
-    expected_cv: Cyvest | None = None,
-) -> DiffItem:
-    """Create a DiffItem with observable and threat intel context."""
-    finding = actual_finding or expected_finding
+def _check_rule(actual: Cyvest, rule: ExpectedResult) -> list[DiffItem]:
+    findings = actual._investigation.get_all_findings()
+    matched = [key for key, finding in findings.items() if rule.matches(key, finding.rule_id)]
 
-    # Build observable diffs from linked observables
-    observable_diffs: list[ObservableDiff] = []
+    if not matched:
+        if rule.ignore and DiffStatus.REMOVED in rule.ignore:
+            return []
+        return [
+            DiffItem(
+                status=DiffStatus.REMOVED,
+                key=rule.key or rule.rule_id or "",
+                rule_id=rule.rule_id or "",
+                expected_verdict=rule.verdict,
+                expected_score_rule=rule.score,
+            )
+        ]
 
-    # Collect observable keys from both findings
-    obs_keys: set[str] = set()
-    if actual_finding:
-        obs_keys.update(link.observable_key for link in actual_finding.observable_links)
-    if expected_finding:
-        obs_keys.update(link.observable_key for link in expected_finding.observable_links)
-
-    for obs_key in sorted(obs_keys):
-        actual_obs = actual_cv.observable_get(obs_key) if actual_cv else None
-        expected_obs = expected_cv.observable_get(obs_key) if expected_cv else None
-        obs = actual_obs or expected_obs
-
-        if not obs:
+    diffs: list[DiffItem] = []
+    for key in matched:
+        result = actual.get_report().finding(key)
+        if result is None:
             continue
-
-        # Build threat intel diffs for this observable
-        ti_diffs: list[ThreatIntelDiff] = []
-        ti_sources: set[str] = set()
-
-        if actual_obs:
-            ti_sources.update(ti.source for ti in actual_obs.threat_intels)
-        if expected_obs:
-            ti_sources.update(ti.source for ti in expected_obs.threat_intels)
-
-        for source in sorted(ti_sources):
-            actual_ti = (
-                next(
-                    (ti for ti in actual_obs.threat_intels if ti.source == source),
-                    None,
-                )
-                if actual_obs
-                else None
-            )
-            expected_ti = (
-                next(
-                    (ti for ti in expected_obs.threat_intels if ti.source == source),
-                    None,
-                )
-                if expected_obs
-                else None
-            )
-
-            ti_diffs.append(
-                ThreatIntelDiff(
-                    source=source,
-                    expected_score=expected_ti.score if expected_ti else None,
-                    expected_level=expected_ti.level if expected_ti else None,
-                    actual_score=actual_ti.score if actual_ti else None,
-                    actual_level=actual_ti.level if actual_ti else None,
-                )
-            )
-
-        observable_diffs.append(
-            ObservableDiff(
-                observable_key=obs_key,
-                obs_type=str(obs.obs_type.value if hasattr(obs.obs_type, "value") else obs.obs_type),
-                value=obs.value,
-                expected_score=expected_obs.score if expected_obs else None,
-                expected_level=expected_obs.level if expected_obs else None,
-                actual_score=actual_obs.score if actual_obs else None,
-                actual_level=actual_obs.level if actual_obs else None,
-                threat_intel_diffs=ti_diffs,
+        score_ok = rule.score is None or (result.score is not None and evaluate_score_rule(result.score, rule.score))
+        verdict_ok = rule.verdict is None or result.verdict is rule.verdict
+        if score_ok and verdict_ok:
+            continue
+        if rule.ignore and DiffStatus.MISMATCH in rule.ignore:
+            continue
+        diffs.append(
+            DiffItem(
+                status=DiffStatus.MISMATCH,
+                key=key,
+                rule_id=findings[key].rule_id,
+                expected_verdict=rule.verdict,
+                expected_score_rule=rule.score,
+                actual_score=result.score,
+                actual_verdict=result.verdict,
             )
         )
+    return diffs
 
-    return DiffItem(
-        status=status,
-        key=finding.key,
-        finding_name=finding.finding_name,
-        expected_level=expected_finding.level if expected_finding else (rule.level if rule else None),
-        expected_score=expected_finding.score if expected_finding else None,
-        expected_score_rule=rule.score if rule else None,
-        actual_level=actual_finding.level if actual_finding else None,
-        actual_score=actual_finding.score if actual_finding else None,
-        observable_diffs=observable_diffs,
-    )
+
+__all__ = [
+    "DiffItem",
+    "DiffStatus",
+    "EngineMismatchError",
+    "ExpectedResult",
+    "ObservableDiff",
+    "compare_investigations",
+    "evaluate_score_rule",
+    "parse_score_rule",
+]

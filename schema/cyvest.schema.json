@@ -1,16 +1,63 @@
 {
   "$defs": {
-    "DataExtractionSchema": {
-      "additionalProperties": false,
-      "description": "Schema for data extraction metadata.",
+    "Contribution": {
+      "description": "One named term that fed a result, kept so the report can explain itself.",
       "properties": {
-        "root_type": {
+        "source_key": {
+          "title": "Source Key",
+          "type": "string"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "value": {
+          "title": "Value",
+          "type": "number"
+        },
+        "retained": {
+          "default": true,
+          "title": "Retained",
+          "type": "boolean"
+        },
+        "detail": {
+          "default": "",
+          "title": "Detail",
+          "type": "string"
+        }
+      },
+      "required": [
+        "source_key",
+        "label",
+        "value"
+      ],
+      "title": "Contribution",
+      "type": "object"
+    },
+    "Decision": {
+      "additionalProperties": false,
+      "description": "A human (or automated) call that overrides the computed result for one target.\n\n``ALLOWLISTED``/``BLOCKLISTED`` bound an observable's score; ``CONFIRMED``/``DISMISSED``\nforce a finding. The kind and the target family must agree.",
+      "properties": {
+        "key": {
+          "minLength": 1,
+          "title": "Key",
+          "type": "string"
+        },
+        "seq": {
+          "maxLength": 26,
+          "minLength": 26,
+          "title": "Seq",
+          "type": "string"
+        },
+        "asserted_at": {
+          "format": "date-time",
+          "title": "Asserted At",
+          "type": "string"
+        },
+        "occurred_at": {
           "anyOf": [
             {
-              "enum": [
-                "file",
-                "artifact"
-              ],
+              "format": "date-time",
               "type": "string"
             },
             {
@@ -18,65 +65,13 @@
             }
           ],
           "default": null,
-          "description": "Root observable type used during data extraction.",
-          "title": "Root Type"
-        },
-        "score_mode_obs": {
-          "$ref": "#/$defs/ScoreMode",
-          "description": "Observable score aggregation mode: 'max' takes highest score, 'sum' adds all scores."
-        }
-      },
-      "required": [
-        "score_mode_obs"
-      ],
-      "title": "DataExtractionSchema",
-      "type": "object"
-    },
-    "Enrichment": {
-      "description": "Represents structured data enrichment for the investigation.\n\nEnrichments store arbitrary structured data that provides additional\ncontext but doesn't directly contribute to scoring.",
-      "properties": {
-        "name": {
-          "title": "Name",
-          "type": "string"
-        },
-        "data": {
-          "title": "Data"
-        },
-        "context": {
-          "title": "Context",
-          "type": "string"
-        },
-        "key": {
-          "title": "Key",
-          "type": "string"
-        }
-      },
-      "required": [
-        "name",
-        "data",
-        "context",
-        "key"
-      ],
-      "title": "Enrichment",
-      "type": "object"
-    },
-    "Evidence": {
-      "description": "Structured material supporting one or more findings.",
-      "properties": {
-        "type": {
-          "title": "Type",
-          "type": "string"
-        },
-        "title": {
-          "title": "Title",
-          "type": "string"
-        },
-        "description": {
-          "title": "Description",
-          "type": "string"
+          "title": "Occurred At"
         },
         "source": {
-          "title": "Source",
+          "$ref": "#/$defs/SourceRef"
+        },
+        "fragment_id": {
+          "title": "Fragment Id",
           "type": "string"
         },
         "external_id": {
@@ -88,166 +83,24 @@
               "type": "null"
             }
           ],
+          "default": null,
           "title": "External Id"
         },
-        "content": {
-          "anyOf": [
-            {},
-            {
-              "type": "null"
-            }
-          ],
-          "title": "Content"
-        },
-        "uri": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "title": "Uri"
-        },
-        "captured_at": {
-          "format": "date-time",
-          "title": "Captured At",
-          "type": "string"
-        },
-        "extra": {
-          "additionalProperties": true,
-          "title": "Extra",
-          "type": "object"
-        },
-        "key": {
-          "title": "Key",
-          "type": "string"
-        },
-        "finding_links": {
-          "description": "Findings that currently link to this evidence (navigation-only).",
+        "evidence_keys": {
+          "default": [],
           "items": {
             "type": "string"
           },
-          "readOnly": true,
-          "title": "Finding Links",
-          "type": "array"
-        }
-      },
-      "required": [
-        "type",
-        "title",
-        "description",
-        "source",
-        "external_id",
-        "content",
-        "uri",
-        "captured_at",
-        "extra",
-        "key",
-        "finding_links"
-      ],
-      "title": "Evidence",
-      "type": "object"
-    },
-    "EvidenceLink": {
-      "additionalProperties": false,
-      "description": "Edge metadata for a Finding\u2194Evidence association.",
-      "properties": {
-        "evidence_key": {
-          "title": "Evidence Key",
-          "type": "string"
-        }
-      },
-      "required": [
-        "evidence_key"
-      ],
-      "title": "EvidenceLink",
-      "type": "object"
-    },
-    "Finding": {
-      "description": "Represents a verification step in the investigation.\n\nA finding validates a specific aspect of the data under investigation\nand contributes to the overall investigation score.",
-      "properties": {
-        "finding_name": {
-          "title": "Finding Name",
-          "type": "string"
-        },
-        "description": {
-          "title": "Description",
-          "type": "string"
-        },
-        "comment": {
-          "title": "Comment",
-          "type": "string"
-        },
-        "extra": {
-          "additionalProperties": true,
-          "title": "Extra",
-          "type": "object"
-        },
-        "score": {
-          "title": "Score",
-          "type": "number"
-        },
-        "level": {
-          "$ref": "#/$defs/Level"
-        },
-        "origin_investigation_id": {
-          "title": "Origin Investigation Id",
-          "type": "string"
-        },
-        "observable_links": {
-          "items": {
-            "$ref": "#/$defs/ObservableLink"
-          },
-          "title": "Observable Links",
+          "title": "Evidence Keys",
           "type": "array"
         },
-        "evidence_links": {
-          "items": {
-            "$ref": "#/$defs/EvidenceLink"
-          },
-          "title": "Evidence Links",
-          "type": "array"
-        },
-        "key": {
-          "title": "Key",
-          "type": "string"
-        },
-        "score_display": {
-          "readOnly": true,
-          "title": "Score Display",
-          "type": "string"
-        }
-      },
-      "required": [
-        "finding_name",
-        "description",
-        "comment",
-        "extra",
-        "score",
-        "level",
-        "origin_investigation_id",
-        "observable_links",
-        "evidence_links",
-        "key",
-        "score_display"
-      ],
-      "title": "Finding",
-      "type": "object"
-    },
-    "InvestigationWhitelist": {
-      "description": "Represents a whitelist entry on an investigation.",
-      "properties": {
-        "identifier": {
+        "target_key": {
           "minLength": 1,
-          "title": "Identifier",
+          "title": "Target Key",
           "type": "string"
         },
-        "name": {
-          "minLength": 1,
-          "title": "Name",
-          "type": "string"
+        "kind": {
+          "$ref": "#/$defs/DecisionKind"
         },
         "justification": {
           "anyOf": [
@@ -263,29 +116,606 @@
         }
       },
       "required": [
-        "identifier",
-        "name"
+        "key",
+        "seq",
+        "asserted_at",
+        "source",
+        "fragment_id",
+        "target_key",
+        "kind"
       ],
-      "title": "InvestigationWhitelist",
+      "title": "Decision",
       "type": "object"
     },
-    "Level": {
-      "description": "Security level classification for findings, observables, and threat intelligence.\n\nLevels are ordered from lowest (NONE) to highest (MALICIOUS) severity.",
+    "DecisionKind": {
+      "description": "A named override of the computation.\n\nForcing a score has to be a declared act — never the side effect of an inflated weight.\nEach kind targets exactly one fact family, enforced by :class:`cyvest.facts.Decision`.",
       "enum": [
-        "NONE",
-        "TRUSTED",
-        "INFO",
-        "SAFE",
-        "NOTABLE",
-        "SUSPICIOUS",
-        "MALICIOUS"
+        "ALLOWLISTED",
+        "BLOCKLISTED",
+        "CONFIRMED",
+        "DISMISSED"
       ],
-      "title": "Level",
+      "title": "DecisionKind",
       "type": "string"
     },
-    "Observable": {
-      "description": "Represents a cyber observable (IP, URL, domain, hash, etc.).\n\nObservables can be linked to threat intelligence, findings, and other observables\nthrough relationships.",
+    "Effect": {
+      "description": "How a finding enters the investigation total. :class:`Status` says *whether*, this says *how*.\n\n``ADDITIVE`` is every finding v6 ever had: a term of the sum.\n\n``FLOOR`` is a **conclusion** — typically an AI analysis that read the other findings. It is\nnot a term: it raises the total just enough to reach the verdict it asserts, and adds nothing\nwhen that verdict is already reached. Conclusions therefore never compound, which is what\nmakes it safe to plug several analysers into the same investigation.\n\nThe floor a verdict maps to is ``basic-v1``'s band convention, like every other number here —\nsee :mod:`cyvest.evaluation.projection`.",
+      "enum": [
+        "ADDITIVE",
+        "FLOOR"
+      ],
+      "title": "Effect",
+      "type": "string"
+    },
+    "Evidence": {
+      "additionalProperties": false,
+      "description": "A captured artefact: an API response, a header dump, an enrichment payload.",
       "properties": {
+        "key": {
+          "minLength": 1,
+          "title": "Key",
+          "type": "string"
+        },
+        "seq": {
+          "maxLength": 26,
+          "minLength": 26,
+          "title": "Seq",
+          "type": "string"
+        },
+        "asserted_at": {
+          "format": "date-time",
+          "title": "Asserted At",
+          "type": "string"
+        },
+        "occurred_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Occurred At"
+        },
+        "source": {
+          "$ref": "#/$defs/SourceRef"
+        },
+        "fragment_id": {
+          "title": "Fragment Id",
+          "type": "string"
+        },
+        "external_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "External Id"
+        },
+        "evidence_keys": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Keys",
+          "type": "array"
+        },
+        "evidence_type": {
+          "minLength": 1,
+          "title": "Evidence Type",
+          "type": "string"
+        },
+        "title": {
+          "default": "",
+          "title": "Title",
+          "type": "string"
+        },
+        "content": {
+          "default": null,
+          "title": "Content"
+        },
+        "uri": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Uri"
+        },
+        "captured_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Captured At"
+        }
+      },
+      "required": [
+        "key",
+        "seq",
+        "asserted_at",
+        "source",
+        "fragment_id",
+        "evidence_type"
+      ],
+      "title": "Evidence",
+      "type": "object"
+    },
+    "FactsSchema": {
+      "additionalProperties": false,
+      "description": "The fact collections, each keyed by its semantic key.",
+      "properties": {
+        "observables": {
+          "additionalProperties": {
+            "$ref": "#/$defs/Observable"
+          },
+          "title": "Observables",
+          "type": "object"
+        },
+        "relations": {
+          "additionalProperties": {
+            "$ref": "#/$defs/Relation"
+          },
+          "title": "Relations",
+          "type": "object"
+        },
+        "signals": {
+          "additionalProperties": {
+            "$ref": "#/$defs/ThreatIntel"
+          },
+          "title": "Signals",
+          "type": "object"
+        },
+        "evidences": {
+          "additionalProperties": {
+            "$ref": "#/$defs/Evidence"
+          },
+          "title": "Evidences",
+          "type": "object"
+        },
+        "findings": {
+          "additionalProperties": {
+            "$ref": "#/$defs/Finding"
+          },
+          "title": "Findings",
+          "type": "object"
+        },
+        "events": {
+          "additionalProperties": true,
+          "title": "Events",
+          "type": "object"
+        }
+      },
+      "title": "FactsSchema",
+      "type": "object"
+    },
+    "Finding": {
+      "additionalProperties": false,
+      "description": "A rule outcome. Identity is ``(rule_id, subject_key)``.\n\n``subject_key`` may be an observable *or* the investigation itself — unlike a signal, which\nalways targets an observable.",
+      "properties": {
+        "subject_key": {
+          "minLength": 1,
+          "title": "Subject Key",
+          "type": "string"
+        },
+        "verdict": {
+          "$ref": "#/$defs/Verdict",
+          "default": "INFO"
+        },
+        "confidence": {
+          "default": 1.0,
+          "exclusiveMinimum": 0.0,
+          "maximum": 1.0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "weight": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Weight"
+        },
+        "key": {
+          "minLength": 1,
+          "title": "Key",
+          "type": "string"
+        },
+        "seq": {
+          "maxLength": 26,
+          "minLength": 26,
+          "title": "Seq",
+          "type": "string"
+        },
+        "asserted_at": {
+          "format": "date-time",
+          "title": "Asserted At",
+          "type": "string"
+        },
+        "occurred_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Occurred At"
+        },
+        "source": {
+          "$ref": "#/$defs/SourceRef"
+        },
+        "fragment_id": {
+          "title": "Fragment Id",
+          "type": "string"
+        },
+        "external_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "External Id"
+        },
+        "evidence_keys": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Keys",
+          "type": "array"
+        },
+        "rule_id": {
+          "minLength": 1,
+          "title": "Rule Id",
+          "type": "string"
+        },
+        "rule_version": {
+          "default": "1",
+          "title": "Rule Version",
+          "type": "string"
+        },
+        "name": {
+          "default": "",
+          "title": "Name",
+          "type": "string"
+        },
+        "comment": {
+          "default": "",
+          "title": "Comment",
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/Status",
+          "default": "EVALUATED"
+        },
+        "effect": {
+          "$ref": "#/$defs/Effect",
+          "default": "ADDITIVE"
+        },
+        "observable_links": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/ObservableLink"
+          },
+          "title": "Observable Links",
+          "type": "array"
+        },
+        "labels": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/Label"
+          },
+          "title": "Labels",
+          "type": "array"
+        },
+        "extra": {
+          "additionalProperties": true,
+          "title": "Extra",
+          "type": "object"
+        }
+      },
+      "required": [
+        "subject_key",
+        "key",
+        "seq",
+        "asserted_at",
+        "source",
+        "fragment_id",
+        "rule_id"
+      ],
+      "title": "Finding",
+      "type": "object"
+    },
+    "FindingResult": {
+      "description": "A finding's verdict.\n\n``own_term_suppressed`` flags that the rule's own claim was overridden by a stronger link —\na contradiction worth surfacing rather than silently dropping.\n\nThree combinations of ``(counted, score)`` are meaningful, and a consumer must not conflate\nthe last two:\n\n- ``(True, float)`` — an additive finding, a term of the total;\n- ``(False, None)`` — dismissed or not evaluated: visible, but out of the evaluation;\n- ``(True, None)`` — a conclusion (``effect`` is ``FLOOR``): it takes part, but it has no\n  magnitude of its own. Its effect is a floor on the investigation total, reported as a\n  contribution of :class:`InvestigationResult`.",
+      "properties": {
+        "key": {
+          "title": "Key",
+          "type": "string"
+        },
+        "verdict": {
+          "$ref": "#/$defs/Verdict",
+          "default": "INFO"
+        },
+        "confidence": {
+          "default": 1.0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "score": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Score"
+        },
+        "contributions": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/Contribution"
+          },
+          "title": "Contributions",
+          "type": "array"
+        },
+        "suppressed_by_decision": {
+          "default": false,
+          "title": "Suppressed By Decision",
+          "type": "boolean"
+        },
+        "raw": {
+          "additionalProperties": true,
+          "title": "Raw",
+          "type": "object"
+        },
+        "status": {
+          "$ref": "#/$defs/Status",
+          "default": "EVALUATED"
+        },
+        "effect": {
+          "$ref": "#/$defs/Effect",
+          "default": "ADDITIVE"
+        },
+        "own_term_suppressed": {
+          "default": false,
+          "title": "Own Term Suppressed",
+          "type": "boolean"
+        },
+        "counted": {
+          "default": true,
+          "title": "Counted",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "key"
+      ],
+      "title": "FindingResult",
+      "type": "object"
+    },
+    "InvestigationHeader": {
+      "description": "What used to be a ``Case`` fact: metadata about the store rather than a fact inside it.\n\n``engine_id`` is denormalized here so an investigation stays replayable identically years\nlater, even after a newer stable engine ships.",
+      "properties": {
+        "investigation_id": {
+          "title": "Investigation Id",
+          "type": "string"
+        },
+        "name": {
+          "default": "",
+          "title": "Name",
+          "type": "string"
+        },
+        "root_key": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Root Key"
+        },
+        "opened_at": {
+          "format": "date-time",
+          "title": "Opened At",
+          "type": "string"
+        },
+        "policy_version": {
+          "default": "default-v1",
+          "title": "Policy Version",
+          "type": "string"
+        },
+        "engine_id": {
+          "default": "basic-v1",
+          "title": "Engine Id",
+          "type": "string"
+        },
+        "fragment_ids": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Fragment Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "investigation_id"
+      ],
+      "title": "InvestigationHeader",
+      "type": "object"
+    },
+    "InvestigationResult": {
+      "description": "The investigation-level verdict.",
+      "properties": {
+        "key": {
+          "title": "Key",
+          "type": "string"
+        },
+        "verdict": {
+          "$ref": "#/$defs/Verdict",
+          "default": "INFO"
+        },
+        "confidence": {
+          "default": 1.0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "score": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Score"
+        },
+        "contributions": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/Contribution"
+          },
+          "title": "Contributions",
+          "type": "array"
+        },
+        "suppressed_by_decision": {
+          "default": false,
+          "title": "Suppressed By Decision",
+          "type": "boolean"
+        },
+        "raw": {
+          "additionalProperties": true,
+          "title": "Raw",
+          "type": "object"
+        }
+      },
+      "required": [
+        "key"
+      ],
+      "title": "InvestigationResult",
+      "type": "object"
+    },
+    "Label": {
+      "description": "A typed tag on a fact: ``axis`` says what kind of statement ``value`` makes.",
+      "properties": {
+        "axis": {
+          "minLength": 1,
+          "title": "Axis",
+          "type": "string"
+        },
+        "value": {
+          "minLength": 1,
+          "title": "Value",
+          "type": "string"
+        }
+      },
+      "required": [
+        "axis",
+        "value"
+      ],
+      "title": "Label",
+      "type": "object"
+    },
+    "Observable": {
+      "additionalProperties": false,
+      "description": "A cyber observable. Identity is ``(type, subtype, namespace, value)``, nothing else.",
+      "properties": {
+        "key": {
+          "minLength": 1,
+          "title": "Key",
+          "type": "string"
+        },
+        "seq": {
+          "maxLength": 26,
+          "minLength": 26,
+          "title": "Seq",
+          "type": "string"
+        },
+        "asserted_at": {
+          "format": "date-time",
+          "title": "Asserted At",
+          "type": "string"
+        },
+        "occurred_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Occurred At"
+        },
+        "source": {
+          "$ref": "#/$defs/SourceRef"
+        },
+        "fragment_id": {
+          "title": "Fragment Id",
+          "type": "string"
+        },
+        "external_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "External Id"
+        },
+        "evidence_keys": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Keys",
+          "type": "array"
+        },
         "type": {
           "title": "Type",
           "type": "string"
@@ -314,18 +744,17 @@
           "title": "Namespace"
         },
         "value": {
+          "minLength": 1,
           "title": "Value",
           "type": "string"
         },
         "internal": {
+          "default": true,
           "title": "Internal",
           "type": "boolean"
         },
-        "whitelisted": {
-          "title": "Whitelisted",
-          "type": "boolean"
-        },
         "comment": {
+          "default": "",
           "title": "Comment",
           "type": "string"
         },
@@ -334,79 +763,36 @@
           "title": "Extra",
           "type": "object"
         },
-        "score": {
-          "title": "Score",
-          "type": "number"
-        },
-        "level": {
-          "$ref": "#/$defs/Level"
-        },
         "aliases": {
+          "default": [],
           "items": {
             "$ref": "#/$defs/ObservableAlias"
           },
           "title": "Aliases",
           "type": "array"
         },
-        "occurrence_count": {
-          "default": 1,
-          "minimum": 1,
-          "title": "Occurrence Count",
-          "type": "integer"
-        },
-        "threat_intels": {
-          "items": {
-            "type": "string"
+        "occurrences": {
+          "additionalProperties": {
+            "type": "integer"
           },
-          "title": "Threat Intels",
-          "type": "array"
-        },
-        "relationships": {
-          "items": {
-            "$ref": "#/$defs/Relationship"
-          },
-          "title": "Relationships",
-          "type": "array"
-        },
-        "key": {
-          "title": "Key",
-          "type": "string"
-        },
-        "finding_links": {
-          "description": "Findings that currently link to this observable (navigation-only).",
-          "items": {
-            "type": "string"
-          },
-          "readOnly": true,
-          "title": "Finding Links",
-          "type": "array"
-        },
-        "score_display": {
-          "readOnly": true,
-          "title": "Score Display",
-          "type": "string"
+          "title": "Occurrences",
+          "type": "object"
         }
       },
       "required": [
-        "type",
-        "value",
-        "internal",
-        "whitelisted",
-        "comment",
-        "extra",
-        "score",
-        "level",
-        "threat_intels",
-        "relationships",
         "key",
-        "finding_links",
-        "score_display"
+        "seq",
+        "asserted_at",
+        "source",
+        "fragment_id",
+        "type",
+        "value"
       ],
       "title": "Observable",
       "type": "object"
     },
     "ObservableAlias": {
-      "description": "Source observable identity attached to a canonical observable.",
+      "description": "A source identity that resolved to a canonical observable.",
       "properties": {
         "type": {
           "title": "Type",
@@ -436,14 +822,16 @@
           "title": "Namespace"
         },
         "value": {
+          "minLength": 1,
           "title": "Value",
           "type": "string"
         },
-        "count": {
-          "default": 1,
-          "minimum": 1,
-          "title": "Count",
-          "type": "integer"
+        "counts": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Counts",
+          "type": "object"
         }
       },
       "required": [
@@ -454,16 +842,16 @@
       "type": "object"
     },
     "ObservableLink": {
-      "additionalProperties": false,
-      "description": "Edge metadata for a Finding\u2194Observable association.",
+      "description": "A link from a finding to one of its observables, with the scope it is evaluated in.\n\nScope is **per link**, exactly like v6's ``propagation_mode``: a finding may mix scopes, and\nmay even link the same observable twice under two scopes. Deduplication is on the tuple.",
       "properties": {
         "observable_key": {
+          "minLength": 1,
           "title": "Observable Key",
           "type": "string"
         },
-        "propagation_mode": {
-          "$ref": "#/$defs/PropagationMode",
-          "default": "LOCAL_ONLY"
+        "scope": {
+          "$ref": "#/$defs/Scope",
+          "default": "OWN_FRAGMENT"
         }
       },
       "required": [
@@ -472,195 +860,358 @@
       "title": "ObservableLink",
       "type": "object"
     },
-    "PropagationMode": {
-      "description": "Controls how a Finding\u2194Observable link propagates across merged investigations.",
-      "enum": [
-        "LOCAL_ONLY",
-        "GLOBAL"
-      ],
-      "title": "PropagationMode",
-      "type": "string"
-    },
-    "Relationship": {
-      "description": "Represents a relationship between observables.",
+    "ObservableResult": {
+      "description": "An observable's verdict within one resolved scope.",
       "properties": {
+        "key": {
+          "title": "Key",
+          "type": "string"
+        },
+        "verdict": {
+          "$ref": "#/$defs/Verdict",
+          "default": "INFO"
+        },
+        "confidence": {
+          "default": 1.0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "score": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Score"
+        },
+        "contributions": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/Contribution"
+          },
+          "title": "Contributions",
+          "type": "array"
+        },
+        "suppressed_by_decision": {
+          "default": false,
+          "title": "Suppressed By Decision",
+          "type": "boolean"
+        },
+        "raw": {
+          "additionalProperties": true,
+          "title": "Raw",
+          "type": "object"
+        },
+        "scope": {
+          "$ref": "#/$defs/ResolvedScope"
+        }
+      },
+      "required": [
+        "key"
+      ],
+      "title": "ObservableResult",
+      "type": "object"
+    },
+    "Relation": {
+      "additionalProperties": false,
+      "description": "A directed edge between two observables, labelled by the analyst pivot that produced it.",
+      "properties": {
+        "key": {
+          "minLength": 1,
+          "title": "Key",
+          "type": "string"
+        },
+        "seq": {
+          "maxLength": 26,
+          "minLength": 26,
+          "title": "Seq",
+          "type": "string"
+        },
+        "asserted_at": {
+          "format": "date-time",
+          "title": "Asserted At",
+          "type": "string"
+        },
+        "occurred_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Occurred At"
+        },
+        "source": {
+          "$ref": "#/$defs/SourceRef"
+        },
+        "fragment_id": {
+          "title": "Fragment Id",
+          "type": "string"
+        },
+        "external_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "External Id"
+        },
+        "evidence_keys": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Keys",
+          "type": "array"
+        },
+        "source_key": {
+          "minLength": 1,
+          "title": "Source Key",
+          "type": "string"
+        },
         "target_key": {
+          "minLength": 1,
           "title": "Target Key",
           "type": "string"
         },
-        "relationship_type": {
-          "title": "Relationship Type",
-          "type": "string"
+        "kind": {
+          "$ref": "#/$defs/RelationKind",
+          "default": "related-to"
         },
-        "direction": {
-          "$ref": "#/$defs/RelationshipDirection"
-        }
-      },
-      "required": [
-        "target_key",
-        "relationship_type",
-        "direction"
-      ],
-      "title": "Relationship",
-      "type": "object"
-    },
-    "RelationshipDirection": {
-      "description": "Direction of a relationship between observables.",
-      "enum": [
-        "outbound",
-        "inbound",
-        "bidirectional"
-      ],
-      "title": "RelationshipDirection",
-      "type": "string"
-    },
-    "ScoreMode": {
-      "description": "Score calculation mode for observables.",
-      "enum": [
-        "max",
-        "sum"
-      ],
-      "title": "ScoreMode",
-      "type": "string"
-    },
-    "StatisticsSchema": {
-      "additionalProperties": false,
-      "description": "Schema for investigation statistics.\n\nMirrors the output of `InvestigationStats.get_summary()`.",
-      "properties": {
-        "total_observables": {
-          "minimum": 0,
-          "title": "Total Observables",
-          "type": "integer"
-        },
-        "internal_observables": {
-          "minimum": 0,
-          "title": "Internal Observables",
-          "type": "integer"
-        },
-        "external_observables": {
-          "minimum": 0,
-          "title": "External Observables",
-          "type": "integer"
-        },
-        "whitelisted_observables": {
-          "minimum": 0,
-          "title": "Whitelisted Observables",
-          "type": "integer"
-        },
-        "observables_by_type": {
-          "additionalProperties": {
-            "minimum": 0,
-            "type": "integer"
-          },
-          "title": "Observables By Type",
-          "type": "object"
-        },
-        "observables_by_level": {
-          "additionalProperties": {
-            "minimum": 0,
-            "type": "integer"
-          },
-          "title": "Observables By Level",
-          "type": "object"
-        },
-        "observables_by_type_and_level": {
-          "additionalProperties": {
-            "additionalProperties": {
-              "minimum": 0,
-              "type": "integer"
-            },
-            "type": "object"
-          },
-          "title": "Observables By Type And Level",
-          "type": "object"
-        },
-        "total_findings": {
-          "minimum": 0,
-          "title": "Total Findings",
-          "type": "integer"
-        },
-        "applied_findings": {
-          "minimum": 0,
-          "title": "Applied Findings",
-          "type": "integer"
-        },
-        "findings_by_level": {
-          "additionalProperties": {
-            "items": {
+        "observed_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
               "type": "string"
             },
-            "type": "array"
-          },
-          "title": "Findings By Level",
-          "type": "object"
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Observed At"
         },
-        "total_evidences": {
-          "minimum": 0,
-          "title": "Total Evidences",
-          "type": "integer"
+        "confidence": {
+          "default": 1.0,
+          "exclusiveMinimum": 0.0,
+          "maximum": 1.0,
+          "title": "Confidence",
+          "type": "number"
         },
-        "evidences_by_type": {
-          "additionalProperties": {
-            "minimum": 0,
-            "type": "integer"
-          },
-          "title": "Evidences By Type",
-          "type": "object"
-        },
-        "evidences_by_source": {
-          "additionalProperties": {
-            "minimum": 0,
-            "type": "integer"
-          },
-          "title": "Evidences By Source",
-          "type": "object"
-        },
-        "total_threat_intel": {
-          "minimum": 0,
-          "title": "Total Threat Intel",
-          "type": "integer"
-        },
-        "threat_intel_by_source": {
-          "additionalProperties": {
-            "minimum": 0,
-            "type": "integer"
-          },
-          "title": "Threat Intel By Source",
-          "type": "object"
-        },
-        "threat_intel_by_level": {
-          "additionalProperties": {
-            "minimum": 0,
-            "type": "integer"
-          },
-          "title": "Threat Intel By Level",
-          "type": "object"
-        },
-        "total_tags": {
-          "minimum": 0,
-          "title": "Total Tags",
-          "type": "integer"
+        "comment": {
+          "default": "",
+          "title": "Comment",
+          "type": "string"
         }
       },
       "required": [
-        "total_observables",
-        "internal_observables",
-        "external_observables",
-        "whitelisted_observables",
-        "total_findings",
-        "applied_findings",
-        "total_evidences",
-        "total_threat_intel",
-        "total_tags"
+        "key",
+        "seq",
+        "asserted_at",
+        "source",
+        "fragment_id",
+        "source_key",
+        "target_key"
       ],
-      "title": "StatisticsSchema",
+      "title": "Relation",
       "type": "object"
+    },
+    "RelationKind": {
+      "description": "The analyst pivot that produced the target from the source.\n\nDirection is implied: ``source_key`` is the parent, ``target_key`` the child. ``RELATED_TO``\nis symmetric and excluded from propagation, which makes v6's ``EXTRACTION`` +\n``BIDIRECTIONAL`` combination inexpressible.",
+      "enum": [
+        "extraction",
+        "pivot",
+        "related-to"
+      ],
+      "title": "RelationKind",
+      "type": "string"
+    },
+    "Report": {
+      "description": "A full evaluation. Derived, never stored on the facts, recomputed from them.",
+      "properties": {
+        "engine_id": {
+          "title": "Engine Id",
+          "type": "string"
+        },
+        "policy_version": {
+          "title": "Policy Version",
+          "type": "string"
+        },
+        "investigation": {
+          "$ref": "#/$defs/InvestigationResult"
+        },
+        "findings": {
+          "additionalProperties": {
+            "$ref": "#/$defs/FindingResult"
+          },
+          "title": "Findings",
+          "type": "object"
+        },
+        "observables": {
+          "additionalProperties": {
+            "$ref": "#/$defs/ObservableResult"
+          },
+          "title": "Observables",
+          "type": "object"
+        }
+      },
+      "required": [
+        "engine_id",
+        "policy_version",
+        "investigation"
+      ],
+      "title": "Report",
+      "type": "object"
+    },
+    "ResolvedScope": {
+      "description": "A link scope with ``OWN_FRAGMENT`` already resolved to the fragment that carries the link.\n\n``OWN_FRAGMENT`` is not *one* scope: it denotes a different set of facts for every fragment.\nTwo findings from different fragments pointing at the same observable need two distinct\nresults, so results are indexed by the resolved scope — never by the raw label.\n\nA model rather than a tuple so it crosses the JSON boundary as a named object: the report is\nthe contract a front-end reads, and positional data makes for a poor contract.",
+      "properties": {
+        "scope": {
+          "$ref": "#/$defs/Scope",
+          "default": "ALL"
+        },
+        "fragment_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Fragment Id"
+        }
+      },
+      "title": "ResolvedScope",
+      "type": "object"
+    },
+    "Scope": {
+      "description": "How far a Finding→Observable link looks when evaluating its observable.\n\nReplaces v6's ``PropagationMode`` one-for-one. ``OWN_FRAGMENT`` resolves to *the fragment of\nthe finding that carries the link*, so it denotes a different scope for each fragment — the\nreport indexes observable results by the resolved scope, never by this label.",
+      "enum": [
+        "OWN_FRAGMENT",
+        "ALL"
+      ],
+      "title": "Scope",
+      "type": "string"
+    },
+    "SourceClass": {
+      "description": "Family a source belongs to, used by the policy to weigh its reliability.",
+      "enum": [
+        "vendor_feed",
+        "sandbox",
+        "osint",
+        "internal_tool",
+        "org_analyst",
+        "org_policy",
+        "unknown"
+      ],
+      "title": "SourceClass",
+      "type": "string"
+    },
+    "SourceRef": {
+      "description": "Who or what asserted a fact.",
+      "properties": {
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "source_class": {
+          "$ref": "#/$defs/SourceClass",
+          "default": "unknown"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "SourceRef",
+      "type": "object"
+    },
+    "Status": {
+      "description": "Whether a finding takes part in the evaluation at all.\n\nAnything other than ``EVALUATED`` is excluded from the score *and* from aggregation\ndenominators, while staying visible in the report.",
+      "enum": [
+        "NOT_APPLICABLE",
+        "PENDING",
+        "EVALUATED"
+      ],
+      "title": "Status",
+      "type": "string"
     },
     "Tag": {
       "additionalProperties": false,
-      "description": "Groups findings for categorical organization.\n\nTags allow structuring the investigation into logical sections\nwith aggregated scores and levels. Hierarchy is automatic based on\nthe \":\" delimiter in tag names (e.g., \"header:auth:dkim\").",
+      "description": "A label grouping findings. Merging two tags unions their finding keys.",
       "properties": {
+        "key": {
+          "minLength": 1,
+          "title": "Key",
+          "type": "string"
+        },
+        "seq": {
+          "maxLength": 26,
+          "minLength": 26,
+          "title": "Seq",
+          "type": "string"
+        },
+        "asserted_at": {
+          "format": "date-time",
+          "title": "Asserted At",
+          "type": "string"
+        },
+        "occurred_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Occurred At"
+        },
+        "source": {
+          "$ref": "#/$defs/SourceRef"
+        },
+        "fragment_id": {
+          "title": "Fragment Id",
+          "type": "string"
+        },
+        "external_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "External Id"
+        },
+        "evidence_keys": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Keys",
+          "type": "array"
+        },
         "name": {
+          "minLength": 1,
           "title": "Name",
           "type": "string"
         },
@@ -669,252 +1220,237 @@
           "title": "Description",
           "type": "string"
         },
-        "findings": {
+        "finding_keys": {
+          "default": [],
           "items": {
             "type": "string"
           },
-          "title": "Findings",
+          "title": "Finding Keys",
           "type": "array"
-        },
-        "key": {
-          "title": "Key",
-          "type": "string"
-        },
-        "direct_score": {
-          "description": "Calculate the score from direct findings only (no hierarchy).\n\nFor hierarchical aggregation (including descendant tags), use\nInvestigation.get_tag_aggregated_score() or TagProxy.get_aggregated_score().\n\nReturns:\n    Total score from direct findings",
-          "readOnly": true,
-          "title": "Direct Score",
-          "type": "number"
-        },
-        "direct_level": {
-          "$ref": "#/$defs/Level",
-          "description": "Calculate the level from direct findings only (no hierarchy).\n\nFor hierarchical aggregation (including descendant tags), use\nInvestigation.get_tag_aggregated_level() or TagProxy.get_aggregated_level().\n\nReturns:\n    Level based on direct score",
-          "readOnly": true
         }
       },
       "required": [
-        "name",
-        "findings",
         "key",
-        "direct_score",
-        "direct_level"
+        "seq",
+        "asserted_at",
+        "source",
+        "fragment_id",
+        "name"
       ],
       "title": "Tag",
       "type": "object"
     },
-    "Taxonomy": {
-      "additionalProperties": false,
-      "description": "Represents a structured taxonomy entry for threat intelligence.",
-      "properties": {
-        "level": {
-          "$ref": "#/$defs/Level"
-        },
-        "name": {
-          "title": "Name",
-          "type": "string"
-        },
-        "value": {
-          "title": "Value",
-          "type": "string"
-        }
-      },
-      "required": [
-        "level",
-        "name",
-        "value"
-      ],
-      "title": "Taxonomy",
-      "type": "object"
-    },
     "ThreatIntel": {
-      "description": "Represents threat intelligence from an external source.\n\nThreat intelligence provides verdicts about observables from sources\nlike VirusTotal, URLScan.io, etc.",
+      "additionalProperties": false,
+      "description": "A verdict from a threat-intelligence source.\n\nIdentity is ``(source, subject_key)`` — byte-identical to v6 — so a source re-asserting the\nsame observable updates in place instead of piling up duplicates. Pass ``external_id`` to\nkeep history on purpose.",
       "properties": {
-        "source": {
-          "title": "Source",
+        "subject_key": {
+          "minLength": 1,
+          "title": "Subject Key",
           "type": "string"
         },
-        "observable_key": {
-          "title": "Observable Key",
-          "type": "string"
+        "verdict": {
+          "$ref": "#/$defs/Verdict",
+          "default": "INFO"
         },
-        "comment": {
-          "title": "Comment",
-          "type": "string"
-        },
-        "extra": {
-          "additionalProperties": true,
-          "title": "Extra",
-          "type": "object"
-        },
-        "score": {
-          "title": "Score",
+        "confidence": {
+          "default": 1.0,
+          "exclusiveMinimum": 0.0,
+          "maximum": 1.0,
+          "title": "Confidence",
           "type": "number"
         },
-        "level": {
-          "$ref": "#/$defs/Level"
+        "weight": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Weight"
+        },
+        "key": {
+          "minLength": 1,
+          "title": "Key",
+          "type": "string"
+        },
+        "seq": {
+          "maxLength": 26,
+          "minLength": 26,
+          "title": "Seq",
+          "type": "string"
+        },
+        "asserted_at": {
+          "format": "date-time",
+          "title": "Asserted At",
+          "type": "string"
+        },
+        "occurred_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Occurred At"
+        },
+        "source": {
+          "$ref": "#/$defs/SourceRef"
+        },
+        "fragment_id": {
+          "title": "Fragment Id",
+          "type": "string"
+        },
+        "external_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "External Id"
+        },
+        "evidence_keys": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Keys",
+          "type": "array"
+        },
+        "kind": {
+          "const": "threat_intel",
+          "default": "threat_intel",
+          "title": "Kind",
+          "type": "string"
+        },
+        "observed_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Observed At"
+        },
+        "labels": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/Label"
+          },
+          "title": "Labels",
+          "type": "array"
+        },
+        "payload": {
+          "additionalProperties": true,
+          "title": "Payload",
+          "type": "object"
+        },
+        "source_class": {
+          "$ref": "#/$defs/SourceClass",
+          "default": "vendor_feed"
         },
         "taxonomies": {
+          "default": [],
           "items": {
-            "$ref": "#/$defs/Taxonomy"
+            "type": "string"
           },
           "title": "Taxonomies",
           "type": "array"
         },
-        "key": {
-          "title": "Key",
-          "type": "string"
-        },
-        "score_display": {
-          "readOnly": true,
-          "title": "Score Display",
+        "comment": {
+          "default": "",
+          "title": "Comment",
           "type": "string"
         }
       },
       "required": [
-        "source",
-        "observable_key",
-        "comment",
-        "extra",
-        "score",
-        "level",
-        "taxonomies",
+        "subject_key",
         "key",
-        "score_display"
+        "seq",
+        "asserted_at",
+        "source",
+        "fragment_id"
       ],
       "title": "ThreatIntel",
       "type": "object"
+    },
+    "Verdict": {
+      "description": "Direction of a judgment, and the displayed level — they are the same thing.\n\nv7 merges the former ``Level`` into ``Verdict``. The five values line up one-for-one with\nthe score bands ``basic-v1`` inherits from v6 (``< 0``, ``= 0``, ``]0,3[``, ``[3,5[``,\n``>= 5``), which makes a verdict/level divergence structurally impossible.\n\nThose bands are ``basic-v1``'s convention, **not** part of the enum's contract: a\nprobabilistic engine maps its own posterior thresholds onto the same labels.\n\nTwo v6 levels deliberately left this axis: ``NONE`` became :class:`Status` and ``TRUSTED``\nbecame a :class:`DecisionKind` (or plain ``SAFE`` when it was merely a negative score).",
+      "enum": [
+        "SAFE",
+        "INFO",
+        "NOTABLE",
+        "SUSPICIOUS",
+        "MALICIOUS"
+      ],
+      "title": "Verdict",
+      "type": "string"
     }
   },
-  "$id": "https://cyvest.io/schema/investigation.json",
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cyvest.io/schema/investigation-7.json",
   "additionalProperties": false,
-  "description": "Schema for a complete serialized investigation.\n\nThis model describes the output of `serialize_investigation()` from\n`cyvest.io_serialization`. It is the top-level schema for exported investigations.\n\nEntity types reference the runtime models directly. When generating schemas with\n`mode='serialization'`, Pydantic respects field_serializer decorators and produces\nschemas matching the actual model_dump() output.",
+  "description": "A complete serialized investigation.",
   "properties": {
     "schema_version": {
-      "const": "6.0.0",
-      "default": "6.0.0",
+      "const": "7.0.0",
+      "default": "7.0.0",
       "title": "Schema Version",
       "type": "string"
     },
-    "investigation_id": {
-      "description": "Stable investigation identity (ULID).",
-      "title": "Investigation Id",
+    "header": {
+      "$ref": "#/$defs/InvestigationHeader"
+    },
+    "policy_version": {
+      "default": "default-v1",
+      "title": "Policy Version",
       "type": "string"
     },
-    "investigation_name": {
-      "anyOf": [
-        {
-          "type": "string"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "default": null,
-      "description": "Optional human-readable investigation name.",
-      "title": "Investigation Name"
+    "engine_id": {
+      "default": "basic-v1",
+      "title": "Engine Id",
+      "type": "string"
     },
-    "score": {
-      "description": "Global investigation score.",
-      "title": "Score",
-      "type": "number"
+    "facts": {
+      "$ref": "#/$defs/FactsSchema"
     },
-    "level": {
-      "$ref": "#/$defs/Level",
-      "description": "Security level classification from NONE (lowest) to MALICIOUS (highest)."
-    },
-    "whitelisted": {
-      "description": "Whether the investigation is whitelisted.",
-      "title": "Whitelisted",
-      "type": "boolean"
-    },
-    "whitelists": {
-      "description": "List of whitelist entries applied to this investigation.",
-      "items": {
-        "$ref": "#/$defs/InvestigationWhitelist"
-      },
-      "title": "Whitelists",
-      "type": "array"
-    },
-    "observables": {
+    "decisions": {
       "additionalProperties": {
-        "$ref": "#/$defs/Observable"
+        "$ref": "#/$defs/Decision"
       },
-      "description": "Observables keyed by their unique key.",
-      "title": "Observables",
-      "type": "object"
-    },
-    "findings": {
-      "additionalProperties": {
-        "$ref": "#/$defs/Finding"
-      },
-      "description": "Findings keyed by their unique key.",
-      "title": "Findings",
-      "type": "object"
-    },
-    "evidences": {
-      "additionalProperties": {
-        "$ref": "#/$defs/Evidence"
-      },
-      "description": "Evidence objects keyed by their unique key.",
-      "title": "Evidences",
-      "type": "object"
-    },
-    "threat_intels": {
-      "additionalProperties": {
-        "$ref": "#/$defs/ThreatIntel"
-      },
-      "description": "Threat intelligence entries keyed by their unique key.",
-      "title": "Threat Intels",
-      "type": "object"
-    },
-    "enrichments": {
-      "additionalProperties": {
-        "$ref": "#/$defs/Enrichment"
-      },
-      "description": "Enrichment entries keyed by their unique key.",
-      "title": "Enrichments",
+      "title": "Decisions",
       "type": "object"
     },
     "tags": {
       "additionalProperties": {
         "$ref": "#/$defs/Tag"
       },
-      "description": "Tags keyed by their unique key.",
       "title": "Tags",
       "type": "object"
     },
-    "stats": {
-      "$ref": "#/$defs/StatisticsSchema",
-      "description": "Investigation statistics summary."
-    },
-    "data_extraction": {
-      "$ref": "#/$defs/DataExtractionSchema",
-      "description": "Data extraction metadata."
-    },
-    "score_display": {
-      "description": "Global investigation score formatted as fixed-point x.xx.",
-      "readOnly": true,
-      "title": "Score Display",
-      "type": "string"
+    "report": {
+      "$ref": "#/$defs/Report"
     }
   },
   "required": [
-    "investigation_id",
-    "score",
-    "level",
-    "whitelisted",
-    "whitelists",
-    "observables",
-    "findings",
-    "evidences",
-    "threat_intels",
-    "enrichments",
-    "tags",
-    "stats",
-    "data_extraction",
-    "score_display"
+    "header",
+    "report"
   ],
-  "title": "Cyvest Investigation",
+  "title": "InvestigationSchema",
   "type": "object"
 }

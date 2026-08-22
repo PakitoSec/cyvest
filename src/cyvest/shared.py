@@ -1,551 +1,199 @@
 """
-Shared investigation context for concurrent execution.
+Shared investigation context: several workers, one store.
 
-This module provides a single implementation that supports both:
-- synchronous usage (threads / thread pools)
-- asynchronous usage (asyncio)
+v6 guarded a mutable model with a global lock and deep-copied everything on every read, because
+concurrent mutation of shared objects had to be prevented. None of that is needed once facts are
+immutable and merging is a union: a worker builds its own fragment, and reconciling is
+``store.union()`` — idempotent, commutative and associative, so the order of arrivals is
+irrelevant and a double reconcile is harmless.
 
-Key design goals:
-- All state mutation and reads go through a single shared implementation.
-- Async APIs never block the event loop: they run the critical section in a worker thread.
-- Returned objects are deep-copied snapshots (read-only-by-convention) to avoid shared mutable state.
+The lock that remains protects one dict insertion, not an object graph.
 """
 
 from __future__ import annotations
 
 import asyncio
 import threading
-from copy import deepcopy
-from decimal import Decimal
-from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal
+from collections.abc import Iterator
+from contextlib import contextmanager
+from typing import Any, Literal
 
 from logurich import get_logger
 
 from cyvest import keys
 from cyvest.cyvest import Cyvest
-from cyvest.io_serialization import (
-    generate_markdown_report,
-    save_investigation_json,
-    save_investigation_markdown,
-    serialize_investigation,
-)
-from cyvest.levels import Level
-from cyvest.model import Enrichment, Evidence, Finding, Observable, ObservableType
-from cyvest.model_enums import ObservableSubtype
-
-if TYPE_CHECKING:
-    from cyvest.investigation import Investigation
-    from cyvest.model_schema import InvestigationSchema
+from cyvest.enums import ObservableType, Verdict
+from cyvest.evaluation import Report, evaluate
+from cyvest.facts import Evidence, Finding, Observable
+from cyvest.facts.store import FactStore, InvestigationHeader
+from cyvest.investigation import Investigation
+from cyvest.policy import DEFAULT_POLICY, Policy
+from cyvest.ulid import generate_ulid
 
 logger = get_logger(__name__)
 
 
-class _SharedLock:
-    """
-    Dual-mode lock adapter with a single canonical lock.
-
-    - Sync path: acquires a single `threading.RLock` around the critical section.
-    - Async path: runs the entire critical section in a worker thread via `asyncio.to_thread(...)`
-      so the event loop is never blocked.
-
-    Notes:
-    - Optionally limits concurrent async callers via a single `asyncio.Semaphore(max_async_workers)`.
-    """
-
-    def __init__(
-        self,
-        thread_lock: threading.RLock | None = None,
-        *,
-        max_async_workers: int | None = None,
-    ) -> None:
-        self._thread_lock = thread_lock or threading.RLock()
-        self._max_async_workers = max_async_workers
-        self._async_semaphores: dict[int, asyncio.Semaphore] = {}
-
-    def run(self, fn, /, *args, **kwargs):
-        with self._thread_lock:
-            return fn(*args, **kwargs)
-
-    async def arun(self, fn, /, *args, **kwargs):
-        max_workers = self._max_async_workers
-        if max_workers is None:
-            return await asyncio.to_thread(self.run, fn, *args, **kwargs)
-
-        loop = asyncio.get_running_loop()
-        loop_id = id(loop)
-        semaphore = self._async_semaphores.get(loop_id)
-        if semaphore is None:
-            semaphore = asyncio.Semaphore(max_workers)
-            self._async_semaphores[loop_id] = semaphore
-
-        async with semaphore:
-            return await asyncio.to_thread(self.run, fn, *args, **kwargs)
-
-
 class SharedInvestigationContext:
     """
-    Shared context for cross-task observable/finding/enrichment sharing.
+    A store several tasks contribute to.
 
-    Initialize with a Cyvest instance; the canonical state is its investigation.
-
-    Invariants:
-    - The canonical state lives in `_main_investigation`.
-    - All merges are atomic: merge + registry refresh happen in a single critical section.
-    - Registries only contain deep-copied snapshots; callers never get live references.
-    - Async APIs never block the event loop: all critical sections run in a worker thread.
+    Each ``create_cyvest`` hands out its own fragment id; reconciling folds that fragment back in.
+    Reads see the current union without taking a global lock on the object graph.
     """
 
     def __init__(
         self,
-        root_cyvest: Cyvest,
+        root_data: Any = None,
+        root_type: ObservableType | Literal["file", "artifact"] = ObservableType.FILE,
         *,
-        lock: threading.RLock | None = None,
-        max_async_workers: int | None = None,
+        policy: Policy | None = None,
+        engine: str | None = None,
+        investigation_name: str | None = None,
+        investigation_id: str | None = None,
     ) -> None:
-        if not isinstance(root_cyvest, Cyvest):
-            raise TypeError("SharedInvestigationContext expects a Cyvest instance. Use Cyvest.shared_context().")
-        self._lock = _SharedLock(lock, max_async_workers=max_async_workers)
-        self._main_cyvest = root_cyvest
-        self._main_investigation = root_cyvest._investigation
-
-        self._root_type = (
-            ObservableType.ARTIFACT
-            if self._main_investigation._root_observable.obs_type == ObservableType.ARTIFACT
-            else ObservableType.FILE
+        self.policy = policy or DEFAULT_POLICY
+        self._root_data = root_data
+        self._root_type = root_type
+        self._main = Investigation(
+            root_data,
+            root_type=root_type,
+            policy=self.policy,
+            engine=engine,
+            investigation_name=investigation_name,
+            investigation_id=investigation_id,
         )
-        self._score_mode_obs = self._main_investigation._score_engine._score_mode_obs
+        self._append_lock = threading.Lock()
 
-        self._observable_registry: dict[str, Observable] = {}
-        self._finding_registry: dict[str, Finding] = {}
-        self._evidence_registry: dict[str, Evidence] = {}
-        self._enrichment_registry: dict[str, Enrichment] = {}
+    @classmethod
+    def from_investigation(cls, investigation: Investigation) -> SharedInvestigationContext:
+        """Wrap an existing investigation so workers can contribute fragments to it."""
+        context = cls.__new__(cls)
+        context.policy = investigation.policy
+        root = investigation.get_root()
+        context._root_data = root.extra
+        context._root_type = root.obs_type
+        context._main = investigation
+        context._append_lock = threading.Lock()
+        return context
 
-        # Initialize registries from the provided canonical investigation so lookups
-        # work immediately (even before the first reconcile).
-        self._lock.run(self._refresh_registries_unlocked)
-
-    # ---------------------------------------------------------------------
-    # Task creation (local fragment builder)
-    # ---------------------------------------------------------------------
+    # ------------------------------------------------------------------ fragments
 
     def create_cyvest(
         self,
-        root_data: Any | None = None,
+        *,
+        fragment_id: str | None = None,
         investigation_id: str | None = None,
         investigation_name: str | None = None,
-    ):
+    ) -> Cyvest:
         """
-        Return a context manager for a task-local Cyvest instance.
+        Hand out a worker-local investigation sharing this context's root.
 
-        - `with shared.create_cyvest() as cy:` auto-reconciles on successful exit.
-        - `async with shared.create_cyvest() as cy:` also works (reconciles via `areconcile()`).
+        The fragment id is what makes ``Scope.OWN_FRAGMENT`` meaningful later: a finding created
+        here will only ever see this fragment's facts unless it asks otherwise.
 
-        Args:
-            root_data: Task data (if None, uses a deep copy of the canonical root observable extra).
-            investigation_id: Optional deterministic investigation ID for the fragment.
-            investigation_name: Optional human-readable name for the fragment.
-
-        If `root_data` is None, task data is a deep copy of the canonical root observable extra.
+        Usable directly or as a context manager, in which case exiting reconciles the fragment.
         """
-        return self._CyvestContextManager(
-            shared_context=self,
-            root_data=root_data,
-            investigation_id=investigation_id,
-            investigation_name=investigation_name,
-        )
-
-    def acreate_cyvest(
-        self,
-        root_data: Any | None = None,
-        investigation_id: str | None = None,
-        investigation_name: str | None = None,
-    ):
-        """Async-friendly alias for `create_cyvest` (supports `async with`)."""
-        return self.create_cyvest(
-            root_data=root_data,
-            investigation_id=investigation_id,
-            investigation_name=investigation_name,
-        )
-
-    class _CyvestContextManager:
-        def __init__(
-            self,
-            *,
-            shared_context: SharedInvestigationContext,
-            root_data: Any | None,
-            investigation_id: str | None = None,
-            investigation_name: str | None = None,
-        ) -> None:
-            self._shared_context = shared_context
-            self._root_data = root_data
-            self._investigation_id = investigation_id
-            self._investigation_name = investigation_name
-            self._cyvest: Cyvest | None = None
-
-        def __enter__(self):
-            self._cyvest = self._shared_context._create_task_cyvest_sync(
-                self._root_data, self._investigation_id, self._investigation_name
-            )
-            return self._cyvest
-
-        def __exit__(self, exc_type, _exc_val, _exc_tb) -> Literal[False]:
-            if exc_type is None and self._cyvest is not None:
-                self._shared_context.reconcile(self._cyvest)
-            return False
-
-        async def __aenter__(self):
-            self._cyvest = await self._shared_context._create_task_cyvest_async(
-                self._root_data, self._investigation_id, self._investigation_name
-            )
-            return self._cyvest
-
-        async def __aexit__(self, exc_type, _exc_val, _exc_tb) -> Literal[False]:
-            if exc_type is None and self._cyvest is not None:
-                await self._shared_context.areconcile(self._cyvest)
-            return False
-
-    def _create_task_cyvest_sync(
-        self,
-        root_data: Any | None,
-        investigation_id: str | None = None,
-        investigation_name: str | None = None,
-    ):
-        if root_data is None:
-            root_data = self._lock.run(self._get_root_data_copy_unlocked)
-        else:
-            root_data = deepcopy(root_data)
-        return Cyvest(
-            root_data,
+        worker = Cyvest(
+            self._root_data,
             root_type=self._root_type,
-            score_mode_obs=self._score_mode_obs,
-            investigation_id=investigation_id,
+            policy=self.policy,
+            engine=self._main.store.header.engine_id,
+            investigation_id=fragment_id or investigation_id or generate_ulid(),
             investigation_name=investigation_name,
         )
+        worker._shared_context = self
+        return worker
 
-    async def _create_task_cyvest_async(
-        self,
-        root_data: Any | None,
-        investigation_id: str | None = None,
-        investigation_name: str | None = None,
-    ):
-        if root_data is None:
-            root_data = await self._lock.arun(self._get_root_data_copy_unlocked)
-        else:
-            root_data = deepcopy(root_data)
-        return Cyvest(
-            root_data,
-            root_type=self._root_type,
-            score_mode_obs=self._score_mode_obs,
-            investigation_id=investigation_id,
-            investigation_name=investigation_name,
-        )
+    async def acreate_cyvest(self, *, fragment_id: str | None = None) -> Cyvest:
+        return await asyncio.to_thread(self.create_cyvest, fragment_id=fragment_id)
 
-    def _get_root_data_copy_unlocked(self) -> Any:
-        return deepcopy(self._main_investigation._root_observable.extra)
+    @contextmanager
+    def task(self, *, fragment_id: str | None = None) -> Iterator[Cyvest]:
+        """Scope a worker and reconcile it on exit, including when the body raises."""
+        worker = self.create_cyvest(fragment_id=fragment_id)
+        try:
+            yield worker
+        finally:
+            self.reconcile(worker)
 
-    # ---------------------------------------------------------------------
-    # Reconciliation (atomic merge into canonical)
-    # ---------------------------------------------------------------------
+    # ------------------------------------------------------------------ reconcile
+
+    @staticmethod
+    def _investigation_of(source: Cyvest | Investigation) -> Investigation:
+        return source._investigation if isinstance(source, Cyvest) else source
 
     def reconcile(self, source: Cyvest | Investigation) -> None:
-        task_investigation = self._extract_investigation(source)
-        self._lock.run(self._reconcile_unlocked, task_investigation)
+        """Fold a worker's fragment into the shared store. Safe to call twice."""
+        incoming = self._investigation_of(source)
+        with self._append_lock:
+            self._main.store = self._main.store.union(incoming.store)
+            self._main.invalidate()
 
     async def areconcile(self, source: Cyvest | Investigation) -> None:
-        task_investigation = self._extract_investigation(source)
-        await self._lock.arun(self._reconcile_unlocked, task_investigation)
+        await asyncio.to_thread(self.reconcile, source)
 
-    def _extract_investigation(self, source: Cyvest | Investigation) -> Investigation:
-        if isinstance(source, Cyvest):
-            return source._investigation
-        return source
+    # ------------------------------------------------------------------ reads
 
-    def _reconcile_unlocked(self, task_investigation: Investigation) -> None:
-        logger.debug("Reconciling task investigation into shared context")
-        self._main_investigation.merge_investigation(task_investigation)
-        self._refresh_registries_unlocked()
-        logger.debug(
-            "Reconciliation complete. Registry: %d observables, %d findings, %d enrichments",
-            len(self._observable_registry),
-            len(self._finding_registry),
-            len(self._enrichment_registry),
-        )
+    @property
+    def store(self) -> FactStore:
+        return self._main.store
 
-    def _refresh_registries_unlocked(self) -> None:
-        observable_registry: dict[str, Observable] = {}
-        for obs in self._main_investigation.get_all_observables().values():
-            copy = obs.model_copy(deep=True)
-            copy._from_shared_context = True
-            observable_registry[obs.key] = copy
-        finding_registry = {
-            finding.key: finding.model_copy(deep=True)
-            for finding in self._main_investigation.get_all_findings().values()
-        }
-        evidence_registry = {
-            evidence.key: evidence.model_copy(deep=True)
-            for evidence in self._main_investigation.get_all_evidences().values()
-        }
-        enrichment_registry = {
-            enrichment.key: enrichment.model_copy(deep=True)
-            for enrichment in self._main_investigation.get_all_enrichments().values()
-        }
-        self._observable_registry = observable_registry
-        self._finding_registry = finding_registry
-        self._evidence_registry = evidence_registry
-        self._enrichment_registry = enrichment_registry
+    @property
+    def header(self) -> InvestigationHeader:
+        return self._main.store.header
 
-    # ---------------------------------------------------------------------
-    # Lookups (deep-copied snapshots only)
-    # ---------------------------------------------------------------------
+    @property
+    def report(self) -> Report:
+        return self._main.report
 
-    def observable_get(
-        self,
-        obs_type: ObservableType | str,
-        value: str,
-        subtype: ObservableSubtype | str | None = None,
-        namespace: str | None = None,
-    ) -> Observable | None:
-        key = self._observable_key(obs_type, value, subtype, namespace)
-        return self._lock.run(self._get_observable_by_key_unlocked, key)
+    def evaluate(self, *, policy: Policy | None = None, engine: str | None = None) -> Report:
+        return evaluate(self._main.store, policy or self.policy, engine or self.header.engine_id)
 
-    async def observable_aget(
-        self,
-        obs_type: ObservableType | str,
-        value: str,
-        subtype: ObservableSubtype | str | None = None,
-        namespace: str | None = None,
-    ) -> Observable | None:
-        key = self._observable_key(obs_type, value, subtype, namespace)
-        return await self._lock.arun(self._get_observable_by_key_unlocked, key)
+    def get_global_score(self) -> float:
+        return self._main.get_global_score()
 
-    def _get_observable_by_key_unlocked(self, key: str) -> Observable | None:
-        obs = self._observable_registry.get(key)
-        if obs is None:
-            return None
-        copy = obs.model_copy(deep=True)
-        copy._from_shared_context = True
-        return copy
+    async def aget_global_score(self) -> float:
+        return await asyncio.to_thread(self.get_global_score)
 
-    def _observable_key(
-        self,
-        obs_type: ObservableType | str,
-        value: str,
-        subtype: ObservableSubtype | str | None = None,
-        namespace: str | None = None,
-    ) -> str:
-        try:
-            obs_type_value = obs_type.value if isinstance(obs_type, ObservableType) else str(obs_type)
-            subtype_value = subtype.value if isinstance(subtype, ObservableSubtype) else subtype
-            return keys.generate_observable_key(
-                obs_type_value,
-                value,
-                subtype=subtype_value,
-                namespace=namespace,
-            )
-        except Exception as e:
-            raise ValueError(f"Failed to generate observable key for type='{obs_type}', value='{value}': {e}") from e
+    def get_global_verdict(self) -> Verdict:
+        return self._main.get_global_verdict()
 
-    def finding_get(self, finding_name: str) -> Finding | None:
-        key = self._finding_key(finding_name)
-        return self._lock.run(self._get_finding_by_key_unlocked, key)
+    async def aget_global_verdict(self) -> Verdict:
+        return await asyncio.to_thread(self.get_global_verdict)
 
-    async def finding_aget(self, finding_name: str) -> Finding | None:
-        key = self._finding_key(finding_name)
-        return await self._lock.arun(self._get_finding_by_key_unlocked, key)
+    def observable_get(self, *args: Any, **kwargs: Any) -> Observable | None:
+        """Accepts a key, or the identity components — same call as on the facade it hands out."""
+        return self._main.get_observable(keys.resolve_observable_key(*args, **kwargs))
 
-    def _get_finding_by_key_unlocked(self, key: str) -> Finding | None:
-        finding = self._finding_registry.get(key)
-        return finding.model_copy(deep=True) if finding else None
+    async def observable_aget(self, *args: Any, **kwargs: Any) -> Observable | None:
+        return await asyncio.to_thread(self.observable_get, *args, **kwargs)
 
-    def _finding_key(self, finding_name: str) -> str:
-        try:
-            return keys.generate_finding_key(finding_name)
-        except Exception as e:
-            raise ValueError(f"Failed to generate finding key for finding_name='{finding_name}': {e}") from e
+    def observables_list_by_type(self, obs_type: ObservableType | str) -> list[Observable]:
+        wanted = obs_type.value if isinstance(obs_type, ObservableType) else str(obs_type).lower()
+        return [
+            observable
+            for observable in self._main.get_all_observables().values()
+            if (observable.obs_type.value if hasattr(observable.obs_type, "value") else observable.obs_type) == wanted
+        ]
+
+    def finding_get(self, key: str) -> Finding | None:
+        return self._main.get_finding(key)
+
+    async def finding_aget(self, key: str) -> Finding | None:
+        return await asyncio.to_thread(self.finding_get, key)
 
     def evidence_get(self, key: str) -> Evidence | None:
-        evidence = self._lock.run(self._evidence_registry.get, key)
-        return evidence.model_copy(deep=True) if evidence else None
+        return self._main.get_evidence(key)
 
     async def evidence_aget(self, key: str) -> Evidence | None:
-        evidence = await self._lock.arun(self._evidence_registry.get, key)
-        return evidence.model_copy(deep=True) if evidence else None
+        return await asyncio.to_thread(self.evidence_get, key)
 
-    def enrichment_get(self, name: str, context: str = "") -> Enrichment | None:
-        key = self._enrichment_key(name, context)
-        return self._lock.run(self._get_enrichment_by_key_unlocked, key)
+    def finalize_relationships(self) -> None:
+        self._main.finalize_relationships()
 
-    async def enrichment_aget(self, name: str, context: str = "") -> Enrichment | None:
-        key = self._enrichment_key(name, context)
-        return await self._lock.arun(self._get_enrichment_by_key_unlocked, key)
+    def as_cyvest(self) -> Cyvest:
+        """Expose the reconciled whole through the ordinary facade."""
+        return Cyvest._wrap(self._main)
 
-    def _get_enrichment_by_key_unlocked(self, key: str) -> Enrichment | None:
-        enrichment = self._enrichment_registry.get(key)
-        return enrichment.model_copy(deep=True) if enrichment else None
 
-    def _enrichment_key(self, name: str, context: str = "") -> str:
-        try:
-            return keys.generate_enrichment_key(name, context)
-        except Exception as e:
-            raise ValueError(f"Failed to generate enrichment key for name='{name}', context='{context}': {e}") from e
-
-    # ---------------------------------------------------------------------
-    # Lightweight state reads
-    # ---------------------------------------------------------------------
-
-    def get_global_score(self) -> Decimal:
-        return self._lock.run(self._main_investigation.get_global_score)
-
-    async def aget_global_score(self) -> Decimal:
-        return await self._lock.arun(self._main_investigation.get_global_score)
-
-    def is_whitelisted(self) -> bool:
-        return self._lock.run(self._main_investigation.is_whitelisted)
-
-    async def ais_whitelisted(self) -> bool:
-        return await self._lock.arun(self._main_investigation.is_whitelisted)
-
-    def get_global_level(self) -> Level:
-        return self._lock.run(self._main_investigation.get_global_level)
-
-    async def aget_global_level(self) -> Level:
-        return await self._lock.arun(self._main_investigation.get_global_level)
-
-    def observables_list_by_type(self, obs_type: ObservableType) -> list[Observable]:
-        return self._lock.run(self._observables_list_by_type_unlocked, obs_type)
-
-    async def observables_alist_by_type(self, obs_type: ObservableType) -> list[Observable]:
-        return await self._lock.arun(self._observables_list_by_type_unlocked, obs_type)
-
-    def _observables_list_by_type_unlocked(self, obs_type: ObservableType) -> list[Observable]:
-        matches = [obs for obs in self._observable_registry.values() if obs.obs_type == obs_type]
-
-        results: list[Observable] = []
-        for obs in matches:
-            copy = obs.model_copy(deep=True)
-            copy._from_shared_context = True
-            results.append(copy)
-        return results
-
-    # Intentionally minimal: prefer `observable_get()` / `finding_get()` and user-side filtering.
-
-    # ---------------------------------------------------------------------
-    # Serialization helpers (sync + async wrappers)
-    # ---------------------------------------------------------------------
-
-    def io_to_markdown(
-        self,
-        include_tags: bool = False,
-        include_enrichments: bool = False,
-        include_observables: bool = True,
-        exclude_levels: set[Level] | None = None,
-    ) -> str:
-        return self._lock.run(
-            self._io_to_markdown_unlocked,
-            include_tags,
-            include_enrichments,
-            include_observables,
-            exclude_levels,
-        )
-
-    async def aio_to_markdown(
-        self,
-        include_tags: bool = False,
-        include_enrichments: bool = False,
-        include_observables: bool = True,
-        exclude_levels: set[Level] | None = None,
-    ) -> str:
-        return await self._lock.arun(
-            self._io_to_markdown_unlocked,
-            include_tags,
-            include_enrichments,
-            include_observables,
-            exclude_levels,
-        )
-
-    def _io_to_markdown_unlocked(
-        self,
-        include_tags: bool,
-        include_enrichments: bool,
-        include_observables: bool,
-        exclude_levels: set[Level] | None,
-    ) -> str:
-        return generate_markdown_report(
-            self._main_investigation,
-            include_tags,
-            include_enrichments,
-            include_observables,
-            exclude_levels,
-        )
-
-    def io_save_markdown(
-        self,
-        filepath: str | Path,
-        include_tags: bool = False,
-        include_enrichments: bool = False,
-        include_observables: bool = True,
-        exclude_levels: set[Level] | None = None,
-    ) -> str:
-        return self._lock.run(
-            self._io_save_markdown_unlocked,
-            filepath,
-            include_tags,
-            include_enrichments,
-            include_observables,
-            exclude_levels,
-        )
-
-    async def aio_save_markdown(
-        self,
-        filepath: str | Path,
-        include_tags: bool = False,
-        include_enrichments: bool = False,
-        include_observables: bool = True,
-        exclude_levels: set[Level] | None = None,
-    ) -> str:
-        return await self._lock.arun(
-            self._io_save_markdown_unlocked,
-            filepath,
-            include_tags,
-            include_enrichments,
-            include_observables,
-            exclude_levels,
-        )
-
-    def _io_save_markdown_unlocked(
-        self,
-        filepath: str | Path,
-        include_tags: bool,
-        include_enrichments: bool,
-        include_observables: bool,
-        exclude_levels: set[Level] | None,
-    ) -> str:
-        save_investigation_markdown(
-            self._main_investigation,
-            filepath,
-            include_tags,
-            include_enrichments,
-            include_observables,
-            exclude_levels,
-        )
-        return str(Path(filepath).resolve())
-
-    def io_to_invest(self) -> InvestigationSchema:
-        return self._lock.run(self._io_to_invest_unlocked)
-
-    async def aio_to_invest(self) -> InvestigationSchema:
-        return await self._lock.arun(self._io_to_invest_unlocked)
-
-    def _io_to_invest_unlocked(self) -> InvestigationSchema:
-        return serialize_investigation(self._main_investigation)
-
-    def io_save_json(self, filepath: str | Path) -> str:
-        return self._lock.run(self._io_save_json_unlocked, filepath)
-
-    async def aio_save_json(self, filepath: str | Path) -> str:
-        return await self._lock.arun(self._io_save_json_unlocked, filepath)
-
-    def _io_save_json_unlocked(self, filepath: str | Path) -> str:
-        save_investigation_json(self._main_investigation, filepath)
-        return str(Path(filepath).resolve())
+__all__ = ["SharedInvestigationContext"]

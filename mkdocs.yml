@@ -53,12 +53,17 @@ nav:
       - Quickstart: getting-started/quickstart.md
       - Concepts: getting-started/concepts.md
   - Migration:
+      - Version 6.x to 7.0: migration-v6-to-v7.md
       - Version 5.x to 6.0: migration-v5-to-v6.md
+  - Scoring Model: scoring-model.md
+  - Timeline: timeline.md
+  - External Signals: external-signals.md
   - Shared Investigation Context: shared-investigation-context.md
   - Comparing Investigations: comparing-investigations.md
   - Observable Extraction: observable-extraction.md
   - JavaScript Packages: js-packages.md
   - Contributing: contributing.md
+  - Follow-up (v7): followup-v7.md
 
 markdown_extensions:
   - admonition

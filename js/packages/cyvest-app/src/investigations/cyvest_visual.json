@@ -1,756 +1,2001 @@
 {
-  "schema_version": "6.0.0",
-  "investigation_id": "cyvest-visual-example",
-  "investigation_name": "Visualization Example",
-  "score": 37.5,
-  "level": "MALICIOUS",
-  "whitelisted": false,
-  "whitelists": [],
-  "observables": {
-    "obs:file:root": {
-      "type": "file",
-      "subtype": null,
-      "namespace": null,
-      "value": "root",
-      "internal": false,
-      "whitelisted": false,
-      "comment": "Root observable for investigation",
-      "extra": {},
-      "score": 0.0,
-      "level": "INFO",
-      "aliases": [],
-      "occurrence_count": 1,
-      "threat_intels": [],
-      "relationships": [
-        {
-          "target_key": "obs:artifact:phishing email - invoice #12345",
-          "relationship_type": "related-to",
-          "direction": "bidirectional"
-        }
-      ],
-      "key": "obs:file:root",
-      "finding_links": [],
-      "score_display": "0.00"
-    },
-    "obs:domain:evil-phishing.com": {
-      "type": "domain",
-      "subtype": null,
-      "namespace": null,
-      "value": "evil-phishing.com",
-      "internal": false,
-      "whitelisted": false,
-      "comment": "",
-      "extra": {},
-      "score": 9.0,
-      "level": "MALICIOUS",
-      "aliases": [],
-      "occurrence_count": 1,
-      "threat_intels": [
-        "ti:virustotal:obs:domain:evil-phishing.com",
-        "ti:alienvault otx:obs:domain:evil-phishing.com"
-      ],
-      "relationships": [],
-      "key": "obs:domain:evil-phishing.com",
-      "finding_links": [
-        "fnd:infrastructure"
-      ],
-      "score_display": "9.00"
-    },
-    "obs:ipv4:185.220.101.50": {
-      "type": "ipv4",
-      "subtype": null,
-      "namespace": null,
-      "value": "185.220.101.50",
-      "internal": false,
-      "whitelisted": false,
-      "comment": "",
-      "extra": {},
-      "score": 9.5,
-      "level": "MALICIOUS",
-      "aliases": [],
-      "occurrence_count": 1,
-      "threat_intels": [
-        "ti:abuseipdb:obs:ipv4:185.220.101.50"
-      ],
-      "relationships": [
-        {
-          "target_key": "obs:domain:evil-phishing.com",
-          "relationship_type": "pivot",
-          "direction": "outbound"
-        }
-      ],
-      "key": "obs:ipv4:185.220.101.50",
-      "finding_links": [
-        "fnd:infrastructure"
-      ],
-      "score_display": "9.50"
-    },
-    "obs:domain:sketchy-site.net": {
-      "type": "domain",
-      "subtype": null,
-      "namespace": null,
-      "value": "sketchy-site.net",
-      "internal": false,
-      "whitelisted": false,
-      "comment": "",
-      "extra": {},
-      "score": 4.5,
-      "level": "SUSPICIOUS",
-      "aliases": [],
-      "occurrence_count": 1,
-      "threat_intels": [
-        "ti:virustotal:obs:domain:sketchy-site.net"
-      ],
-      "relationships": [
-        {
-          "target_key": "obs:ipv4:192.168.100.5",
-          "relationship_type": "pivot",
-          "direction": "outbound"
-        }
-      ],
-      "key": "obs:domain:sketchy-site.net",
-      "finding_links": [],
-      "score_display": "4.50"
-    },
-    "obs:ipv4:192.168.100.5": {
-      "type": "ipv4",
-      "subtype": null,
-      "namespace": null,
-      "value": "192.168.100.5",
-      "internal": false,
-      "whitelisted": false,
-      "comment": "",
-      "extra": {},
-      "score": 3.0,
-      "level": "SUSPICIOUS",
-      "aliases": [],
-      "occurrence_count": 1,
-      "threat_intels": [
-        "ti:shodan:obs:ipv4:192.168.100.5"
-      ],
-      "relationships": [],
-      "key": "obs:ipv4:192.168.100.5",
-      "finding_links": [],
-      "score_display": "3.00"
-    },
-    "obs:email:attacker@evil-phishing.com": {
-      "type": "email",
-      "subtype": null,
-      "namespace": null,
-      "value": "attacker@evil-phishing.com",
-      "internal": false,
-      "whitelisted": false,
-      "comment": "",
-      "extra": {},
-      "score": 8.0,
-      "level": "MALICIOUS",
-      "aliases": [],
-      "occurrence_count": 1,
-      "threat_intels": [
-        "ti:emailrep:obs:email:attacker@evil-phishing.com"
-      ],
-      "relationships": [
-        {
-          "target_key": "obs:domain:evil-phishing.com",
-          "relationship_type": "related-to",
-          "direction": "bidirectional"
-        }
-      ],
-      "key": "obs:email:attacker@evil-phishing.com",
-      "finding_links": [
-        "fnd:email_analysis"
-      ],
-      "score_display": "8.00"
-    },
-    "obs:email:victim@company.com": {
-      "type": "email",
-      "subtype": null,
-      "namespace": null,
-      "value": "victim@company.com",
-      "internal": true,
-      "whitelisted": false,
-      "comment": "",
-      "extra": {},
-      "score": -1.0,
-      "level": "TRUSTED",
-      "aliases": [],
-      "occurrence_count": 1,
-      "threat_intels": [
-        "ti:internal whitelist:obs:email:victim@company.com"
-      ],
-      "relationships": [],
-      "key": "obs:email:victim@company.com",
-      "finding_links": [
-        "fnd:email_analysis"
-      ],
-      "score_display": "-1.00"
-    },
-    "obs:artifact:phishing email - invoice #12345": {
-      "type": "artifact",
-      "subtype": null,
-      "namespace": null,
-      "value": "Phishing Email - Invoice #12345",
-      "internal": false,
-      "whitelisted": false,
-      "comment": "",
-      "extra": {},
-      "score": 9.0,
-      "level": "MALICIOUS",
-      "aliases": [],
-      "occurrence_count": 1,
-      "threat_intels": [
-        "ti:email gateway:obs:artifact:phishing email - invoice #12345"
-      ],
-      "relationships": [
-        {
-          "target_key": "obs:email:attacker@evil-phishing.com",
-          "relationship_type": "extraction",
-          "direction": "outbound"
-        },
-        {
-          "target_key": "obs:email:victim@company.com",
-          "relationship_type": "extraction",
-          "direction": "outbound"
-        },
-        {
-          "target_key": "obs:url:https://evil-phishing.com/login",
-          "relationship_type": "extraction",
-          "direction": "outbound"
-        },
-        {
-          "target_key": "obs:url:https://evil-phishing.com/verify",
-          "relationship_type": "extraction",
-          "direction": "outbound"
-        },
-        {
-          "target_key": "obs:url:https://sketchy-site.net/invoice",
-          "relationship_type": "extraction",
-          "direction": "outbound"
-        },
-        {
-          "target_key": "obs:url:https://accounts.google.com/security",
-          "relationship_type": "extraction",
-          "direction": "outbound"
-        }
-      ],
-      "key": "obs:artifact:phishing email - invoice #12345",
-      "finding_links": [
-        "fnd:email_analysis"
-      ],
-      "score_display": "9.00"
-    },
-    "obs:url:https://evil-phishing.com/login": {
-      "type": "url",
-      "subtype": null,
-      "namespace": null,
-      "value": "https://evil-phishing.com/login",
-      "internal": false,
-      "whitelisted": false,
-      "comment": "",
-      "extra": {},
-      "score": 9.0,
-      "level": "MALICIOUS",
-      "aliases": [],
-      "occurrence_count": 1,
-      "threat_intels": [
-        "ti:urlhaus:obs:url:https://evil-phishing.com/login"
-      ],
-      "relationships": [
-        {
-          "target_key": "obs:domain:evil-phishing.com",
-          "relationship_type": "related-to",
-          "direction": "bidirectional"
-        }
-      ],
-      "key": "obs:url:https://evil-phishing.com/login",
-      "finding_links": [
-        "fnd:url_analysis"
-      ],
-      "score_display": "9.00"
-    },
-    "obs:url:https://evil-phishing.com/verify": {
-      "type": "url",
-      "subtype": null,
-      "namespace": null,
-      "value": "https://evil-phishing.com/verify",
-      "internal": false,
-      "whitelisted": false,
-      "comment": "",
-      "extra": {},
-      "score": 8.5,
-      "level": "MALICIOUS",
-      "aliases": [],
-      "occurrence_count": 1,
-      "threat_intels": [
-        "ti:urlhaus:obs:url:https://evil-phishing.com/verify"
-      ],
-      "relationships": [
-        {
-          "target_key": "obs:domain:evil-phishing.com",
-          "relationship_type": "related-to",
-          "direction": "bidirectional"
-        }
-      ],
-      "key": "obs:url:https://evil-phishing.com/verify",
-      "finding_links": [
-        "fnd:url_analysis"
-      ],
-      "score_display": "8.50"
-    },
-    "obs:url:https://sketchy-site.net/invoice": {
-      "type": "url",
-      "subtype": null,
-      "namespace": null,
-      "value": "https://sketchy-site.net/invoice",
-      "internal": false,
-      "whitelisted": false,
-      "comment": "",
-      "extra": {},
-      "score": 4.5,
-      "level": "SUSPICIOUS",
-      "aliases": [],
-      "occurrence_count": 1,
-      "threat_intels": [
-        "ti:urlhaus:obs:url:https://sketchy-site.net/invoice"
-      ],
-      "relationships": [
-        {
-          "target_key": "obs:domain:sketchy-site.net",
-          "relationship_type": "related-to",
-          "direction": "bidirectional"
-        }
-      ],
-      "key": "obs:url:https://sketchy-site.net/invoice",
-      "finding_links": [
-        "fnd:url_analysis"
-      ],
-      "score_display": "4.50"
-    },
-    "obs:url:https://accounts.google.com/security": {
-      "type": "url",
-      "subtype": null,
-      "namespace": null,
-      "value": "https://accounts.google.com/security",
-      "internal": false,
-      "whitelisted": true,
-      "comment": "",
-      "extra": {},
-      "score": -2.0,
-      "level": "TRUSTED",
-      "aliases": [],
-      "occurrence_count": 1,
-      "threat_intels": [
-        "ti:internal whitelist:obs:url:https://accounts.google.com/security"
-      ],
-      "relationships": [],
-      "key": "obs:url:https://accounts.google.com/security",
-      "finding_links": [],
-      "score_display": "-2.00"
-    },
-    "obs:file:invoice.exe": {
-      "type": "file",
-      "subtype": null,
-      "namespace": null,
-      "value": "invoice.exe",
-      "internal": false,
-      "whitelisted": false,
-      "comment": "",
-      "extra": {},
-      "score": 10.0,
-      "level": "MALICIOUS",
-      "aliases": [],
-      "occurrence_count": 1,
-      "threat_intels": [
-        "ti:virustotal:obs:file:invoice.exe"
-      ],
-      "relationships": [
-        {
-          "target_key": "obs:url:https://evil-phishing.com/login",
-          "relationship_type": "extraction",
-          "direction": "outbound"
-        },
-        {
-          "target_key": "obs:ipv4:185.220.101.50",
-          "relationship_type": "related-to",
-          "direction": "bidirectional"
-        }
-      ],
-      "key": "obs:file:invoice.exe",
-      "finding_links": [
-        "fnd:malware_detection"
-      ],
-      "score_display": "10.00"
-    }
+  "schema_version": "7.0.0",
+  "header": {
+    "investigation_id": "cyvest-visual-example",
+    "name": "Visualization Example",
+    "root_key": "obs:file:__cyvest_root__",
+    "opened_at": "2026-08-21T12:27:26.987560Z",
+    "policy_version": "default-v1",
+    "engine_id": "basic-v1",
+    "fragment_ids": [
+      "cyvest-visual-example"
+    ]
   },
-  "findings": {
-    "fnd:email_analysis": {
-      "finding_name": "email_analysis",
-      "description": "Phishing email analysis",
-      "comment": "",
-      "extra": {},
-      "score": 9.0,
-      "level": "MALICIOUS",
-      "origin_investigation_id": "cyvest-visual-example",
-      "observable_links": [
-        {
-          "observable_key": "obs:artifact:phishing email - invoice #12345",
-          "propagation_mode": "LOCAL_ONLY"
+  "policy_version": "default-v1",
+  "engine_id": "basic-v1",
+  "facts": {
+    "observables": {
+      "obs:file:__cyvest_root__": {
+        "key": "obs:file:__cyvest_root__",
+        "seq": "01M0J4MNWBKDE62M2JK0MD6ETX",
+        "asserted_at": "2026-08-21T12:27:26.987916Z",
+        "occurred_at": null,
+        "source": {
+          "name": "cyvest",
+          "source_class": "internal_tool"
         },
-        {
-          "observable_key": "obs:email:attacker@evil-phishing.com",
-          "propagation_mode": "LOCAL_ONLY"
+        "fragment_id": "cyvest-visual-example",
+        "external_id": null,
+        "evidence_keys": [],
+        "type": "file",
+        "subtype": null,
+        "namespace": null,
+        "value": "__cyvest_root__",
+        "internal": false,
+        "comment": "Root observable for investigation",
+        "extra": {},
+        "aliases": [],
+        "occurrences": {}
+      },
+      "obs:domain:evil-phishing.com": {
+        "key": "obs:domain:evil-phishing.com",
+        "seq": "01M0J4MNWCFGBWCZQSEA3Q4BQQ",
+        "asserted_at": "2026-08-21T12:27:26.988109Z",
+        "occurred_at": null,
+        "source": {
+          "name": "cyvest",
+          "source_class": "internal_tool"
         },
-        {
-          "observable_key": "obs:email:victim@company.com",
-          "propagation_mode": "LOCAL_ONLY"
+        "fragment_id": "cyvest-visual-example",
+        "external_id": null,
+        "evidence_keys": [],
+        "type": "domain",
+        "subtype": null,
+        "namespace": null,
+        "value": "evil-phishing.com",
+        "internal": false,
+        "comment": "",
+        "extra": {},
+        "aliases": [],
+        "occurrences": {
+          "cyvest-visual-example": 1
         }
-      ],
-      "evidence_links": [],
-      "key": "fnd:email_analysis",
-      "score_display": "9.00"
-    },
-    "fnd:url_analysis": {
-      "finding_name": "url_analysis",
-      "description": "Malicious URLs found in email",
-      "comment": "",
-      "extra": {},
-      "score": 9.0,
-      "level": "MALICIOUS",
-      "origin_investigation_id": "cyvest-visual-example",
-      "observable_links": [
-        {
-          "observable_key": "obs:url:https://evil-phishing.com/login",
-          "propagation_mode": "LOCAL_ONLY"
+      },
+      "obs:ipv4:185.220.101.50": {
+        "key": "obs:ipv4:185.220.101.50",
+        "seq": "01M0J4MNWCJ9P3TQAQX0NF08YQ",
+        "asserted_at": "2026-08-21T12:27:26.988231Z",
+        "occurred_at": null,
+        "source": {
+          "name": "cyvest",
+          "source_class": "internal_tool"
         },
-        {
-          "observable_key": "obs:url:https://evil-phishing.com/verify",
-          "propagation_mode": "LOCAL_ONLY"
+        "fragment_id": "cyvest-visual-example",
+        "external_id": null,
+        "evidence_keys": [],
+        "type": "ipv4",
+        "subtype": null,
+        "namespace": null,
+        "value": "185.220.101.50",
+        "internal": false,
+        "comment": "",
+        "extra": {},
+        "aliases": [],
+        "occurrences": {
+          "cyvest-visual-example": 1
+        }
+      },
+      "obs:domain:sketchy-site.net": {
+        "key": "obs:domain:sketchy-site.net",
+        "seq": "01M0J4MNWCKARRWTK9QX6CCCYB",
+        "asserted_at": "2026-08-21T12:27:26.988314Z",
+        "occurred_at": null,
+        "source": {
+          "name": "cyvest",
+          "source_class": "internal_tool"
         },
-        {
-          "observable_key": "obs:url:https://sketchy-site.net/invoice",
-          "propagation_mode": "LOCAL_ONLY"
+        "fragment_id": "cyvest-visual-example",
+        "external_id": null,
+        "evidence_keys": [],
+        "type": "domain",
+        "subtype": null,
+        "namespace": null,
+        "value": "sketchy-site.net",
+        "internal": false,
+        "comment": "",
+        "extra": {},
+        "aliases": [],
+        "occurrences": {
+          "cyvest-visual-example": 1
         }
-      ],
-      "evidence_links": [],
-      "key": "fnd:url_analysis",
-      "score_display": "9.00"
-    },
-    "fnd:infrastructure": {
-      "finding_name": "infrastructure",
-      "description": "Malicious infrastructure identified",
-      "comment": "",
-      "extra": {},
-      "score": 9.5,
-      "level": "MALICIOUS",
-      "origin_investigation_id": "cyvest-visual-example",
-      "observable_links": [
-        {
-          "observable_key": "obs:domain:evil-phishing.com",
-          "propagation_mode": "LOCAL_ONLY"
+      },
+      "obs:ipv4:192.168.100.5": {
+        "key": "obs:ipv4:192.168.100.5",
+        "seq": "01M0J4MNWCVSK7G59WZ59WRE2C",
+        "asserted_at": "2026-08-21T12:27:26.988381Z",
+        "occurred_at": null,
+        "source": {
+          "name": "cyvest",
+          "source_class": "internal_tool"
         },
-        {
-          "observable_key": "obs:ipv4:185.220.101.50",
-          "propagation_mode": "LOCAL_ONLY"
+        "fragment_id": "cyvest-visual-example",
+        "external_id": null,
+        "evidence_keys": [],
+        "type": "ipv4",
+        "subtype": null,
+        "namespace": null,
+        "value": "192.168.100.5",
+        "internal": false,
+        "comment": "",
+        "extra": {},
+        "aliases": [],
+        "occurrences": {
+          "cyvest-visual-example": 1
         }
-      ],
-      "evidence_links": [],
-      "key": "fnd:infrastructure",
-      "score_display": "9.50"
-    },
-    "fnd:malware_detection": {
-      "finding_name": "malware_detection",
-      "description": "Malware file analysis",
-      "comment": "",
-      "extra": {},
-      "score": 10.0,
-      "level": "MALICIOUS",
-      "origin_investigation_id": "cyvest-visual-example",
-      "observable_links": [
-        {
-          "observable_key": "obs:file:invoice.exe",
-          "propagation_mode": "LOCAL_ONLY"
+      },
+      "obs:email:attacker@evil-phishing.com": {
+        "key": "obs:email:attacker@evil-phishing.com",
+        "seq": "01M0J4MNWC9CG4J7XJTT335JCJ",
+        "asserted_at": "2026-08-21T12:27:26.988446Z",
+        "occurred_at": null,
+        "source": {
+          "name": "cyvest",
+          "source_class": "internal_tool"
+        },
+        "fragment_id": "cyvest-visual-example",
+        "external_id": null,
+        "evidence_keys": [],
+        "type": "email",
+        "subtype": null,
+        "namespace": null,
+        "value": "attacker@evil-phishing.com",
+        "internal": false,
+        "comment": "",
+        "extra": {},
+        "aliases": [],
+        "occurrences": {
+          "cyvest-visual-example": 1
         }
-      ],
-      "evidence_links": [],
-      "key": "fnd:malware_detection",
-      "score_display": "10.00"
-    }
-  },
-  "evidences": {},
-  "threat_intels": {
-    "ti:virustotal:obs:domain:evil-phishing.com": {
-      "source": "VirusTotal",
-      "observable_key": "obs:domain:evil-phishing.com",
-      "comment": "Known phishing domain",
-      "extra": {},
-      "score": 9.0,
-      "level": "MALICIOUS",
-      "taxonomies": [],
-      "key": "ti:virustotal:obs:domain:evil-phishing.com",
-      "score_display": "9.00"
-    },
-    "ti:alienvault otx:obs:domain:evil-phishing.com": {
-      "source": "AlienVault OTX",
-      "observable_key": "obs:domain:evil-phishing.com",
-      "comment": "Recently reported",
-      "extra": {},
-      "score": 8.5,
-      "level": "MALICIOUS",
-      "taxonomies": [],
-      "key": "ti:alienvault otx:obs:domain:evil-phishing.com",
-      "score_display": "8.50"
-    },
-    "ti:abuseipdb:obs:ipv4:185.220.101.50": {
-      "source": "AbuseIPDB",
-      "observable_key": "obs:ipv4:185.220.101.50",
-      "comment": "C2 server",
-      "extra": {},
-      "score": 9.5,
-      "level": "MALICIOUS",
-      "taxonomies": [],
-      "key": "ti:abuseipdb:obs:ipv4:185.220.101.50",
-      "score_display": "9.50"
-    },
-    "ti:virustotal:obs:domain:sketchy-site.net": {
-      "source": "VirusTotal",
-      "observable_key": "obs:domain:sketchy-site.net",
-      "comment": "Some detections",
-      "extra": {},
-      "score": 4.5,
-      "level": "SUSPICIOUS",
-      "taxonomies": [],
-      "key": "ti:virustotal:obs:domain:sketchy-site.net",
-      "score_display": "4.50"
-    },
-    "ti:shodan:obs:ipv4:192.168.100.5": {
-      "source": "Shodan",
-      "observable_key": "obs:ipv4:192.168.100.5",
-      "comment": "",
-      "extra": {},
-      "score": 3.0,
-      "level": "SUSPICIOUS",
-      "taxonomies": [],
-      "key": "ti:shodan:obs:ipv4:192.168.100.5",
-      "score_display": "3.00"
-    },
-    "ti:emailrep:obs:email:attacker@evil-phishing.com": {
-      "source": "EmailRep",
-      "observable_key": "obs:email:attacker@evil-phishing.com",
-      "comment": "Suspicious sender",
-      "extra": {},
-      "score": 8.0,
-      "level": "MALICIOUS",
-      "taxonomies": [],
-      "key": "ti:emailrep:obs:email:attacker@evil-phishing.com",
-      "score_display": "8.00"
-    },
-    "ti:internal whitelist:obs:email:victim@company.com": {
-      "source": "Internal Whitelist",
-      "observable_key": "obs:email:victim@company.com",
-      "comment": "Known employee",
-      "extra": {},
-      "score": -1.0,
-      "level": "TRUSTED",
-      "taxonomies": [],
-      "key": "ti:internal whitelist:obs:email:victim@company.com",
-      "score_display": "-1.00"
-    },
-    "ti:email gateway:obs:artifact:phishing email - invoice #12345": {
-      "source": "Email Gateway",
-      "observable_key": "obs:artifact:phishing email - invoice #12345",
-      "comment": "Flagged as suspicious",
-      "extra": {},
-      "score": 7.0,
-      "level": "MALICIOUS",
-      "taxonomies": [],
-      "key": "ti:email gateway:obs:artifact:phishing email - invoice #12345",
-      "score_display": "7.00"
-    },
-    "ti:urlhaus:obs:url:https://evil-phishing.com/login": {
-      "source": "URLhaus",
-      "observable_key": "obs:url:https://evil-phishing.com/login",
-      "comment": "",
-      "extra": {},
-      "score": 9.0,
-      "level": "MALICIOUS",
-      "taxonomies": [],
-      "key": "ti:urlhaus:obs:url:https://evil-phishing.com/login",
-      "score_display": "9.00"
-    },
-    "ti:urlhaus:obs:url:https://evil-phishing.com/verify": {
-      "source": "URLhaus",
-      "observable_key": "obs:url:https://evil-phishing.com/verify",
-      "comment": "",
-      "extra": {},
-      "score": 8.5,
-      "level": "MALICIOUS",
-      "taxonomies": [],
-      "key": "ti:urlhaus:obs:url:https://evil-phishing.com/verify",
-      "score_display": "8.50"
-    },
-    "ti:urlhaus:obs:url:https://sketchy-site.net/invoice": {
-      "source": "URLhaus",
-      "observable_key": "obs:url:https://sketchy-site.net/invoice",
-      "comment": "Low-confidence redirect",
-      "extra": {},
-      "score": 4.5,
-      "level": "SUSPICIOUS",
-      "taxonomies": [],
-      "key": "ti:urlhaus:obs:url:https://sketchy-site.net/invoice",
-      "score_display": "4.50"
-    },
-    "ti:internal whitelist:obs:url:https://accounts.google.com/security": {
-      "source": "Internal Whitelist",
-      "observable_key": "obs:url:https://accounts.google.com/security",
-      "comment": "Known safe link",
-      "extra": {},
-      "score": -2.0,
-      "level": "TRUSTED",
-      "taxonomies": [],
-      "key": "ti:internal whitelist:obs:url:https://accounts.google.com/security",
-      "score_display": "-2.00"
-    },
-    "ti:virustotal:obs:file:invoice.exe": {
-      "source": "VirusTotal",
-      "observable_key": "obs:file:invoice.exe",
-      "comment": "Detected by 45/70 engines",
-      "extra": {},
-      "score": 10.0,
-      "level": "MALICIOUS",
-      "taxonomies": [],
-      "key": "ti:virustotal:obs:file:invoice.exe",
-      "score_display": "10.00"
-    }
-  },
-  "enrichments": {},
-  "tags": {
-    "tag:phishing": {
-      "name": "phishing",
-      "description": "",
-      "findings": [],
-      "key": "tag:phishing",
-      "direct_score": 0.0,
-      "direct_level": "INFO"
-    },
-    "tag:phishing:investigation": {
-      "name": "phishing:investigation",
-      "description": "",
-      "findings": [],
-      "key": "tag:phishing:investigation",
-      "direct_score": 0.0,
-      "direct_level": "INFO"
-    },
-    "tag:phishing:investigation:email": {
-      "name": "phishing:investigation:email",
-      "description": "",
-      "findings": [
-        "fnd:email_analysis"
-      ],
-      "key": "tag:phishing:investigation:email",
-      "direct_score": 9.0,
-      "direct_level": "MALICIOUS"
-    },
-    "tag:phishing:investigation:network": {
-      "name": "phishing:investigation:network",
-      "description": "",
-      "findings": [
-        "fnd:url_analysis",
-        "fnd:infrastructure"
-      ],
-      "key": "tag:phishing:investigation:network",
-      "direct_score": 18.5,
-      "direct_level": "MALICIOUS"
-    },
-    "tag:phishing:investigation:malware": {
-      "name": "phishing:investigation:malware",
-      "description": "",
-      "findings": [
-        "fnd:malware_detection"
-      ],
-      "key": "tag:phishing:investigation:malware",
-      "direct_score": 10.0,
-      "direct_level": "MALICIOUS"
-    }
-  },
-  "stats": {
-    "total_observables": 13,
-    "internal_observables": 1,
-    "external_observables": 12,
-    "whitelisted_observables": 1,
-    "observables_by_type": {
-      "file": 2,
-      "domain": 2,
-      "ipv4": 2,
-      "email": 2,
-      "artifact": 1,
-      "url": 4
-    },
-    "observables_by_level": {
-      "INFO": 1,
-      "MALICIOUS": 7,
-      "SUSPICIOUS": 3,
-      "TRUSTED": 2
-    },
-    "observables_by_type_and_level": {
-      "file": {
-        "INFO": 1,
-        "MALICIOUS": 1
       },
-      "domain": {
-        "MALICIOUS": 1,
-        "SUSPICIOUS": 1
+      "obs:email:victim@company.com": {
+        "key": "obs:email:victim@company.com",
+        "seq": "01M0J4MNWCRSH2XMJRYV4Q0AAT",
+        "asserted_at": "2026-08-21T12:27:26.988510Z",
+        "occurred_at": null,
+        "source": {
+          "name": "cyvest",
+          "source_class": "internal_tool"
+        },
+        "fragment_id": "cyvest-visual-example",
+        "external_id": null,
+        "evidence_keys": [],
+        "type": "email",
+        "subtype": null,
+        "namespace": null,
+        "value": "victim@company.com",
+        "internal": true,
+        "comment": "",
+        "extra": {},
+        "aliases": [],
+        "occurrences": {
+          "cyvest-visual-example": 1
+        }
       },
-      "ipv4": {
-        "MALICIOUS": 1,
-        "SUSPICIOUS": 1
+      "obs:artifact:phishing email - invoice #12345": {
+        "key": "obs:artifact:phishing email - invoice #12345",
+        "seq": "01M0J4MNWCMC3Z0VR2NYEDYR9Q",
+        "asserted_at": "2026-08-21T12:27:26.988555Z",
+        "occurred_at": null,
+        "source": {
+          "name": "cyvest",
+          "source_class": "internal_tool"
+        },
+        "fragment_id": "cyvest-visual-example",
+        "external_id": null,
+        "evidence_keys": [],
+        "type": "artifact",
+        "subtype": null,
+        "namespace": null,
+        "value": "Phishing Email - Invoice #12345",
+        "internal": false,
+        "comment": "",
+        "extra": {},
+        "aliases": [],
+        "occurrences": {
+          "cyvest-visual-example": 1
+        }
       },
-      "email": {
-        "MALICIOUS": 1,
-        "TRUSTED": 1
+      "obs:url:https://evil-phishing.com/login": {
+        "key": "obs:url:https://evil-phishing.com/login",
+        "seq": "01M0J4MNWC2TX3EY0HZ3GBSFPW",
+        "asserted_at": "2026-08-21T12:27:26.988628Z",
+        "occurred_at": null,
+        "source": {
+          "name": "cyvest",
+          "source_class": "internal_tool"
+        },
+        "fragment_id": "cyvest-visual-example",
+        "external_id": null,
+        "evidence_keys": [],
+        "type": "url",
+        "subtype": null,
+        "namespace": null,
+        "value": "https://evil-phishing.com/login",
+        "internal": false,
+        "comment": "",
+        "extra": {},
+        "aliases": [],
+        "occurrences": {
+          "cyvest-visual-example": 1
+        }
       },
-      "artifact": {
-        "MALICIOUS": 1
+      "obs:url:https://evil-phishing.com/verify": {
+        "key": "obs:url:https://evil-phishing.com/verify",
+        "seq": "01M0J4MNWC3AS6GWP42MBETSK2",
+        "asserted_at": "2026-08-21T12:27:26.988680Z",
+        "occurred_at": null,
+        "source": {
+          "name": "cyvest",
+          "source_class": "internal_tool"
+        },
+        "fragment_id": "cyvest-visual-example",
+        "external_id": null,
+        "evidence_keys": [],
+        "type": "url",
+        "subtype": null,
+        "namespace": null,
+        "value": "https://evil-phishing.com/verify",
+        "internal": false,
+        "comment": "",
+        "extra": {},
+        "aliases": [],
+        "occurrences": {
+          "cyvest-visual-example": 1
+        }
       },
-      "url": {
-        "MALICIOUS": 2,
-        "SUSPICIOUS": 1,
-        "TRUSTED": 1
+      "obs:url:https://sketchy-site.net/invoice": {
+        "key": "obs:url:https://sketchy-site.net/invoice",
+        "seq": "01M0J4MNWC8P8EXMTN4H7N500Z",
+        "asserted_at": "2026-08-21T12:27:26.988758Z",
+        "occurred_at": null,
+        "source": {
+          "name": "cyvest",
+          "source_class": "internal_tool"
+        },
+        "fragment_id": "cyvest-visual-example",
+        "external_id": null,
+        "evidence_keys": [],
+        "type": "url",
+        "subtype": null,
+        "namespace": null,
+        "value": "https://sketchy-site.net/invoice",
+        "internal": false,
+        "comment": "",
+        "extra": {},
+        "aliases": [],
+        "occurrences": {
+          "cyvest-visual-example": 1
+        }
+      },
+      "obs:url:https://accounts.google.com/security": {
+        "key": "obs:url:https://accounts.google.com/security",
+        "seq": "01M0J4MNWC9PA2PEWGFD1BVWRY",
+        "asserted_at": "2026-08-21T12:27:26.988808Z",
+        "occurred_at": null,
+        "source": {
+          "name": "cyvest",
+          "source_class": "internal_tool"
+        },
+        "fragment_id": "cyvest-visual-example",
+        "external_id": null,
+        "evidence_keys": [],
+        "type": "url",
+        "subtype": null,
+        "namespace": null,
+        "value": "https://accounts.google.com/security",
+        "internal": false,
+        "comment": "",
+        "extra": {},
+        "aliases": [],
+        "occurrences": {
+          "cyvest-visual-example": 1
+        }
+      },
+      "obs:file:invoice.exe": {
+        "key": "obs:file:invoice.exe",
+        "seq": "01M0J4MNWC5QD9GDZBZKJK3D28",
+        "asserted_at": "2026-08-21T12:27:26.988923Z",
+        "occurred_at": null,
+        "source": {
+          "name": "cyvest",
+          "source_class": "internal_tool"
+        },
+        "fragment_id": "cyvest-visual-example",
+        "external_id": null,
+        "evidence_keys": [],
+        "type": "file",
+        "subtype": null,
+        "namespace": null,
+        "value": "invoice.exe",
+        "internal": false,
+        "comment": "",
+        "extra": {},
+        "aliases": [],
+        "occurrences": {
+          "cyvest-visual-example": 1
+        }
       }
     },
-    "total_findings": 4,
-    "applied_findings": 4,
-    "findings_by_level": {
-      "MALICIOUS": [
-        "fnd:email_analysis",
-        "fnd:url_analysis",
-        "fnd:infrastructure",
-        "fnd:malware_detection"
+    "relations": {
+      "rel:pivot:obs:ipv4:185.220.101.50>obs:domain:evil-phishing.com": {
+        "key": "rel:pivot:obs:ipv4:185.220.101.50>obs:domain:evil-phishing.com",
+        "seq": "01M0J4MNWCJW3ZA3ZDS94EN03P",
+        "asserted_at": "2026-08-21T12:27:26.988272Z",
+        "occurred_at": null,
+        "source": {
+          "name": "cyvest",
+          "source_class": "internal_tool"
+        },
+        "fragment_id": "cyvest-visual-example",
+        "external_id": null,
+        "evidence_keys": [],
+        "source_key": "obs:ipv4:185.220.101.50",
+        "target_key": "obs:domain:evil-phishing.com",
+        "kind": "pivot",
+        "observed_at": null,
+        "confidence": 1.0,
+        "comment": ""
+      },
+      "rel:pivot:obs:domain:sketchy-site.net>obs:ipv4:192.168.100.5": {
+        "key": "rel:pivot:obs:domain:sketchy-site.net>obs:ipv4:192.168.100.5",
+        "seq": "01M0J4MNWCWHSWKZWQ7X0GFPZ3",
+        "asserted_at": "2026-08-21T12:27:26.988408Z",
+        "occurred_at": null,
+        "source": {
+          "name": "cyvest",
+          "source_class": "internal_tool"
+        },
+        "fragment_id": "cyvest-visual-example",
+        "external_id": null,
+        "evidence_keys": [],
+        "source_key": "obs:domain:sketchy-site.net",
+        "target_key": "obs:ipv4:192.168.100.5",
+        "kind": "pivot",
+        "observed_at": null,
+        "confidence": 1.0,
+        "comment": ""
+      },
+      "rel:related-to:obs:email:attacker@evil-phishing.com>obs:domain:evil-phishing.com": {
+        "key": "rel:related-to:obs:email:attacker@evil-phishing.com>obs:domain:evil-phishing.com",
+        "seq": "01M0J4MNWCES8THGCK280D7GYP",
+        "asserted_at": "2026-08-21T12:27:26.988479Z",
+        "occurred_at": null,
+        "source": {
+          "name": "cyvest",
+          "source_class": "internal_tool"
+        },
+        "fragment_id": "cyvest-visual-example",
+        "external_id": null,
+        "evidence_keys": [],
+        "source_key": "obs:email:attacker@evil-phishing.com",
+        "target_key": "obs:domain:evil-phishing.com",
+        "kind": "related-to",
+        "observed_at": null,
+        "confidence": 1.0,
+        "comment": ""
+      },
+      "rel:extraction:obs:artifact:phishing email - invoice #12345>obs:email:attacker@evil-phishing.com": {
+        "key": "rel:extraction:obs:artifact:phishing email - invoice #12345>obs:email:attacker@evil-phishing.com",
+        "seq": "01M0J4MNWCWW86H3A413SVJ5EB",
+        "asserted_at": "2026-08-21T12:27:26.988566Z",
+        "occurred_at": null,
+        "source": {
+          "name": "cyvest",
+          "source_class": "internal_tool"
+        },
+        "fragment_id": "cyvest-visual-example",
+        "external_id": null,
+        "evidence_keys": [],
+        "source_key": "obs:artifact:phishing email - invoice #12345",
+        "target_key": "obs:email:attacker@evil-phishing.com",
+        "kind": "extraction",
+        "observed_at": null,
+        "confidence": 1.0,
+        "comment": ""
+      },
+      "rel:extraction:obs:artifact:phishing email - invoice #12345>obs:email:victim@company.com": {
+        "key": "rel:extraction:obs:artifact:phishing email - invoice #12345>obs:email:victim@company.com",
+        "seq": "01M0J4MNWC04ASZMVARJFEAY3G",
+        "asserted_at": "2026-08-21T12:27:26.988576Z",
+        "occurred_at": null,
+        "source": {
+          "name": "cyvest",
+          "source_class": "internal_tool"
+        },
+        "fragment_id": "cyvest-visual-example",
+        "external_id": null,
+        "evidence_keys": [],
+        "source_key": "obs:artifact:phishing email - invoice #12345",
+        "target_key": "obs:email:victim@company.com",
+        "kind": "extraction",
+        "observed_at": null,
+        "confidence": 1.0,
+        "comment": ""
+      },
+      "rel:related-to:obs:url:https://evil-phishing.com/login>obs:domain:evil-phishing.com": {
+        "key": "rel:related-to:obs:url:https://evil-phishing.com/login>obs:domain:evil-phishing.com",
+        "seq": "01M0J4MNWCRZKQHFMV0JZ5R0BA",
+        "asserted_at": "2026-08-21T12:27:26.988652Z",
+        "occurred_at": null,
+        "source": {
+          "name": "cyvest",
+          "source_class": "internal_tool"
+        },
+        "fragment_id": "cyvest-visual-example",
+        "external_id": null,
+        "evidence_keys": [],
+        "source_key": "obs:url:https://evil-phishing.com/login",
+        "target_key": "obs:domain:evil-phishing.com",
+        "kind": "related-to",
+        "observed_at": null,
+        "confidence": 1.0,
+        "comment": ""
+      },
+      "rel:related-to:obs:url:https://evil-phishing.com/verify>obs:domain:evil-phishing.com": {
+        "key": "rel:related-to:obs:url:https://evil-phishing.com/verify>obs:domain:evil-phishing.com",
+        "seq": "01M0J4MNWC7713JF5YBYXAQKZX",
+        "asserted_at": "2026-08-21T12:27:26.988704Z",
+        "occurred_at": null,
+        "source": {
+          "name": "cyvest",
+          "source_class": "internal_tool"
+        },
+        "fragment_id": "cyvest-visual-example",
+        "external_id": null,
+        "evidence_keys": [],
+        "source_key": "obs:url:https://evil-phishing.com/verify",
+        "target_key": "obs:domain:evil-phishing.com",
+        "kind": "related-to",
+        "observed_at": null,
+        "confidence": 1.0,
+        "comment": ""
+      },
+      "rel:extraction:obs:artifact:phishing email - invoice #12345>obs:url:https://evil-phishing.com/login": {
+        "key": "rel:extraction:obs:artifact:phishing email - invoice #12345>obs:url:https://evil-phishing.com/login",
+        "seq": "01M0J4MNWC89WZV8DC2E0905XY",
+        "asserted_at": "2026-08-21T12:27:26.988717Z",
+        "occurred_at": null,
+        "source": {
+          "name": "cyvest",
+          "source_class": "internal_tool"
+        },
+        "fragment_id": "cyvest-visual-example",
+        "external_id": null,
+        "evidence_keys": [],
+        "source_key": "obs:artifact:phishing email - invoice #12345",
+        "target_key": "obs:url:https://evil-phishing.com/login",
+        "kind": "extraction",
+        "observed_at": null,
+        "confidence": 1.0,
+        "comment": ""
+      },
+      "rel:extraction:obs:artifact:phishing email - invoice #12345>obs:url:https://evil-phishing.com/verify": {
+        "key": "rel:extraction:obs:artifact:phishing email - invoice #12345>obs:url:https://evil-phishing.com/verify",
+        "seq": "01M0J4MNWCX3QASW34PNB2CP51",
+        "asserted_at": "2026-08-21T12:27:26.988729Z",
+        "occurred_at": null,
+        "source": {
+          "name": "cyvest",
+          "source_class": "internal_tool"
+        },
+        "fragment_id": "cyvest-visual-example",
+        "external_id": null,
+        "evidence_keys": [],
+        "source_key": "obs:artifact:phishing email - invoice #12345",
+        "target_key": "obs:url:https://evil-phishing.com/verify",
+        "kind": "extraction",
+        "observed_at": null,
+        "confidence": 1.0,
+        "comment": ""
+      },
+      "rel:related-to:obs:url:https://sketchy-site.net/invoice>obs:domain:sketchy-site.net": {
+        "key": "rel:related-to:obs:url:https://sketchy-site.net/invoice>obs:domain:sketchy-site.net",
+        "seq": "01M0J4MNWC63VVZG0KV14Y4WGB",
+        "asserted_at": "2026-08-21T12:27:26.988779Z",
+        "occurred_at": null,
+        "source": {
+          "name": "cyvest",
+          "source_class": "internal_tool"
+        },
+        "fragment_id": "cyvest-visual-example",
+        "external_id": null,
+        "evidence_keys": [],
+        "source_key": "obs:url:https://sketchy-site.net/invoice",
+        "target_key": "obs:domain:sketchy-site.net",
+        "kind": "related-to",
+        "observed_at": null,
+        "confidence": 1.0,
+        "comment": ""
+      },
+      "rel:extraction:obs:artifact:phishing email - invoice #12345>obs:url:https://sketchy-site.net/invoice": {
+        "key": "rel:extraction:obs:artifact:phishing email - invoice #12345>obs:url:https://sketchy-site.net/invoice",
+        "seq": "01M0J4MNWC4WBWY4V9DWRR5T4H",
+        "asserted_at": "2026-08-21T12:27:26.988882Z",
+        "occurred_at": null,
+        "source": {
+          "name": "cyvest",
+          "source_class": "internal_tool"
+        },
+        "fragment_id": "cyvest-visual-example",
+        "external_id": null,
+        "evidence_keys": [],
+        "source_key": "obs:artifact:phishing email - invoice #12345",
+        "target_key": "obs:url:https://sketchy-site.net/invoice",
+        "kind": "extraction",
+        "observed_at": null,
+        "confidence": 1.0,
+        "comment": ""
+      },
+      "rel:extraction:obs:artifact:phishing email - invoice #12345>obs:url:https://accounts.google.com/security": {
+        "key": "rel:extraction:obs:artifact:phishing email - invoice #12345>obs:url:https://accounts.google.com/security",
+        "seq": "01M0J4MNWCFA0TAGWXM3YMB210",
+        "asserted_at": "2026-08-21T12:27:26.988892Z",
+        "occurred_at": null,
+        "source": {
+          "name": "cyvest",
+          "source_class": "internal_tool"
+        },
+        "fragment_id": "cyvest-visual-example",
+        "external_id": null,
+        "evidence_keys": [],
+        "source_key": "obs:artifact:phishing email - invoice #12345",
+        "target_key": "obs:url:https://accounts.google.com/security",
+        "kind": "extraction",
+        "observed_at": null,
+        "confidence": 1.0,
+        "comment": ""
+      },
+      "rel:extraction:obs:file:invoice.exe>obs:url:https://evil-phishing.com/login": {
+        "key": "rel:extraction:obs:file:invoice.exe>obs:url:https://evil-phishing.com/login",
+        "seq": "01M0J4MNWCHZ3S4RQ6B1XPD133",
+        "asserted_at": "2026-08-21T12:27:26.988944Z",
+        "occurred_at": null,
+        "source": {
+          "name": "cyvest",
+          "source_class": "internal_tool"
+        },
+        "fragment_id": "cyvest-visual-example",
+        "external_id": null,
+        "evidence_keys": [],
+        "source_key": "obs:file:invoice.exe",
+        "target_key": "obs:url:https://evil-phishing.com/login",
+        "kind": "extraction",
+        "observed_at": null,
+        "confidence": 1.0,
+        "comment": ""
+      },
+      "rel:related-to:obs:file:invoice.exe>obs:ipv4:185.220.101.50": {
+        "key": "rel:related-to:obs:file:invoice.exe>obs:ipv4:185.220.101.50",
+        "seq": "01M0J4MNWCGWZWNCAW9NJZ234X",
+        "asserted_at": "2026-08-21T12:27:26.988953Z",
+        "occurred_at": null,
+        "source": {
+          "name": "cyvest",
+          "source_class": "internal_tool"
+        },
+        "fragment_id": "cyvest-visual-example",
+        "external_id": null,
+        "evidence_keys": [],
+        "source_key": "obs:file:invoice.exe",
+        "target_key": "obs:ipv4:185.220.101.50",
+        "kind": "related-to",
+        "observed_at": null,
+        "confidence": 1.0,
+        "comment": ""
+      },
+      "rel:related-to:obs:file:__cyvest_root__>obs:artifact:phishing email - invoice #12345": {
+        "key": "rel:related-to:obs:file:__cyvest_root__>obs:artifact:phishing email - invoice #12345",
+        "seq": "01M0J4MNWD9BGM5DC3WH0T2EEJ",
+        "asserted_at": "2026-08-21T12:27:26.989363Z",
+        "occurred_at": null,
+        "source": {
+          "name": "cyvest",
+          "source_class": "internal_tool"
+        },
+        "fragment_id": "cyvest-visual-example",
+        "external_id": null,
+        "evidence_keys": [],
+        "source_key": "obs:file:__cyvest_root__",
+        "target_key": "obs:artifact:phishing email - invoice #12345",
+        "kind": "related-to",
+        "observed_at": null,
+        "confidence": 1.0,
+        "comment": ""
+      }
+    },
+    "signals": {
+      "ti:virustotal:obs:domain:evil-phishing.com": {
+        "subject_key": "obs:domain:evil-phishing.com",
+        "verdict": "MALICIOUS",
+        "confidence": 1.0,
+        "weight": 9.0,
+        "key": "ti:virustotal:obs:domain:evil-phishing.com",
+        "seq": "01M0J4MNWC0JXMVJR9YKXANDCY",
+        "asserted_at": "2026-08-21T12:27:26.988161Z",
+        "occurred_at": null,
+        "source": {
+          "name": "VirusTotal",
+          "source_class": "vendor_feed"
+        },
+        "fragment_id": "cyvest-visual-example",
+        "external_id": null,
+        "evidence_keys": [],
+        "kind": "threat_intel",
+        "observed_at": null,
+        "labels": [],
+        "payload": {},
+        "source_class": "vendor_feed",
+        "taxonomies": [],
+        "comment": "Known phishing domain"
+      },
+      "ti:alienvault otx:obs:domain:evil-phishing.com": {
+        "subject_key": "obs:domain:evil-phishing.com",
+        "verdict": "MALICIOUS",
+        "confidence": 1.0,
+        "weight": 8.5,
+        "key": "ti:alienvault otx:obs:domain:evil-phishing.com",
+        "seq": "01M0J4MNWCKX7NNGCRP4Z1QNYR",
+        "asserted_at": "2026-08-21T12:27:26.988187Z",
+        "occurred_at": null,
+        "source": {
+          "name": "AlienVault OTX",
+          "source_class": "vendor_feed"
+        },
+        "fragment_id": "cyvest-visual-example",
+        "external_id": null,
+        "evidence_keys": [],
+        "kind": "threat_intel",
+        "observed_at": null,
+        "labels": [],
+        "payload": {},
+        "source_class": "vendor_feed",
+        "taxonomies": [],
+        "comment": "Recently reported"
+      },
+      "ti:abuseipdb:obs:ipv4:185.220.101.50": {
+        "subject_key": "obs:ipv4:185.220.101.50",
+        "verdict": "MALICIOUS",
+        "confidence": 1.0,
+        "weight": 9.5,
+        "key": "ti:abuseipdb:obs:ipv4:185.220.101.50",
+        "seq": "01M0J4MNWC5J0377AZC1XD6HT8",
+        "asserted_at": "2026-08-21T12:27:26.988247Z",
+        "occurred_at": null,
+        "source": {
+          "name": "AbuseIPDB",
+          "source_class": "vendor_feed"
+        },
+        "fragment_id": "cyvest-visual-example",
+        "external_id": null,
+        "evidence_keys": [],
+        "kind": "threat_intel",
+        "observed_at": null,
+        "labels": [],
+        "payload": {},
+        "source_class": "vendor_feed",
+        "taxonomies": [],
+        "comment": "C2 server"
+      },
+      "ti:virustotal:obs:domain:sketchy-site.net": {
+        "subject_key": "obs:domain:sketchy-site.net",
+        "verdict": "SUSPICIOUS",
+        "confidence": 1.0,
+        "weight": 4.5,
+        "key": "ti:virustotal:obs:domain:sketchy-site.net",
+        "seq": "01M0J4MNWCX6RJG1T3T3FCA1G6",
+        "asserted_at": "2026-08-21T12:27:26.988331Z",
+        "occurred_at": null,
+        "source": {
+          "name": "VirusTotal",
+          "source_class": "vendor_feed"
+        },
+        "fragment_id": "cyvest-visual-example",
+        "external_id": null,
+        "evidence_keys": [],
+        "kind": "threat_intel",
+        "observed_at": null,
+        "labels": [],
+        "payload": {},
+        "source_class": "vendor_feed",
+        "taxonomies": [],
+        "comment": "Some detections"
+      },
+      "ti:shodan:obs:ipv4:192.168.100.5": {
+        "subject_key": "obs:ipv4:192.168.100.5",
+        "verdict": "SUSPICIOUS",
+        "confidence": 1.0,
+        "weight": 3.0,
+        "key": "ti:shodan:obs:ipv4:192.168.100.5",
+        "seq": "01M0J4MNWCTMBXBYDADCFWJQCF",
+        "asserted_at": "2026-08-21T12:27:26.988396Z",
+        "occurred_at": null,
+        "source": {
+          "name": "Shodan",
+          "source_class": "vendor_feed"
+        },
+        "fragment_id": "cyvest-visual-example",
+        "external_id": null,
+        "evidence_keys": [],
+        "kind": "threat_intel",
+        "observed_at": null,
+        "labels": [],
+        "payload": {},
+        "source_class": "vendor_feed",
+        "taxonomies": [],
+        "comment": ""
+      },
+      "ti:emailrep:obs:email:attacker@evil-phishing.com": {
+        "subject_key": "obs:email:attacker@evil-phishing.com",
+        "verdict": "MALICIOUS",
+        "confidence": 1.0,
+        "weight": 8.0,
+        "key": "ti:emailrep:obs:email:attacker@evil-phishing.com",
+        "seq": "01M0J4MNWCVN49PMPA08KDZREN",
+        "asserted_at": "2026-08-21T12:27:26.988461Z",
+        "occurred_at": null,
+        "source": {
+          "name": "EmailRep",
+          "source_class": "vendor_feed"
+        },
+        "fragment_id": "cyvest-visual-example",
+        "external_id": null,
+        "evidence_keys": [],
+        "kind": "threat_intel",
+        "observed_at": null,
+        "labels": [],
+        "payload": {},
+        "source_class": "vendor_feed",
+        "taxonomies": [],
+        "comment": "Suspicious sender"
+      },
+      "ti:internal whitelist:obs:email:victim@company.com": {
+        "subject_key": "obs:email:victim@company.com",
+        "verdict": "SAFE",
+        "confidence": 1.0,
+        "weight": 1.0,
+        "key": "ti:internal whitelist:obs:email:victim@company.com",
+        "seq": "01M0J4MNWCRV03JNF81PKMJNK0",
+        "asserted_at": "2026-08-21T12:27:26.988525Z",
+        "occurred_at": null,
+        "source": {
+          "name": "Internal Whitelist",
+          "source_class": "vendor_feed"
+        },
+        "fragment_id": "cyvest-visual-example",
+        "external_id": null,
+        "evidence_keys": [],
+        "kind": "threat_intel",
+        "observed_at": null,
+        "labels": [],
+        "payload": {},
+        "source_class": "vendor_feed",
+        "taxonomies": [],
+        "comment": "Known employee"
+      },
+      "ti:email gateway:obs:artifact:phishing email - invoice #12345": {
+        "subject_key": "obs:artifact:phishing email - invoice #12345",
+        "verdict": "MALICIOUS",
+        "confidence": 1.0,
+        "weight": 7.0,
+        "key": "ti:email gateway:obs:artifact:phishing email - invoice #12345",
+        "seq": "01M0J4MNWCY4M9F5A09YV4V8QX",
+        "asserted_at": "2026-08-21T12:27:26.988591Z",
+        "occurred_at": null,
+        "source": {
+          "name": "Email Gateway",
+          "source_class": "vendor_feed"
+        },
+        "fragment_id": "cyvest-visual-example",
+        "external_id": null,
+        "evidence_keys": [],
+        "kind": "threat_intel",
+        "observed_at": null,
+        "labels": [],
+        "payload": {},
+        "source_class": "vendor_feed",
+        "taxonomies": [],
+        "comment": "Flagged as suspicious"
+      },
+      "ti:urlhaus:obs:url:https://evil-phishing.com/login": {
+        "subject_key": "obs:url:https://evil-phishing.com/login",
+        "verdict": "MALICIOUS",
+        "confidence": 1.0,
+        "weight": 9.0,
+        "key": "ti:urlhaus:obs:url:https://evil-phishing.com/login",
+        "seq": "01M0J4MNWCMQ8T20KB7WFMEE4Q",
+        "asserted_at": "2026-08-21T12:27:26.988641Z",
+        "occurred_at": null,
+        "source": {
+          "name": "URLhaus",
+          "source_class": "vendor_feed"
+        },
+        "fragment_id": "cyvest-visual-example",
+        "external_id": null,
+        "evidence_keys": [],
+        "kind": "threat_intel",
+        "observed_at": null,
+        "labels": [],
+        "payload": {},
+        "source_class": "vendor_feed",
+        "taxonomies": [],
+        "comment": ""
+      },
+      "ti:urlhaus:obs:url:https://evil-phishing.com/verify": {
+        "subject_key": "obs:url:https://evil-phishing.com/verify",
+        "verdict": "MALICIOUS",
+        "confidence": 1.0,
+        "weight": 8.5,
+        "key": "ti:urlhaus:obs:url:https://evil-phishing.com/verify",
+        "seq": "01M0J4MNWCHF19GKYEP6MEXK6J",
+        "asserted_at": "2026-08-21T12:27:26.988693Z",
+        "occurred_at": null,
+        "source": {
+          "name": "URLhaus",
+          "source_class": "vendor_feed"
+        },
+        "fragment_id": "cyvest-visual-example",
+        "external_id": null,
+        "evidence_keys": [],
+        "kind": "threat_intel",
+        "observed_at": null,
+        "labels": [],
+        "payload": {},
+        "source_class": "vendor_feed",
+        "taxonomies": [],
+        "comment": ""
+      },
+      "ti:urlhaus:obs:url:https://sketchy-site.net/invoice": {
+        "subject_key": "obs:url:https://sketchy-site.net/invoice",
+        "verdict": "SUSPICIOUS",
+        "confidence": 1.0,
+        "weight": 4.5,
+        "key": "ti:urlhaus:obs:url:https://sketchy-site.net/invoice",
+        "seq": "01M0J4MNWCK82Z4AD75CR1467W",
+        "asserted_at": "2026-08-21T12:27:26.988769Z",
+        "occurred_at": null,
+        "source": {
+          "name": "URLhaus",
+          "source_class": "vendor_feed"
+        },
+        "fragment_id": "cyvest-visual-example",
+        "external_id": null,
+        "evidence_keys": [],
+        "kind": "threat_intel",
+        "observed_at": null,
+        "labels": [],
+        "payload": {},
+        "source_class": "vendor_feed",
+        "taxonomies": [],
+        "comment": "Low-confidence redirect"
+      },
+      "ti:internal whitelist:obs:url:https://accounts.google.com/security": {
+        "subject_key": "obs:url:https://accounts.google.com/security",
+        "verdict": "SAFE",
+        "confidence": 1.0,
+        "weight": 2.0,
+        "key": "ti:internal whitelist:obs:url:https://accounts.google.com/security",
+        "seq": "01M0J4MNWCWPRXB7HS5WQC55WT",
+        "asserted_at": "2026-08-21T12:27:26.988819Z",
+        "occurred_at": null,
+        "source": {
+          "name": "Internal Whitelist",
+          "source_class": "vendor_feed"
+        },
+        "fragment_id": "cyvest-visual-example",
+        "external_id": null,
+        "evidence_keys": [],
+        "kind": "threat_intel",
+        "observed_at": null,
+        "labels": [],
+        "payload": {},
+        "source_class": "vendor_feed",
+        "taxonomies": [],
+        "comment": "Known safe link"
+      },
+      "ti:virustotal:obs:file:invoice.exe": {
+        "subject_key": "obs:file:invoice.exe",
+        "verdict": "MALICIOUS",
+        "confidence": 1.0,
+        "weight": 10.0,
+        "key": "ti:virustotal:obs:file:invoice.exe",
+        "seq": "01M0J4MNWC5691ZT1WC49E3129",
+        "asserted_at": "2026-08-21T12:27:26.988934Z",
+        "occurred_at": null,
+        "source": {
+          "name": "VirusTotal",
+          "source_class": "vendor_feed"
+        },
+        "fragment_id": "cyvest-visual-example",
+        "external_id": null,
+        "evidence_keys": [],
+        "kind": "threat_intel",
+        "observed_at": null,
+        "labels": [],
+        "payload": {},
+        "source_class": "vendor_feed",
+        "taxonomies": [],
+        "comment": "Detected by 45/70 engines"
+      }
+    },
+    "evidences": {},
+    "findings": {
+      "fnd:email_analysis:obs:file:__cyvest_root__": {
+        "subject_key": "obs:file:__cyvest_root__",
+        "verdict": "MALICIOUS",
+        "confidence": 1.0,
+        "weight": 8.0,
+        "key": "fnd:email_analysis:obs:file:__cyvest_root__",
+        "seq": "01M0J4MNWDRZEJTGBSRG532380",
+        "asserted_at": "2026-08-21T12:27:26.989070Z",
+        "occurred_at": null,
+        "source": {
+          "name": "cyvest",
+          "source_class": "internal_tool"
+        },
+        "fragment_id": "cyvest-visual-example",
+        "external_id": null,
+        "evidence_keys": [],
+        "rule_id": "email_analysis",
+        "rule_version": "1",
+        "name": "Phishing email analysis",
+        "comment": "",
+        "status": "EVALUATED",
+        "effect": "ADDITIVE",
+        "observable_links": [
+          {
+            "observable_key": "obs:artifact:phishing email - invoice #12345",
+            "scope": "OWN_FRAGMENT"
+          },
+          {
+            "observable_key": "obs:email:attacker@evil-phishing.com",
+            "scope": "OWN_FRAGMENT"
+          },
+          {
+            "observable_key": "obs:email:victim@company.com",
+            "scope": "OWN_FRAGMENT"
+          }
+        ],
+        "labels": [],
+        "extra": {}
+      },
+      "fnd:url_analysis:obs:file:__cyvest_root__": {
+        "subject_key": "obs:file:__cyvest_root__",
+        "verdict": "MALICIOUS",
+        "confidence": 1.0,
+        "weight": 9.0,
+        "key": "fnd:url_analysis:obs:file:__cyvest_root__",
+        "seq": "01M0J4MNWD6CH5GJ280NDJC5AH",
+        "asserted_at": "2026-08-21T12:27:26.989200Z",
+        "occurred_at": null,
+        "source": {
+          "name": "cyvest",
+          "source_class": "internal_tool"
+        },
+        "fragment_id": "cyvest-visual-example",
+        "external_id": null,
+        "evidence_keys": [],
+        "rule_id": "url_analysis",
+        "rule_version": "1",
+        "name": "Malicious URLs found in email",
+        "comment": "",
+        "status": "EVALUATED",
+        "effect": "ADDITIVE",
+        "observable_links": [
+          {
+            "observable_key": "obs:url:https://evil-phishing.com/login",
+            "scope": "OWN_FRAGMENT"
+          },
+          {
+            "observable_key": "obs:url:https://evil-phishing.com/verify",
+            "scope": "OWN_FRAGMENT"
+          },
+          {
+            "observable_key": "obs:url:https://sketchy-site.net/invoice",
+            "scope": "OWN_FRAGMENT"
+          }
+        ],
+        "labels": [],
+        "extra": {}
+      },
+      "fnd:infrastructure:obs:file:__cyvest_root__": {
+        "subject_key": "obs:file:__cyvest_root__",
+        "verdict": "MALICIOUS",
+        "confidence": 1.0,
+        "weight": 9.5,
+        "key": "fnd:infrastructure:obs:file:__cyvest_root__",
+        "seq": "01M0J4MNWDMQ9DEF69EC1B507G",
+        "asserted_at": "2026-08-21T12:27:26.989267Z",
+        "occurred_at": null,
+        "source": {
+          "name": "cyvest",
+          "source_class": "internal_tool"
+        },
+        "fragment_id": "cyvest-visual-example",
+        "external_id": null,
+        "evidence_keys": [],
+        "rule_id": "infrastructure",
+        "rule_version": "1",
+        "name": "Malicious infrastructure identified",
+        "comment": "",
+        "status": "EVALUATED",
+        "effect": "ADDITIVE",
+        "observable_links": [
+          {
+            "observable_key": "obs:domain:evil-phishing.com",
+            "scope": "OWN_FRAGMENT"
+          },
+          {
+            "observable_key": "obs:ipv4:185.220.101.50",
+            "scope": "OWN_FRAGMENT"
+          }
+        ],
+        "labels": [],
+        "extra": {}
+      },
+      "fnd:malware_detection:obs:file:__cyvest_root__": {
+        "subject_key": "obs:file:__cyvest_root__",
+        "verdict": "MALICIOUS",
+        "confidence": 1.0,
+        "weight": 10.0,
+        "key": "fnd:malware_detection:obs:file:__cyvest_root__",
+        "seq": "01M0J4MNWDQZT4ZCPXASR34WTJ",
+        "asserted_at": "2026-08-21T12:27:26.989303Z",
+        "occurred_at": null,
+        "source": {
+          "name": "cyvest",
+          "source_class": "internal_tool"
+        },
+        "fragment_id": "cyvest-visual-example",
+        "external_id": null,
+        "evidence_keys": [],
+        "rule_id": "malware_detection",
+        "rule_version": "1",
+        "name": "Malware file analysis",
+        "comment": "",
+        "status": "EVALUATED",
+        "effect": "ADDITIVE",
+        "observable_links": [
+          {
+            "observable_key": "obs:file:invoice.exe",
+            "scope": "OWN_FRAGMENT"
+          }
+        ],
+        "labels": [],
+        "extra": {}
+      }
+    },
+    "events": {}
+  },
+  "decisions": {
+    "dec:allowlisted:obs:url:https://accounts.google.com/security": {
+      "key": "dec:allowlisted:obs:url:https://accounts.google.com/security",
+      "seq": "01M0J4MNWC5BW52R3M01YB7N4D",
+      "asserted_at": "2026-08-21T12:27:26.988850Z",
+      "occurred_at": null,
+      "source": {
+        "name": "rssi",
+        "source_class": "org_analyst"
+      },
+      "fragment_id": "cyvest-visual-example",
+      "external_id": null,
+      "evidence_keys": [],
+      "target_key": "obs:url:https://accounts.google.com/security",
+      "kind": "ALLOWLISTED",
+      "justification": "Domaine d'authentification Google, validé par la RSSI"
+    }
+  },
+  "tags": {
+    "tag:phishing": {
+      "key": "tag:phishing",
+      "seq": "01M0J4MNWD316GKWWWYP47D7BF",
+      "asserted_at": "2026-08-21T12:27:26.989104Z",
+      "occurred_at": null,
+      "source": {
+        "name": "cyvest",
+        "source_class": "internal_tool"
+      },
+      "fragment_id": "cyvest-visual-example",
+      "external_id": null,
+      "evidence_keys": [],
+      "name": "phishing",
+      "description": "",
+      "finding_keys": []
+    },
+    "tag:phishing:investigation": {
+      "key": "tag:phishing:investigation",
+      "seq": "01M0J4MNWDWNZCF7YPM6NN7KW9",
+      "asserted_at": "2026-08-21T12:27:26.989116Z",
+      "occurred_at": null,
+      "source": {
+        "name": "cyvest",
+        "source_class": "internal_tool"
+      },
+      "fragment_id": "cyvest-visual-example",
+      "external_id": null,
+      "evidence_keys": [],
+      "name": "phishing:investigation",
+      "description": "",
+      "finding_keys": []
+    },
+    "tag:phishing:investigation:email": {
+      "key": "tag:phishing:investigation:email",
+      "seq": "01M0J4MNWD6J10JS0GJ3V199WY",
+      "asserted_at": "2026-08-21T12:27:26.989127Z",
+      "occurred_at": null,
+      "source": {
+        "name": "cyvest",
+        "source_class": "internal_tool"
+      },
+      "fragment_id": "cyvest-visual-example",
+      "external_id": null,
+      "evidence_keys": [],
+      "name": "phishing:investigation:email",
+      "description": "",
+      "finding_keys": [
+        "fnd:email_analysis:obs:file:__cyvest_root__"
       ]
     },
-    "total_evidences": 0,
-    "evidences_by_type": {},
-    "evidences_by_source": {},
-    "total_threat_intel": 13,
-    "threat_intel_by_source": {
-      "VirusTotal": 3,
-      "AlienVault OTX": 1,
-      "AbuseIPDB": 1,
-      "Shodan": 1,
-      "EmailRep": 1,
-      "Internal Whitelist": 2,
-      "Email Gateway": 1,
-      "URLhaus": 3
+    "tag:phishing:investigation:network": {
+      "key": "tag:phishing:investigation:network",
+      "seq": "01M0J4MNWDGHFKK0FQQ0YKJQ2G",
+      "asserted_at": "2026-08-21T12:27:26.989274Z",
+      "occurred_at": null,
+      "source": {
+        "name": "cyvest",
+        "source_class": "internal_tool"
+      },
+      "fragment_id": "cyvest-visual-example",
+      "external_id": null,
+      "evidence_keys": [],
+      "name": "phishing:investigation:network",
+      "description": "",
+      "finding_keys": [
+        "fnd:url_analysis:obs:file:__cyvest_root__",
+        "fnd:infrastructure:obs:file:__cyvest_root__"
+      ]
     },
-    "threat_intel_by_level": {
-      "MALICIOUS": 8,
-      "SUSPICIOUS": 3,
-      "TRUSTED": 2
+    "tag:phishing:investigation:malware": {
+      "key": "tag:phishing:investigation:malware",
+      "seq": "01M0J4MNWDWSW4D2BJHM6JHQ78",
+      "asserted_at": "2026-08-21T12:27:26.989325Z",
+      "occurred_at": null,
+      "source": {
+        "name": "cyvest",
+        "source_class": "internal_tool"
+      },
+      "fragment_id": "cyvest-visual-example",
+      "external_id": null,
+      "evidence_keys": [],
+      "name": "phishing:investigation:malware",
+      "description": "",
+      "finding_keys": [
+        "fnd:malware_detection:obs:file:__cyvest_root__"
+      ]
+    }
+  },
+  "report": {
+    "engine_id": "basic-v1",
+    "policy_version": "default-v1",
+    "investigation": {
+      "key": "cyvest-visual-example",
+      "verdict": "MALICIOUS",
+      "confidence": 1.0,
+      "score": 37.5,
+      "contributions": [
+        {
+          "source_key": "fnd:email_analysis:obs:file:__cyvest_root__",
+          "label": "finding",
+          "value": 9.0,
+          "retained": true,
+          "detail": ""
+        },
+        {
+          "source_key": "fnd:url_analysis:obs:file:__cyvest_root__",
+          "label": "finding",
+          "value": 9.0,
+          "retained": true,
+          "detail": ""
+        },
+        {
+          "source_key": "fnd:infrastructure:obs:file:__cyvest_root__",
+          "label": "finding",
+          "value": 9.5,
+          "retained": true,
+          "detail": ""
+        },
+        {
+          "source_key": "fnd:malware_detection:obs:file:__cyvest_root__",
+          "label": "finding",
+          "value": 10.0,
+          "retained": true,
+          "detail": ""
+        }
+      ],
+      "suppressed_by_decision": false,
+      "raw": {}
     },
-    "total_tags": 5
-  },
-  "data_extraction": {
-    "root_type": "file",
-    "score_mode_obs": "max"
-  },
-  "score_display": "37.50"
+    "findings": {
+      "fnd:email_analysis:obs:file:__cyvest_root__": {
+        "key": "fnd:email_analysis:obs:file:__cyvest_root__",
+        "verdict": "MALICIOUS",
+        "confidence": 1.0,
+        "score": 9.0,
+        "contributions": [
+          {
+            "source_key": "fnd:email_analysis:obs:file:__cyvest_root__",
+            "label": "rule floor · MALICIOUS",
+            "value": 8.0,
+            "retained": false,
+            "detail": "outweighed by a linked observable"
+          },
+          {
+            "source_key": "obs:artifact:phishing email - invoice #12345",
+            "label": "link · fragment:cyvest-visual-example",
+            "value": 9.0,
+            "retained": true,
+            "detail": ""
+          },
+          {
+            "source_key": "obs:email:attacker@evil-phishing.com",
+            "label": "link · fragment:cyvest-visual-example",
+            "value": 8.0,
+            "retained": true,
+            "detail": ""
+          },
+          {
+            "source_key": "obs:email:victim@company.com",
+            "label": "link · fragment:cyvest-visual-example",
+            "value": -1.0,
+            "retained": true,
+            "detail": ""
+          }
+        ],
+        "suppressed_by_decision": false,
+        "raw": {},
+        "status": "EVALUATED",
+        "effect": "ADDITIVE",
+        "own_term_suppressed": true,
+        "counted": true
+      },
+      "fnd:url_analysis:obs:file:__cyvest_root__": {
+        "key": "fnd:url_analysis:obs:file:__cyvest_root__",
+        "verdict": "MALICIOUS",
+        "confidence": 1.0,
+        "score": 9.0,
+        "contributions": [
+          {
+            "source_key": "fnd:url_analysis:obs:file:__cyvest_root__",
+            "label": "rule floor · MALICIOUS",
+            "value": 9.0,
+            "retained": true,
+            "detail": ""
+          },
+          {
+            "source_key": "obs:url:https://evil-phishing.com/login",
+            "label": "link · fragment:cyvest-visual-example",
+            "value": 9.0,
+            "retained": true,
+            "detail": ""
+          },
+          {
+            "source_key": "obs:url:https://evil-phishing.com/verify",
+            "label": "link · fragment:cyvest-visual-example",
+            "value": 8.5,
+            "retained": true,
+            "detail": ""
+          },
+          {
+            "source_key": "obs:url:https://sketchy-site.net/invoice",
+            "label": "link · fragment:cyvest-visual-example",
+            "value": 4.5,
+            "retained": true,
+            "detail": ""
+          }
+        ],
+        "suppressed_by_decision": false,
+        "raw": {},
+        "status": "EVALUATED",
+        "effect": "ADDITIVE",
+        "own_term_suppressed": false,
+        "counted": true
+      },
+      "fnd:infrastructure:obs:file:__cyvest_root__": {
+        "key": "fnd:infrastructure:obs:file:__cyvest_root__",
+        "verdict": "MALICIOUS",
+        "confidence": 1.0,
+        "score": 9.5,
+        "contributions": [
+          {
+            "source_key": "fnd:infrastructure:obs:file:__cyvest_root__",
+            "label": "rule floor · MALICIOUS",
+            "value": 9.5,
+            "retained": true,
+            "detail": ""
+          },
+          {
+            "source_key": "obs:domain:evil-phishing.com",
+            "label": "link · fragment:cyvest-visual-example",
+            "value": 9.0,
+            "retained": true,
+            "detail": ""
+          },
+          {
+            "source_key": "obs:ipv4:185.220.101.50",
+            "label": "link · fragment:cyvest-visual-example",
+            "value": 9.5,
+            "retained": true,
+            "detail": ""
+          }
+        ],
+        "suppressed_by_decision": false,
+        "raw": {},
+        "status": "EVALUATED",
+        "effect": "ADDITIVE",
+        "own_term_suppressed": false,
+        "counted": true
+      },
+      "fnd:malware_detection:obs:file:__cyvest_root__": {
+        "key": "fnd:malware_detection:obs:file:__cyvest_root__",
+        "verdict": "MALICIOUS",
+        "confidence": 1.0,
+        "score": 10.0,
+        "contributions": [
+          {
+            "source_key": "fnd:malware_detection:obs:file:__cyvest_root__",
+            "label": "rule floor · MALICIOUS",
+            "value": 10.0,
+            "retained": true,
+            "detail": ""
+          },
+          {
+            "source_key": "obs:file:invoice.exe",
+            "label": "link · fragment:cyvest-visual-example",
+            "value": 10.0,
+            "retained": true,
+            "detail": ""
+          }
+        ],
+        "suppressed_by_decision": false,
+        "raw": {},
+        "status": "EVALUATED",
+        "effect": "ADDITIVE",
+        "own_term_suppressed": false,
+        "counted": true
+      }
+    },
+    "observables": {
+      "obs:email:attacker@evil-phishing.com@fragment:cyvest-visual-example": {
+        "key": "obs:email:attacker@evil-phishing.com",
+        "verdict": "MALICIOUS",
+        "confidence": 1.0,
+        "score": 8.0,
+        "contributions": [
+          {
+            "source_key": "ti:emailrep:obs:email:attacker@evil-phishing.com",
+            "label": "EmailRep · MALICIOUS",
+            "value": 8.0,
+            "retained": true,
+            "detail": ""
+          }
+        ],
+        "suppressed_by_decision": false,
+        "raw": {},
+        "scope": {
+          "scope": "OWN_FRAGMENT",
+          "fragment_id": "cyvest-visual-example"
+        }
+      },
+      "obs:email:victim@company.com@fragment:cyvest-visual-example": {
+        "key": "obs:email:victim@company.com",
+        "verdict": "SAFE",
+        "confidence": 1.0,
+        "score": -1.0,
+        "contributions": [
+          {
+            "source_key": "ti:internal whitelist:obs:email:victim@company.com",
+            "label": "Internal Whitelist · SAFE",
+            "value": -1.0,
+            "retained": true,
+            "detail": ""
+          }
+        ],
+        "suppressed_by_decision": false,
+        "raw": {},
+        "scope": {
+          "scope": "OWN_FRAGMENT",
+          "fragment_id": "cyvest-visual-example"
+        }
+      },
+      "obs:url:https://evil-phishing.com/login@fragment:cyvest-visual-example": {
+        "key": "obs:url:https://evil-phishing.com/login",
+        "verdict": "MALICIOUS",
+        "confidence": 1.0,
+        "score": 9.0,
+        "contributions": [
+          {
+            "source_key": "ti:urlhaus:obs:url:https://evil-phishing.com/login",
+            "label": "URLhaus · MALICIOUS",
+            "value": 9.0,
+            "retained": true,
+            "detail": ""
+          }
+        ],
+        "suppressed_by_decision": false,
+        "raw": {},
+        "scope": {
+          "scope": "OWN_FRAGMENT",
+          "fragment_id": "cyvest-visual-example"
+        }
+      },
+      "obs:url:https://sketchy-site.net/invoice@fragment:cyvest-visual-example": {
+        "key": "obs:url:https://sketchy-site.net/invoice",
+        "verdict": "SUSPICIOUS",
+        "confidence": 1.0,
+        "score": 4.5,
+        "contributions": [
+          {
+            "source_key": "ti:urlhaus:obs:url:https://sketchy-site.net/invoice",
+            "label": "URLhaus · SUSPICIOUS",
+            "value": 4.5,
+            "retained": true,
+            "detail": ""
+          }
+        ],
+        "suppressed_by_decision": false,
+        "raw": {},
+        "scope": {
+          "scope": "OWN_FRAGMENT",
+          "fragment_id": "cyvest-visual-example"
+        }
+      },
+      "obs:url:https://evil-phishing.com/verify@fragment:cyvest-visual-example": {
+        "key": "obs:url:https://evil-phishing.com/verify",
+        "verdict": "MALICIOUS",
+        "confidence": 1.0,
+        "score": 8.5,
+        "contributions": [
+          {
+            "source_key": "ti:urlhaus:obs:url:https://evil-phishing.com/verify",
+            "label": "URLhaus · MALICIOUS",
+            "value": 8.5,
+            "retained": true,
+            "detail": ""
+          }
+        ],
+        "suppressed_by_decision": false,
+        "raw": {},
+        "scope": {
+          "scope": "OWN_FRAGMENT",
+          "fragment_id": "cyvest-visual-example"
+        }
+      },
+      "obs:url:https://accounts.google.com/security@fragment:cyvest-visual-example": {
+        "key": "obs:url:https://accounts.google.com/security",
+        "verdict": "SAFE",
+        "confidence": 1.0,
+        "score": -2.0,
+        "contributions": [
+          {
+            "source_key": "ti:internal whitelist:obs:url:https://accounts.google.com/security",
+            "label": "Internal Whitelist · SAFE",
+            "value": -2.0,
+            "retained": true,
+            "detail": ""
+          },
+          {
+            "source_key": "dec:allowlisted:obs:url:https://accounts.google.com/security",
+            "label": "decision · ALLOWLISTED",
+            "value": -2.0,
+            "retained": true,
+            "detail": "Domaine d'authentification Google, validé par la RSSI"
+          }
+        ],
+        "suppressed_by_decision": false,
+        "raw": {},
+        "scope": {
+          "scope": "OWN_FRAGMENT",
+          "fragment_id": "cyvest-visual-example"
+        }
+      },
+      "obs:artifact:phishing email - invoice #12345@fragment:cyvest-visual-example": {
+        "key": "obs:artifact:phishing email - invoice #12345",
+        "verdict": "MALICIOUS",
+        "confidence": 1.0,
+        "score": 9.0,
+        "contributions": [
+          {
+            "source_key": "ti:email gateway:obs:artifact:phishing email - invoice #12345",
+            "label": "Email Gateway · MALICIOUS",
+            "value": 7.0,
+            "retained": true,
+            "detail": ""
+          },
+          {
+            "source_key": "rel:extraction:obs:artifact:phishing email - invoice #12345>obs:email:attacker@evil-phishing.com",
+            "label": "extraction → obs:email:attacker@evil-phishing.com",
+            "value": 8.0,
+            "retained": true,
+            "detail": ""
+          },
+          {
+            "source_key": "rel:extraction:obs:artifact:phishing email - invoice #12345>obs:email:victim@company.com",
+            "label": "extraction → obs:email:victim@company.com",
+            "value": -1.0,
+            "retained": true,
+            "detail": ""
+          },
+          {
+            "source_key": "rel:extraction:obs:artifact:phishing email - invoice #12345>obs:url:https://evil-phishing.com/login",
+            "label": "extraction → obs:url:https://evil-phishing.com/login",
+            "value": 9.0,
+            "retained": true,
+            "detail": ""
+          },
+          {
+            "source_key": "rel:extraction:obs:artifact:phishing email - invoice #12345>obs:url:https://sketchy-site.net/invoice",
+            "label": "extraction → obs:url:https://sketchy-site.net/invoice",
+            "value": 4.5,
+            "retained": true,
+            "detail": ""
+          },
+          {
+            "source_key": "rel:extraction:obs:artifact:phishing email - invoice #12345>obs:url:https://evil-phishing.com/verify",
+            "label": "extraction → obs:url:https://evil-phishing.com/verify",
+            "value": 8.5,
+            "retained": true,
+            "detail": ""
+          },
+          {
+            "source_key": "rel:extraction:obs:artifact:phishing email - invoice #12345>obs:url:https://accounts.google.com/security",
+            "label": "extraction → obs:url:https://accounts.google.com/security",
+            "value": -2.0,
+            "retained": true,
+            "detail": ""
+          }
+        ],
+        "suppressed_by_decision": false,
+        "raw": {},
+        "scope": {
+          "scope": "OWN_FRAGMENT",
+          "fragment_id": "cyvest-visual-example"
+        }
+      },
+      "obs:domain:evil-phishing.com@fragment:cyvest-visual-example": {
+        "key": "obs:domain:evil-phishing.com",
+        "verdict": "MALICIOUS",
+        "confidence": 1.0,
+        "score": 9.0,
+        "contributions": [
+          {
+            "source_key": "ti:virustotal:obs:domain:evil-phishing.com",
+            "label": "VirusTotal · MALICIOUS",
+            "value": 9.0,
+            "retained": true,
+            "detail": ""
+          },
+          {
+            "source_key": "ti:alienvault otx:obs:domain:evil-phishing.com",
+            "label": "AlienVault OTX · MALICIOUS",
+            "value": 8.5,
+            "retained": true,
+            "detail": ""
+          }
+        ],
+        "suppressed_by_decision": false,
+        "raw": {},
+        "scope": {
+          "scope": "OWN_FRAGMENT",
+          "fragment_id": "cyvest-visual-example"
+        }
+      },
+      "obs:ipv4:185.220.101.50@fragment:cyvest-visual-example": {
+        "key": "obs:ipv4:185.220.101.50",
+        "verdict": "MALICIOUS",
+        "confidence": 1.0,
+        "score": 9.5,
+        "contributions": [
+          {
+            "source_key": "ti:abuseipdb:obs:ipv4:185.220.101.50",
+            "label": "AbuseIPDB · MALICIOUS",
+            "value": 9.5,
+            "retained": true,
+            "detail": ""
+          },
+          {
+            "source_key": "rel:pivot:obs:ipv4:185.220.101.50>obs:domain:evil-phishing.com",
+            "label": "pivot → obs:domain:evil-phishing.com",
+            "value": 9.0,
+            "retained": true,
+            "detail": ""
+          }
+        ],
+        "suppressed_by_decision": false,
+        "raw": {},
+        "scope": {
+          "scope": "OWN_FRAGMENT",
+          "fragment_id": "cyvest-visual-example"
+        }
+      },
+      "obs:file:invoice.exe@fragment:cyvest-visual-example": {
+        "key": "obs:file:invoice.exe",
+        "verdict": "MALICIOUS",
+        "confidence": 1.0,
+        "score": 10.0,
+        "contributions": [
+          {
+            "source_key": "ti:virustotal:obs:file:invoice.exe",
+            "label": "VirusTotal · MALICIOUS",
+            "value": 10.0,
+            "retained": true,
+            "detail": ""
+          },
+          {
+            "source_key": "rel:extraction:obs:file:invoice.exe>obs:url:https://evil-phishing.com/login",
+            "label": "extraction → obs:url:https://evil-phishing.com/login",
+            "value": 9.0,
+            "retained": true,
+            "detail": ""
+          }
+        ],
+        "suppressed_by_decision": false,
+        "raw": {},
+        "scope": {
+          "scope": "OWN_FRAGMENT",
+          "fragment_id": "cyvest-visual-example"
+        }
+      },
+      "obs:file:__cyvest_root__@ALL": {
+        "key": "obs:file:__cyvest_root__",
+        "verdict": "INFO",
+        "confidence": 1.0,
+        "score": 0.0,
+        "contributions": [],
+        "suppressed_by_decision": false,
+        "raw": {},
+        "scope": {
+          "scope": "ALL",
+          "fragment_id": null
+        }
+      },
+      "obs:domain:evil-phishing.com@ALL": {
+        "key": "obs:domain:evil-phishing.com",
+        "verdict": "MALICIOUS",
+        "confidence": 1.0,
+        "score": 9.0,
+        "contributions": [
+          {
+            "source_key": "ti:virustotal:obs:domain:evil-phishing.com",
+            "label": "VirusTotal · MALICIOUS",
+            "value": 9.0,
+            "retained": true,
+            "detail": ""
+          },
+          {
+            "source_key": "ti:alienvault otx:obs:domain:evil-phishing.com",
+            "label": "AlienVault OTX · MALICIOUS",
+            "value": 8.5,
+            "retained": true,
+            "detail": ""
+          }
+        ],
+        "suppressed_by_decision": false,
+        "raw": {},
+        "scope": {
+          "scope": "ALL",
+          "fragment_id": null
+        }
+      },
+      "obs:ipv4:185.220.101.50@ALL": {
+        "key": "obs:ipv4:185.220.101.50",
+        "verdict": "MALICIOUS",
+        "confidence": 1.0,
+        "score": 9.5,
+        "contributions": [
+          {
+            "source_key": "ti:abuseipdb:obs:ipv4:185.220.101.50",
+            "label": "AbuseIPDB · MALICIOUS",
+            "value": 9.5,
+            "retained": true,
+            "detail": ""
+          },
+          {
+            "source_key": "rel:pivot:obs:ipv4:185.220.101.50>obs:domain:evil-phishing.com",
+            "label": "pivot → obs:domain:evil-phishing.com",
+            "value": 9.0,
+            "retained": true,
+            "detail": ""
+          }
+        ],
+        "suppressed_by_decision": false,
+        "raw": {},
+        "scope": {
+          "scope": "ALL",
+          "fragment_id": null
+        }
+      },
+      "obs:ipv4:192.168.100.5@ALL": {
+        "key": "obs:ipv4:192.168.100.5",
+        "verdict": "SUSPICIOUS",
+        "confidence": 1.0,
+        "score": 3.0,
+        "contributions": [
+          {
+            "source_key": "ti:shodan:obs:ipv4:192.168.100.5",
+            "label": "Shodan · SUSPICIOUS",
+            "value": 3.0,
+            "retained": true,
+            "detail": ""
+          }
+        ],
+        "suppressed_by_decision": false,
+        "raw": {},
+        "scope": {
+          "scope": "ALL",
+          "fragment_id": null
+        }
+      },
+      "obs:domain:sketchy-site.net@ALL": {
+        "key": "obs:domain:sketchy-site.net",
+        "verdict": "SUSPICIOUS",
+        "confidence": 1.0,
+        "score": 4.5,
+        "contributions": [
+          {
+            "source_key": "ti:virustotal:obs:domain:sketchy-site.net",
+            "label": "VirusTotal · SUSPICIOUS",
+            "value": 4.5,
+            "retained": true,
+            "detail": ""
+          },
+          {
+            "source_key": "rel:pivot:obs:domain:sketchy-site.net>obs:ipv4:192.168.100.5",
+            "label": "pivot → obs:ipv4:192.168.100.5",
+            "value": 3.0,
+            "retained": true,
+            "detail": ""
+          }
+        ],
+        "suppressed_by_decision": false,
+        "raw": {},
+        "scope": {
+          "scope": "ALL",
+          "fragment_id": null
+        }
+      },
+      "obs:email:attacker@evil-phishing.com@ALL": {
+        "key": "obs:email:attacker@evil-phishing.com",
+        "verdict": "MALICIOUS",
+        "confidence": 1.0,
+        "score": 8.0,
+        "contributions": [
+          {
+            "source_key": "ti:emailrep:obs:email:attacker@evil-phishing.com",
+            "label": "EmailRep · MALICIOUS",
+            "value": 8.0,
+            "retained": true,
+            "detail": ""
+          }
+        ],
+        "suppressed_by_decision": false,
+        "raw": {},
+        "scope": {
+          "scope": "ALL",
+          "fragment_id": null
+        }
+      },
+      "obs:email:victim@company.com@ALL": {
+        "key": "obs:email:victim@company.com",
+        "verdict": "SAFE",
+        "confidence": 1.0,
+        "score": -1.0,
+        "contributions": [
+          {
+            "source_key": "ti:internal whitelist:obs:email:victim@company.com",
+            "label": "Internal Whitelist · SAFE",
+            "value": -1.0,
+            "retained": true,
+            "detail": ""
+          }
+        ],
+        "suppressed_by_decision": false,
+        "raw": {},
+        "scope": {
+          "scope": "ALL",
+          "fragment_id": null
+        }
+      },
+      "obs:url:https://evil-phishing.com/login@ALL": {
+        "key": "obs:url:https://evil-phishing.com/login",
+        "verdict": "MALICIOUS",
+        "confidence": 1.0,
+        "score": 9.0,
+        "contributions": [
+          {
+            "source_key": "ti:urlhaus:obs:url:https://evil-phishing.com/login",
+            "label": "URLhaus · MALICIOUS",
+            "value": 9.0,
+            "retained": true,
+            "detail": ""
+          }
+        ],
+        "suppressed_by_decision": false,
+        "raw": {},
+        "scope": {
+          "scope": "ALL",
+          "fragment_id": null
+        }
+      },
+      "obs:url:https://sketchy-site.net/invoice@ALL": {
+        "key": "obs:url:https://sketchy-site.net/invoice",
+        "verdict": "SUSPICIOUS",
+        "confidence": 1.0,
+        "score": 4.5,
+        "contributions": [
+          {
+            "source_key": "ti:urlhaus:obs:url:https://sketchy-site.net/invoice",
+            "label": "URLhaus · SUSPICIOUS",
+            "value": 4.5,
+            "retained": true,
+            "detail": ""
+          }
+        ],
+        "suppressed_by_decision": false,
+        "raw": {},
+        "scope": {
+          "scope": "ALL",
+          "fragment_id": null
+        }
+      },
+      "obs:url:https://evil-phishing.com/verify@ALL": {
+        "key": "obs:url:https://evil-phishing.com/verify",
+        "verdict": "MALICIOUS",
+        "confidence": 1.0,
+        "score": 8.5,
+        "contributions": [
+          {
+            "source_key": "ti:urlhaus:obs:url:https://evil-phishing.com/verify",
+            "label": "URLhaus · MALICIOUS",
+            "value": 8.5,
+            "retained": true,
+            "detail": ""
+          }
+        ],
+        "suppressed_by_decision": false,
+        "raw": {},
+        "scope": {
+          "scope": "ALL",
+          "fragment_id": null
+        }
+      },
+      "obs:url:https://accounts.google.com/security@ALL": {
+        "key": "obs:url:https://accounts.google.com/security",
+        "verdict": "SAFE",
+        "confidence": 1.0,
+        "score": -2.0,
+        "contributions": [
+          {
+            "source_key": "ti:internal whitelist:obs:url:https://accounts.google.com/security",
+            "label": "Internal Whitelist · SAFE",
+            "value": -2.0,
+            "retained": true,
+            "detail": ""
+          },
+          {
+            "source_key": "dec:allowlisted:obs:url:https://accounts.google.com/security",
+            "label": "decision · ALLOWLISTED",
+            "value": -2.0,
+            "retained": true,
+            "detail": "Domaine d'authentification Google, validé par la RSSI"
+          }
+        ],
+        "suppressed_by_decision": false,
+        "raw": {},
+        "scope": {
+          "scope": "ALL",
+          "fragment_id": null
+        }
+      },
+      "obs:artifact:phishing email - invoice #12345@ALL": {
+        "key": "obs:artifact:phishing email - invoice #12345",
+        "verdict": "MALICIOUS",
+        "confidence": 1.0,
+        "score": 9.0,
+        "contributions": [
+          {
+            "source_key": "ti:email gateway:obs:artifact:phishing email - invoice #12345",
+            "label": "Email Gateway · MALICIOUS",
+            "value": 7.0,
+            "retained": true,
+            "detail": ""
+          },
+          {
+            "source_key": "rel:extraction:obs:artifact:phishing email - invoice #12345>obs:email:attacker@evil-phishing.com",
+            "label": "extraction → obs:email:attacker@evil-phishing.com",
+            "value": 8.0,
+            "retained": true,
+            "detail": ""
+          },
+          {
+            "source_key": "rel:extraction:obs:artifact:phishing email - invoice #12345>obs:email:victim@company.com",
+            "label": "extraction → obs:email:victim@company.com",
+            "value": -1.0,
+            "retained": true,
+            "detail": ""
+          },
+          {
+            "source_key": "rel:extraction:obs:artifact:phishing email - invoice #12345>obs:url:https://evil-phishing.com/login",
+            "label": "extraction → obs:url:https://evil-phishing.com/login",
+            "value": 9.0,
+            "retained": true,
+            "detail": ""
+          },
+          {
+            "source_key": "rel:extraction:obs:artifact:phishing email - invoice #12345>obs:url:https://sketchy-site.net/invoice",
+            "label": "extraction → obs:url:https://sketchy-site.net/invoice",
+            "value": 4.5,
+            "retained": true,
+            "detail": ""
+          },
+          {
+            "source_key": "rel:extraction:obs:artifact:phishing email - invoice #12345>obs:url:https://evil-phishing.com/verify",
+            "label": "extraction → obs:url:https://evil-phishing.com/verify",
+            "value": 8.5,
+            "retained": true,
+            "detail": ""
+          },
+          {
+            "source_key": "rel:extraction:obs:artifact:phishing email - invoice #12345>obs:url:https://accounts.google.com/security",
+            "label": "extraction → obs:url:https://accounts.google.com/security",
+            "value": -2.0,
+            "retained": true,
+            "detail": ""
+          }
+        ],
+        "suppressed_by_decision": false,
+        "raw": {},
+        "scope": {
+          "scope": "ALL",
+          "fragment_id": null
+        }
+      },
+      "obs:file:invoice.exe@ALL": {
+        "key": "obs:file:invoice.exe",
+        "verdict": "MALICIOUS",
+        "confidence": 1.0,
+        "score": 10.0,
+        "contributions": [
+          {
+            "source_key": "ti:virustotal:obs:file:invoice.exe",
+            "label": "VirusTotal · MALICIOUS",
+            "value": 10.0,
+            "retained": true,
+            "detail": ""
+          },
+          {
+            "source_key": "rel:extraction:obs:file:invoice.exe>obs:url:https://evil-phishing.com/login",
+            "label": "extraction → obs:url:https://evil-phishing.com/login",
+            "value": 9.0,
+            "retained": true,
+            "detail": ""
+          }
+        ],
+        "suppressed_by_decision": false,
+        "raw": {},
+        "scope": {
+          "scope": "ALL",
+          "fragment_id": null
+        }
+      }
+    }
+  }
 }

@@ -10,7 +10,7 @@ import json
 from typing import Any
 from urllib.parse import quote
 
-from cyvest.model_enums import ObservableSubtype, ObservableType
+from cyvest.enums import ObservableSubtype, ObservableType
 
 _MAX_READABLE_OBSERVABLE_IDENTITY_BYTES = 128
 
@@ -121,20 +121,72 @@ def generate_observable_key(
     return ":".join(parts)
 
 
-def generate_finding_key(finding_name: str) -> str:
+def resolve_observable_key(*args: Any, **kwargs: Any) -> str:
     """
-    Generate a unique key for a finding.
+    Accept either a ready-made key or the identity components, and return a key.
 
-    Format: fnd:{finding_name}
-
-    Args:
-        finding_name: Name of the finding
-
-    Returns:
-        Unique finding key
+    Shared by the facade and the shared context so a worker does not have to remember which of
+    the two it is holding.
     """
-    normalized_name = _normalize_value(finding_name)
-    return f"fnd:{normalized_name}"
+    if len(args) == 1 and not kwargs and isinstance(args[0], str) and args[0].startswith("obs:"):
+        return args[0]
+
+    obs_type = kwargs.get("obs_type", args[0] if args else None)
+    value = kwargs.get("value", args[1] if len(args) > 1 else None)
+    subtype = kwargs.get("subtype", args[2] if len(args) > 2 else None)
+    namespace = kwargs.get("namespace", args[3] if len(args) > 3 else None)
+    return generate_observable_key(
+        obs_type.value if hasattr(obs_type, "value") else str(obs_type),
+        str(value),
+        subtype=subtype.value if hasattr(subtype, "value") else subtype,
+        namespace=namespace,
+    )
+
+
+def generate_finding_key(rule_id: str, subject_key: str, external_id: str | None = None) -> str:
+    """
+    Generate a finding key.
+
+    Format: ``fnd:{rule_id}:{subject_key}`` or ``fnd:{rule_id}:{external_id}:{subject_key}``
+
+    The subject is part of the identity: the same rule firing on two observables yields two
+    findings. v6 keyed on the name alone, which is why it needed ``origin_investigation_id`` to
+    keep merged findings apart.
+    """
+    normalized_rule = _normalize_value(rule_id)
+    if external_id:
+        return f"fnd:{normalized_rule}:{external_id.strip()}:{subject_key}"
+    return f"fnd:{normalized_rule}:{subject_key}"
+
+
+def generate_relation_key(
+    source_key: str,
+    target_key: str,
+    kind: str,
+    external_id: str | None = None,
+) -> str:
+    """
+    Generate a relation key.
+
+    Format: ``rel:{kind}:{source_key}>{target_key}``
+
+    Direction is carried by the key itself, so no ``direction`` field is needed to disambiguate.
+    """
+    normalized_kind = _normalize_value(kind)
+    if external_id:
+        return f"rel:{normalized_kind}:{external_id.strip()}:{source_key}>{target_key}"
+    return f"rel:{normalized_kind}:{source_key}>{target_key}"
+
+
+def generate_decision_key(target_key: str, kind: str) -> str:
+    """
+    Generate a decision key.
+
+    Format: ``dec:{kind}:{target_key}``
+
+    One decision of a given kind per target, so re-asserting it is idempotent.
+    """
+    return f"dec:{_normalize_value(kind)}:{target_key}"
 
 
 def generate_evidence_key(
@@ -170,41 +222,24 @@ def generate_evidence_key(
     return f"evd:sha256:{hashlib.sha256(payload.encode()).hexdigest()}"
 
 
-def generate_threat_intel_key(source: str, observable_key: str) -> str:
+def generate_signal_key(source: str, subject_key: str, external_id: str | None = None) -> str:
     """
-    Generate a unique key for threat intelligence.
+    Generate an observable-signal key.
 
-    Format: ti:{normalized_source}:{observable_key}
+    Format: ``ti:{source}:{subject_key}`` — **byte-identical to v6** when no ``external_id`` is
+    given, so migrated documents need no remapping on this side.
 
-    Args:
-        source: Name of the threat intel source
-        observable_key: Key of the related observable
-
-    Returns:
-        Unique threat intel key
+    Passing an ``external_id`` is how a caller opts into keeping a source's history instead of
+    letting the freshest assertion win.
     """
     normalized_source = _normalize_value(source)
-    return f"ti:{normalized_source}:{observable_key}"
+    if external_id:
+        return f"ti:{normalized_source}:{external_id.strip()}:{subject_key}"
+    return f"ti:{normalized_source}:{subject_key}"
 
 
-def generate_enrichment_key(name: str, context: str = "") -> str:
-    """
-    Generate a unique key for an enrichment.
-
-    Format: enr:{name}:{context_hash}
-
-    Args:
-        name: Name of the enrichment
-        context: Optional context string
-
-    Returns:
-        Unique enrichment key
-    """
-    normalized_name = _normalize_value(name)
-    if context:
-        context_hash = hashlib.sha256(context.encode()).hexdigest()[:8]
-        return f"enr:{normalized_name}:{context_hash}"
-    return f"enr:{normalized_name}"
+# Kept under its v6 name for the migration path; new code calls generate_signal_key.
+generate_threat_intel_key = generate_signal_key
 
 
 def generate_tag_key(name: str) -> str:
@@ -270,6 +305,9 @@ def is_tag_descendant_of(descendant_name: str, ancestor_name: str) -> bool:
     return descendant_name.startswith(ancestor_name + ":")
 
 
+KEY_PREFIXES = frozenset({"obs", "fnd", "evd", "ti", "rel", "dec", "tag"})
+
+
 def parse_key_type(key: str) -> str | None:
     """
     Extract the type prefix from a key.
@@ -278,7 +316,7 @@ def parse_key_type(key: str) -> str | None:
         key: The key to parse
 
     Returns:
-        Type prefix (obs, fnd, evd, ti, enr, tag) or None if invalid
+        Type prefix (one of :data:`KEY_PREFIXES`) or None if invalid
     """
     if ":" in key:
         return key.split(":", 1)[0]
@@ -326,7 +364,7 @@ def validate_key(key: str, expected_type: str | None = None) -> bool:
         return False
 
     key_type = parse_key_type(key)
-    if key_type not in ("obs", "fnd", "evd", "ti", "enr", "tag"):
+    if key_type not in KEY_PREFIXES:
         return False
 
     if expected_type and key_type != expected_type:

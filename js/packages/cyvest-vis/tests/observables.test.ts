@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Core } from "cytoscape";
 
-import { parseCyvest } from "@cyvest/cyvest-js";
+import { getAllObservables, getAllRelations, parseCyvest } from "@cyvest/cyvest-js";
 
 import { buildObservablesElements } from "../src/adapters/observablesElements";
 import { updateLabelDensity } from "../src/components/CytoscapeCanvas";
@@ -14,7 +14,7 @@ import {
 import { filterInvestigation, normalizeGraphFilters } from "../src/core/filters";
 import { resolveRelationshipProfile } from "../src/core/relationships";
 import { createObservablesStylesheet } from "../src/core/styles";
-import { getLevelColor } from "../src/utils/colors";
+import { getVerdictColor } from "../src/utils/colors";
 import { truncateLabel } from "../src/utils/labels";
 
 import cyvestEmailData from "../../cyvest-app/src/investigations/cyvest_email.json";
@@ -25,25 +25,26 @@ const emailInvestigation = parseCyvest(cyvestEmailData);
 
 describe("email investigation semantics", () => {
   it("records the analyst pivot instead of generic associations", () => {
-    const relationships = Object.values(emailInvestigation.observables).flatMap(
-      (observable) => observable.relationships
-    );
+    const relations = Object.values(getAllRelations(emailInvestigation));
     const counts = Object.fromEntries(
-      [...new Set(relationships.map((relationship) => relationship.relationship_type))]
+      [...new Set(relations.map((relation) => relation.kind))]
         .sort()
-        .map((type) => [
-          type,
-          relationships.filter((relationship) => relationship.relationship_type === type).length,
-        ])
+        .map((kind) => [kind, relations.filter((relation) => relation.kind === kind).length])
     );
 
     expect(counts).toEqual({
       extraction: 11,
       pivot: 4,
     });
-    expect(relationships).not.toContainEqual(
-      expect.objectContaining({ relationship_type: "related-to" })
-    );
+  });
+
+  it("needs no neutral edge, because every observable was reached by a stated pivot", () => {
+    // `finalize_relationships` only falls back to `related-to` for orphans. None here: the graph
+    // is connected by extraction and pivot, so nothing had to be attached without a reason.
+    const relations = Object.values(getAllRelations(emailInvestigation));
+
+    expect(relations).not.toContainEqual(expect.objectContaining({ kind: "related-to" }));
+    expect(relations.every((relation) => relation.kind === "extraction" || relation.kind === "pivot")).toBe(true);
   });
 
   it("presents the technical root as the investigation subject", () => {
@@ -186,35 +187,31 @@ describe("cytoscape adapters", () => {
 });
 
 describe("graph filters", () => {
-  it("keeps the root while filtering observable and relationship types", () => {
+  it("keeps the root while filtering observable types and relation kinds", () => {
+    const rootKey = investigation.header.root_key as string;
     const filtered = filterInvestigation(
       investigation,
       normalizeGraphFilters({
         observableTypes: ["domain", "url"],
-        relationshipTypes: ["related-to"],
+        relationKinds: ["related-to"],
       })
     );
+    const kept = getAllObservables(filtered);
 
-    expect(Object.values(filtered.observables).some((item) => item.value === "root")).toBe(true);
+    expect(kept[rootKey]).toBeDefined();
     expect(
-      Object.values(filtered.observables).every(
-        (item) =>
-          item.value === "root" ||
-          item.value === "Phishing Email - Invoice #12345" ||
-          item.type === "domain" ||
-          item.type === "url"
+      Object.entries(kept).every(
+        ([key, item]) => key === rootKey || item.type === "domain" || item.type === "url"
       )
     ).toBe(true);
 
-    const keptRelationships = Object.values(filtered.observables)
-      .filter((item) => item.value !== "root")
-      .flatMap((item) => item.relationships);
+    const keptRelations = Object.values(getAllRelations(filtered)).filter(
+      (relation) => relation.source_key !== rootKey && relation.target_key !== rootKey
+    );
 
     // Guards the assertion below against passing on an empty list
-    expect(keptRelationships.length).toBeGreaterThan(0);
-    expect(
-      keptRelationships.every((relationship) => relationship.relationship_type === "related-to")
-    ).toBe(true);
+    expect(keptRelations.length).toBeGreaterThan(0);
+    expect(keptRelations.every((relation) => relation.kind === "related-to")).toBe(true);
   });
 });
 
@@ -381,9 +378,9 @@ describe("force-directed layout", () => {
     ).toBe(true);
   });
 
-  it("uses a restrained level palette", () => {
-    expect(getLevelColor("INFO")).toBe("#94a3b8");
-    expect(getLevelColor("MALICIOUS")).toBe("#ad5555");
+  it("uses a restrained verdict palette", () => {
+    expect(getVerdictColor("INFO")).toBe("#94a3b8");
+    expect(getVerdictColor("MALICIOUS")).toBe("#ad5555");
   });
 
   it("places the phishing narrative in semantic rings", () => {

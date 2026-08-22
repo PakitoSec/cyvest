@@ -1,25 +1,26 @@
 """
-Click-based command-line interface for Cyvest.
+Command-line interface.
 
-Provides commands for managing investigations, displaying summaries,
-and generating simple reports from serialized investigations.
+Every command that shows a number goes through the report, never through a stored field: the
+serialized document carries a report, but a ``--engine`` override re-derives it, which is the
+whole point of separating facts from evaluation.
 """
 
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
 import click
 from logurich import get_logger
 from logurich.opt_click import click_logger_params
-from pydantic import BaseModel
 from rich.console import Console
 
 from cyvest import __version__
-from cyvest.compare import ExpectedResult, compare_investigations
+from cyvest.compare import EngineMismatchError, ExpectedResult, compare_investigations
+from cyvest.cyvest import Cyvest
+from cyvest.enums import ObservableType
 from cyvest.extract import (
     ExtractedObservable,
     extract_all,
@@ -27,70 +28,50 @@ from cyvest.extract import (
     observables_to_markdown,
     observables_to_markdown_table,
 )
-from cyvest.io_rich import display_diff, display_finding_query, display_observable_query, display_threat_intel_query
-from cyvest.io_schema import get_investigation_schema
-from cyvest.io_serialization import load_investigation_json, migrate_v5_to_v6
-from cyvest.keys import parse_key_type
-from cyvest.model_enums import ObservableType
+from cyvest.io_rich import display_diff
+from cyvest.io_schema import get_investigation_schema, get_signal_schema
+from cyvest.io_serialization import detect_schema_version, migrate_to_current
+from cyvest.policy import DEFAULT_POLICY
 
 CONTEXT_SETTINGS = {"help_option_names": ["-h", "--help"]}
 console = Console()
 logger = get_logger(__name__)
 
 
-def _load_investigation(input_path: Path) -> dict[str, Any]:
-    """Load a serialized investigation from disk."""
-    with input_path.open("r", encoding="utf-8") as handle:
+def _read_json(path: Path) -> dict[str, Any]:
+    with path.open("r", encoding="utf-8") as handle:
         return json.load(handle)
 
 
-def _statistics_as_dict(stats: Mapping[str, Any] | BaseModel | None) -> dict[str, Any]:
-    """Return statistics as a plain dictionary for CLI rendering."""
-    if stats is None:
-        return {}
-    if isinstance(stats, BaseModel):
-        return stats.model_dump(mode="json")
-    return dict(stats)
+def _write_json(data: dict[str, Any], path: Path) -> Path:
+    resolved = path.resolve()
+    resolved.parent.mkdir(parents=True, exist_ok=True)
+    resolved.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    return resolved
 
 
-def _print_stats_overview(stats: Mapping[str, Any] | BaseModel | None) -> None:
-    """Render a lightweight overview of statistics."""
-    stats_data = _statistics_as_dict(stats)
-    if not stats_data:
-        logger.info("  No statistics available.")
-        return
+def _open(path: Path, engine: str | None, *, migrate: bool = True) -> Cyvest:
+    """
+    Load an investigation, migrating older documents on the way in.
 
-    for key, value in stats_data.items():
-        if isinstance(value, dict):
-            continue
-        logger.info("  %s: %s", key, value)
-
-
-def _write_markdown(data: dict[str, Any], output_path: Path) -> None:
-    """Write a basic Markdown report derived from serialized data."""
-    stats = _statistics_as_dict(data.get("stats", {}))
-    score_value = data.get("score", None)
+    Loading always drops the stored report and re-derives from the facts, so a hand-edited
+    ``report`` block cannot mislead the CLI. ``--engine`` picks *which* engine does it, which is
+    how you ask "what would this case look like under another one?" without touching the facts.
+    """
     try:
-        score_display = "N/A" if score_value is None else f"{float(score_value):.2f}"
-    except (TypeError, ValueError):
-        score_display = str(score_value)
-    lines = [
-        "# Investigation Report",
-        "",
-        f"**Score:** {score_display}",
-        f"**Level:** {data.get('level', 'N/A')}",
-        "",
-        "## Statistics",
-        "",
-    ]
+        cv = Cyvest.io_load_json(path, migrate=migrate)
+    except ValueError as exc:
+        raise click.ClickException(str(exc)) from exc
+    if engine:
+        cv.reevaluate(engine=engine)
+    return cv
 
-    for key, value in stats.items():
-        if isinstance(value, dict):
-            continue
-        lines.append(f"- **{key}:** {value}")
 
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text("\n".join(lines), encoding="utf-8")
+_engine_option = click.option(
+    "--engine",
+    default=None,
+    help="Evaluate with this engine instead of the one recorded in the document header.",
+)
 
 
 @click.group(context_settings=CONTEXT_SETTINGS)
@@ -104,19 +85,12 @@ def cli() -> None:
 @cli.command()
 @click.argument("input", type=click.Path(exists=True, dir_okay=False, path_type=Path))
 @click.option("--stats/--no-stats", default=False, help="Display statistics tables after the summary.")
-@click.option(
-    "--graph/--no-graph",
-    default=True,
-    show_default=True,
-    help="Toggle observable graph rendering.",
-)
-def show(input: Path, stats: bool, graph: bool) -> None:
-    """
-    Display an investigation from a JSON file.
-    """
-    cv = load_investigation_json(input)
+@click.option("--graph/--no-graph", default=True, show_default=True, help="Toggle observable graph rendering.")
+@_engine_option
+def show(input: Path, stats: bool, graph: bool, engine: str | None) -> None:
+    """Display an investigation from a JSON file."""
+    cv = _open(input, engine)
     cv.display_summary(show_graph=graph)
-
     if stats:
         logger.info("")
         cv.display_statistics()
@@ -125,94 +99,135 @@ def show(input: Path, stats: bool, graph: bool) -> None:
 @cli.command()
 @click.argument("input", type=click.Path(exists=True, dir_okay=False, path_type=Path))
 @click.option("-d", "--detailed", is_flag=True, help="Show detailed breakdowns.")
-def stats(input: Path, detailed: bool) -> None:
-    """
-    Display statistics for an investigation.
-    """
-
-    cv = load_investigation_json(input)
+@_engine_option
+def stats(input: Path, detailed: bool, engine: str | None) -> None:
+    """Display statistics for an investigation."""
+    cv = _open(input, engine)
+    report = cv.get_report()
     logger.info(f"[cyan]Statistics for: {input}[/cyan]")
     logger.info("[bold]Overview:[/bold]")
-    logger.info("  Global Score: %s", f"{cv.get_global_score():.2f}")
-    logger.info("  Global Level: %s", cv.get_global_level())
+    logger.info("  Engine:        %s", report.engine_id)
+    logger.info("  Global score:  %.2f", cv.get_global_score())
+    logger.info("  Global verdict: %s", cv.get_global_verdict().value)
 
     if detailed:
         logger.info("")
         cv.display_statistics()
-    else:
-        _print_stats_overview(cv.get_statistics())
+        return
+
+    statistics = cv.statistics()
+    for key, value in statistics.model_dump(mode="json").items():
+        if not isinstance(value, dict | list):
+            logger.info("  %s: %s", key, value)
+
+
+@cli.command(name="explain")
+@click.argument("input", type=click.Path(exists=True, dir_okay=False, path_type=Path))
+@click.argument("key")
+@_engine_option
+def explain_cmd(input: Path, key: str, engine: str | None) -> None:
+    """
+    Show how KEY got its score.
+
+    KEY is an observable or a finding key, as it appears in the summary.
+    """
+    cv = _open(input, engine)
+    try:
+        cv.display_explanation(key)
+    except KeyError as exc:
+        raise click.ClickException(f"Unknown key: {key}") from exc
+
+
+@cli.command(name="timeline")
+@click.argument("input", type=click.Path(exists=True, dir_okay=False, path_type=Path))
+@click.option(
+    "--time",
+    "time_basis",
+    type=click.Choice(["occurred", "asserted"], case_sensitive=False),
+    default="occurred",
+    show_default=True,
+    help="Order by when things happened, or by when they were recorded.",
+)
+@click.option("--key-only", is_flag=True, help="Keep only entries marked as key moments.")
+@_engine_option
+def timeline_cmd(input: Path, time_basis: str, key_only: bool, engine: str | None) -> None:
+    """Display the chronology of an investigation."""
+    from cyvest.enums import Salience
+
+    cv = _open(input, engine)
+    kwargs: dict[str, Any] = {"time": time_basis}
+    if key_only:
+        kwargs["min_salience"] = Salience.KEY
+    cv.display_timeline(**kwargs)
+
+
+@cli.command(name="engines")
+def engines_cmd() -> None:
+    """List the registered engines and their aliases."""
+    for name, target in sorted(Cyvest.ENGINES().items()):
+        logger.info("  %s%s", name, "" if name == target else f" \u2192 {target}")
+
+
+@cli.group(name="policy")
+def policy_group() -> None:
+    """Inspect scoring policies."""
+
+
+@policy_group.command(name="show")
+@click.argument("input", type=click.Path(exists=True, dir_okay=False, path_type=Path), required=False)
+def policy_show(input: Path | None) -> None:
+    """
+    Show the policy in effect.
+
+    Without an argument, shows the default policy; with one, shows the policy version recorded in
+    that investigation — a report is only reproducible against the policy that produced it.
+    """
+    if input is not None:
+        data = _read_json(input)
+        logger.info("  Policy version recorded in file: %s", data.get("policy_version", "unknown"))
+        logger.info("  Engine recorded in file:         %s", data.get("engine_id", "unknown"))
+        logger.info("")
+
+    logger.rich("INFO", json.dumps(DEFAULT_POLICY.model_dump(mode="json"), indent=2), prefix=False)
 
 
 @cli.command()
 @click.argument("inputs", nargs=-1, type=click.Path(exists=True, dir_okay=False, path_type=Path))
 @click.option("-o", "--output", required=True, type=click.Path(dir_okay=False, path_type=Path))
-@click.option(
-    "-f",
-    "--format",
-    "output_format",
-    type=click.Choice(["json", "rich"], case_sensitive=False),
-    default="json",
-    show_default=True,
-    help="Output format for merged investigation.",
-)
-@click.option(
-    "--stats/--no-stats",
-    default=True,
-    show_default=True,
-    help="Display merge statistics after merging.",
-)
-def merge(inputs: tuple[Path, ...], output: Path, output_format: str, stats: bool) -> None:
+@click.option("--stats/--no-stats", default=True, show_default=True, help="Display statistics after merging.")
+@_engine_option
+def merge(inputs: tuple[Path, ...], output: Path, stats: bool, engine: str | None) -> None:
     """
-    Merge multiple investigation JSON files into a single investigation.
+    Merge investigation files into one.
 
-    This command loads multiple investigation files and merges them together,
-    automatically handling duplicate objects and score propagation.
-    The merged investigation is saved to the specified output file.
+    Merging is a union of facts, so it is idempotent and order-independent; conflicting assertions
+    about the same fact are settled by freshness, which means a score can go down.
     """
     if len(inputs) < 2:
         raise click.BadParameter("Provide at least two input files.", param_hint="inputs")
 
     logger.info(f"[cyan]Merging {len(inputs)} investigation files...[/cyan]")
-
-    # Load first investigation
     logger.info(f"  Loading: {inputs[0]}")
-    main_investigation = load_investigation_json(inputs[0])
+    merged = _open(inputs[0], engine)
 
-    # Merge all other investigations
     for input_path in inputs[1:]:
-        logger.info(f"  Loading: {input_path}")
-        other_investigation = load_investigation_json(input_path)
-        logger.info(f"  Merging: {input_path.name}")
-        main_investigation.merge_investigation(other_investigation)
+        logger.info(f"  Merging: {input_path}")
+        merged.merge_investigation(_open(input_path, engine))
 
-    logger.info("[green]✓ Merge complete[/green]\n")
+    logger.info("[green]\u2713 Merge complete[/green]\n")
 
-    # Display statistics if requested
     if stats:
-        logger.info("[bold]Merged Investigation Statistics:[/bold]")
-        investigation_stats = main_investigation.get_statistics()
-        logger.info(f"  Total Observables: {investigation_stats.total_observables}")
-        logger.info(f"  Total Findings: {investigation_stats.total_findings}")
-        logger.info(f"  Total Threat Intel: {investigation_stats.total_threat_intel}")
-        logger.info(f"  Total Tags: {investigation_stats.total_tags}")
-        logger.info(f"  Global Score: {main_investigation.get_global_score():.2f}")
-        logger.info(f"  Global Level: {main_investigation.get_global_level()}\n")
+        statistics = merged.statistics()
+        logger.info("[bold]Merged investigation:[/bold]")
+        logger.info(f"  Observables:    {statistics.total_observables}")
+        logger.info(f"  Findings:       {statistics.total_findings}")
+        logger.info(f"  Signals:        {statistics.total_signals}")
+        logger.info(f"  Tags:           {statistics.total_tags}")
+        logger.info(f"  Global score:   {merged.get_global_score():.2f}")
+        logger.info(f"  Global verdict: {merged.get_global_verdict().value}\n")
 
-    # Save merged investigation
-    output_path = output.resolve()
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-
-    if output_format == "json":
-        main_investigation.io_save_json(str(output_path))
-        logger.info(f"[green]✓ Saved merged investigation to: {output_path}[/green]")
-    elif output_format == "rich":
-        # Display rich summary
-        logger.info("[bold]Merged Investigation Summary:[/bold]\n")
-        main_investigation.display_summary(show_graph=True)
-        # Also save as JSON
-        json_output = output_path.with_suffix(".json")
-        main_investigation.io_save_json(str(json_output))
-        logger.info(f"\n[green]✓ Saved merged investigation to: {json_output}[/green]")
+    saved = merged.io_save_json(output)
+    logger.info(f"[green]\u2713 Saved merged investigation to: {saved}[/green]")
 
 
 @cli.command()
@@ -227,23 +242,17 @@ def merge(inputs: tuple[Path, ...], output: Path, output_format: str, stats: boo
     show_default=True,
     help="Output format.",
 )
-def export(input: Path, output: Path, export_format: str) -> None:
-    """
-    Export an investigation to a different format.
-    """
-
-    data = _load_investigation(input)
-    output_path = output.resolve()
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-
+@_engine_option
+def export(input: Path, output: Path, export_format: str, engine: str | None) -> None:
+    """Export an investigation to another format."""
+    cv = _open(input, engine)
     if export_format.lower() == "json":
-        with output_path.open("w", encoding="utf-8") as handle:
-            json.dump(data, handle, indent=2, ensure_ascii=False)
-        logger.info(f"[green]Exported to JSON: {output_path}[/green]")
+        saved = cv.io_save_json(output)
+        logger.info(f"[green]Exported to JSON: {saved}[/green]")
         return
 
-    _write_markdown(data, output_path)
-    logger.info(f"[green]Exported to Markdown: {output_path}[/green]")
+    cv.io_save_markdown(output)
+    logger.info(f"[green]Exported to Markdown: {output.resolve()}[/green]")
 
 
 @cli.command(name="schema")
@@ -253,16 +262,19 @@ def export(input: Path, output: Path, export_format: str) -> None:
     type=click.Path(dir_okay=False, path_type=Path),
     help="Write the JSON Schema to a file instead of stdout.",
 )
-def schema_cmd(output: Path | None) -> None:
-    """
-    Emit the JSON Schema describing serialized investigations.
-    """
-    schema = get_investigation_schema()
+@click.option(
+    "--which",
+    type=click.Choice(["investigation", "signal"], case_sensitive=False),
+    default="investigation",
+    show_default=True,
+    help="The serialized investigation, or the contract for ingesting an external signal.",
+)
+def schema_cmd(output: Path | None, which: str) -> None:
+    """Emit a JSON Schema."""
+    schema = get_signal_schema() if which == "signal" else get_investigation_schema()
     if output:
-        output_path = output.resolve()
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        output_path.write_text(json.dumps(schema, indent=2) + "\n", encoding="utf-8")
-        logger.info(f"[green]Schema written to: {output_path}[/green]")
+        written = _write_json(schema, output)
+        logger.info(f"[green]Schema written to: {written}[/green]")
         return
 
     logger.rich("INFO", json.dumps(schema, indent=2), prefix=False)
@@ -271,14 +283,33 @@ def schema_cmd(output: Path | None) -> None:
 @cli.command()
 @click.argument("input", type=click.Path(exists=True, dir_okay=False, path_type=Path))
 @click.option("-o", "--output", required=True, type=click.Path(dir_okay=False, path_type=Path))
-def migrate(input: Path, output: Path) -> None:
-    """Migrate a Cyvest 5.x investigation to schema version 6.0.0."""
-    source = _load_investigation(input)
-    migrated = migrate_v5_to_v6(source)
-    output_path = output.resolve()
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(json.dumps(migrated, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    logger.info(f"[green]Migrated investigation written to: {output_path}[/green]")
+@click.option(
+    "--from",
+    "from_version",
+    default="auto",
+    show_default=True,
+    help="Source schema version, or 'auto' to detect it.",
+)
+def migrate(input: Path, output: Path, from_version: str) -> None:
+    """
+    Migrate an older investigation to the current schema.
+
+    Migration is a chain of dict-to-dict steps, so a 5.x document reaches the current version by
+    passing through every intermediate one.
+    """
+    source = _read_json(input)
+    detected = detect_schema_version(source)
+    if from_version != "auto" and not detected.startswith(from_version.split(".")[0]):
+        raise click.ClickException(f"File looks like schema {detected}, not {from_version}.")
+
+    logger.info("  Detected schema version: %s", detected)
+    try:
+        migrated = migrate_to_current(source)
+    except ValueError as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    written = _write_json(migrated, output)
+    logger.info(f"[green]Migrated investigation written to: {written}[/green]")
 
 
 @cli.command()
@@ -290,25 +321,19 @@ def migrate(input: Path, output: Path) -> None:
     type=click.Path(exists=True, dir_okay=False, path_type=Path),
     help="JSON file with ExpectedResult tolerance rules.",
 )
-@click.option(
-    "--title",
-    default="Investigation Diff",
-    show_default=True,
-    help="Title for the diff table.",
-)
-def diff(actual: Path, expected: Path, rules: Path | None, title: str) -> None:
+@click.option("--title", default="Investigation Diff", show_default=True, help="Title for the diff table.")
+@_engine_option
+def diff(actual: Path, expected: Path, rules: Path | None, title: str, engine: str | None) -> None:
     """
-    Compare two investigation JSON files and display differences.
+    Compare two investigation files.
 
-    ACTUAL is the investigation to validate (actual results).
-    EXPECTED is the reference investigation (expected results).
-
-    Optionally provide a rules file with tolerance rules in JSON format:
+    ACTUAL is the investigation under test, EXPECTED the reference. A rules file may loosen the
+    comparison to a band rather than an exact value:
 
     \b
     [
-      {"finding_name": "domain-finding", "score": ">= 1.0"},
-      {"key": "fnd:ai-analysis", "level": "SUSPICIOUS", "score": "< 3.0"}
+      {"rule_id": "domain-reputation", "score": ">= 1.0"},
+      {"key": "fnd:ai-analysis:obs:url:...", "verdict": "SUSPICIOUS", "score": "< 3.0"}
     ]
 
     Supported operators: >=, <=, >, <, ==, !=
@@ -317,87 +342,26 @@ def diff(actual: Path, expected: Path, rules: Path | None, title: str) -> None:
     logger.info(f"  Actual:   {actual}")
     logger.info(f"  Expected: {expected}")
 
-    actual_cv = load_investigation_json(actual)
-    expected_cv = load_investigation_json(expected)
+    actual_cv = _open(actual, engine)
+    expected_cv = _open(expected, engine)
 
-    # Load tolerance rules if provided
     result_expected: list[ExpectedResult] | None = None
     if rules:
         logger.info(f"  Rules:    {rules}")
-        with rules.open("r", encoding="utf-8") as f:
-            rules_data = json.load(f)
-        result_expected = [ExpectedResult(**r) for r in rules_data]
+        result_expected = [ExpectedResult(**rule) for rule in _read_json(rules)]  # type: ignore[union-attr]
 
     logger.info("")
 
-    # Compare investigations
-    diffs = compare_investigations(actual_cv, expected_cv, result_expected=result_expected)
+    try:
+        diffs = compare_investigations(actual_cv, expected_cv, result_expected=result_expected)
+    except EngineMismatchError as exc:
+        raise click.ClickException(f"{exc} Pass --engine to re-evaluate both with the same one.") from exc
 
     if not diffs:
-        logger.info("[green]✓ No differences found[/green]")
+        logger.info("[green]\u2713 No differences found[/green]")
         return
 
-    # Display diff table
-    display_diff(diffs, lambda r: logger.rich("INFO", r, width=150), title=title)
-
-
-@cli.command()
-@click.argument("input", type=click.Path(exists=True, dir_okay=False, path_type=Path))
-@click.option(
-    "-k",
-    "--key",
-    required=True,
-    help="Key of the object to query (fnd:..., obs:..., or ti:...).",
-)
-@click.option(
-    "-d",
-    "--depth",
-    type=int,
-    default=1,
-    show_default=True,
-    help="Relationship traversal depth for observable queries.",
-)
-def query(input: Path, key: str, depth: int) -> None:
-    """
-    Query a specific object from an investigation file by its key.
-
-    Displays detailed information about the object, including linked
-    objects, scores, levels, and how scores were calculated.
-
-    \b
-    Supports querying:
-    - Findings: --key fnd:finding-name
-    - Observables: --key obs:type:value
-    - Threat Intel: --key ti:source:obs:type:value
-
-    \b
-    Examples:
-        cyvest query investigation.json --key fnd:dns-finding
-        cyvest query investigation.json --key obs:domain:example.com --depth 2
-        cyvest query investigation.json -k ti:virustotal:obs:domain:example.com
-    """
-    cv = load_investigation_json(input)
-
-    # Determine key type
-    key_type = parse_key_type(key)
-
-    if key_type is None or key_type not in ("fnd", "obs", "ti"):
-        raise click.ClickException(f"Invalid key format: '{key}'. Expected fnd:..., obs:..., or ti:...")
-
-    logger.info(f"[cyan]Querying: {key}[/cyan]\n")
-
-    def rich_print(r):
-        return logger.rich("INFO", r, prefix=False)
-
-    try:
-        if key_type == "fnd":
-            display_finding_query(cv, key, rich_print)
-        elif key_type == "obs":
-            display_observable_query(cv, key, rich_print, depth=depth)
-        elif key_type == "ti":
-            display_threat_intel_query(cv, key, rich_print)
-    except KeyError as exc:
-        raise click.ClickException(str(exc)) from exc
+    display_diff(diffs, lambda renderable: logger.rich("INFO", renderable, width=150), title=title)
 
 
 # =============================================================================

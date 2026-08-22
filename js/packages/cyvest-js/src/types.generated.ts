@@ -1,371 +1,498 @@
 // AUTO-GENERATED FROM cyvest.schema.json — DO NOT EDIT
 
+export type RootKey = string | null;
+export type FragmentIds = string[];
+export type OccurredAt = string | null;
 /**
- * Optional human-readable investigation name.
+ * Family a source belongs to, used by the policy to weigh its reliability.
  */
-export type InvestigationName = string | null;
-/**
- * Security level classification for findings, observables, and threat intelligence.
- *
- * Levels are ordered from lowest (NONE) to highest (MALICIOUS) severity.
- */
-export type Level = "NONE" | "TRUSTED" | "INFO" | "SAFE" | "NOTABLE" | "SUSPICIOUS" | "MALICIOUS";
-export type Justification = string | null;
-/**
- * List of whitelist entries applied to this investigation.
- */
-export type Whitelists = InvestigationWhitelist[];
+export type SourceClass =
+  | "vendor_feed"
+  | "sandbox"
+  | "osint"
+  | "internal_tool"
+  | "org_analyst"
+  | "org_policy"
+  | "unknown";
+export type ExternalId = string | null;
+export type EvidenceKeys = string[];
 export type Subtype = string | null;
 export type Namespace = string | null;
 export type Subtype1 = string | null;
 export type Namespace1 = string | null;
 export type Aliases = ObservableAlias[];
-export type ThreatIntels = string[];
+export type OccurredAt1 = string | null;
+export type ExternalId1 = string | null;
+export type EvidenceKeys1 = string[];
 /**
- * Direction of a relationship between observables.
+ * The analyst pivot that produced the target from the source.
+ *
+ * Direction is implied: ``source_key`` is the parent, ``target_key`` the child. ``RELATED_TO``
+ * is symmetric and excluded from propagation, which makes v6's ``EXTRACTION`` +
+ * ``BIDIRECTIONAL`` combination inexpressible.
  */
-export type RelationshipDirection = "outbound" | "inbound" | "bidirectional";
-export type Relationships = Relationship[];
+export type RelationKind = "extraction" | "pivot" | "related-to";
+export type ObservedAt = string | null;
 /**
- * Findings that currently link to this observable (navigation-only).
+ * Direction of a judgment, and the displayed level — they are the same thing.
+ *
+ * v7 merges the former ``Level`` into ``Verdict``. The five values line up one-for-one with
+ * the score bands ``basic-v1`` inherits from v6 (``< 0``, ``= 0``, ``]0,3[``, ``[3,5[``,
+ * ``>= 5``), which makes a verdict/level divergence structurally impossible.
+ *
+ * Those bands are ``basic-v1``'s convention, **not** part of the enum's contract: a
+ * probabilistic engine maps its own posterior thresholds onto the same labels.
+ *
+ * Two v6 levels deliberately left this axis: ``NONE`` became :class:`Status` and ``TRUSTED``
+ * became a :class:`DecisionKind` (or plain ``SAFE`` when it was merely a negative score).
  */
-export type FindingLinks = string[];
-/**
- * Controls how a Finding↔Observable link propagates across merged investigations.
- */
-export type PropagationMode = "LOCAL_ONLY" | "GLOBAL";
-export type ObservableLinks = ObservableLink[];
-export type EvidenceLinks = EvidenceLink[];
-export type ExternalId = string | null;
+export type Verdict = "SAFE" | "INFO" | "NOTABLE" | "SUSPICIOUS" | "MALICIOUS";
+export type Weight = number | null;
+export type OccurredAt2 = string | null;
+export type ExternalId2 = string | null;
+export type EvidenceKeys2 = string[];
+export type ObservedAt1 = string | null;
+export type Labels = Label[];
+export type Taxonomies = string[];
+export type OccurredAt3 = string | null;
+export type ExternalId3 = string | null;
+export type EvidenceKeys3 = string[];
 export type Uri = string | null;
+export type CapturedAt = string | null;
+export type Weight1 = number | null;
+export type OccurredAt4 = string | null;
+export type ExternalId4 = string | null;
+export type EvidenceKeys4 = string[];
 /**
- * Findings that currently link to this evidence (navigation-only).
+ * Whether a finding takes part in the evaluation at all.
+ *
+ * Anything other than ``EVALUATED`` is excluded from the score *and* from aggregation
+ * denominators, while staying visible in the report.
  */
-export type FindingLinks1 = string[];
-export type Taxonomies = Taxonomy[];
-export type Findings1 = string[];
+export type Status = "NOT_APPLICABLE" | "PENDING" | "EVALUATED";
 /**
- * Root observable type used during data extraction.
+ * How a finding enters the investigation total. :class:`Status` says *whether*, this says *how*.
+ *
+ * ``ADDITIVE`` is every finding v6 ever had: a term of the sum.
+ *
+ * ``FLOOR`` is a **conclusion** — typically an AI analysis that read the other findings. It is
+ * not a term: it raises the total just enough to reach the verdict it asserts, and adds nothing
+ * when that verdict is already reached. Conclusions therefore never compound, which is what
+ * makes it safe to plug several analysers into the same investigation.
+ *
+ * The floor a verdict maps to is ``basic-v1``'s band convention, like every other number here —
+ * see :mod:`cyvest.evaluation.projection`.
  */
-export type RootType = ("file" | "artifact") | null;
+export type Effect = "ADDITIVE" | "FLOOR";
 /**
- * Score calculation mode for observables.
+ * How far a Finding→Observable link looks when evaluating its observable.
+ *
+ * Replaces v6's ``PropagationMode`` one-for-one. ``OWN_FRAGMENT`` resolves to *the fragment of
+ * the finding that carries the link*, so it denotes a different scope for each fragment — the
+ * report indexes observable results by the resolved scope, never by this label.
  */
-export type ScoreMode = "max" | "sum";
+export type Scope = "OWN_FRAGMENT" | "ALL";
+export type ObservableLinks = ObservableLink[];
+export type Labels1 = Label[];
+export type OccurredAt5 = string | null;
+export type ExternalId5 = string | null;
+export type EvidenceKeys5 = string[];
+/**
+ * A named override of the computation.
+ *
+ * Forcing a score has to be a declared act — never the side effect of an inflated weight.
+ * Each kind targets exactly one fact family, enforced by :class:`cyvest.facts.Decision`.
+ */
+export type DecisionKind = "ALLOWLISTED" | "BLOCKLISTED" | "CONFIRMED" | "DISMISSED";
+export type Justification = string | null;
+export type OccurredAt6 = string | null;
+export type ExternalId6 = string | null;
+export type EvidenceKeys6 = string[];
+export type FindingKeys = string[];
+export type Score = number | null;
+export type Contributions = Contribution[];
+export type Score1 = number | null;
+export type Contributions1 = Contribution[];
+export type Score2 = number | null;
+export type Contributions2 = Contribution[];
+export type FragmentId = string | null;
 
 /**
- * Schema for a complete serialized investigation.
- *
- * This model describes the output of `serialize_investigation()` from
- * `cyvest.io_serialization`. It is the top-level schema for exported investigations.
- *
- * Entity types reference the runtime models directly. When generating schemas with
- * `mode='serialization'`, Pydantic respects field_serializer decorators and produces
- * schemas matching the actual model_dump() output.
+ * A complete serialized investigation.
  */
-export interface CyvestInvestigation {
-  schema_version?: "6.0.0";
-  /**
-   * Stable investigation identity (ULID).
-   */
-  investigation_id: string;
-  investigation_name?: InvestigationName;
-  /**
-   * Global investigation score.
-   */
-  score: number;
-  level: Level;
-  /**
-   * Whether the investigation is whitelisted.
-   */
-  whitelisted: boolean;
-  whitelists: Whitelists;
-  observables: Observables;
-  findings: Findings;
-  evidences: Evidences;
-  threat_intels: ThreatIntels1;
-  enrichments: Enrichments;
-  tags: Tags;
-  stats: StatisticsSchema;
-  data_extraction: DataExtractionSchema;
-  /**
-   * Global investigation score formatted as fixed-point x.xx.
-   */
-  score_display: string;
+export interface InvestigationSchema {
+  schema_version?: "7.0.0";
+  header: InvestigationHeader;
+  policy_version?: string;
+  engine_id?: string;
+  facts?: FactsSchema;
+  decisions?: Decisions;
+  tags?: Tags;
+  report: Report;
 }
 /**
- * Represents a whitelist entry on an investigation.
+ * What used to be a ``Case`` fact: metadata about the store rather than a fact inside it.
+ *
+ * ``engine_id`` is denormalized here so an investigation stays replayable identically years
+ * later, even after a newer stable engine ships.
  */
-export interface InvestigationWhitelist {
-  identifier: string;
-  name: string;
-  justification?: Justification;
+export interface InvestigationHeader {
+  investigation_id: string;
+  name?: string;
+  root_key?: RootKey;
+  opened_at?: string;
+  policy_version?: string;
+  engine_id?: string;
+  fragment_ids?: FragmentIds;
   [k: string]: unknown;
 }
 /**
- * Observables keyed by their unique key.
+ * The fact collections, each keyed by its semantic key.
  */
+export interface FactsSchema {
+  observables?: Observables;
+  relations?: Relations;
+  signals?: Signals;
+  evidences?: Evidences;
+  findings?: Findings;
+  events?: Events;
+}
 export interface Observables {
   [k: string]: Observable;
 }
 /**
- * Represents a cyber observable (IP, URL, domain, hash, etc.).
- *
- * Observables can be linked to threat intelligence, findings, and other observables
- * through relationships.
+ * A cyber observable. Identity is ``(type, subtype, namespace, value)``, nothing else.
  */
 export interface Observable {
+  key: string;
+  seq: string;
+  asserted_at: string;
+  occurred_at?: OccurredAt;
+  source: SourceRef;
+  fragment_id: string;
+  external_id?: ExternalId;
+  evidence_keys?: EvidenceKeys;
   type: string;
   subtype?: Subtype;
   namespace?: Namespace;
   value: string;
-  internal: boolean;
-  whitelisted: boolean;
-  comment: string;
-  extra: Extra;
-  score: number;
-  level: Level;
+  internal?: boolean;
+  comment?: string;
+  extra?: Extra;
   aliases?: Aliases;
-  occurrence_count?: number;
-  threat_intels: ThreatIntels;
-  relationships: Relationships;
-  key: string;
-  finding_links: FindingLinks;
-  score_display: string;
+  occurrences?: Occurrences;
+}
+/**
+ * Who or what asserted a fact.
+ */
+export interface SourceRef {
+  name: string;
+  source_class?: SourceClass;
   [k: string]: unknown;
 }
 export interface Extra {
   [k: string]: unknown;
 }
 /**
- * Source observable identity attached to a canonical observable.
+ * A source identity that resolved to a canonical observable.
  */
 export interface ObservableAlias {
   type: string;
   subtype?: Subtype1;
   namespace?: Namespace1;
   value: string;
-  count?: number;
+  counts?: Counts;
   [k: string]: unknown;
 }
+export interface Counts {
+  [k: string]: number;
+}
+export interface Occurrences {
+  [k: string]: number;
+}
+export interface Relations {
+  [k: string]: Relation;
+}
 /**
- * Represents a relationship between observables.
+ * A directed edge between two observables, labelled by the analyst pivot that produced it.
  */
-export interface Relationship {
+export interface Relation {
+  key: string;
+  seq: string;
+  asserted_at: string;
+  occurred_at?: OccurredAt1;
+  source: SourceRef;
+  fragment_id: string;
+  external_id?: ExternalId1;
+  evidence_keys?: EvidenceKeys1;
+  source_key: string;
   target_key: string;
-  relationship_type: string;
-  direction: RelationshipDirection;
-  [k: string]: unknown;
+  kind?: RelationKind;
+  observed_at?: ObservedAt;
+  confidence?: number;
+  comment?: string;
+}
+export interface Signals {
+  [k: string]: ThreatIntel;
 }
 /**
- * Findings keyed by their unique key.
+ * A verdict from a threat-intelligence source.
+ *
+ * Identity is ``(source, subject_key)`` — byte-identical to v6 — so a source re-asserting the
+ * same observable updates in place instead of piling up duplicates. Pass ``external_id`` to
+ * keep history on purpose.
  */
+export interface ThreatIntel {
+  subject_key: string;
+  verdict?: Verdict;
+  confidence?: number;
+  weight?: Weight;
+  key: string;
+  seq: string;
+  asserted_at: string;
+  occurred_at?: OccurredAt2;
+  source: SourceRef;
+  fragment_id: string;
+  external_id?: ExternalId2;
+  evidence_keys?: EvidenceKeys2;
+  kind?: "threat_intel";
+  observed_at?: ObservedAt1;
+  labels?: Labels;
+  payload?: Payload;
+  source_class?: SourceClass;
+  taxonomies?: Taxonomies;
+  comment?: string;
+}
+/**
+ * A typed tag on a fact: ``axis`` says what kind of statement ``value`` makes.
+ */
+export interface Label {
+  axis: string;
+  value: string;
+  [k: string]: unknown;
+}
+export interface Payload {
+  [k: string]: unknown;
+}
+export interface Evidences {
+  [k: string]: Evidence;
+}
+/**
+ * A captured artefact: an API response, a header dump, an enrichment payload.
+ */
+export interface Evidence {
+  key: string;
+  seq: string;
+  asserted_at: string;
+  occurred_at?: OccurredAt3;
+  source: SourceRef;
+  fragment_id: string;
+  external_id?: ExternalId3;
+  evidence_keys?: EvidenceKeys3;
+  evidence_type: string;
+  title?: string;
+  content?: Content;
+  uri?: Uri;
+  captured_at?: CapturedAt;
+}
+export interface Content {
+  [k: string]: unknown;
+}
 export interface Findings {
   [k: string]: Finding;
 }
 /**
- * Represents a verification step in the investigation.
+ * A rule outcome. Identity is ``(rule_id, subject_key)``.
  *
- * A finding validates a specific aspect of the data under investigation
- * and contributes to the overall investigation score.
+ * ``subject_key`` may be an observable *or* the investigation itself — unlike a signal, which
+ * always targets an observable.
  */
 export interface Finding {
-  finding_name: string;
-  description: string;
-  comment: string;
-  extra: Extra1;
-  score: number;
-  level: Level;
-  origin_investigation_id: string;
-  observable_links: ObservableLinks;
-  evidence_links: EvidenceLinks;
+  subject_key: string;
+  verdict?: Verdict;
+  confidence?: number;
+  weight?: Weight1;
   key: string;
-  score_display: string;
+  seq: string;
+  asserted_at: string;
+  occurred_at?: OccurredAt4;
+  source: SourceRef;
+  fragment_id: string;
+  external_id?: ExternalId4;
+  evidence_keys?: EvidenceKeys4;
+  rule_id: string;
+  rule_version?: string;
+  name?: string;
+  comment?: string;
+  status?: Status;
+  effect?: Effect;
+  observable_links?: ObservableLinks;
+  labels?: Labels1;
+  extra?: Extra1;
+}
+/**
+ * A link from a finding to one of its observables, with the scope it is evaluated in.
+ *
+ * Scope is **per link**, exactly like v6's ``propagation_mode``: a finding may mix scopes, and
+ * may even link the same observable twice under two scopes. Deduplication is on the tuple.
+ */
+export interface ObservableLink {
+  observable_key: string;
+  scope?: Scope;
   [k: string]: unknown;
 }
 export interface Extra1 {
   [k: string]: unknown;
 }
-/**
- * Edge metadata for a Finding↔Observable association.
- */
-export interface ObservableLink {
-  observable_key: string;
-  propagation_mode?: PropagationMode;
-}
-/**
- * Edge metadata for a Finding↔Evidence association.
- */
-export interface EvidenceLink {
-  evidence_key: string;
-}
-/**
- * Evidence objects keyed by their unique key.
- */
-export interface Evidences {
-  [k: string]: Evidence;
-}
-/**
- * Structured material supporting one or more findings.
- */
-export interface Evidence {
-  type: string;
-  title: string;
-  description: string;
-  source: string;
-  external_id: ExternalId;
-  content: unknown;
-  uri: Uri;
-  captured_at: string;
-  extra: Extra2;
-  key: string;
-  finding_links: FindingLinks1;
+export interface Events {
   [k: string]: unknown;
 }
-export interface Extra2 {
-  [k: string]: unknown;
+export interface Decisions {
+  [k: string]: Decision;
 }
 /**
- * Threat intelligence entries keyed by their unique key.
- */
-export interface ThreatIntels1 {
-  [k: string]: ThreatIntel;
-}
-/**
- * Represents threat intelligence from an external source.
+ * A human (or automated) call that overrides the computed result for one target.
  *
- * Threat intelligence provides verdicts about observables from sources
- * like VirusTotal, URLScan.io, etc.
+ * ``ALLOWLISTED``/``BLOCKLISTED`` bound an observable's score; ``CONFIRMED``/``DISMISSED``
+ * force a finding. The kind and the target family must agree.
  */
-export interface ThreatIntel {
-  source: string;
-  observable_key: string;
-  comment: string;
-  extra: Extra3;
-  score: number;
-  level: Level;
-  taxonomies: Taxonomies;
+export interface Decision {
   key: string;
-  score_display: string;
-  [k: string]: unknown;
+  seq: string;
+  asserted_at: string;
+  occurred_at?: OccurredAt5;
+  source: SourceRef;
+  fragment_id: string;
+  external_id?: ExternalId5;
+  evidence_keys?: EvidenceKeys5;
+  target_key: string;
+  kind: DecisionKind;
+  justification?: Justification;
 }
-export interface Extra3 {
-  [k: string]: unknown;
-}
-/**
- * Represents a structured taxonomy entry for threat intelligence.
- */
-export interface Taxonomy {
-  level: Level;
-  name: string;
-  value: string;
-}
-/**
- * Enrichment entries keyed by their unique key.
- */
-export interface Enrichments {
-  [k: string]: Enrichment;
-}
-/**
- * Represents structured data enrichment for the investigation.
- *
- * Enrichments store arbitrary structured data that provides additional
- * context but doesn't directly contribute to scoring.
- */
-export interface Enrichment {
-  name: string;
-  data: Data;
-  context: string;
-  key: string;
-  [k: string]: unknown;
-}
-export interface Data {
-  [k: string]: unknown;
-}
-/**
- * Tags keyed by their unique key.
- */
 export interface Tags {
   [k: string]: Tag;
 }
 /**
- * Groups findings for categorical organization.
- *
- * Tags allow structuring the investigation into logical sections
- * with aggregated scores and levels. Hierarchy is automatic based on
- * the ":" delimiter in tag names (e.g., "header:auth:dkim").
+ * A label grouping findings. Merging two tags unions their finding keys.
  */
 export interface Tag {
+  key: string;
+  seq: string;
+  asserted_at: string;
+  occurred_at?: OccurredAt6;
+  source: SourceRef;
+  fragment_id: string;
+  external_id?: ExternalId6;
+  evidence_keys?: EvidenceKeys6;
   name: string;
   description?: string;
-  findings: Findings1;
+  finding_keys?: FindingKeys;
+}
+/**
+ * A full evaluation. Derived, never stored on the facts, recomputed from them.
+ */
+export interface Report {
+  engine_id: string;
+  policy_version: string;
+  investigation: InvestigationResult;
+  findings?: Findings1;
+  observables?: Observables1;
+  [k: string]: unknown;
+}
+/**
+ * The investigation-level verdict.
+ */
+export interface InvestigationResult {
   key: string;
-  /**
-   * Calculate the score from direct findings only (no hierarchy).
-   *
-   * For hierarchical aggregation (including descendant tags), use
-   * Investigation.get_tag_aggregated_score() or TagProxy.get_aggregated_score().
-   *
-   * Returns:
-   *     Total score from direct findings
-   */
-  direct_score: number;
-  direct_level: Level;
+  verdict?: Verdict;
+  confidence?: number;
+  score?: Score;
+  contributions?: Contributions;
+  suppressed_by_decision?: boolean;
+  raw?: Raw;
+  [k: string]: unknown;
 }
 /**
- * Schema for investigation statistics.
+ * One named term that fed a result, kept so the report can explain itself.
+ */
+export interface Contribution {
+  source_key: string;
+  label: string;
+  value: number;
+  retained?: boolean;
+  detail?: string;
+  [k: string]: unknown;
+}
+export interface Raw {
+  [k: string]: unknown;
+}
+export interface Findings1 {
+  [k: string]: FindingResult;
+}
+/**
+ * A finding's verdict.
  *
- * Mirrors the output of `InvestigationStats.get_summary()`.
+ * ``own_term_suppressed`` flags that the rule's own claim was overridden by a stronger link —
+ * a contradiction worth surfacing rather than silently dropping.
+ *
+ * Three combinations of ``(counted, score)`` are meaningful, and a consumer must not conflate
+ * the last two:
+ *
+ * - ``(True, float)`` — an additive finding, a term of the total;
+ * - ``(False, None)`` — dismissed or not evaluated: visible, but out of the evaluation;
+ * - ``(True, None)`` — a conclusion (``effect`` is ``FLOOR``): it takes part, but it has no
+ *   magnitude of its own. Its effect is a floor on the investigation total, reported as a
+ *   contribution of :class:`InvestigationResult`.
  */
-export interface StatisticsSchema {
-  total_observables: number;
-  internal_observables: number;
-  external_observables: number;
-  whitelisted_observables: number;
-  observables_by_type?: ObservablesByType;
-  observables_by_level?: ObservablesByLevel;
-  observables_by_type_and_level?: ObservablesByTypeAndLevel;
-  total_findings: number;
-  applied_findings: number;
-  findings_by_level?: FindingsByLevel;
-  total_evidences: number;
-  evidences_by_type?: EvidencesByType;
-  evidences_by_source?: EvidencesBySource;
-  total_threat_intel: number;
-  threat_intel_by_source?: ThreatIntelBySource;
-  threat_intel_by_level?: ThreatIntelByLevel;
-  total_tags: number;
+export interface FindingResult {
+  key: string;
+  verdict?: Verdict;
+  confidence?: number;
+  score?: Score1;
+  contributions?: Contributions1;
+  suppressed_by_decision?: boolean;
+  raw?: Raw1;
+  status?: Status;
+  effect?: Effect;
+  own_term_suppressed?: boolean;
+  counted?: boolean;
+  [k: string]: unknown;
 }
-export interface ObservablesByType {
-  [k: string]: number;
+export interface Raw1 {
+  [k: string]: unknown;
 }
-export interface ObservablesByLevel {
-  [k: string]: number;
-}
-export interface ObservablesByTypeAndLevel {
-  [k: string]: {
-    [k: string]: number;
-  };
-}
-export interface FindingsByLevel {
-  [k: string]: string[];
-}
-export interface EvidencesByType {
-  [k: string]: number;
-}
-export interface EvidencesBySource {
-  [k: string]: number;
-}
-export interface ThreatIntelBySource {
-  [k: string]: number;
-}
-export interface ThreatIntelByLevel {
-  [k: string]: number;
+export interface Observables1 {
+  [k: string]: ObservableResult;
 }
 /**
- * Schema for data extraction metadata.
+ * An observable's verdict within one resolved scope.
  */
-export interface DataExtractionSchema {
-  root_type?: RootType;
-  score_mode_obs: ScoreMode;
+export interface ObservableResult {
+  key: string;
+  verdict?: Verdict;
+  confidence?: number;
+  score?: Score2;
+  contributions?: Contributions2;
+  suppressed_by_decision?: boolean;
+  raw?: Raw2;
+  scope?: ResolvedScope;
+  [k: string]: unknown;
+}
+export interface Raw2 {
+  [k: string]: unknown;
+}
+/**
+ * A link scope with ``OWN_FRAGMENT`` already resolved to the fragment that carries the link.
+ *
+ * ``OWN_FRAGMENT`` is not *one* scope: it denotes a different set of facts for every fragment.
+ * Two findings from different fragments pointing at the same observable need two distinct
+ * results, so results are indexed by the resolved scope — never by the raw label.
+ *
+ * A model rather than a tuple so it crosses the JSON boundary as a named object: the report is
+ * the contract a front-end reads, and positional data makes for a poor contract.
+ */
+export interface ResolvedScope {
+  scope?: Scope;
+  fragment_id?: FragmentId;
+  [k: string]: unknown;
 }

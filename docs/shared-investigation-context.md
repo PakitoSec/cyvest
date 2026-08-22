@@ -1,286 +1,168 @@
-# SharedInvestigationContext
+# Shared Investigation Context
 
-> **Note**: This is an advanced feature. You can create it via `Cyvest.shared_context()` or import `SharedInvestigationContext` directly.
+Several workers, one case. `SharedInvestigationContext` lets concurrent tasks — threads or asyncio
+— contribute to a single investigation without stepping on each other.
 
-## Overview
-
-The `SharedInvestigationContext` enables safe sharing of observables and findings across concurrent tasks (threads or asyncio). This allows tasks to reuse and reference observables created by other tasks, preventing duplication and enabling aggregated findings.
-
-**Usage**: Create from a Cyvest instance or import directly from the shared module:
 ```python
 from cyvest import Cyvest
 from cyvest.shared import SharedInvestigationContext
 ```
 
-## Features
+---
 
-- **Sync + Async**: Same implementation supports threads and asyncio
-- **Single Lock**: Canonical state is protected by one `threading.RLock`
-- **Async-safe**: Async APIs run the entire critical section in a worker thread via `asyncio.to_thread(...)` (no event-loop blocking)
-- **Auto-Reconcile**: Works with both `with` and `async with`
-- **Cross-Task Sharing**: Tasks can access observables/findings created by other tasks
-- **Deep Copying**: Prevents concurrent modification issues
+## Why it is almost boring now
 
-## Basic Usage
+In v6 this was a delicate piece of machinery: a mutable object graph behind a global lock, deep
+copied on every read, because two workers mutating the same observable would corrupt it.
+
+In v7 none of that is necessary. Facts are immutable, and reconciling is `store.union()` —
+idempotent, commutative and associative. So:
+
+- arrival **order does not matter**;
+- reconciling the same worker **twice is harmless**;
+- a read needs no lock on the object graph, because nothing mutates in place.
+
+The one lock that remains protects a single dict swap.
+
+---
+
+## Basic usage
 
 ```python
-from cyvest import Cyvest
+main = Cyvest(root_data=incident, root_type=Cyvest.OBS.ARTIFACT)
+shared = main.shared_context()
 
-# Create a shared context from the main Cyvest instance
-main_cy = Cyvest(root_data=main_data, root_type=Cyvest.OBS.ARTIFACT)
-shared_context = main_cy.shared_context()
-
-# Use in a worker with auto-reconcile
-def my_worker(shared_context):
-    with shared_context.create_cyvest() as cy:
-        data = cy.root().extra
-        cy.observable(cy.OBS.EMAIL, data.get("email"))
+def worker(shared: SharedInvestigationContext) -> None:
+    with shared.task() as cv:
+        data = cv.root().extra
+        cv.observable(cv.OBS.EMAIL, data["sender"])
 ```
 
-## Cross-Task Observable Sharing
+`task()` hands out a worker-local `Cyvest` and reconciles it on exit — **including when the body
+raises**, so a failing worker still contributes what it managed to establish.
 
-Tasks can access observables created by other tasks:
+You can also build the context directly:
 
 ```python
-def email_from(shared_context):
-    with shared_context.create_cyvest() as cy:
-        data = cy.root().extra
-        cy.observable(cy.OBS.DOMAIN, data.get("domain"))
-
-
-def bodies_url(shared_context):
-    with shared_context.create_cyvest() as cy:
-        data = cy.root().extra
-        domain_info = shared_context.observable_get(cy.OBS.DOMAIN, "malicious.com")
-        if domain_info:
-            cy.observable(cy.OBS.URL, data.get("url")).relate_to(
-                cy.observable(cy.OBS.DOMAIN, domain_info.value),
-                cy.REL.RELATED_TO,
-            )
-```
-
-## API Reference
-
-### SharedInvestigationContext
-
-#### Constructor
-```python
-SharedInvestigationContext(
-    main_cyvest: Cyvest,
-    *,
-    lock: threading.RLock | None = None,
-    max_async_workers: int | None = None,
+shared = SharedInvestigationContext(
+    root_data=incident,
+    root_type=Cyvest.OBS.ARTIFACT,
+    investigation_name="INC-4242",
 )
 ```
-Creates a shared context from a main Cyvest instance. Automatically inherits `root_type`, `score_mode_obs`, and `root_data`.
-`max_async_workers` (optional) limits concurrent async callers.
 
-#### Methods
-
-##### `create_cyvest(root_data=None) -> _CyvestContextManager`
-Returns a context manager that creates a `Cyvest` instance and auto-reconciles on exit.
-
-**Parameters:**
-- `root_data`: Optional override data (defaults to the main Cyvest root data)
-
-**Returns:** Context manager yielding a `Cyvest` instance
-
-**Example:**
-```python
-with shared_context.create_cyvest() as cy:
-    # Build investigation fragment
-    cy.observable(...)
-    return cy  # Automatically reconciled
-```
-
-##### `reconcile(source: Cyvest | Investigation) -> None`
-Manually merges observables and findings from a source into the shared context.
-
-**Parameters:**
-- `source`: Cyvest or Investigation instance to merge
-
-**Thread-Safety:** Merge + registry refresh are atomic under the shared `threading.RLock`.
-
-##### `areconcile(source: Cyvest | Investigation) -> None`
-Async equivalent of `reconcile()`. Runs the entire critical section in a worker thread.
-
-##### `observable_get(obs_type: ObservableType, value: str) -> Observable | None`
-Retrieves a shared observable by type and value.
-
-**Parameters:**
-- `obs_type`: Observable type (use `Cyvest.OBS.*` for the official vocabulary)
-- `value`: Observable value
-
-**Returns:** Deep copy of the observable, or `None` if not found
-
-**Examples:**
-```python
-from cyvest import Cyvest
-
-domain = shared_context.observable_get(Cyvest.OBS.DOMAIN, "malicious.com")
-email = shared_context.observable_get(Cyvest.OBS.EMAIL, "user@example.com")
-
-# Use in task to reference observables from other tasks
-if domain:
-    cy.observable(cy.OBS.URL, "https://example.com").relate_to(
-        cy.observable(cy.OBS.DOMAIN, domain.value),
-        cy.REL.RELATED_TO,
-    )
-```
-
-##### `finding_get(finding_name: str) -> Finding | None`
-Retrieves a shared finding by name.
-
-**Parameters:**
-- `finding_name`: Finding name
-
-**Returns:** Deep copy of the finding, or `None` if not found
-
-**Examples:**
-```python
-from_finding = shared_context.finding_get("from_verification")
-malware_finding = shared_context.finding_get("malware_scan")
-```
-
-##### Existence findings
-Use `observable_get(...)` / `finding_get(...)` and finding for `None`.
-
-##### `is_whitelisted() -> bool`
-Returns whether the underlying investigation has whitelist entries.
-
-##### `get_global_level() -> Level`
-Returns the global level of the underlying investigation.
-
-##### `io_to_markdown(include_tags: bool = False, include_enrichments: bool = False, include_observables: bool = True, exclude_levels: set[Level] | None = None) -> str`
-Generate a Markdown report of the shared investigation with optional sections.
-
-Thread-safe: Uses lock to ensure consistent read of investigation state.
-
-**Parameters:**
-- `include_tags`: Include tags section in the report (default: `False`)
-- `include_enrichments`: Include enrichments section in the report (default: `False`)
-- `include_observables`: Include observables section in the report (default: `True`)
-- `exclude_levels`: Set of levels to exclude from findings section (default: `{Level.NONE}`)
-
-**Returns:** Markdown formatted report as a string
-
-**Examples:**
-```python
-shared = main_cy.shared_context()
-markdown = shared.io_to_markdown()
-print(markdown)
-
-# Include all finding levels (no exclusion)
-markdown_all = shared.io_to_markdown(exclude_levels=set())
-```
-
-##### `io_save_markdown(filepath: str | Path, include_tags: bool = False, include_enrichments: bool = False, include_observables: bool = True, exclude_levels: set[Level] | None = None) -> str`
-Save the shared investigation as a Markdown report.
-
-Thread-safe: Uses lock to ensure consistent read. Relative paths are converted to absolute paths.
-
-**Parameters:**
-- `filepath`: Path to save the Markdown file (relative or absolute)
-- `include_tags`: Include tags section in the report (default: `False`)
-- `include_enrichments`: Include enrichments section in the report (default: `False`)
-- `include_observables`: Include observables section in the report (default: `True`)
-- `exclude_levels`: Set of levels to exclude from findings section (default: `{Level.NONE}`)
-
-**Returns:** Absolute path to the saved file as a string
-
-**Examples:**
-```python
-shared = main_cy.shared_context()
-path = shared.io_save_markdown("report.md")
-print(path)  # /absolute/path/to/report.md
-
-path_no_obs = shared.io_save_markdown("report_redacted.md", include_observables=False)
-```
-
-##### `io_to_invest() -> InvestigationSchema`
-Serialize the shared investigation to an `InvestigationSchema`.
-
-Thread-safe: Uses lock to ensure consistent read of investigation state.
-
-**Returns:** `InvestigationSchema` instance (use `.model_dump()` for JSON-ready dict — defaults to `by_alias=True`)
-
-**Examples:**
-```python
-shared = main_cy.shared_context()
-schema = shared.io_to_invest()
-print(schema.score, schema.level)
-```
-
-##### `io_save_json(filepath: str | Path) -> str`
-Save the shared investigation to a JSON file.
-
-Thread-safe: Uses lock to ensure consistent read. Relative paths are converted to absolute paths.
-
-**Parameters:**
-- `filepath`: Path to save the JSON file (relative or absolute)
-
-**Returns:** Absolute path to the saved file as a string
-
-**Examples:**
-```python
-shared = main_cy.shared_context()
-path = shared.io_save_json("investigation.json")
-print(path)  # /absolute/path/to/investigation.json
-```
-
-> Access merged results by reusing the original `Cyvest` instance you passed to `SharedInvestigationContext`; reconciliation mutates it in place.
-
-!!! note "Provenance-aware reconciliation"
-    `investigation_id` is serialized and findings carry canonical provenance (`origin_investigation_id`) for LOCAL_ONLY propagation.
-
-## Thread Safety
-
-The implementation uses several strategies to ensure safe concurrency:
-
-1. **Single lock**: Canonical state is protected by one `threading.RLock`
-2. **Deep Copying**: All returned observables/findings are deep copies
-3. **Async-safe access**: Async APIs run the entire critical section in a worker thread (never on the event loop)
-4. **Immutable Keys**: Observable/finding keys are immutable strings
-
-## Async Usage
+Or wrap an investigation you already have:
 
 ```python
-import asyncio
-from cyvest.shared import SharedInvestigationContext
-
-async def worker(shared: SharedInvestigationContext):
-    async with shared.create_cyvest() as cy:
-        cy.observable(cy.OBS.DOMAIN, "example.com")
-
-asyncio.run(worker(shared_context))
+shared = SharedInvestigationContext.from_investigation(cv._investigation)
 ```
 
-## Performance Considerations
+---
 
-- **Deep Copying Overhead**: Each access creates a deep copy (safe but slower)
-- **Lock Contention**: Heavy concurrent access may cause some blocking
-- **Memory Usage**: Shared context maintains references to all observables/findings
+## Fragments and scope
 
-## Example: Multi-Threaded Email Investigation
+Each worker gets its own **fragment id**, and that is not an implementation detail: it is what
+gives `Scope.OWN_FRAGMENT` its meaning.
 
-See `examples/04_email.py` for a complete working example demonstrating:
-- Parallel task execution with `ThreadPoolExecutor`
-- Auto-reconcile pattern for clean code
-- Cross-task observable sharing between `EmailFrom` and `BodiesUrlTask`
-- Aggregated findings across multiple concurrent tasks
+```python
+with shared.task(fragment_id="virustotal-worker") as cv:
+    url = cv.observable(cv.OBS.URL, "https://evil.test").with_ti("virustotal", 3.0)
+    finding = cv.finding("url_reputation")
+    cv.finding_link_observable(finding.key, url.key)   # sees only this fragment
+```
 
-## Best Practices
+A finding created in a fragment sees, by default, only what that fragment established. So when a
+second worker raises the same URL to 7, the first worker's finding **keeps its own value** — which
+is exactly the behaviour you want when two feeds disagree and you need to know who said what.
 
-1. **Always use context manager**: `with shared_context.create_cyvest() as cy:`
-2. **Access data from root**: `data = cy.root().extra` to get the investigation data
-3. **Checking for None**: Always check if `observable_get()` returns None
-4. **Meaningful keys**: Use descriptive observable keys for easy lookup
-5. **Task ordering**: Consider task dependencies when designing workflows
-6. **Error handling**: Wrap task execution in try/except for robustness
+Opt into the merged view per link:
 
-## Limitations
+```python
+cv.finding_link_observable(finding.key, url.key, scope=cv.SCOPE.ALL)
+```
 
-- Observable/finding keys must be unique across the investigation
-- Deep copying may impact performance for very large investigations
-- Lock contention possible with high concurrency (>10-20 threads)
-- No built-in task dependency management (use task ordering)
+See [scope](scoring-model.md#scope-why-a-finding-can-hold-its-value).
+
+---
+
+## Reading across tasks
+
+A worker can consult what other workers have already established:
+
+```python
+def bodies_url(shared: SharedInvestigationContext) -> None:
+    with shared.task() as cv:
+        domain = shared.observable_get("obs:domain:malicious.com")
+        if domain is not None:
+            url = cv.observable(cv.OBS.URL, "https://malicious.com/login")
+            cv.observable_add_relation(url.key, domain.key, cv.REL.PIVOT)
+```
+
+Reads take keys, not `(type, value)` pairs — keys are deterministic, so a worker can compute one
+without asking anybody:
+
+```python
+shared.observable_get("obs:domain:malicious.com")
+shared.observables_list_by_type(Cyvest.OBS.URL)
+shared.finding_get("fnd:url_reputation:obs:url:https://evil.test")
+shared.evidence_get("evd:sha256:…")
+```
+
+---
+
+## Asyncio
+
+Every read has an `a…` twin that runs the critical section in a worker thread, so the event loop
+is never blocked:
+
+```python
+cv = await shared.acreate_cyvest(fragment_id="worker-1")
+...
+await shared.areconcile(cv)
+
+score = await shared.aget_global_score()
+verdict = await shared.aget_global_verdict()
+observable = await shared.observable_aget("obs:url:https://evil.test")
+```
+
+---
+
+## Results
+
+The shared context exposes the reconciled whole:
+
+```python
+shared.report                 # the derived report
+shared.get_global_score()
+shared.get_global_verdict()
+shared.evaluate(engine="basic-v1")   # re-derive without touching facts
+
+shared.finalize_relationships()      # attach orphaned components to the root
+```
+
+When you want the ordinary facade over the merged result:
+
+```python
+cv = shared.as_cyvest()
+cv.display_summary(show_graph=True)
+cv.io_save_json("investigation.json")
+```
+
+---
+
+## API summary
+
+| Method | Purpose |
+|---|---|
+| `create_cyvest(*, fragment_id=…)` | a worker-local `Cyvest`; usable as a context manager |
+| `acreate_cyvest(*, fragment_id=…)` | async equivalent |
+| `task(*, fragment_id=…)` | scoped worker, reconciled on exit even on error |
+| `reconcile(source)` / `areconcile(source)` | fold a fragment in; safe to call twice |
+| `store`, `header`, `report` | the reconciled state |
+| `evaluate(*, policy=…, engine=…)` | re-derive a report |
+| `get_global_score()` / `get_global_verdict()` | headline results (`a…` variants available) |
+| `observable_get(key)`, `observables_list_by_type(type)` | reads (`a…` variants available) |
+| `finding_get(key)`, `evidence_get(key)` | reads (`a…` variants available) |
+| `finalize_relationships()` | connect orphans to the root |
+| `as_cyvest()` | the ordinary facade over the whole |
+| `from_investigation(investigation)` | wrap an existing investigation |

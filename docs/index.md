@@ -24,11 +24,12 @@ Build, score, and narrate cybersecurity investigations with a single fluent Pyth
 
 | Area | Why it matters | What to look at |
 | --- | --- | --- |
-| **Structured objects** | Model observables, findings, TI, tags, and enrichments with typed helpers | `cyvest.model`, [Concepts](getting-started/concepts.md#observables) |
-| **Deterministic scoring** | MAX/SUM propagation and automatic level classification | `cyvest.score`, [Scoring System](getting-started/concepts.md#scoring-system) |
+| **Immutable facts** | An append-only log you can audit, merge and re-score | `cyvest.facts`, [Concepts](getting-started/concepts.md#the-facts) |
+| **Derived scoring** | No score is ever stored; every number comes with the terms that produced it | `cyvest.evaluation`, [Scoring Model](scoring-model.md) |
 | **Fluent helpers** | Builder-style methods with deterministic keys and safe merges | `cyvest.cyvest`, [Quick Start](getting-started/quickstart.md#using-the-fluent-api) |
-| **Shared context** | Thread-safe fragments that can reconcile into a single story | `cyvest.shared.SharedInvestigationContext`, [Guide](shared-investigation-context.md) |
-| **Comparison** | Compare investigations with tolerance rules for regression testing | `cyvest.compare`, [Guide](comparing-investigations.md) |
+| **Shared context** | Thread-safe fragments that reconcile into a single story | `cyvest.shared.SharedInvestigationContext`, [Guide](shared-investigation-context.md) |
+| **Timeline** | A chronology projected from the log, on two clocks | `cyvest.evaluation.timeline`, [Guide](timeline.md) |
+| **Comparison** | Diff investigations with tolerance bands for regression testing | `cyvest.compare`, [Guide](comparing-investigations.md) |
 | **Observable extraction** | Extract IOCs from text, markdown, or URLs with defang/refang support | `cyvest.extract`, [Guide](observable-extraction.md) |
 | **Reporting** | Export JSON, Markdown, or render rich terminal summaries | `cyvest.io_serialization`, `cyvest.io_rich`, [Quick Start](getting-started/quickstart.md#exporting-results) |
 
@@ -37,30 +38,32 @@ Build, score, and narrate cybersecurity investigations with a single fluent Pyth
 ## Walkthrough in 60 Seconds
 
 ```python
-from decimal import Decimal
 from cyvest import Cyvest
 
 cv = Cyvest(root_data={"type": "email"})
 phishing_url = (
     cv.observable(cv.OBS.URL, "https://phishing.com", internal=False)
-    .with_ti("virustotal", Decimal("8.5"), level=cv.LVL.MALICIOUS)
-    .relate_to(cv.root(), cv.REL.RELATED_TO)
+    .with_ti("virustotal", 8.5)
 )
+cv.observable_add_relation(cv.root().key, phishing_url.key, cv.REL.EXTRACTION)
 
 (
     cv.finding("email_url_finding", "Analyze embedded URL")
     .link_observable(phishing_url)
-    .with_score(Decimal("8.5"))
+    .with_weight(8.5)
 )
 
-print(cv.get_global_score(), cv.get_global_level())
+print(cv.get_global_score(), cv.get_global_verdict())
+cv.display_explanation(phishing_url.key)   # and why
 ```
 
 !!! tip "Best practice"
     Store investigation metadata (request ID, analyst, ticket link) in the root observable's `extra` field by passing `root_data` to `Cyvest(...)`.
 
-!!! note "Immutable proxies"
-    The objects returned by `cv.observable_*`/`cv.finding_*` are read-only `*Proxy` wrappers. Use the facade or their fluent helper methods to apply changes so scoring stays consistent.
+!!! note "Facts in, report out"
+    `cv.observable_*` / `cv.finding_*` append immutable facts and return thin proxies. Scores are
+    never stored on them: `get_report()` derives everything, so re-evaluating under another policy
+    changes the numbers without touching a single fact.
 
 ---
 
@@ -68,20 +71,20 @@ print(cv.get_global_score(), cv.get_global_level())
 
 ```
 Cyvest (facade + fluent proxies)
-└─ Investigation (core state)
-   ├─ Observables & relationships
-   ├─ Findings and tags (workflow context)
-   ├─ Threat intelligence (source, score, taxonomies)
-   ├─ ScoreEngine (MAX/SUM propagation, history)
-   ├─ InvestigationStats (live metrics)
-   └─ IO / reporting utilities (JSON, Markdown, Rich)
+└─ Investigation (thin orchestrator)
+   ├─ FactStore ......... the append-only log: observables, relations, signals,
+   │                      evidence, findings, decisions, tags
+   ├─ Policy ............ weights, attenuation, decision bounds
+   ├─ Engine ............ derives a Report from facts + policy
+   └─ IO / reporting .... JSON, Markdown, Rich, timeline
 ```
 
 **Design principles**
 
-- Deterministic keys guarantee lossless merges from concurrent builders.
-- Relationship direction controls score propagation.
-- The fluent helper layer is thin—everything ultimately stores data inside a single `Investigation`.
+- Facts are immutable and semantically keyed, so merges are lossless and idempotent.
+- No derived value is ever stored; the report is the single place numbers live.
+- A relation's *kind* decides whether score propagates — there is no direction flag.
+- The evaluator never reads the clock, so an archived report stays reproducible.
 
 ---
 
@@ -90,8 +93,10 @@ Cyvest (facade + fluent proxies)
 | Goal | Recommended Path |
 | --- | --- |
 | Evaluate Cyvest in <10 minutes | [Getting Started](getting-started/quickstart.md) |
+| Upgrade an existing Cyvest 6.x integration | [Migration from v6 to v7](migration-v6-to-v7.md) |
 | Upgrade an existing Cyvest 5.x integration | [Migration from v5 to v6](migration-v5-to-v6.md) |
-| Understand observables vs. findings | [Core Concepts](getting-started/concepts.md#investigation-structure) |
+| Understand observables vs. findings | [Core Concepts](getting-started/concepts.md#the-facts) |
+| Understand where a number comes from | [Scoring Model](scoring-model.md) |
 | Share state across threads | [Shared Investigation Context](shared-investigation-context.md) |
 | Compare investigations or regression test | [Comparing Investigations](comparing-investigations.md) |
 | Extract IOCs from text or URLs | [Observable Extraction](observable-extraction.md) |

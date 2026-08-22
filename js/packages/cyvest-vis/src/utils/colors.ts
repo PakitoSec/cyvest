@@ -1,20 +1,17 @@
-import type { Level } from "@cyvest/cyvest-js";
+import { getColorForVerdict, type Verdict } from "@cyvest/cyvest-js";
 import {
   DEFAULT_CYVEST_THEME,
   type CyvestThemeTokens,
 } from "../types";
 
-export function getLevelColor(level: Level): string {
-  const colors: Record<Level, string> = {
-    NONE: "#cbd5e1",
-    TRUSTED: "#94a3b8",
-    INFO: "#94a3b8",
-    SAFE: "#648b79",
-    NOTABLE: "#aa8958",
-    SUSPICIOUS: "#ad704b",
-    MALICIOUS: "#ad5555",
-  };
-  return colors[level] ?? colors.INFO;
+/**
+ * The colour of a verdict.
+ *
+ * Delegated to the SDK so that a graph node, a table row and a CLI badge never disagree about
+ * what `SUSPICIOUS` looks like.
+ */
+export function getVerdictColor(verdict: Verdict): string {
+  return getColorForVerdict(verdict);
 }
 
 function clampChannel(channel: number): number {
@@ -53,13 +50,13 @@ export function lightenHexColor(hex: string, ratio: number): string {
   return mixHexColor(hex, "#ffffff", ratio);
 }
 
-export function getLevelBackgroundColor(
-  level: Level,
+export function getVerdictBackgroundColor(
+  verdict: Verdict,
   theme?: Partial<CyvestThemeTokens>
 ): string {
   const resolved = resolveTheme(theme);
   return mixHexColor(
-    getLevelColor(level),
+    getVerdictColor(verdict),
     resolved.levelSurfaceMix,
     resolved.levelSurfaceMixRatio
   );

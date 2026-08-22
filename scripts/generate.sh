@@ -2,6 +2,7 @@
 #! /bin/bash
 
 uv run cyvest schema -o ./schema/cyvest.schema.json
+uv run cyvest schema --which signal -o ./schema/cyvest.signal.schema.json
 pnpm -C js/packages/cyvest-js run generate:types
 uv run examples/04_email.py -o ./js/packages/cyvest-app/src/investigations/cyvest_email.json
 uv run examples/05_graph_dataset.py -o ./js/packages/cyvest-app/src/investigations/cyvest_visual.json

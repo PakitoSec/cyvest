@@ -178,18 +178,14 @@ export const CytoscapeCanvas: React.FC<CytoscapeCanvasProps> = ({
         edgeId: edge.id(),
         sourceId: edge.source().id(),
         targetId: edge.target().id(),
-        relationshipType:
-          typeof data.relationshipType === "string"
-            ? data.relationshipType
-            : undefined,
+        relationKind:
+          typeof data.relationKind === "string" ? data.relationKind : undefined,
         relationshipFamily:
           typeof data.relationshipFamily === "string"
             ? data.relationshipFamily as CyEdgeSelectEvent["relationshipFamily"]
             : undefined,
-        direction:
-          typeof data.direction === "string"
-            ? data.direction as CyEdgeSelectEvent["direction"]
-            : undefined,
+        confidence:
+          typeof data.confidence === "number" ? data.confidence : undefined,
         data,
         element: edge,
       });

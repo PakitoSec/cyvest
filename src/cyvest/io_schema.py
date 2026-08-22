@@ -14,6 +14,7 @@ from __future__ import annotations
 from typing import Any
 
 from cyvest.model_schema import InvestigationSchema
+from cyvest.signal_schema import SignalEnvelope
 
 
 def get_investigation_schema() -> dict[str, Any]:
@@ -33,3 +34,13 @@ def get_investigation_schema() -> dict[str, Any]:
         dict[str, Any]: Schema dictionary compliant with JSON Schema Draft 2020-12.
     """
     return InvestigationSchema.model_json_schema(mode="serialization", by_alias=True)
+
+
+def get_signal_schema() -> dict[str, Any]:
+    """
+    The contract an external system fills in to hand Cyvest a signal.
+
+    Generated in ``validation`` mode, unlike the investigation schema: this one describes what a
+    producer must send, not what Cyvest emits.
+    """
+    return SignalEnvelope.model_json_schema(mode="validation", by_alias=True)

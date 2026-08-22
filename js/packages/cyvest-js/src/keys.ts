@@ -8,7 +8,10 @@
 /**
  * Key type prefixes used in Cyvest.
  */
-export type KeyType = "obs" | "fnd" | "evd" | "ti" | "enr" | "tag";
+export type KeyType = "obs" | "fnd" | "evd" | "ti" | "rel" | "dec" | "tag";
+
+/** Every prefix a v7 document can carry. `enr:` is gone — enrichments are evidence now. */
+export const KEY_PREFIXES: readonly KeyType[] = ["obs", "fnd", "evd", "ti", "rel", "dec", "tag"] as const;
 
 /**
  * Normalize a string value for consistent key generation.
@@ -208,72 +211,77 @@ export function generateObservableKey(
 }
 
 /**
- * Generate a unique key for a finding.
+ * Generate a finding key.
  *
- * Format: fnd:{finding_name}
+ * Format: `fnd:{rule_id}:{subject_key}`, or `fnd:{rule_id}:{external_id}:{subject_key}`.
  *
- * @param findingName - Name of the finding
- * @returns Unique finding key
+ * The subject is part of the identity: the same rule firing on two observables yields two
+ * findings. v6 keyed on the name alone, which is why it needed `origin_investigation_id`.
  *
  * @example
  * ```ts
- * generateFindingKey("sender_verification")
- * // => "fnd:sender_verification"
+ * generateFindingKey("url_in_body", "obs:url:hxxp://bad.example")
+ * // => "fnd:url_in_body:obs:url:hxxp://bad.example"
  * ```
  */
-export function generateFindingKey(findingName: string): string {
-  const normalizedName = normalizeValue(findingName);
-  return `fnd:${normalizedName}`;
+export function generateFindingKey(ruleId: string, subjectKey: string, externalId?: string): string {
+  const normalizedRule = normalizeValue(ruleId);
+  if (externalId) {
+    return `fnd:${normalizedRule}:${externalId.trim()}:${subjectKey}`;
+  }
+  return `fnd:${normalizedRule}:${subjectKey}`;
 }
 
 /**
- * Generate a unique key for threat intelligence.
+ * Generate an observable-signal key.
  *
- * Format: ti:{normalized_source}:{observable_key}
- *
- * @param source - Name of the threat intel source
- * @param observableKey - Key of the related observable
- * @returns Unique threat intel key
+ * Format: `ti:{source}:{subject_key}` — byte-identical to v6 when no `externalId` is given, so
+ * migrated documents need no remapping on this side.
  *
  * @example
  * ```ts
- * generateThreatIntelKey("virustotal", "obs:ipv4:192.168.1.1")
+ * generateSignalKey("virustotal", "obs:ipv4:192.168.1.1")
  * // => "ti:virustotal:obs:ipv4:192.168.1.1"
  * ```
  */
-export function generateThreatIntelKey(
-  source: string,
-  observableKey: string
-): string {
+export function generateSignalKey(source: string, subjectKey: string, externalId?: string): string {
   const normalizedSource = normalizeValue(source);
-  return `ti:${normalizedSource}:${observableKey}`;
+  if (externalId) {
+    return `ti:${normalizedSource}:${externalId.trim()}:${subjectKey}`;
+  }
+  return `ti:${normalizedSource}:${subjectKey}`;
+}
+
+/** Kept under its v6 name; new code calls {@link generateSignalKey}. */
+export const generateThreatIntelKey = generateSignalKey;
+
+/**
+ * Generate a relation key.
+ *
+ * Format: `rel:{kind}:{source_key}>{target_key}` — direction lives in the key itself, so no
+ * `direction` field is needed to disambiguate.
+ */
+export function generateRelationKey(
+  sourceKey: string,
+  targetKey: string,
+  kind: string,
+  externalId?: string,
+): string {
+  const normalizedKind = normalizeValue(kind);
+  if (externalId) {
+    return `rel:${normalizedKind}:${externalId.trim()}:${sourceKey}>${targetKey}`;
+  }
+  return `rel:${normalizedKind}:${sourceKey}>${targetKey}`;
 }
 
 /**
- * Generate a unique key for an enrichment.
+ * Generate a decision key.
  *
- * Format: enr:{name} or enr:{name}:{context_hash}
- *
- * @param name - Name of the enrichment
- * @param context - Optional context string for disambiguation
- * @returns Unique enrichment key
- *
- * @example
- * ```ts
- * generateEnrichmentKey("whois_data")
- * // => "enr:whois_data"
- *
- * generateEnrichmentKey("whois_data", "domain:example.com")
- * // => "enr:whois_data:a1b2c3d4"
- * ```
+ * Format: `dec:{kind}:{target_key}` — one decision of a given kind per target, so re-asserting
+ * it is idempotent.
  */
-export function generateEnrichmentKey(name: string, context?: string): string {
-  const normalizedName = normalizeValue(name);
-  if (context) {
-    const contextHash = hashString(context, 8);
-    return `enr:${normalizedName}:${contextHash}`;
-  }
-  return `enr:${normalizedName}`;
+export function generateDecisionKey(targetKey: string, kind: string): string {
+  return `dec:${normalizeValue(kind)}:${targetKey}`;
 }
 
 /**
@@ -358,7 +366,7 @@ export function isTagDescendantOf(descendantName: string, ancestorName: string):
  * Extract the type prefix from a key.
  *
  * @param key - The key to parse
- * @returns Type prefix (obs, fnd, evd, ti, enr, tag) or null if invalid
+ * @returns Type prefix (see {@link KEY_PREFIXES}) or null if invalid
  *
  * @example
  * ```ts
@@ -369,7 +377,7 @@ export function isTagDescendantOf(descendantName: string, ancestorName: string):
 export function parseKeyType(key: string): KeyType | null {
   if (key.includes(":")) {
     const prefix = key.split(":", 1)[0] as KeyType;
-    if (["obs", "fnd", "evd", "ti", "enr", "tag"].includes(prefix)) {
+    if ((KEY_PREFIXES as readonly string[]).includes(prefix)) {
       return prefix;
     }
   }

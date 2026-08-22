@@ -7,7 +7,6 @@ Model a complete investigation, link observables, and produce a shareable report
 ## 1. Create your first investigation
 
 ```python
-from decimal import Decimal
 from cyvest import Cyvest
 
 cv = Cyvest(root_data={"type": "email_analysis"})
@@ -20,23 +19,27 @@ phishing_url = cv.observable_create(
 cv.observable_add_threat_intel(
     phishing_url.key,
     source="virustotal",
-    score=Decimal("8.5"),
-    level=cv.LVL.MALICIOUS,
+    weight=8.5,
     comment="Known phishing site",
 )
 
 url_finding = cv.finding_create(
     "url_analysis",
     "Analyze URLs in email",
-    score=Decimal("8.5"),
+    weight=8.5,
 )
 cv.finding_link_observable(url_finding.key, phishing_url.key)
 
-print(cv.get_global_score(), cv.get_global_level())
+print(cv.get_global_score(), cv.get_global_verdict())
 ```
 
-!!! tip "Context-first mindset"
-    Pass incident metadata through `Cyvest(root_data={...})`. Every tag, finding, and export inherits it so you never lose analyst intent.
+Note what is **not** happening here: no score is stored anywhere. `get_global_score()` derives it
+from the facts, so the same investigation re-evaluated under another policy yields another number
+without any fact changing. See [the scoring model](../scoring-model.md).
+
+!!! tip "State the verdict, or the weight, or both"
+    `weight=8.5` implies `MALICIOUS`; `verdict=cv.VERDICT.MALICIOUS` implies a weight taken from
+    the policy. You only need the half you actually know.
 
 !!! tip "Deterministic investigation IDs"
     For reproducible reports that enable diffing between runs, pass a custom `investigation_id`:
@@ -45,71 +48,73 @@ print(cv.get_global_score(), cv.get_global_level())
     ```
     Without this parameter, a unique ULID is auto-generated for each run.
 
-!!! note "Immutable proxies"
-    `observable_create`, `finding_create`, and the fluent helpers return read-only proxies (`ObservableProxy`, `FindingProxy`, …). Inspect their attributes freely, but use the Cyvest facade or the proxy helper methods for any updates so the score engine runs automatically.
+!!! note "Immutable facts, thin proxies"
+    `observable_create`, `finding_create` and the fluent helpers return proxies
+    (`ObservableProxy`, `FindingProxy`, …) over immutable facts. Mutating helpers append a new
+    fact rather than editing one in place, which is what makes the log auditable.
 
 ---
 
 ## 2. Use the fluent API for expressiveness {: #using-the-fluent-api }
 
 ```python
-from decimal import Decimal
 from cyvest import Cyvest
 
 cv = Cyvest()
 url = (
     cv.observable(cv.OBS.URL, "https://malicious.com", internal=False)
-    .with_ti("virustotal", score=Decimal("8.5"), level=cv.LVL.MALICIOUS)
-    .relate_to(cv.root(), cv.REL.RELATED_TO)
+    .with_ti("virustotal", 8.5)
+    .with_ti("misp", verdict=cv.VERDICT.SUSPICIOUS)
 )
 
 (
     cv.finding("url_finding", "Finding suspicious URL")
     .link_observable(url)
-    .with_score(Decimal("8.5"))
+    .with_weight(8.5)
 )
 ```
 
-**Why the fluent helpers?**
+`with_ti` returns the observable, so calls chain. Two intels from the **same source** on the same
+observable are one fact, not two — pass an `external_id` when you genuinely need to keep both:
 
-- Deterministic keys let you merge multiple builders without collisions.
-- Relationships use the semantic default direction for known types (e.g., `RELATED_TO` → `BIDIRECTIONAL`); override when you need hierarchy.
+```python
+url.with_ti("virustotal", 8.5, external_id="scan-2024-03")
+url.with_ti("virustotal", 2.0, external_id="scan-2024-06")
+```
 
 ---
 
 ## 3. Capture relationships with intent
 
+A relation is a standalone fact: **source is the parent, target is the child**. There is no
+direction flag to set.
+
 ```python
 from cyvest import Cyvest
 
 cv = Cyvest()
+email = cv.observable_create(cv.OBS.FILE, "invoice.eml")
 url = cv.observable_create(cv.OBS.URL, "http://c2-server.com")
 ip = cv.observable_create(cv.OBS.IPV4, "192.0.2.100", internal=False)
-cv.observable_add_relationship(url, ip, cv.REL.RELATED_TO)  # BIDIRECTIONAL
 
-domain = (
-    cv.observable(cv.OBS.DOMAIN, "c2-server.com", internal=False)
-    .relate_to(ip, cv.REL.RELATED_TO)
-)
+# The URL was extracted from the email; the IP was found by pivoting on the URL.
+cv.observable_add_relation(email.key, url.key, cv.REL.EXTRACTION)
+cv.observable_add_relation(url.key, ip.key, cv.REL.PIVOT)
 
+# A symmetric association that should carry no blame.
 host1 = cv.observable_create(cv.OBS.IPV4, "10.0.1.10", internal=True)
 host2 = cv.observable_create(cv.OBS.IPV4, "10.0.1.20", internal=True)
-cv.observable_add_relationship(host1, host2, cv.REL.RELATED_TO)  # BIDIRECTIONAL
-
-malware = cv.observable_create(cv.OBS.FILE, "payload.exe", internal=False)
-cv.observable_add_relationship(malware.key, url.key, cv.REL.RELATED_TO)  # BIDIRECTIONAL
-
-cv.observable_add_relationship(
-    url.key,
-    ip.key,
-    cv.REL.RELATED_TO,
-    cv.DIR.INBOUND,  # explicit override
-)
+cv.observable_add_relation(host1.key, host2.key, cv.REL.RELATED_TO)
 ```
 
-!!! info "Default directions"
-    - Defaults follow the relationship type when available; unknown types fall back to `OUTBOUND`.
-    - Use `OUTBOUND`/`INBOUND` to force hierarchy for score propagation.
+| Kind | Propagates score |
+|---|---|
+| `EXTRACTION` | yes — the child came out of the parent |
+| `PIVOT` | yes — the analyst went looking and found it |
+| `RELATED_TO` | **no** — symmetric, deliberately inert |
+
+Choosing `RELATED_TO` is a real decision: it keeps the graph connected without claiming the two
+observables share guilt.
 
 ---
 
@@ -121,69 +126,67 @@ cv = Cyvest()
 # Simple: pass tag names directly (auto-creates tags)
 (
     cv.finding("c2_detection", "Detect C2 communication")
-    .tagged("network", "suspicious")  # multiple tags at once
+    .tagged("network", "suspicious")
 )
 
-# With description: create tag first
+# With description: create the tag first
 network_tag = cv.tag("network:analysis", "Network telemetry")
 (
     cv.finding("ids_east", "IDS signals from east DC")
-    .tagged(network_tag, "network:analysis:east_dc")  # mix TagProxy and strings
+    .tagged(network_tag, "network:analysis:east_dc")
 )
 
-# Query hierarchy
-children = cv.tag_get_children("network:analysis")  # Returns east_dc tag
+children = cv.tag_get_children("network:analysis")
 ```
 
-Tags organize findings with automatic hierarchy. Creating `header:auth:dkim` auto-creates `header` and `header:auth` tags.
+Creating `header:auth:dkim` auto-creates `header` and `header:auth`.
 
 ---
 
-## 5. Export and share {: #exporting-results }
+## 5. Record an analyst decision
+
+Judgment overrules arithmetic — and stays a fact, so it merges and it is dated.
 
 ```python
-from cyvest.io_rich import display_summary
-from cyvest import Cyvest
-from rich.console import Console
+url.allowlist(justification="Corporate sandbox")     # caps the score
+finding.dismiss(justification="Known false positive") # excluded from the total
+```
 
-cv = Cyvest()
-# ... build investigation ...
+A dismissed finding remains in the report with `counted = False`. Deleting it would erase the fact
+that someone looked at it.
 
-console = Console()
-display_summary(cv, console)
+---
 
-# Hide unscored and INFO-level findings
-display_summary(cv, console, exclude_levels=[cv.LVL.NONE, cv.LVL.INFO])
+## 6. Export and share {: #exporting-results }
 
-# Show only high-severity findings (SUSPICIOUS and above)
-display_summary(
-    cv,
-    console,
-    exclude_levels=[cv.LVL.NONE, cv.LVL.TRUSTED, cv.LVL.INFO, cv.LVL.SAFE, cv.LVL.NOTABLE],
-)
+```python
+cv.display_summary(show_graph=True)
+cv.display_statistics()
+cv.display_explanation(url.key)   # why this observable scores what it scores
+cv.display_timeline()
 
 cv.io_save_json("investigation.json")
 cv.io_save_markdown("report.md")
-# Hide observables while keeping aggregate stats/whitelists
-cv.io_save_markdown("redacted_report.md", include_observables=False)
 ```
 
-!!! tip "Filtering findings by severity"
-    Use `exclude_levels` to hide noise tiers. By default, `Cyvest.LVL.NONE` is excluded to skip
-    unscored findings; add `Cyvest.LVL.INFO` or `Cyvest.LVL.NOTABLE` to focus on actionable findings in
-    larger investigations. Pass an empty list (`exclude_levels=[]`) to show every finding,
-    including unscored ones.
+From the shell:
 
-!!! question "Where do exports live?"
-    The docs assume you write to the project root, but automation pipelines typically point to `dist/` (JSON) and `reports/` (Markdown/PDF). Adjust paths to match your workflow.
+```bash
+cyvest show investigation.json --stats
+cyvest explain investigation.json obs:url:https://malicious.com
+cyvest timeline investigation.json --key-only
+```
 
-!!! note "Provenance fields in JSON"
-    Exports include `investigation_id`, optional `investigation_name`, plus finding origins (`origin_investigation_id`) and link fields (`observable_links`, `finding_links`) needed for scoring after merges.
+!!! note "The exported document carries its report"
+    A serialized investigation includes `report`, `policy_version` and `engine_id`. That is what
+    lets the JavaScript SDK display scores without reimplementing a single rule — and what lets
+    you tell whether two files are even comparable.
 
 ---
 
 ## Next Steps
 
-- Deep dive into the [Core Concepts](concepts.md) for scoring and levels
+- Understand how numbers are produced in [the scoring model](../scoring-model.md)
+- Read the chronology of a case with the [timeline](../timeline.md)
 - Explore concurrency via [Shared Investigation Context](../shared-investigation-context.md)
 - Browse the `examples/` directory for end-to-end scenarios

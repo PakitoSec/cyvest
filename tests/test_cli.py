@@ -1,514 +1,325 @@
 """
-Tests for the Click-based CLI.
+The command line.
+
+Assertions favour exit codes and files on disk over terminal output: the rendering is Rich's
+business and changes with the terminal width, whereas "did it write a valid document" does not.
+When the message itself is the contract, it is read from ``caplog`` — the CLI speaks through the
+logger, not through Click's stdout.
 """
 
 from __future__ import annotations
 
 import json
-import re
+import logging
 from pathlib import Path
 
 import pytest
 from click.testing import CliRunner
 
 from cyvest import Cyvest
-
-cli = pytest.importorskip("cyvest.cli").cli
-
-
-def _strip_ansi(text: str) -> str:
-    """Remove ANSI color codes for easier assertions."""
-    return re.sub(r"\x1b\[[0-9;]*m", "", text)
-
-
-def _write_sample(tmp_path: Path) -> Path:
-    """Create a sample investigation JSON file for CLI tests."""
-    from decimal import Decimal
-
-    cv = Cyvest()
-    observable = cv.observable(Cyvest.OBS.URL, "https://example.com", internal=False).with_ti(
-        "virustotal", score=Decimal("6.0"), level=Cyvest.LVL.MALICIOUS
-    )
-    cv.finding("url_finding", "network", "Validate URL").link_observable(observable).with_score(Decimal("6.0"))
-
-    sample_path = tmp_path / "sample.json"
-    cv.io_save_json(sample_path)
-    return sample_path
-
-
-def test_cli_show_displays_summary(tmp_path: Path) -> None:
-    """CLI 'show' command prints summary and optional stats."""
-    sample = _write_sample(tmp_path)
-    runner = CliRunner()
-
-    result = runner.invoke(cli, ["show", str(sample), "--no-graph"])
-    assert result.exit_code == 0
-
-
-def test_cli_stats_detailed(tmp_path: Path) -> None:
-    """CLI 'stats' command shows overview and detail sections."""
-    sample = _write_sample(tmp_path)
-    runner = CliRunner()
-
-    result = runner.invoke(cli, ["stats", str(sample), "--detailed"])
-    assert result.exit_code == 0
-
-
-def test_cli_stats_overview_accepts_statistics_schema(tmp_path: Path) -> None:
-    """CLI 'stats' overview accepts the Pydantic statistics model returned by Cyvest."""
-    sample = _write_sample(tmp_path)
-    runner = CliRunner()
-
-    result = runner.invoke(cli, ["stats", str(sample)])
-
-    assert result.exit_code == 0
-    assert result.exception is None
-
-
-def test_cli_export_writes_files(tmp_path: Path) -> None:
-    """CLI 'export' command writes both JSON and Markdown outputs."""
-    sample = _write_sample(tmp_path)
-    runner = CliRunner()
-    md_output = tmp_path / "report.md"
-    json_output = tmp_path / "report.json"
-
-    result_md = runner.invoke(cli, ["export", str(sample), "-o", str(md_output)])
-    assert result_md.exit_code == 0
-    assert md_output.exists()
-
-    result_json = runner.invoke(cli, ["export", str(sample), "-o", str(json_output), "--format", "json"])
-    assert result_json.exit_code == 0
-    assert json_output.exists()
-
-
-def test_cli_migrate_writes_v6_document(tmp_path: Path) -> None:
-    """CLI 'migrate' rewrites a v5 document to the strict v6 schema."""
-    sample = _write_sample(tmp_path)
-    source = json.loads(sample.read_text(encoding="utf-8"))
-    source["schema_version"] = "5.4.1"
-
-    source["checks"] = {}
-    finding_key_map: dict[str, str] = {}
-    for finding_key, finding in source.pop("findings").items():
-        check_key = finding_key.replace("fnd:", "chk:", 1)
-        finding_key_map[finding_key] = check_key
-        finding["check_name"] = finding.pop("finding_name")
-        finding["key"] = check_key
-        finding.pop("evidence_links", None)
-        source["checks"][check_key] = finding
-    source.pop("evidences", None)
-
-    for tag in source.get("tags", {}).values():
-        tag["checks"] = [finding_key_map.get(key, key) for key in tag.pop("findings", [])]
-
-    v5_path = tmp_path / "v5.json"
-    output_path = tmp_path / "v6.json"
-    v5_path.write_text(json.dumps(source), encoding="utf-8")
-
-    result = CliRunner().invoke(cli, ["migrate", str(v5_path), "-o", str(output_path)])
-
-    assert result.exit_code == 0
-    migrated = json.loads(output_path.read_text(encoding="utf-8"))
-    assert migrated["schema_version"] == "6.0.0"
-    assert migrated["evidences"] == {}
-    assert "checks" not in migrated
-    assert migrated["findings"]
-    assert all(key.startswith("fnd:") for key in migrated["findings"])
-
-
-def test_cli_merge_requires_multiple_inputs(tmp_path: Path) -> None:
-    """CLI 'merge' command validates the number of inputs."""
-    sample = _write_sample(tmp_path)
-    runner = CliRunner()
-
-    result = runner.invoke(cli, ["merge", str(sample), "-o", str(tmp_path / "out.json")])
-    assert result.exit_code != 0
-    assert "Provide at least two input files." in _strip_ansi(result.output)
-
-    result_ok = runner.invoke(
-        cli,
-        [
-            "merge",
-            str(sample),
-            str(sample),
-            "-o",
-            str(tmp_path / "out.json"),
-        ],
-    )
-    assert result_ok.exit_code == 0
-
-
-def test_display_summary_exclude_levels() -> None:
-    """Test that display_summary omits selected levels."""
-    from decimal import Decimal
-    from io import StringIO
-
-    from rich.console import Console
-
-    from cyvest.io_rich import display_summary
-
-    cv = Cyvest()
-
-    # Create observables and findings at different levels
-    # Score ranges: MALICIOUS >= 5.0, SUSPICIOUS 3.0-5.0, NOTABLE < 3.0, INFO = 0.0
-    # Note: Findings with observables are now automatically upgraded from NONE to INFO
-    obs_malicious = cv.observable(Cyvest.OBS.URL, "https://malicious.com", internal=False)
-    obs_suspicious = cv.observable(Cyvest.OBS.URL, "https://suspicious.com", internal=False)
-    obs_info = cv.observable(Cyvest.OBS.URL, "https://info.com", internal=False)
-
-    cv.finding("malicious_finding", "network", "Malicious URL").link_observable(obs_malicious).with_score(
-        Decimal("6.0")
-    )  # MALICIOUS
-    cv.finding("suspicious_finding", "network", "Suspicious URL").link_observable(obs_suspicious).with_score(
-        Decimal("4.0")
-    )  # SUSPICIOUS
-    cv.finding("info_finding", "network", "Info URL").link_observable(obs_info).with_score(Decimal("0.0"))  # INFO
-    # Create a finding without observable (Cyvest.LVL.NONE - no auto-upgrade without observable)
-    cv.finding("none_finding", "network", "None finding without observable")
-
-    # Default excludes Cyvest.LVL.NONE
-    output = StringIO()
-    console = Console(file=output, width=120)
-    display_summary(cv, console.print, show_graph=False)
-    output_default = output.getvalue()
-
-    assert "malicious_finding" in output_default
-    assert "suspicious_finding" in output_default
-    assert "info_finding" in output_default
-    assert "none_finding" not in output_default
-    assert "excluding: NONE" in output_default
-
-    # Exclude INFO and SUSPICIOUS along with NONE
-    output = StringIO()
-    console = Console(file=output, width=120)
-    display_summary(cv, console.print, show_graph=False, exclude_levels=[Cyvest.LVL.INFO, Cyvest.LVL.SUSPICIOUS])
-    output_excluding_info = output.getvalue()
-
-    assert "malicious_finding" in output_excluding_info
-    assert "suspicious_finding" not in output_excluding_info
-    assert "info_finding" not in output_excluding_info
-    assert "none_finding" not in output_excluding_info
-
-    # Allow displaying all findings when exclusions are cleared
-    output = StringIO()
-    console = Console(file=output, width=120)
-    display_summary(cv, console.print, show_graph=False, exclude_levels=[])
-    output_all = output.getvalue()
-
-    assert "malicious_finding" in output_all
-    assert "suspicious_finding" in output_all
-    assert "info_finding" in output_all
-    assert "none_finding" in output_all
-
-
-def test_cli_diff_no_differences(tmp_path: Path) -> None:
-    """CLI 'diff' command succeeds for identical investigations."""
-    from decimal import Decimal
-
-    cv = Cyvest()
-    cv.finding("test-finding", "test", "Test finding").with_score(Decimal("1.0"))
-
-    file1 = tmp_path / "inv1.json"
-    file2 = tmp_path / "inv2.json"
-    cv.io_save_json(file1)
-    cv.io_save_json(file2)
-
-    runner = CliRunner()
-    result = runner.invoke(cli, ["diff", str(file1), str(file2)])
-
-    assert result.exit_code == 0
-
-
-def test_cli_diff_with_differences(tmp_path: Path) -> None:
-    """CLI 'diff' command succeeds when differences exist."""
-    from decimal import Decimal
-
-    from cyvest.compare import compare_investigations
-
-    # Create actual investigation
-    actual = Cyvest(investigation_name="actual")
-    actual.finding("finding-a", "test", "Finding A").with_score(Decimal("2.0"))
-    actual.finding("finding-new", "test", "New finding").with_score(Decimal("1.0"))
-
-    # Create expected investigation
-    expected = Cyvest(investigation_name="expected")
-    expected.finding("finding-a", "test", "Finding A").with_score(Decimal("1.0"))
-    expected.finding("finding-old", "test", "Old finding").with_score(Decimal("1.0"))
-
-    actual_file = tmp_path / "actual.json"
-    expected_file = tmp_path / "expected.json"
-    actual.io_save_json(actual_file)
-    expected.io_save_json(expected_file)
-
-    runner = CliRunner()
-    result = runner.invoke(cli, ["diff", str(actual_file), str(expected_file)])
-
-    assert result.exit_code == 0
-
-    # Verify differences using the compare module directly
-    diffs = compare_investigations(actual, expected)
-    assert len(diffs) == 3  # Added, Removed, Mismatch
-    diff_keys = {d.key for d in diffs}
-    assert "fnd:finding-new" in diff_keys
-    assert "fnd:finding-old" in diff_keys
-    assert "fnd:finding-a" in diff_keys
-
-
-def test_cli_diff_with_rules_file(tmp_path: Path) -> None:
-    """CLI 'diff' command applies tolerance rules from file."""
-    import json
-    from decimal import Decimal
-
-    from cyvest.compare import ExpectedResult, compare_investigations
-
-    # Create investigations with different scores
-    actual = Cyvest(investigation_name="actual")
-    actual.finding("tolerant-finding", "test", "Tolerant finding").with_score(Decimal("1.5"))
-
-    expected = Cyvest(investigation_name="expected")
-    expected.finding("tolerant-finding", "test", "Tolerant finding").with_score(Decimal("1.0"))
-
-    actual_file = tmp_path / "actual.json"
-    expected_file = tmp_path / "expected.json"
-    actual.io_save_json(actual_file)
-    expected.io_save_json(expected_file)
-
-    # Create rules file that tolerates the difference
-    rules_file = tmp_path / "rules.json"
-    rules_file.write_text(
-        json.dumps([{"finding_name": "tolerant-finding", "score": ">= 1.0"}]),
-        encoding="utf-8",
-    )
-
-    runner = CliRunner()
-    result = runner.invoke(cli, ["diff", str(actual_file), str(expected_file), "-r", str(rules_file)])
-
-    assert result.exit_code == 0
-
-    # Verify tolerance rules work
-    rules = [ExpectedResult(finding_name="tolerant-finding", score=">= 1.0")]
-    diffs = compare_investigations(actual, expected, result_expected=rules)
-    assert len(diffs) == 0  # No differences with tolerance
-
-
-def _write_detailed_sample(tmp_path: Path) -> Path:
-    """Create a detailed sample investigation for query tests."""
-    from decimal import Decimal
-
-    cv = Cyvest()
-
-    # Create observables with relationships
-    domain_obs = cv.observable(Cyvest.OBS.DOMAIN, "example.com", internal=False)
-    ip_obs = cv.observable(Cyvest.OBS.IPV4, "192.168.1.1", internal=True)
-
-    # Add threat intel to domain
-    domain_obs.with_ti(
-        "virustotal",
-        score=Decimal("6.0"),
-        level=Cyvest.LVL.MALICIOUS,
-        comment="Detected by 10/70 engines",
-        extra={"positives": 10, "total": 70},
-        taxonomies=[{"level": Cyvest.LVL.MALICIOUS, "name": "verdict", "value": "malicious"}],
-    )
-    domain_obs.with_ti(
-        "urlscan",
-        score=Decimal("3.5"),
-        level=Cyvest.LVL.SUSPICIOUS,
-        comment="Phishing detected",
-    )
-
-    # Add relationship
-    domain_obs.relate_to(ip_obs, Cyvest.REL.RELATED_TO, Cyvest.DIR.OUTBOUND)
-
-    # Create finding linked to domain
-    finding = cv.finding("domain-finding", "network", "Domain validation finding")
-    finding.link_observable(domain_obs)
-    finding.with_score(Decimal("6.0"))
-
-    sample_path = tmp_path / "detailed_sample.json"
-    cv.io_save_json(sample_path)
-    return sample_path
-
-
-def test_cli_query_finding(tmp_path: Path) -> None:
-    """CLI 'query' command displays finding information."""
-    sample = _write_detailed_sample(tmp_path)
-    runner = CliRunner()
-
-    result = runner.invoke(cli, ["query", str(sample), "--key", "fnd:domain-finding"])
-    assert result.exit_code == 0
-
-
-def test_cli_query_observable(tmp_path: Path) -> None:
-    """CLI 'query' command displays observable information with score breakdown."""
-    sample = _write_detailed_sample(tmp_path)
-    runner = CliRunner()
-
-    result = runner.invoke(cli, ["query", str(sample), "-k", "obs:domain:example.com"])
-    assert result.exit_code == 0
-
-
-def test_cli_query_observable_with_depth(tmp_path: Path) -> None:
-    """CLI 'query' command respects depth parameter."""
-    sample = _write_detailed_sample(tmp_path)
-    runner = CliRunner()
-
-    result = runner.invoke(cli, ["query", str(sample), "-k", "obs:domain:example.com", "--depth", "2"])
-    assert result.exit_code == 0
-
-
-def test_cli_query_threat_intel(tmp_path: Path) -> None:
-    """CLI 'query' command displays threat intel information."""
-    sample = _write_detailed_sample(tmp_path)
-    runner = CliRunner()
-
-    result = runner.invoke(cli, ["query", str(sample), "-k", "ti:virustotal:obs:domain:example.com"])
-    assert result.exit_code == 0
-
-
-def test_cli_query_invalid_key(tmp_path: Path) -> None:
-    """CLI 'query' command rejects invalid key formats."""
-    sample = _write_detailed_sample(tmp_path)
-    runner = CliRunner()
-
-    result = runner.invoke(cli, ["query", str(sample), "-k", "invalid-key"])
-    assert result.exit_code != 0
-    assert "Invalid key format" in result.output
-
-
-def test_cli_query_not_found(tmp_path: Path) -> None:
-    """CLI 'query' command handles missing objects gracefully."""
-    sample = _write_detailed_sample(tmp_path)
-    runner = CliRunner()
-
-    result = runner.invoke(cli, ["query", str(sample), "-k", "fnd:nonexistent"])
-    assert result.exit_code != 0
-    assert "not found" in result.output
-
-
-# =============================================================================
-# Extract Command Markdown Format Tests
-# =============================================================================
-
-
-class TestExtractMarkdownFormat:
-    """Tests for extract command markdown output formats."""
-
-    def test_extract_format_markdown(self, tmp_path: Path) -> None:
-        """Extract command outputs markdown format."""
-        runner = CliRunner()
-        input_text = "Visit https://example.com or email admin@test.org"
-        output_file = tmp_path / "output.md"
-
-        result = runner.invoke(cli, ["extract", "--format", "markdown", "-o", str(output_file)], input=input_text)
-        assert result.exit_code == 0
-        content = output_file.read_text()
-        assert "- URL" in content
-        assert "- EMAIL" in content
-
-    def test_extract_format_markdown_table(self, tmp_path: Path) -> None:
-        """Extract command outputs markdown table format."""
-        runner = CliRunner()
-        input_text = "IP: 192.168.1.1"
-        output_file = tmp_path / "output.md"
-
-        result = runner.invoke(cli, ["extract", "--format", "markdown-table", "-o", str(output_file)], input=input_text)
-        assert result.exit_code == 0
-        content = output_file.read_text()
-        assert "| Type | Value | Defanged |" in content
-        assert "| IPV4 |" in content
-
-    def test_extract_markdown_with_title(self, tmp_path: Path) -> None:
-        """Extract command adds title header to markdown output."""
-        runner = CliRunner()
-        input_text = "https://example.com"
-        output_file = tmp_path / "output.md"
-
-        result = runner.invoke(
-            cli,
-            ["extract", "--format", "markdown", "--title", "Threat IOCs", "-o", str(output_file)],
-            input=input_text,
-        )
-        assert result.exit_code == 0
-        content = output_file.read_text()
-        assert "## Threat IOCs" in content
-
-    def test_extract_markdown_group_by_type(self, tmp_path: Path) -> None:
-        """Extract command groups by type in markdown output."""
-        runner = CliRunner()
-        input_text = "URL: https://a.com Email: test@example.com IP: 1.2.3.4"
-        output_file = tmp_path / "output.md"
-
-        result = runner.invoke(
-            cli,
-            ["extract", "--format", "markdown", "--group-by-type", "-o", str(output_file)],
-            input=input_text,
-        )
-        assert result.exit_code == 0
-        content = output_file.read_text()
-        # Should have type headers
-        assert "### IPV4" in content or "### URL" in content
-
-    def test_extract_markdown_include_original(self, tmp_path: Path) -> None:
-        """Extract command includes original text in markdown output."""
-        runner = CliRunner()
-        input_text = "Malicious: hxxps://evil[.]com"
-        output_file = tmp_path / "output.md"
-
-        result = runner.invoke(
-            cli,
-            ["extract", "--format", "markdown", "--include-original", "-o", str(output_file)],
-            input=input_text,
-        )
-        assert result.exit_code == 0
-        content = output_file.read_text()
-        assert "Original:" in content
-        assert "hxxps://evil[.]com" in content
-
-    def test_extract_markdown_defang_output(self, tmp_path: Path) -> None:
-        """Extract command defangs values in markdown output."""
-        runner = CliRunner()
-        input_text = "https://malware.com/payload"
-        output_file = tmp_path / "output.md"
-
-        result = runner.invoke(
-            cli,
-            ["extract", "--format", "markdown", "--defang-output", "-o", str(output_file)],
-            input=input_text,
-        )
-        assert result.exit_code == 0
-        content = output_file.read_text()
-        assert "hxxps://" in content
-        assert "[.]" in content
-
-    def test_extract_markdown_table_defang_output(self, tmp_path: Path) -> None:
-        """Extract command defangs values in markdown table output."""
-        runner = CliRunner()
-        input_text = "admin@malware.com"
-        output_file = tmp_path / "output.md"
-
-        result = runner.invoke(
-            cli,
-            ["extract", "--format", "markdown-table", "--defang-output", "-o", str(output_file)],
-            input=input_text,
-        )
-        assert result.exit_code == 0
-        content = output_file.read_text()
-        assert "[@]" in content
-        assert "[.]" in content
-
-    def test_extract_markdown_table_with_title(self, tmp_path: Path) -> None:
-        """Extract command adds title header to markdown table output."""
-        runner = CliRunner()
-        input_text = "192.168.1.1"
-        output_file = tmp_path / "output.md"
-
-        result = runner.invoke(
-            cli,
-            ["extract", "--format", "markdown-table", "--title", "Network IOCs", "-o", str(output_file)],
-            input=input_text,
-        )
-        assert result.exit_code == 0
-        content = output_file.read_text()
-        assert "## Network IOCs" in content
-        assert "| Type | Value | Defanged |" in content
+from cyvest.cli import cli
+from cyvest.evaluation.engines.basic import BasicEngine
+from cyvest.evaluation.engines.registry import available_engines, register_engine
+from tests.test_serialization import V6_DOCUMENT
+
+
+@pytest.fixture(autouse=True)
+def _capture_cli_logs(caplog: pytest.LogCaptureFixture):
+    caplog.set_level(logging.INFO, logger="cyvest.cli")
+    return caplog
+
+
+@pytest.fixture(scope="session")
+def second_engine() -> str:
+    """A second registered engine, so "engines are pluggable" is tested rather than asserted."""
+    engine_id = "parity-v1"
+    if engine_id not in available_engines():
+
+        class ParityEngine(BasicEngine):
+            engine_id = "parity-v1"
+
+        register_engine(ParityEngine())
+    return engine_id
+
+
+@pytest.fixture
+def runner() -> CliRunner:
+    # Rich wraps to the terminal width; pin it so substring assertions are not width-dependent.
+    return CliRunner(env={"COLUMNS": "200"})
+
+
+@pytest.fixture
+def case(tmp_path: Path) -> Path:
+    """A small investigation on disk: one scored URL, one finding, one allowlisted IP."""
+    cv = Cyvest(investigation_name="IR-1", investigation_id="inv-1")
+    url = cv.observable(cv.OBS.URL, "https://evil.test").with_ti("virustotal", 6.0)
+    ip = cv.observable(cv.OBS.IPV4, "203.0.113.50")
+    cv.observable_add_relation(url.key, ip.key, cv.REL.PIVOT)
+    finding = cv.finding("phishing_page", "Phishing page", weight=4.0)
+    cv.finding_link_observable(finding.key, url.key)
+    ip.allowlist(justification="Corporate egress")
+
+    path = tmp_path / "case.json"
+    cv.io_save_json(path)
+    return path
+
+
+@pytest.fixture
+def other_case(tmp_path: Path) -> Path:
+    cv = Cyvest(investigation_name="IR-2", investigation_id="inv-2")
+    cv.observable(cv.OBS.DOMAIN, "evil.test").with_ti("misp", 2.0)
+    cv.finding("lookalike_domain", "Lookalike", weight=2.0)
+
+    path = tmp_path / "other.json"
+    cv.io_save_json(path)
+    return path
+
+
+class TestInspection:
+    def test_show_renders_an_investigation(self, runner: CliRunner, case: Path) -> None:
+        result = runner.invoke(cli, ["show", str(case)])
+        assert result.exit_code == 0, result.output
+
+    def test_show_accepts_both_graph_and_stats(self, runner: CliRunner, case: Path) -> None:
+        result = runner.invoke(cli, ["show", str(case), "--stats", "--no-graph"])
+        assert result.exit_code == 0, result.output
+
+    def test_stats_reports_the_engine_alongside_the_score(
+        self, runner: CliRunner, case: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """A score without its engine is not interpretable, so the overview states both."""
+        result = runner.invoke(cli, ["stats", str(case)])
+        assert result.exit_code == 0, result.output
+        assert "basic-v1" in caplog.text
+
+    def test_stats_detailed_renders_the_tables(self, runner: CliRunner, case: Path) -> None:
+        result = runner.invoke(cli, ["stats", str(case), "--detailed"])
+        assert result.exit_code == 0, result.output
+
+    def test_explain_names_the_contributions(self, runner: CliRunner, case: Path) -> None:
+        result = runner.invoke(cli, ["explain", str(case), "obs:url:https://evil.test"])
+        assert result.exit_code == 0, result.output
+        assert "virustotal" in result.output
+
+    def test_explain_refuses_an_unknown_key(self, runner: CliRunner, case: Path) -> None:
+        """An empty table would read as "nothing contributed", which is not what a typo means."""
+        result = runner.invoke(cli, ["explain", str(case), "obs:url:not-in-the-case"])
+        assert result.exit_code != 0
+        assert "Unknown key" in result.output
+
+    def test_timeline_runs_on_both_clocks(self, runner: CliRunner, case: Path) -> None:
+        for basis in ("occurred", "asserted"):
+            result = runner.invoke(cli, ["timeline", str(case), "--time", basis])
+            assert result.exit_code == 0, result.output
+
+    def test_timeline_can_be_narrowed_to_key_moments(self, runner: CliRunner, case: Path) -> None:
+        result = runner.invoke(cli, ["timeline", str(case), "--key-only"])
+        assert result.exit_code == 0, result.output
+
+
+class TestEngines:
+    def test_engines_lists_the_registry_and_its_aliases(
+        self, runner: CliRunner, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        result = runner.invoke(cli, ["engines"])
+        assert result.exit_code == 0, result.output
+        assert "basic-v1" in caplog.text
+        assert "basic → basic-v1" in caplog.text
+
+    def test_an_unknown_engine_is_refused_rather_than_ignored(self, runner: CliRunner, case: Path) -> None:
+        result = runner.invoke(cli, ["show", str(case), "--engine", "no-such-engine"])
+        assert result.exit_code != 0
+
+    def test_the_stored_report_never_influences_what_python_prints(
+        self, runner: CliRunner, case: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """
+        The serialized report exists for consumers without an engine, not as an authority.
+
+        Loading drops it and re-derives from the facts, so tampering with it must change nothing.
+        """
+        document = json.loads(case.read_text(encoding="utf-8"))
+        document["report"]["investigation"]["score"] = 999.0
+        case.write_text(json.dumps(document), encoding="utf-8")
+
+        result = runner.invoke(cli, ["stats", str(case)])
+
+        assert result.exit_code == 0, result.output
+        assert "999" not in caplog.text
+
+    def test_the_report_names_the_engine_that_produced_it(
+        self, runner: CliRunner, case: Path, second_engine: str, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        result = runner.invoke(cli, ["stats", str(case), "--engine", second_engine])
+
+        assert result.exit_code == 0, result.output
+        assert second_engine in caplog.text
+
+
+class TestPolicy:
+    def test_policy_show_without_a_file_describes_the_default(self, runner: CliRunner) -> None:
+        result = runner.invoke(cli, ["policy", "show"])
+        assert result.exit_code == 0, result.output
+
+    def test_policy_show_with_a_file_states_what_produced_it(
+        self, runner: CliRunner, case: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        result = runner.invoke(cli, ["policy", "show", str(case)])
+        assert result.exit_code == 0, result.output
+        assert "default-v1" in caplog.text
+
+
+class TestMerge:
+    def test_merging_two_files_writes_a_readable_document(
+        self, runner: CliRunner, case: Path, other_case: Path, tmp_path: Path
+    ) -> None:
+        output = tmp_path / "merged.json"
+        result = runner.invoke(cli, ["merge", str(case), str(other_case), "-o", str(output)])
+
+        assert result.exit_code == 0, result.output
+        merged = Cyvest.io_load_json(output)
+        assert "obs:url:https://evil.test" in merged.observable_get_all()
+        assert "obs:domain:evil.test" in merged.observable_get_all()
+
+    def test_merging_is_idempotent_through_the_cli_too(self, runner: CliRunner, case: Path, tmp_path: Path) -> None:
+        output = tmp_path / "merged.json"
+        runner.invoke(cli, ["merge", str(case), str(case), "-o", str(output)])
+
+        once = Cyvest.io_load_json(case)
+        twice = Cyvest.io_load_json(output)
+        assert twice.get_global_score() == once.get_global_score()
+
+    def test_a_single_input_is_not_a_merge(self, runner: CliRunner, case: Path, tmp_path: Path) -> None:
+        result = runner.invoke(cli, ["merge", str(case), "-o", str(tmp_path / "merged.json")])
+        assert result.exit_code != 0
+        assert "at least two" in result.output
+
+
+class TestExport:
+    def test_export_to_markdown(self, runner: CliRunner, case: Path, tmp_path: Path) -> None:
+        output = tmp_path / "report.md"
+        result = runner.invoke(cli, ["export", str(case), "-o", str(output)])
+
+        assert result.exit_code == 0, result.output
+        assert "Phishing page" in output.read_text(encoding="utf-8")
+
+    def test_export_to_json_stays_loadable(self, runner: CliRunner, case: Path, tmp_path: Path) -> None:
+        output = tmp_path / "copy.json"
+        result = runner.invoke(cli, ["export", str(case), "-o", str(output), "-f", "json"])
+
+        assert result.exit_code == 0, result.output
+        assert Cyvest.io_load_json(output).get_global_score() == Cyvest.io_load_json(case).get_global_score()
+
+
+class TestSchema:
+    def test_schema_writes_the_investigation_contract(self, runner: CliRunner, tmp_path: Path) -> None:
+        output = tmp_path / "schema.json"
+        result = runner.invoke(cli, ["schema", "-o", str(output)])
+
+        assert result.exit_code == 0, result.output
+        assert json.loads(output.read_text(encoding="utf-8"))["$id"].endswith("investigation-7.json")
+
+    def test_schema_can_emit_the_signal_contract_instead(self, runner: CliRunner, tmp_path: Path) -> None:
+        output = tmp_path / "signal.json"
+        result = runner.invoke(cli, ["schema", "--which", "signal", "-o", str(output)])
+
+        assert result.exit_code == 0, result.output
+        assert json.loads(output.read_text(encoding="utf-8"))["$id"].endswith("signal-7.json")
+
+    def test_schema_goes_to_stdout_without_an_output_file(self, runner: CliRunner) -> None:
+        result = runner.invoke(cli, ["schema"])
+        assert result.exit_code == 0, result.output
+
+
+class TestMigrate:
+    def _write_v6(self, tmp_path: Path) -> Path:
+        path = tmp_path / "legacy.json"
+        path.write_text(json.dumps(V6_DOCUMENT), encoding="utf-8")
+        return path
+
+    def test_a_v6_document_is_detected_and_migrated(self, runner: CliRunner, tmp_path: Path) -> None:
+        source = self._write_v6(tmp_path)
+        output = tmp_path / "migrated.json"
+        result = runner.invoke(cli, ["migrate", str(source), "-o", str(output)])
+
+        assert result.exit_code == 0, result.output
+        assert json.loads(output.read_text(encoding="utf-8"))["schema_version"] == "7.0.0"
+        assert Cyvest.io_load_json(output).get_global_score() == 6.0
+
+    def test_an_explicit_from_that_disagrees_with_the_file_is_refused(self, runner: CliRunner, tmp_path: Path) -> None:
+        """Being wrong about the source version is a mistake worth stopping on, not guessing past."""
+        source = self._write_v6(tmp_path)
+        result = runner.invoke(cli, ["migrate", str(source), "-o", str(tmp_path / "x.json"), "--from", "5"])
+
+        assert result.exit_code != 0
+        assert "looks like schema" in result.output
+
+    def test_a_current_document_needs_no_migration(self, runner: CliRunner, case: Path, tmp_path: Path) -> None:
+        output = tmp_path / "same.json"
+        result = runner.invoke(cli, ["migrate", str(case), "-o", str(output)])
+
+        assert result.exit_code == 0, result.output
+        assert json.loads(output.read_text(encoding="utf-8"))["schema_version"] == "7.0.0"
+
+
+class TestDiff:
+    def test_two_identical_files_differ_in_nothing(
+        self, runner: CliRunner, case: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        result = runner.invoke(cli, ["diff", str(case), str(case)])
+        assert result.exit_code == 0, result.output
+        assert "No differences" in caplog.text
+
+    def test_a_changed_score_is_reported(self, runner: CliRunner, case: Path, other_case: Path) -> None:
+        result = runner.invoke(cli, ["diff", str(case), str(other_case)])
+        assert result.exit_code == 0, result.output
+
+    def test_tolerance_rules_are_read_from_a_file(
+        self, runner: CliRunner, case: Path, tmp_path: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        rules = tmp_path / "rules.json"
+        rules.write_text(json.dumps([{"rule_id": "phishing_page", "score": "> 900"}]), encoding="utf-8")
+
+        result = runner.invoke(cli, ["diff", str(case), str(case), "--rules", str(rules)])
+        assert result.exit_code == 0, result.output
+        assert "No differences" not in caplog.text
+
+    def test_comparing_across_engines_stops_with_an_actionable_message(
+        self, runner: CliRunner, case: Path, tmp_path: Path, second_engine: str
+    ) -> None:
+        foreign = tmp_path / "foreign.json"
+        document = json.loads(case.read_text(encoding="utf-8"))
+        document["header"]["engine_id"] = second_engine
+        foreign.write_text(json.dumps(document), encoding="utf-8")
+
+        result = runner.invoke(cli, ["diff", str(case), str(foreign)])
+        assert result.exit_code != 0
+        assert "--engine" in result.output
+
+    def test_and_re_deriving_both_with_one_engine_makes_them_comparable_again(
+        self, runner: CliRunner, case: Path, tmp_path: Path, second_engine: str
+    ) -> None:
+        foreign = tmp_path / "foreign.json"
+        document = json.loads(case.read_text(encoding="utf-8"))
+        document["header"]["engine_id"] = second_engine
+        foreign.write_text(json.dumps(document), encoding="utf-8")
+
+        result = runner.invoke(cli, ["diff", str(case), str(foreign), "--engine", "basic-v1"])
+        assert result.exit_code == 0, result.output
+
+
+class TestGuards:
+    def test_a_missing_file_is_refused_by_click(self, runner: CliRunner, tmp_path: Path) -> None:
+        result = runner.invoke(cli, ["show", str(tmp_path / "nope.json")])
+        assert result.exit_code != 0
+        assert "does not exist" in result.output
+
+    def test_a_document_from_a_newer_library_is_refused(self, runner: CliRunner, case: Path, tmp_path: Path) -> None:
+        """Reading forward only: a 7.0 library must not guess at a 7.1 document."""
+        future = tmp_path / "future.json"
+        document = json.loads(case.read_text(encoding="utf-8"))
+        document["schema_version"] = "7.1.0"
+        future.write_text(json.dumps(document), encoding="utf-8")
+
+        result = runner.invoke(cli, ["show", str(future)])
+        assert result.exit_code != 0

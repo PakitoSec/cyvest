@@ -9,8 +9,8 @@ export {
 
 export { truncateLabel } from "./utils/labels";
 export {
-  getLevelColor,
-  getLevelBackgroundColor,
+  getVerdictColor,
+  getVerdictBackgroundColor,
   lightenHexColor,
   mixHexColor,
 } from "./utils/colors";

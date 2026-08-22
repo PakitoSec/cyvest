@@ -1,7 +1,10 @@
 import {
-  getAllRelationshipTypes,
-  getRootObservable,
-  type Level,
+  countRelationsByKind,
+  getAllObservables,
+  getObservableVerdict,
+  getRelationsForObservable,
+  VERDICT_ORDER,
+  type Verdict,
 } from "@cyvest/cyvest-js";
 import type { Core } from "cytoscape";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
@@ -24,15 +27,8 @@ import { CyvestObservablesView } from "./CyvestObservablesView";
 
 type GraphSelection = CyNodeSelectEvent | CyEdgeSelectEvent;
 
-const LEVEL_ORDER: Level[] = [
-  "MALICIOUS",
-  "SUSPICIOUS",
-  "NOTABLE",
-  "SAFE",
-  "TRUSTED",
-  "INFO",
-  "NONE",
-];
+// Most severe first: a filter panel should lead with what an analyst is looking for.
+const VERDICT_FILTER_ORDER: Verdict[] = [...VERDICT_ORDER].reverse();
 
 function joinClassNames(...names: Array<string | undefined | false>): string {
   return names.filter(Boolean).join(" ");
@@ -75,41 +71,41 @@ function Inspector({
     ? nodeSelection
       ? [
           ["Observable type", nodeSelection.data.observableType],
-          ["Level", nodeSelection.data.level],
+          ["Verdict", nodeSelection.data.verdict],
           ["Score", nodeSelection.data.score],
           ["Scope", nodeSelection.data.internal ? "Internal" : "External"],
-          ["Whitelisted", nodeSelection.data.whitelisted ? "Yes" : "No"],
+          ["Allowlisted", nodeSelection.data.allowlisted ? "Yes" : "No"],
         ]
       : [
           ["Family", edgeSelection?.relationshipFamily],
-          ["Direction", edgeSelection?.direction],
+          ["Kind", edgeSelection?.relationKind],
+          ["Confidence", edgeSelection?.confidence],
+          ["Carried score", edgeSelection?.data.carriedScore ? "Yes" : "No"],
           ["Source", edgeSelection?.sourceId],
           ["Target", edgeSelection?.targetId],
         ]
     : [];
   const neighbors = useMemo(() => {
     if (!nodeSelection) return [];
-    const outbound = (investigation.observables[nodeSelection.nodeId]?.relationships ?? []).map(
-      (relationship) => ({
-        id: relationship.target_key,
-        label: investigation.observables[relationship.target_key]?.value ?? relationship.target_key,
-        type: relationship.relationship_type,
-        direction: relationship.direction === "inbound" ? "←" : relationship.direction === "bidirectional" ? "↔" : "→",
+    const observables = getAllObservables(investigation);
+    return getRelationsForObservable(investigation, nodeSelection.nodeId)
+      .map((relation) => {
+        const isOutbound = relation.source_key === nodeSelection.nodeId;
+        const otherKey = isOutbound ? relation.target_key : relation.source_key;
+        return {
+          id: otherKey,
+          label: observables[otherKey]?.value ?? otherKey,
+          type: relation.kind ?? "related-to",
+          // `related-to` is symmetric, so it gets no arrow in either direction.
+          direction: relation.kind === "related-to" ? "↔" : isOutbound ? "→" : "←",
+        };
       })
-    );
-    const inbound = Object.values(investigation.observables).flatMap((observable) =>
-      observable.relationships
-        .filter((relationship) => relationship.target_key === nodeSelection.nodeId)
-        .map((relationship) => ({
-          id: observable.key,
-          label: observable.value,
-          type: relationship.relationship_type,
-          direction: relationship.direction === "bidirectional" ? "↔" : "←",
-        }))
-    );
-    return [...outbound, ...inbound].filter(
-      (item, index, items) => items.findIndex((candidate) => candidate.id === item.id && candidate.type === item.type) === index
-    );
+      .filter(
+        (item, index, items) =>
+          items.findIndex(
+            (candidate) => candidate.id === item.id && candidate.type === item.type
+          ) === index
+      );
   }, [investigation, nodeSelection]);
 
   return (
@@ -130,7 +126,7 @@ function Inspector({
           <h3>
             {nodeSelection
               ? nodeSelection.label
-              : edgeSelection?.relationshipType ?? "Relationship"}
+              : edgeSelection?.relationKind ?? "Relationship"}
           </h3>
           <p className="cyvest-inspector__id">
             {nodeSelection ? nodeSelection.nodeId : edgeSelection?.edgeId}
@@ -210,17 +206,20 @@ export const CyvestGraph: React.FC<CyvestGraphProps> = ({
   useEffect(() => setPhysicsEnabled(physics), [physics]);
 
   const observableTypes = useMemo(
-    () => [...new Set(Object.values(investigation.observables).map((item) => item.type))].sort(),
+    () => [...new Set(Object.values(getAllObservables(investigation)).map((item) => item.type))].sort(),
     [investigation]
   );
-  const levels = useMemo(
-    () => LEVEL_ORDER.filter((level) =>
-      Object.values(investigation.observables).some((item) => item.level === level)
-    ),
+  const verdicts = useMemo(
+    () =>
+      VERDICT_FILTER_ORDER.filter((verdict) =>
+        Object.keys(getAllObservables(investigation)).some(
+          (key) => getObservableVerdict(investigation, key) === verdict
+        )
+      ),
     [investigation]
   );
-  const relationshipTypes = useMemo(
-    () => getAllRelationshipTypes(investigation),
+  const relationKinds = useMemo(
+    () => Object.keys(countRelationsByKind(investigation)).sort(),
     [investigation]
   );
   const visibleInvestigation = useMemo(
@@ -270,12 +269,14 @@ export const CyvestGraph: React.FC<CyvestGraphProps> = ({
 
   const isFiltered =
     filters.observableTypes.length > 0 ||
-    filters.levels.length > 0 ||
-    filters.relationshipTypes.length > 0 ||
+    filters.verdicts.length > 0 ||
+    filters.relationKinds.length > 0 ||
     filters.scope !== "all";
+  // The technical root is scaffolding, not an observable the analyst gathered.
   const countPresentedObservables = (value: CyvestGraphProps["investigation"]) => {
-    const root = getRootObservable(value);
-    return Object.keys(value.observables).length - (root?.value === "root" ? 1 : 0);
+    const rootKey = value.header.root_key;
+    const observables = getAllObservables(value);
+    return Object.keys(observables).length - (rootKey && observables[rootKey] ? 1 : 0);
   };
   const visibleCount = countPresentedObservables(visibleInvestigation);
   const totalCount = countPresentedObservables(investigation);
@@ -353,7 +354,7 @@ export const CyvestGraph: React.FC<CyvestGraphProps> = ({
             <div className="cyvest-filter-panel__group">
               <span>Scope</span>
               <div className="cyvest-chipset">
-                {(["all", "internal", "external", "whitelisted"] as const).map((scope) => (
+                {(["all", "internal", "external", "allowlisted"] as const).map((scope) => (
                   <button
                     type="button"
                     key={scope}
@@ -379,34 +380,34 @@ export const CyvestGraph: React.FC<CyvestGraphProps> = ({
               </div>
             </div>
             <div className="cyvest-filter-panel__group">
-              <span>Level</span>
+              <span>Verdict</span>
               <div className="cyvest-chipset">
-                {levels.map((level) => (
+                {verdicts.map((verdict) => (
                   <button
                     type="button"
-                    key={level}
-                    className={filters.levels.includes(level) ? "is-active" : undefined}
-                    onClick={() => updateFilters({ ...filters, levels: toggleValue(filters.levels, level) })}
-                  >{level}</button>
+                    key={verdict}
+                    className={filters.verdicts.includes(verdict) ? "is-active" : undefined}
+                    onClick={() => updateFilters({ ...filters, verdicts: toggleValue(filters.verdicts, verdict) })}
+                  >{verdict}</button>
                 ))}
               </div>
             </div>
             <div className="cyvest-filter-panel__group">
               <span>Relationships</span>
               <div className="cyvest-chipset cyvest-chipset--relationships">
-                {relationshipTypes.map((type) => {
-                  const profile = resolveRelationshipProfile(type, { theme, overrides: relationshipProfiles });
-                  const active = filters.relationshipTypes.length === 0 || filters.relationshipTypes.includes(type);
+                {relationKinds.map((kind) => {
+                  const profile = resolveRelationshipProfile(kind, { theme, overrides: relationshipProfiles });
+                  const active = filters.relationKinds.length === 0 || filters.relationKinds.includes(kind);
                   return (
                     <button
                       type="button"
-                      key={type}
+                      key={kind}
                       className={active ? "is-active" : undefined}
                       aria-pressed={active}
                       onClick={() => {
-                        const current = filters.relationshipTypes.length === 0 ? relationshipTypes : filters.relationshipTypes;
-                        const next = toggleValue(current, type);
-                        updateFilters({ ...filters, relationshipTypes: next.length === relationshipTypes.length ? [] : next });
+                        const current = filters.relationKinds.length === 0 ? relationKinds : filters.relationKinds;
+                        const next = toggleValue(current, kind);
+                        updateFilters({ ...filters, relationKinds: next.length === relationKinds.length ? [] : next });
                       }}
                     >
                       <i

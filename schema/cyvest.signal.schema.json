@@ -1,0 +1,134 @@
+{
+  "$defs": {
+    "SourceClass": {
+      "description": "Family a source belongs to, used by the policy to weigh its reliability.",
+      "enum": [
+        "vendor_feed",
+        "sandbox",
+        "osint",
+        "internal_tool",
+        "org_analyst",
+        "org_policy",
+        "unknown"
+      ],
+      "title": "SourceClass",
+      "type": "string"
+    },
+    "Verdict": {
+      "description": "Direction of a judgment, and the displayed level — they are the same thing.\n\nv7 merges the former ``Level`` into ``Verdict``. The five values line up one-for-one with\nthe score bands ``basic-v1`` inherits from v6 (``< 0``, ``= 0``, ``]0,3[``, ``[3,5[``,\n``>= 5``), which makes a verdict/level divergence structurally impossible.\n\nThose bands are ``basic-v1``'s convention, **not** part of the enum's contract: a\nprobabilistic engine maps its own posterior thresholds onto the same labels.\n\nTwo v6 levels deliberately left this axis: ``NONE`` became :class:`Status` and ``TRUSTED``\nbecame a :class:`DecisionKind` (or plain ``SAFE`` when it was merely a negative score).",
+      "enum": [
+        "SAFE",
+        "INFO",
+        "NOTABLE",
+        "SUSPICIOUS",
+        "MALICIOUS"
+      ],
+      "title": "Verdict",
+      "type": "string"
+    }
+  },
+  "$id": "https://cyvest.io/schema/signal-7.json",
+  "additionalProperties": false,
+  "description": "One judgment about one observable, as produced by an external system.\n\n``verdict`` and ``weight`` are the two halves of a magnitude and either one is enough: a\nsource that only knows \"this is bad\" states the verdict, a source that returns a number\nstates the weight, and the missing half is completed from the score bands.",
+  "properties": {
+    "schema_version": {
+      "const": "7.0.0",
+      "default": "7.0.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "kind": {
+      "const": "threat_intel",
+      "default": "threat_intel",
+      "title": "Kind",
+      "type": "string"
+    },
+    "source": {
+      "minLength": 1,
+      "title": "Source",
+      "type": "string"
+    },
+    "source_class": {
+      "$ref": "#/$defs/SourceClass",
+      "default": "vendor_feed"
+    },
+    "verdict": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Verdict"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "weight": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Weight"
+    },
+    "confidence": {
+      "default": 1.0,
+      "exclusiveMinimum": 0.0,
+      "maximum": 1.0,
+      "title": "Confidence",
+      "type": "number"
+    },
+    "observed_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Observed At"
+    },
+    "external_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "External Id"
+    },
+    "comment": {
+      "default": "",
+      "title": "Comment",
+      "type": "string"
+    },
+    "taxonomies": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Taxonomies",
+      "type": "array"
+    },
+    "payload": {
+      "additionalProperties": true,
+      "title": "Payload",
+      "type": "object"
+    }
+  },
+  "required": [
+    "source"
+  ],
+  "title": "SignalEnvelope",
+  "type": "object"
+}

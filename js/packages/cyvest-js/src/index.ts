@@ -1,28 +1,33 @@
 /**
- * Cyvest JavaScript/TypeScript SDK
+ * Cyvest JavaScript/TypeScript SDK — read-only.
  *
- * A library for working with Cyvest Investigation data structures.
+ * The SDK parses, validates and queries a v7 document. It never builds one, and it never
+ * reimplements a scoring rule: every derived value is read from `report`, which is why the
+ * document always carries it.
  *
  * @packageDocumentation
  */
 
-// Core types (auto-generated from JSON schema)
+// Raw types, rebuilt from the JSON schema
 export * from "./types.generated";
 
-// JSON parsing and validation
+// `Investigation` is the only alias worth re-exporting; the rest already carry these names.
+export type { Investigation } from "./types";
+
+// Parsing, validation and the version contract
 export * from "./helpers";
 
-// Key generation utilities
+// Key generation and parsing
 export * from "./keys";
 
-// Level and scoring utilities
-export * from "./levels";
+// Verdict labels, ordering and colors
+export * from "./verdicts";
 
-// Entity getters
+// Entity and result getters
 export * from "./getters";
 
 // Query and filter functions
 export * from "./finders";
 
-// Graph and relationship traversal
+// Graph traversal
 export * from "./graph";

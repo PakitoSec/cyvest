@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from cyvest.model_enums import ObservableSubtype, ObservableType
+from cyvest.enums import ObservableSubtype, ObservableType
 
 # =============================================================================
 # Pydantic Model

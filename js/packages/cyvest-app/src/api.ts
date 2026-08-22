@@ -1,5 +1,5 @@
 import { parseCyvest } from "@cyvest/cyvest-js";
-import type { CyvestInvestigation } from "@cyvest/cyvest-js";
+import type { Investigation } from "@cyvest/cyvest-js";
 
 // Import all investigation files
 import cyvest_visual from "./investigations/cyvest_visual.json";
@@ -15,7 +15,7 @@ export type InvestigationKey = keyof typeof INVESTIGATIONS;
 
 export async function loadInvestigation(
   key: InvestigationKey = "cyvest_visual"
-): Promise<CyvestInvestigation> {
+): Promise<Investigation> {
   await new Promise((resolve) => setTimeout(resolve, 50));
   // Validate and parse using the schema validator
   return parseCyvest(INVESTIGATIONS[key].data);

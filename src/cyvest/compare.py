@@ -19,6 +19,7 @@ from cyvest.enums import Verdict
 if TYPE_CHECKING:
     from cyvest.cyvest import Cyvest
     from cyvest.evaluation.report import FindingResult
+    from cyvest.facts.finding import Finding
 
 _RULE = re.compile(r"(>=|<=|>|<|==|!=)\s*(-?\d+\.?\d*)")
 
@@ -203,8 +204,9 @@ def _diff_against_investigation(
     rules = rules or []
     actual_findings = actual._investigation.get_all_findings()
     expected_findings = expected._investigation.get_all_findings()
-    # Tracked by identity: two rules may carry the same content and still be two rules.
-    consumed: set[int] = set()
+    # Keys the structural pass has spoken about — reported, or deliberately suppressed. A rule
+    # must not speak about them again, or one disagreement would be reported twice.
+    settled: set[str] = set()
 
     for key in sorted(set(actual_findings) | set(expected_findings)):
         in_actual, in_expected = key in actual_findings, key in expected_findings
@@ -212,10 +214,9 @@ def _diff_against_investigation(
         expected_result = expected.get_report().finding(key)
         finding = actual_findings.get(key) or expected_findings[key]
         rule = _rule_for(rules, key, finding.rule_id)
-        if rule is not None:
-            consumed.add(id(rule))
 
         if in_actual and not in_expected:
+            settled.add(key)
             if _ignores(rule, DiffStatus.ADDED):
                 continue
             diffs.append(
@@ -228,6 +229,7 @@ def _diff_against_investigation(
                 )
             )
         elif in_expected and not in_actual:
+            settled.add(key)
             if _ignores(rule, DiffStatus.REMOVED):
                 continue
             diffs.append(
@@ -245,6 +247,7 @@ def _diff_against_investigation(
             and expected_result
             and (actual_result.score != expected_result.score or actual_result.verdict is not expected_result.verdict)
         ):
+            settled.add(key)
             if _ignores(rule, DiffStatus.MISMATCH) or _rule_tolerates(rule, actual_result):
                 continue
             diffs.append(
@@ -261,10 +264,36 @@ def _diff_against_investigation(
                 )
             )
 
-    # A rule that matched nothing on either side still expected something: report it once.
+    diffs.extend(_unsettled_rule_diffs(actual, actual_findings, expected_findings, rules, settled))
+    return diffs
+
+
+def _unsettled_rule_diffs(
+    actual: Cyvest,
+    actual_findings: dict[str, Finding],
+    expected_findings: dict[str, Finding],
+    rules: list[ExpectedResult],
+    settled: set[str],
+) -> list[DiffItem]:
+    """
+    Run the rules the structural comparison left unanswered.
+
+    A rule whose every subject was settled above has had its say — re-running it would report the
+    same key twice. But a finding *identical on both sides* is never settled: the comparison has
+    nothing to say about it, while the rule still does. Marking a rule consumed on match alone
+    dropped exactly those violations, which is the one case a tolerance rule is least able to
+    catch by eye.
+    """
+    diffs: list[DiffItem] = []
     for rule in rules:
-        if id(rule) not in consumed:
-            diffs.extend(_check_rule(actual, rule))
+        subjects = {
+            key
+            for key, finding in (*actual_findings.items(), *expected_findings.items())
+            if rule.matches(key, finding.rule_id)
+        }
+        if subjects and subjects <= settled:
+            continue
+        diffs.extend(diff for diff in _check_rule(actual, rule) if diff.key not in settled)
     return diffs
 
 

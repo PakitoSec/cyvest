@@ -177,6 +177,43 @@ class TestToleranceRules:
         violated = compare_investigations(actual, None, [ExpectedResult(rule_id="phishing-page", score="> 99")])
         assert [d.status for d in violated] == [DiffStatus.MISMATCH]
 
+    def test_a_violated_rule_is_reported_even_when_the_two_agree(self) -> None:
+        """
+        The case a tolerance rule is least able to catch by eye, and the one that was dropped.
+
+        Marking a rule consumed as soon as it *matched* a key meant that two investigations
+        agreeing on a finding left every branch of the comparison unentered — so the rule was
+        never evaluated, here or in the pass that follows. Agreement is not correctness: both
+        sides can be wrong together, which is precisely what a band is asked to detect.
+        """
+        actual, expected = _investigation(weight=4.0), _investigation(weight=4.0)
+        assert compare_investigations(actual, expected) == []
+
+        rules = [ExpectedResult(rule_id="phishing-page", score="< 0.1")]
+        diffs = compare_investigations(actual, expected, rules)
+        assert [d.status for d in diffs] == [DiffStatus.MISMATCH]
+        assert diffs[0].expected_score_rule == "< 0.1"
+
+    def test_a_satisfied_rule_stays_silent_when_the_two_agree(self) -> None:
+        actual, expected = _investigation(weight=4.0), _investigation(weight=4.0)
+        rules = [ExpectedResult(rule_id="phishing-page", score=">= 1.0")]
+        assert compare_investigations(actual, expected, rules) == []
+
+    @pytest.mark.parametrize("status", [DiffStatus.ADDED, DiffStatus.REMOVED, DiffStatus.MISMATCH])
+    def test_a_settled_key_is_never_reported_twice(self, status: DiffStatus) -> None:
+        """The rule has had its say through the structural row; running it again would duplicate."""
+        actual, expected = _investigation(weight=7.0), _investigation(weight=4.0)
+        if status is DiffStatus.ADDED:
+            actual.finding_create("solo-rule", weight=2.0)
+        elif status is DiffStatus.REMOVED:
+            expected.finding_create("solo-rule", weight=2.0)
+        rule_id = "phishing-page" if status is DiffStatus.MISMATCH else "solo-rule"
+
+        rules = [ExpectedResult(rule_id=rule_id, score="< 0.1")]
+        diffs = [d for d in compare_investigations(actual, expected, rules) if d.rule_id == rule_id]
+        assert len(diffs) == 1, diffs
+        assert diffs[0].status is status
+
 
 class TestEngineMismatch:
     def test_comparing_across_engines_is_refused(self) -> None:

@@ -184,9 +184,25 @@ come from the `Fact` envelope (`source`, `asserted_at`), like every other fact.
 ### Investigation-level whitelists
 
 v6 also had whitelist entries on the investigation itself, whose `identifier` was a free-form
-string. Those that name an observable become a decision on it. The rest have no equivalent — v7
-has no investigation-level decision — so they land on the **root observable**, merged into a
-single decision that keeps each entry's name and justification in its own justification.
+string. Those that name an observable become an `ALLOWLISTED` decision on it, which is what v6
+meant by them.
+
+The rest name nothing v7 can bound — a ticket reference, an analyst note. They are kept as
+**evidence** (`evidence_type="legacy_whitelist"`), one entry per record, and deliberately *not* as
+a decision on the root: `ALLOWLISTED` caps its target's score and marks every contribution on it
+unretained, so anchoring them there would manufacture a verdict nobody asserted, out of a string
+that had no scoring effect in v6 either.
+
+### Keys are regenerated, and every reference follows
+
+v7 normalizes an observable's value, so a v6 `obs:domain:EVIL.com` is re-keyed to
+`obs:domain:evil.com`. The migration therefore translates *every* cross-reference — relations on
+both ends, threat-intel subjects, finding links, tag members and whitelist identifiers — through
+the map it builds while regenerating the observables. A reference it cannot place is left as it
+was rather than rewritten.
+
+Findings are re-keyed too, from v6's `fnd:{name}` to `fnd:{rule_id}:{subject_key}`, so a tag's
+members go through the same translation.
 
 ### Two contradictory decisions on one target
 

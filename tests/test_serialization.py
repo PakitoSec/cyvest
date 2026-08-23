@@ -270,26 +270,147 @@ class TestMigrationWhitelists:
         decisions = self._migrated(self._document())._investigation.store.decisions
         assert decisions["dec:allowlisted:obs:url:hxxp://bad.example"].justification == "corporate"
 
-    def test_an_investigation_wide_entry_lands_on_the_root(self) -> None:
-        """Its identifier names no observable, and v7 has no investigation-level decision."""
-        decisions = self._migrated(self._document())._investigation.store.decisions
-        justification = decisions["dec:allowlisted:obs:file:root"].justification
-        assert "SOC-TICKET-42" in justification
-        assert "False positive" in justification
-        assert "cleared by L2" in justification
+    def _legacy_evidence(self, document: dict):
+        evidences = self._migrated(document)._investigation.store.evidences
+        return next(e for e in evidences.values() if e.evidence_type == "legacy_whitelist")
 
-    def test_several_investigation_wide_entries_are_merged_not_overwritten(self) -> None:
-        """They would otherwise share one key and silently drop all but the last."""
+    def test_an_unplaceable_entry_is_kept_as_evidence(self) -> None:
+        """Its identifier names no observable, and v7 has no investigation-level decision."""
+        entries = self._legacy_evidence(self._document()).content
+        assert [entry["identifier"] for entry in entries] == ["SOC-TICKET-42"]
+        assert entries[0]["name"] == "False positive"
+        assert entries[0]["justification"] == "cleared by L2"
+
+    def test_an_unplaceable_entry_does_not_bound_the_root(self) -> None:
+        """
+        ``ALLOWLISTED`` caps its target and unretains every contribution on it.
+
+        Parking a ticket reference on the root manufactured a verdict nobody asserted — out of a
+        string that had no scoring effect in v6 either. The migrated score must not move.
+        """
+        plain = self._migrated(json.loads(json.dumps(V6_DOCUMENT)))
+        with_notes = self._migrated(self._document())
+
+        root_key = plain._investigation.store.header.root_key
+        assert "dec:allowlisted:" + root_key not in with_notes._investigation.store.decisions
+
+        root_result = with_notes.get_report().observable(root_key)
+        assert root_result.suppressed_by_decision is False
+        assert root_result.score == plain.get_report().observable(root_key).score
+
+    def test_several_unplaceable_entries_are_all_kept(self) -> None:
+        """They used to share one decision key, which silently dropped all but the last."""
         document = json.loads(json.dumps(V6_DOCUMENT))
         document["whitelists"] = [
             {"identifier": "SOC-1", "name": "first", "justification": ""},
             {"identifier": "SOC-2", "name": "second", "justification": ""},
         ]
-        justification = (
-            self._migrated(document)._investigation.store.decisions["dec:allowlisted:obs:file:root"].justification
-        )
-        assert "SOC-1" in justification
-        assert "SOC-2" in justification
+        entries = self._legacy_evidence(document).content
+        assert [entry["identifier"] for entry in entries] == ["SOC-1", "SOC-2"]
+
+
+class TestMigrationKeyTranslation:
+    """
+    v6 keys are not always what v7 regenerates, and every cross-reference must follow.
+
+    v7 normalizes an observable's value, so `obs:domain:EVIL.com` is re-keyed to
+    `obs:domain:evil.com`. Reusing the v6 key verbatim left signals, relations, finding links and
+    whitelist entries pointing at an observable that no longer exists — silently, since a
+    dangling key raises nothing. The propagation those references carried simply vanished, and
+    the migrated score stopped matching v6, which is the one promise this migration makes.
+    """
+
+    def _document(self, *, whitelist: bool = True) -> dict:
+        document = {
+            "schema_version": "6.0.0",
+            "investigation_id": "inv-x",
+            "investigation_name": "case",
+            "observables": {
+                "obs:domain:EVIL.com": {
+                    "type": "domain",
+                    "value": "EVIL.com",
+                    "occurrence_count": 1,
+                    "relationships": [
+                        {
+                            "target_key": "obs:url:hxxp://x",
+                            "relationship_type": "extraction",
+                            "direction": "outbound",
+                        }
+                    ],
+                },
+                "obs:url:hxxp://x": {"type": "url", "value": "hxxp://x", "occurrence_count": 1},
+            },
+            "findings": {
+                "fnd:f": {
+                    "finding_name": "f",
+                    "score": 3.0,
+                    "level": "NOTABLE",
+                    "observable_links": [{"observable_key": "obs:domain:EVIL.com", "propagation_mode": "GLOBAL"}],
+                }
+            },
+            "threat_intels": {
+                "ti:vt:obs:domain:EVIL.com": {
+                    "observable_key": "obs:domain:EVIL.com",
+                    "source": "vt",
+                    "score": 5.0,
+                    "level": "MALICIOUS",
+                }
+            },
+            "tags": {"tag:t": {"name": "t", "findings": [{"key": "fnd:f"}]}},
+            "whitelists": [{"identifier": "obs:domain:EVIL.com", "name": "n", "justification": "j"}],
+        }
+        if not whitelist:
+            document["whitelists"] = []
+        return document
+
+    def _migrated(self, *, whitelist: bool = True):
+        return load_investigation_dict(migrate_to_current(self._document(whitelist=whitelist)))
+
+    def test_the_observable_is_re_keyed(self) -> None:
+        assert "obs:domain:evil.com" in self._migrated().store.observables
+
+    def test_a_signal_follows_its_observable(self) -> None:
+        store = self._migrated().store
+        assert [s.subject_key for s in store.signals.values()] == ["obs:domain:evil.com"]
+        assert store.signals_for("obs:domain:evil.com") != []
+
+    def test_a_relation_follows_both_ends(self) -> None:
+        store = self._migrated().store
+        relation = next(iter(store.relations.values()))
+        assert relation.source_key == "obs:domain:evil.com"
+        assert relation.target_key == "obs:url:hxxp://x"
+
+    def test_a_finding_link_follows_its_observable(self) -> None:
+        store = self._migrated().store
+        finding = next(iter(store.findings.values()))
+        assert [link.observable_key for link in finding.observable_links] == ["obs:domain:evil.com"]
+
+    def test_a_tag_follows_its_re_keyed_finding(self) -> None:
+        """v6 keyed a finding on its name alone; v7 keys it on `(rule_id, subject_key)`."""
+        store = self._migrated().store
+        tag = next(iter(store.tags.values()))
+        assert set(tag.finding_keys) == set(store.findings)
+
+    def test_a_whitelist_entry_finds_its_re_keyed_observable(self) -> None:
+        store = self._migrated().store
+        assert "dec:allowlisted:obs:domain:evil.com" in store.decisions
+
+    def test_the_score_still_reflects_the_signal(self) -> None:
+        """
+        The whole point: a detached signal propagates nothing and the total silently drops.
+
+        Read without the whitelist entry, so the number under test is the signal reaching its
+        observable rather than the allowlist ceiling that entry now correctly applies.
+        """
+        investigation = self._migrated(whitelist=False)
+        assert investigation.report.observable("obs:domain:evil.com").score == 5.0
+        assert investigation.report.investigation.score == 5.0
+
+    def test_the_whitelist_entry_now_actually_bounds_its_observable(self) -> None:
+        """It matched nothing while the key was stale, so the ceiling was never applied."""
+        bounded = self._migrated().report.observable("obs:domain:evil.com")
+        assert bounded.suppressed_by_decision is True
+        assert bounded.score < self._migrated(whitelist=False).report.observable("obs:domain:evil.com").score
 
 
 class TestRelationDirection:

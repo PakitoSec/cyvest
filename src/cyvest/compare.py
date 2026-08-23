@@ -18,6 +18,7 @@ from cyvest.enums import Verdict
 
 if TYPE_CHECKING:
     from cyvest.cyvest import Cyvest
+    from cyvest.evaluation.report import FindingResult
 
 _RULE = re.compile(r"(>=|<=|>|<|==|!=)\s*(-?\d+\.?\d*)")
 
@@ -144,42 +145,79 @@ def compare_investigations(
     """
     Diff two investigations, or check one against tolerance rules.
 
+    The two are not independent passes. When an ``expected`` investigation is given, the rules act
+    as **tolerances on that diff**: a rule its subject satisfies suppresses the exact-value
+    mismatch, and ``ignore`` drops a whole status. Run side by side instead, rules could only ever
+    add rows — a band rule would never loosen anything, a violated one would report the same key
+    twice, and ``ignore={ADDED}`` would be unreachable.
+
+    With no ``expected``, the rules stand alone as assertions on ``actual``.
+
     Raises :class:`EngineMismatchError` when the two reports come from different engines, unless
     the caller says otherwise — scores from different engines are not comparable.
     """
     actual_report = actual.get_report()
-
-    if expected is not None and not allow_engine_mismatch:
-        expected_report = expected.get_report()
-        if actual_report.engine_id != expected_report.engine_id:
-            raise EngineMismatchError(
-                f"Cannot compare a {actual_report.engine_id} report with a {expected_report.engine_id} one; "
-                "scores from different engines are not on the same scale."
-            )
-
-    diffs: list[DiffItem] = []
     rules = result_expected or []
 
-    if expected is not None:
-        diffs.extend(_diff_against_investigation(actual, expected))
+    if expected is None:
+        return [diff for rule in rules for diff in _check_rule(actual, rule)]
 
-    for rule in rules:
-        diffs.extend(_check_rule(actual, rule))
+    expected_report = expected.get_report()
+    if not allow_engine_mismatch and actual_report.engine_id != expected_report.engine_id:
+        raise EngineMismatchError(
+            f"Cannot compare a {actual_report.engine_id} report with a {expected_report.engine_id} one; "
+            "scores from different engines are not on the same scale."
+        )
 
-    return diffs
+    return _diff_against_investigation(actual, expected, rules)
 
 
-def _diff_against_investigation(actual: Cyvest, expected: Cyvest) -> list[DiffItem]:
+def _rule_for(rules: list[ExpectedResult], key: str, rule_id: str) -> ExpectedResult | None:
+    return next((rule for rule in rules if rule.matches(key, rule_id)), None)
+
+
+def _ignores(rule: ExpectedResult | None, status: DiffStatus) -> bool:
+    return rule is not None and rule.ignore is not None and status in rule.ignore
+
+
+def _rule_tolerates(rule: ExpectedResult | None, result: FindingResult | None) -> bool:
+    """
+    Whether a rule vouches for the actual result, making the exact-value mismatch irrelevant.
+
+    A rule that states nothing tolerates nothing: ``ignore`` is the way to wave a difference
+    through, and a bare target would otherwise silence every mismatch on it.
+    """
+    if rule is None or result is None or (rule.score is None and rule.verdict is None):
+        return False
+    score_ok = rule.score is None or (result.score is not None and evaluate_score_rule(result.score, rule.score))
+    verdict_ok = rule.verdict is None or result.verdict is rule.verdict
+    return score_ok and verdict_ok
+
+
+def _diff_against_investigation(
+    actual: Cyvest,
+    expected: Cyvest,
+    rules: list[ExpectedResult] | None = None,
+) -> list[DiffItem]:
     diffs: list[DiffItem] = []
+    rules = rules or []
     actual_findings = actual._investigation.get_all_findings()
     expected_findings = expected._investigation.get_all_findings()
+    # Tracked by identity: two rules may carry the same content and still be two rules.
+    consumed: set[int] = set()
 
     for key in sorted(set(actual_findings) | set(expected_findings)):
         in_actual, in_expected = key in actual_findings, key in expected_findings
         actual_result = actual.get_report().finding(key)
         expected_result = expected.get_report().finding(key)
+        finding = actual_findings.get(key) or expected_findings[key]
+        rule = _rule_for(rules, key, finding.rule_id)
+        if rule is not None:
+            consumed.add(id(rule))
 
         if in_actual and not in_expected:
+            if _ignores(rule, DiffStatus.ADDED):
+                continue
             diffs.append(
                 DiffItem(
                     status=DiffStatus.ADDED,
@@ -190,6 +228,8 @@ def _diff_against_investigation(actual: Cyvest, expected: Cyvest) -> list[DiffIt
                 )
             )
         elif in_expected and not in_actual:
+            if _ignores(rule, DiffStatus.REMOVED):
+                continue
             diffs.append(
                 DiffItem(
                     status=DiffStatus.REMOVED,
@@ -197,6 +237,7 @@ def _diff_against_investigation(actual: Cyvest, expected: Cyvest) -> list[DiffIt
                     rule_id=expected_findings[key].rule_id,
                     expected_score=expected_result.score if expected_result else None,
                     expected_verdict=expected_result.verdict if expected_result else None,
+                    expected_score_rule=rule.score if rule else None,
                 )
             )
         elif (
@@ -204,6 +245,8 @@ def _diff_against_investigation(actual: Cyvest, expected: Cyvest) -> list[DiffIt
             and expected_result
             and (actual_result.score != expected_result.score or actual_result.verdict is not expected_result.verdict)
         ):
+            if _ignores(rule, DiffStatus.MISMATCH) or _rule_tolerates(rule, actual_result):
+                continue
             diffs.append(
                 DiffItem(
                     status=DiffStatus.MISMATCH,
@@ -211,11 +254,17 @@ def _diff_against_investigation(actual: Cyvest, expected: Cyvest) -> list[DiffIt
                     rule_id=actual_findings[key].rule_id,
                     expected_score=expected_result.score,
                     expected_verdict=expected_result.verdict,
+                    expected_score_rule=rule.score if rule else None,
                     actual_score=actual_result.score,
                     actual_verdict=actual_result.verdict,
                     observable_diffs=_observable_diffs(actual, expected, key),
                 )
             )
+
+    # A rule that matched nothing on either side still expected something: report it once.
+    for rule in rules:
+        if id(rule) not in consumed:
+            diffs.extend(_check_rule(actual, rule))
     return diffs
 
 

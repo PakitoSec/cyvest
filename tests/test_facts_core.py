@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -70,14 +70,14 @@ class TestKeyTable:
 
 class TestEnvelope:
     def test_seq_is_generated_from_asserted_at(self) -> None:
-        moment = datetime(2026, 3, 1, 12, 0, tzinfo=UTC)
+        moment = datetime(2026, 3, 1, 12, 0, tzinfo=timezone.utc)
         fact = observable()
         aligned = Observable(type="ipv4", value="1.2.3.4", source=SRC, fragment_id="f1", asserted_at=moment)
         assert abs(decode_ulid_timestamp(aligned.seq) - int(moment.timestamp() * 1000)) < 1000
         assert fact.seq != aligned.seq
 
     def test_inconsistent_seq_is_rejected(self) -> None:
-        moment = datetime(2026, 3, 1, 12, 0, tzinfo=UTC)
+        moment = datetime(2026, 3, 1, 12, 0, tzinfo=timezone.utc)
         stale_seq = generate_ulid(timestamp_ms=int((moment - timedelta(days=30)).timestamp() * 1000))
         with pytest.raises(ValueError, match="disagrees with asserted_at"):
             Observable(type="ipv4", value="1.2.3.4", source=SRC, fragment_id="f1", asserted_at=moment, seq=stale_seq)
@@ -133,22 +133,22 @@ class TestMergeLaws:
     def test_freshest_observation_wins_not_the_largest(self) -> None:
         """v6 took the max, so a score could never come back down. v7 lets it."""
         target = store()
-        old = self._signal("f1", weight=9.0, observed_at=datetime(2026, 1, 1, tzinfo=UTC))
-        fresh = self._signal("f1", weight=1.0, observed_at=datetime(2026, 6, 1, tzinfo=UTC))
+        old = self._signal("f1", weight=9.0, observed_at=datetime(2026, 1, 1, tzinfo=timezone.utc))
+        fresh = self._signal("f1", weight=1.0, observed_at=datetime(2026, 6, 1, tzinfo=timezone.utc))
         target.append(old)
         target.append(fresh)
         assert target.signals[fresh.key].weight == 1.0
 
     def test_a_late_worker_asserting_stale_data_does_not_win(self) -> None:
         target = store()
-        fresh = self._signal("f1", weight=1.0, observed_at=datetime(2026, 6, 1, tzinfo=UTC))
+        fresh = self._signal("f1", weight=1.0, observed_at=datetime(2026, 6, 1, tzinfo=timezone.utc))
         target.append(fresh)
         stale_but_late = ThreatIntel(
             subject_key=observable().key,
             verdict=Verdict.MALICIOUS,
             weight=9.0,
-            observed_at=datetime(2026, 1, 1, tzinfo=UTC),
-            asserted_at=datetime(2026, 7, 1, tzinfo=UTC),
+            observed_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+            asserted_at=datetime(2026, 7, 1, tzinfo=timezone.utc),
             source=SRC,
             fragment_id="f1",
         )

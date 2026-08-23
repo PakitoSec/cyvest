@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import json
 import re
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -172,8 +172,17 @@ def detect_schema_version(data: dict[str, Any]) -> str:
 
 
 def _version_tuple(version: str) -> tuple[int, int]:
-    major, minor, *_ = version.split(".")
-    return int(major), int(minor)
+    """
+    Split a version into ``(major, minor)``.
+
+    ``"5"`` is a legitimate input, not a malformed one: unversioned documents predate the
+    ``major.minor.patch`` convention and :func:`detect_schema_version` reports them as bare
+    ``"5"``. Unpacking two parts unconditionally made every v5 document unloadable — including
+    through ``migrate=True``, since the readability check runs before the migration.
+    """
+    major, _, remainder = version.partition(".")
+    minor, _, _patch = remainder.partition(".")
+    return int(major), int(minor or 0)
 
 
 def _check_readable(version: str) -> None:
@@ -244,17 +253,24 @@ def load_investigation_json(filepath: str | Path, *, migrate: bool = False) -> I
 
 def _iso(value: Any, fallback: datetime) -> datetime:
     if isinstance(value, datetime):
-        return value if value.tzinfo else value.replace(tzinfo=UTC)
+        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
     if isinstance(value, str):
         try:
             parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
         except ValueError:
             return fallback
-        return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
+        return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
     return fallback
 
 
 def _envelope(fragment_id: str, asserted_at: datetime, source: SourceRef = MIGRATION_SOURCE) -> dict[str, Any]:
+    """
+    Build a fresh envelope for **one** migrated fact.
+
+    Called per fact, never hoisted: ``seq`` is the ULID that orders facts and breaks merge ties,
+    so reusing a single one across a whole document would leave every migrated fact tied with
+    every other and make ``resolve_conflict`` arbitrary between them.
+    """
     return {
         "asserted_at": asserted_at,
         "seq": generate_ulid(timestamp_ms=int(asserted_at.timestamp() * 1000)),
@@ -306,8 +322,7 @@ def _migrate_v5_to_v6(data: dict[str, Any]) -> dict[str, Any]:
 def _migrate_v6_to_v7(data: dict[str, Any]) -> dict[str, Any]:
     """Turn a v6 document into a v7 one, preserving its numbers exactly."""
     fragment_id = str(data.get("investigation_id") or generate_ulid())
-    opened_at = _iso(data.get("started_at"), datetime.now(UTC))
-    envelope = _envelope(fragment_id, opened_at)
+    opened_at = _iso(data.get("started_at"), datetime.now(timezone.utc))
 
     observables: dict[str, Any] = {}
     relations: dict[str, Any] = {}
@@ -319,8 +334,6 @@ def _migrate_v6_to_v7(data: dict[str, Any]) -> dict[str, Any]:
 
     root_key = None
     for key, payload in (data.get("observables") or {}).items():
-        if payload.get("value") == "root":
-            root_key = key
         observable = Observable(
             type=payload.get("type") or payload.get("obs_type"),
             subtype=payload.get("subtype"),
@@ -330,21 +343,25 @@ def _migrate_v6_to_v7(data: dict[str, Any]) -> dict[str, Any]:
             comment=payload.get("comment", ""),
             extra=payload.get("extra") or {},
             occurrences={fragment_id: int(payload.get("occurrence_count", 1))},
-            **envelope,
+            **_envelope(fragment_id, opened_at),
         )
         observables[observable.key] = observable
+        # Read the regenerated key, not the v6 one: the header must point at a key that exists
+        # in the migrated document.
+        if payload.get("value") == "root":
+            root_key = observable.key
 
         if payload.get("whitelisted"):
             decision = Decision(
                 target_key=observable.key,
                 kind=DecisionKind.ALLOWLISTED,
                 justification="migrated from v6 whitelisted flag",
-                **envelope,
+                **_envelope(fragment_id, opened_at),
             )
             decisions[decision.key] = decision
 
         for raw in payload.get("relationships") or []:
-            relation = _migrate_relationship(raw, source_key=key, envelope=envelope)
+            relation = _migrate_relationship(raw, source_key=key, envelope=_envelope(fragment_id, opened_at))
             if relation is not None:
                 relations[relation.key] = relation
 
@@ -354,15 +371,16 @@ def _migrate_v6_to_v7(data: dict[str, Any]) -> dict[str, Any]:
             continue
         signal = ThreatIntel(
             subject_key=subject_key,
-            source=SourceRef(name=payload.get("source", "unknown"), source_class=SourceClass.VENDOR_FEED),
             taxonomies=tuple(
                 item.get("name", "") if isinstance(item, dict) else str(item)
                 for item in (payload.get("taxonomies") or [])
             ),
             comment=payload.get("comment", ""),
-            asserted_at=envelope["asserted_at"],
-            seq=envelope["seq"],
-            fragment_id=fragment_id,
+            **_envelope(
+                fragment_id,
+                opened_at,
+                SourceRef(name=payload.get("source", "unknown"), source_class=SourceClass.VENDOR_FEED),
+            ),
             **_judgment_from_v6(payload),
         )
         signals[signal.key] = signal
@@ -374,10 +392,11 @@ def _migrate_v6_to_v7(data: dict[str, Any]) -> dict[str, Any]:
             content=payload.get("content"),
             uri=payload.get("uri"),
             external_id=payload.get("external_id"),
-            source=SourceRef(name=payload.get("source", "legacy"), source_class=SourceClass.INTERNAL_TOOL),
-            asserted_at=envelope["asserted_at"],
-            seq=envelope["seq"],
-            fragment_id=fragment_id,
+            **_envelope(
+                fragment_id,
+                opened_at,
+                SourceRef(name=payload.get("source", "legacy"), source_class=SourceClass.INTERNAL_TOOL),
+            ),
         )
         evidences[evidence.key] = evidence
 
@@ -387,13 +406,11 @@ def _migrate_v6_to_v7(data: dict[str, Any]) -> dict[str, Any]:
             evidence_type="enrichment",
             title=payload.get("name", ""),
             content=payload.get("data"),
-            source=SourceRef(
-                name=payload.get("context") or "legacy",
-                source_class=SourceClass.INTERNAL_TOOL,
+            **_envelope(
+                fragment_id,
+                opened_at,
+                SourceRef(name=payload.get("context") or "legacy", source_class=SourceClass.INTERNAL_TOOL),
             ),
-            asserted_at=envelope["asserted_at"],
-            seq=envelope["seq"],
-            fragment_id=fragment_id,
         )
         evidences[evidence.key] = evidence
 
@@ -408,6 +425,12 @@ def _migrate_v6_to_v7(data: dict[str, Any]) -> dict[str, Any]:
         judgment = _judgment_from_v6(payload)
         # A v6 finding stuck at NONE never applied; keep it visible but out of the arithmetic.
         status = Status.NOT_APPLICABLE if str(payload.get("level", "")).upper() == "NONE" else Status.EVALUATED
+        # ⚠ The origin *is* the fragment. v6 gated a LOCAL_ONLY link on
+        # ``origin_investigation_id == investigation_id``; v7 expresses the same gate as
+        # ``Scope.OWN_FRAGMENT`` resolved against the finding's own fragment. Collapsing every
+        # finding onto the document-level fragment would make imported LOCAL_ONLY links start
+        # propagating, which silently raises the score of any merged investigation.
+        origin = str(payload.get("origin_investigation_id") or fragment_id)
         finding = Finding(
             rule_id=payload.get("finding_name", "unknown"),
             name=payload.get("description", ""),
@@ -417,10 +440,7 @@ def _migrate_v6_to_v7(data: dict[str, Any]) -> dict[str, Any]:
             status=status,
             extra=payload.get("extra") or {},
             evidence_keys=tuple(link["evidence_key"] for link in payload.get("evidence_links") or []),
-            asserted_at=envelope["asserted_at"],
-            seq=envelope["seq"],
-            source=MIGRATION_SOURCE,
-            fragment_id=fragment_id,
+            **_envelope(origin, opened_at),
             **judgment,
         )
         findings[finding.key] = finding
@@ -432,20 +452,14 @@ def _migrate_v6_to_v7(data: dict[str, Any]) -> dict[str, Any]:
             finding_keys=tuple(
                 item["key"] if isinstance(item, dict) else str(item) for item in payload.get("findings") or []
             ),
-            **envelope,
+            **_envelope(fragment_id, opened_at),
         )
         tags[tag.key] = tag
 
-    for payload in data.get("whitelists") or []:
-        target = payload.get("identifier")
-        if target in observables:
-            decision = Decision(
-                target_key=target,
-                kind=DecisionKind.ALLOWLISTED,
-                justification=payload.get("justification"),
-                **envelope,
-            )
-            decisions[decision.key] = decision
+    _migrate_whitelists(data, observables, decisions, root_key, fragment_id, opened_at)
+
+    # Findings carry their origin fragment, so the header must list every fragment present.
+    fragment_ids = dict.fromkeys([fragment_id, *(finding.fragment_id for finding in findings.values())])
 
     header = InvestigationHeader(
         investigation_id=fragment_id,
@@ -454,7 +468,7 @@ def _migrate_v6_to_v7(data: dict[str, Any]) -> dict[str, Any]:
         opened_at=opened_at,
         policy_version="default-v1",
         engine_id="basic-v1",
-        fragment_ids=(fragment_id,),
+        fragment_ids=tuple(fragment_ids),
     )
 
     document = InvestigationSchema(
@@ -476,6 +490,53 @@ def _migrate_v6_to_v7(data: dict[str, Any]) -> dict[str, Any]:
     rebuilt = load_investigation_dict(migrated)
     migrated["report"] = rebuilt.report.model_dump(mode="json", by_alias=True)
     return migrated
+
+
+def _migrate_whitelists(
+    data: dict[str, Any],
+    observables: dict[str, Any],
+    decisions: dict[str, Any],
+    root_key: str | None,
+    fragment_id: str,
+    opened_at: datetime,
+) -> None:
+    """
+    Carry v6 whitelist entries over as allowlist decisions.
+
+    A v6 whitelist is investigation-level and its ``identifier`` is a free-form string, so only
+    some entries name an observable. Those become a decision on that observable; the rest land on
+    the root, the only investigation-wide anchor v7 offers. They are merged into a single
+    decision because they would otherwise share the key ``dec:allowlisted:{root}`` and overwrite
+    one another — and an analyst's call is not something to drop on the floor.
+    """
+    investigation_wide: list[str] = []
+
+    for payload in data.get("whitelists") or []:
+        target = payload.get("identifier")
+        if target in observables:
+            decision = Decision(
+                target_key=target,
+                kind=DecisionKind.ALLOWLISTED,
+                justification=payload.get("justification"),
+                **_envelope(fragment_id, opened_at),
+            )
+            decisions[decision.key] = decision
+            continue
+        note = " · ".join(
+            part for part in (str(payload.get("name") or ""), str(payload.get("justification") or "")) if part
+        )
+        investigation_wide.append(f"{target}: {note}" if note else str(target))
+
+    if not investigation_wide or root_key is None:
+        return
+
+    decision = Decision(
+        target_key=root_key,
+        kind=DecisionKind.ALLOWLISTED,
+        justification="migrated from v6 investigation whitelist — " + "; ".join(investigation_wide),
+        **_envelope(fragment_id, opened_at),
+    )
+    decisions[decision.key] = decision
 
 
 def _empty_report(header: InvestigationHeader) -> Any:

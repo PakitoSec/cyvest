@@ -9,7 +9,7 @@ score, whereas letting the evaluator consult the clock would make an archived re
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 from rich.console import Console, Group
@@ -59,7 +59,7 @@ def _applied_floor(report: Report, finding_key: str) -> float:
 
 def _age(moment: datetime) -> str:
     """Display-only: how long ago something was decided. Never touches a score."""
-    months = (datetime.now(UTC) - moment).days // 30
+    months = (datetime.now(timezone.utc) - moment).days // 30
     if months >= 24:
         return f"il y a {months // 12} ans"
     if months >= 1:

@@ -7,7 +7,7 @@ What stays is identity, provenance and the ``internal`` flag.
 
 from __future__ import annotations
 
-from typing import Any, Self
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator, model_validator
 
@@ -167,7 +167,7 @@ class Observable(Fact):
         return values
 
     @model_validator(mode="after")
-    def _validate_identity(self) -> Self:
+    def _validate_identity(self) -> Observable:
         obs_type = self.obs_type.value if isinstance(self.obs_type, ObservableType) else str(self.obs_type).lower()
         subtype = self.subtype.value if isinstance(self.subtype, ObservableSubtype) else self.subtype
 

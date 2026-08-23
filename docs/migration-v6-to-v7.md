@@ -50,7 +50,7 @@ read-only and never reimplement a scoring rule — but the report is an output, 
 | `score` (on facts) | `weight` | A magnitude *asserted*, not derived |
 | `score` (derived) | `report.*.score` | §1 |
 | `whitelisted` | `Decision(ALLOWLISTED)` | §6 |
-| `origin_investigation_id` | *(gone)* | Identity now includes the subject; §7 |
+| `origin_investigation_id` | `fragment_id` (on the finding) | Carried over, because it *is* the fragment; §7 |
 | `propagation_mode` | `ObservableLink.scope` | Still **per link**, not per finding |
 | `observable_add_relationship` | `observable_add_relation` | |
 | `enrichment_create` | `evidence_create` | |
@@ -181,6 +181,21 @@ it did in v6.** That is the intended correction.
 A decision carries only `target_key`, `kind` and an optional `justification`. Who decided and when
 come from the `Fact` envelope (`source`, `asserted_at`), like every other fact.
 
+### Investigation-level whitelists
+
+v6 also had whitelist entries on the investigation itself, whose `identifier` was a free-form
+string. Those that name an observable become a decision on it. The rest have no equivalent — v7
+has no investigation-level decision — so they land on the **root observable**, merged into a
+single decision that keeps each entry's name and justification in its own justification.
+
+### Two contradictory decisions on one target
+
+`ALLOWLISTED` and `BLOCKLISTED` carry different keys, so one observable can hold both — likewise
+`CONFIRMED` and `DISMISSED` on one finding. The conflict is settled exactly like any other in v7:
+**the freshest assertion wins**, on `occurred_at or asserted_at` then `seq`. The superseded
+decision stays in the report as an unretained contribution, because a human call that lost is
+still a human call.
+
 ---
 
 ## 7. Merging, and why a score can now go down
@@ -198,6 +213,12 @@ the most recently asserted wins. v6 resolved conflicts by `max`, so a score coul
 Identity no longer needs `origin_investigation_id`, because a finding's identity is
 `(rule_id, subject_key)`: the same rule on two observables is two findings, and the same rule on
 the same observable is one finding, in any number of investigations.
+
+The origin itself is **not** dropped, though: it becomes the finding's `fragment_id`. v6 gated a
+`LOCAL_ONLY` link on `origin_investigation_id == investigation_id`, and v7 states that same gate
+as `Scope.OWN_FRAGMENT` resolved against the finding's own fragment. Collapsing every migrated
+finding onto the document-level fragment would make links that were inert in v6 start
+propagating, silently raising the score of any merged investigation.
 
 ### The scenario this was designed for
 
@@ -317,6 +338,23 @@ never recomputes a score — every derived value is read from `report`.
 | `observable.relationships` | `getAllRelations(inv)` / `getRelationsForObservable(inv, key)` |
 | `edge.direction` | *(gone)* — `source_key` is the parent |
 | `VERDICT_COLORS` | `VERDICT_HEX_COLORS` for the web, `VERDICT_TERMINAL_STYLES` for the CLI |
+| `CyvestInvestigation` | `Investigation` |
+| `parseFindingKey`, `parseThreatIntelKey` | *(gone)* — see below |
+
+`Level` disappeared along the same axis as in Python, taking `LEVEL_ORDER`, `LEVEL_COLORS`,
+`compareLevels`, `getLevelFromScore`, `getEntityLevel` and their siblings with it; the `Verdict`
+equivalents replace them one for one.
+
+### Key parsing is gone
+
+`parseFindingKey` and `parseThreatIntelKey` were removed rather than updated. A v7 key embeds the
+subject — `fnd:{rule_id}:{subject_key}`, with an optional `external_id` in between — and both
+`rule_id` and `source` may themselves contain `:`, so the result cannot be split back apart
+unambiguously. Python deliberately exposes no equivalent: a key is an identity token, not a
+record. Read the fact from the document instead.
+
+`parseObservableKey` stays, with the same caveat it has always had on both sides: it is only
+reliable for the simple `obs:{type}:{value}` form.
 
 ---
 

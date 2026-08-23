@@ -2,13 +2,15 @@
 
 Cyvest ships a small JavaScript/TypeScript workspace alongside the Python API. Use these packages to validate serialized investigations, power UI integrations, or explore the data model in a browser.
 
-The JS packages follow the generated schema. Serialized investigations should include the
-schema-required fields such as `investigation_id`, `investigation_name`,
-`score_display`, `finding_links`, and `observable_links`.
+The JS packages follow the generated schema. A serialized investigation is a v7 document: facts
+live under `facts.*` (`observables`, `relations`, `signals`, `evidences`, `findings`), decisions
+and tags sit beside them, and **every derived value is read from `report`** — the SDK never
+recomputes a score. `parseCyvest` refuses any document whose `schema_version` is not `7.0.0`,
+pointing at `cyvest migrate` for older ones.
 
 ## Packages
 
-- **@cyvest/cyvest-js** — Generated types, schema validation, graph builders, tag hierarchy utilities (including aggregated score/level), and helper functions for Cyvest investigation JSON. Ships ESM/CJS builds and `.d.ts` files.
+- **@cyvest/cyvest-js** — Generated types, schema validation, graph builders, tag hierarchy utilities (including aggregated score and verdict), and helper functions for Cyvest investigation JSON. Ships ESM/CJS builds and `.d.ts` files.
 - **@cyvest/cyvest-vis** — React 19+ visualization components using Cytoscape for interaction and a deterministic `d3-force` simulation for positioning. Depends on `@cyvest/cyvest-js`.
 - **@cyvest/cyvest-app** — Private Vite demo that bundles sample investigations and renders them via `CyvestGraph`. Useful for tweaking visuals and testing UI flows.
 
@@ -19,7 +21,7 @@ Interactive visualization of Cyvest observable relationships.
 ### Features
 
 - **Observable Explorer**: community-aware force graph centered on the root, with typed edges, search, filters, legend, and node/edge inspection
-- **Restrained visual language**: neutral surfaces, compact SVG nodes, thin edges, and level color used only as a contour
+- **Restrained visual language**: neutral surfaces, compact SVG nodes, thin edges, and verdict color used only as a contour
 - **Interactive focus**: pan/zoom, fit, deterministic layout replay, selection, and neighborhood focus on hover
 
 ### Quick Start

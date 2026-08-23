@@ -283,6 +283,7 @@ class Cyvest:
         # tally. Within a fragment, though, seeing the same artifact twice is a real second
         # occurrence — so we count up from what this fragment has already recorded.
         seen = 0
+        alias_seen = 0
         probe = Observable(
             type=identity.obs_type,
             subtype=identity.subtype,
@@ -294,6 +295,12 @@ class Cyvest:
         existing = self._investigation.get_observable(probe.key)
         if existing is not None:
             seen = existing.occurrences.get(fragment, 0)
+            previous = next((a for a in existing.aliases if a.identity_tuple == alias.identity_tuple), None)
+            if previous is not None:
+                alias_seen = previous.counts.get(fragment, 0)
+        # An alias keeps its own tally: it answers "how often did we see *this* spelling", which
+        # is not the observable's total once several spellings resolve to the same canonical one.
+        alias = alias.model_copy(update={"counts": {fragment: alias_seen + 1}})
 
         observable = Observable(
             type=identity.obs_type,

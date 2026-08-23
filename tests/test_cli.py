@@ -75,6 +75,22 @@ def other_case(tmp_path: Path) -> Path:
     return path
 
 
+@pytest.fixture
+def drifted_case(tmp_path: Path) -> Path:
+    """The same case scored differently: exactly what a tolerance rule is meant to absorb."""
+    cv = Cyvest(investigation_name="IR-1", investigation_id="inv-1")
+    url = cv.observable(cv.OBS.URL, "https://evil.test").with_ti("virustotal", 3.0)
+    ip = cv.observable(cv.OBS.IPV4, "203.0.113.50")
+    cv.observable_add_relation(url.key, ip.key, cv.REL.PIVOT)
+    finding = cv.finding("phishing_page", "Phishing page", weight=4.0)
+    cv.finding_link_observable(finding.key, url.key)
+    ip.allowlist(justification="Corporate egress")
+
+    path = tmp_path / "drifted.json"
+    cv.io_save_json(path)
+    return path
+
+
 class TestInspection:
     def test_show_renders_an_investigation(self, runner: CliRunner, case: Path) -> None:
         result = runner.invoke(cli, ["show", str(case)])
@@ -275,12 +291,42 @@ class TestDiff:
         assert result.exit_code == 0, result.output
 
     def test_tolerance_rules_are_read_from_a_file(
-        self, runner: CliRunner, case: Path, tmp_path: Path, caplog: pytest.LogCaptureFixture
+        self,
+        runner: CliRunner,
+        case: Path,
+        drifted_case: Path,
+        tmp_path: Path,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """
+        A rules file *loosens* the comparison, so its effect shows as a difference disappearing.
+
+        This used to assert the opposite — that a violated rule adds a row to an otherwise clean
+        diff — which is what "rules could only ever add differences" looked like from the CLI.
+        """
+        assert runner.invoke(cli, ["diff", str(case), str(drifted_case)]).exit_code == 0
+        assert "No differences" not in caplog.text
+
+        caplog.clear()
+        rules = tmp_path / "rules.json"
+        rules.write_text(json.dumps([{"rule_id": "phishing_page", "score": ">= 1.0"}]), encoding="utf-8")
+
+        result = runner.invoke(cli, ["diff", str(case), str(drifted_case), "--rules", str(rules)])
+        assert result.exit_code == 0, result.output
+        assert "No differences" in caplog.text
+
+    def test_a_violated_tolerance_rule_leaves_the_difference_visible(
+        self,
+        runner: CliRunner,
+        case: Path,
+        drifted_case: Path,
+        tmp_path: Path,
+        caplog: pytest.LogCaptureFixture,
     ) -> None:
         rules = tmp_path / "rules.json"
         rules.write_text(json.dumps([{"rule_id": "phishing_page", "score": "> 900"}]), encoding="utf-8")
 
-        result = runner.invoke(cli, ["diff", str(case), str(case), "--rules", str(rules)])
+        result = runner.invoke(cli, ["diff", str(case), str(drifted_case), "--rules", str(rules)])
         assert result.exit_code == 0, result.output
         assert "No differences" not in caplog.text
 
@@ -323,3 +369,71 @@ class TestGuards:
 
         result = runner.invoke(cli, ["show", str(future)])
         assert result.exit_code != 0
+
+
+class TestCleanErrors:
+    """
+    A wrong argument is a user error, not a crash.
+
+    Every case below used to end in a traceback, which buries the one line that says what to do
+    next under a stack the user did not write.
+    """
+
+    def _fails_cleanly(self, result) -> str:
+        assert result.exit_code != 0
+        assert result.exception is None or isinstance(result.exception, SystemExit), result.output
+        assert "Traceback" not in result.output
+        return result.output
+
+    def test_an_unknown_engine_lists_the_known_ones(self, runner: CliRunner, case: Path) -> None:
+        output = self._fails_cleanly(runner.invoke(cli, ["show", str(case), "--engine", "no-such-engine"]))
+        assert "Unknown scoring engine" in output
+        assert "basic-v1" in output
+
+    @pytest.mark.parametrize(
+        "command",
+        [
+            ["policy", "show"],
+            ["migrate"],
+        ],
+    )
+    def test_a_malformed_json_file_is_named(self, runner: CliRunner, tmp_path: Path, command: list[str]) -> None:
+        broken = tmp_path / "broken.json"
+        broken.write_text("this is not json", encoding="utf-8")
+        argv = [*command, str(broken)]
+        if command == ["migrate"]:
+            argv += ["-o", str(tmp_path / "out.json")]
+        output = self._fails_cleanly(runner.invoke(cli, argv))
+        assert "not valid JSON" in output
+
+    def test_a_rules_file_that_is_not_a_list_is_refused(
+        self, runner: CliRunner, case: Path, other_case: Path, tmp_path: Path
+    ) -> None:
+        rules = tmp_path / "rules.json"
+        rules.write_text(json.dumps({"rule_id": "x"}), encoding="utf-8")
+        output = self._fails_cleanly(runner.invoke(cli, ["diff", str(case), str(other_case), "-r", str(rules)]))
+        assert "list of rule objects" in output
+
+    def test_an_invalid_rule_is_refused(self, runner: CliRunner, case: Path, other_case: Path, tmp_path: Path) -> None:
+        rules = tmp_path / "rules.json"
+        rules.write_text(json.dumps([{"nope": 1}]), encoding="utf-8")
+        output = self._fails_cleanly(runner.invoke(cli, ["diff", str(case), str(other_case), "-r", str(rules)]))
+        assert "Invalid rule" in output
+
+    def test_merge_creates_a_missing_output_directory(
+        self, runner: CliRunner, case: Path, other_case: Path, tmp_path: Path
+    ) -> None:
+        """The merge used to run in full and then be thrown away on the write."""
+        output = tmp_path / "deep" / "nested" / "merged.json"
+        result = runner.invoke(cli, ["merge", str(case), str(other_case), "-o", str(output)])
+        assert result.exit_code == 0, result.output
+        assert output.exists()
+
+    @pytest.mark.parametrize(("export_format", "name"), [("json", "e.json"), ("markdown", "e.md")])
+    def test_export_creates_a_missing_output_directory(
+        self, runner: CliRunner, case: Path, tmp_path: Path, export_format: str, name: str
+    ) -> None:
+        output = tmp_path / "deep" / "nested" / name
+        result = runner.invoke(cli, ["export", str(case), "-o", str(output), "-f", export_format])
+        assert result.exit_code == 0, result.output
+        assert output.exists()

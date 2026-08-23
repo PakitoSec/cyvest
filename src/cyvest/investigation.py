@@ -410,7 +410,7 @@ class Investigation:
             if root_key in component:
                 continue
             best = max(
-                component,
+                sorted(component),
                 key=lambda node: (-len(incoming[node] & component), len(adjacency[node] & component)),
             )
             self.add_relation(root_key, best, RelationKind.RELATED_TO)

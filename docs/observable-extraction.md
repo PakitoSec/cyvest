@@ -133,7 +133,7 @@ cyvest extract report.txt --format markdown-table --defang-output
 
 ```python
 from cyvest.extract import extract_all, extract_urls, extract_ips, extract_emails, extract_hashes, extract_domains
-from cyvest.model_enums import ObservableType
+from cyvest.enums import ObservableType
 
 # Extract all observable types
 text = """
@@ -162,7 +162,7 @@ domain: evil.com (defanged: True)
 
 ```python
 from cyvest.extract import extract_all
-from cyvest.model_enums import ObservableType
+from cyvest.enums import ObservableType
 
 # Extract only URLs and IPs
 observables = extract_all(
@@ -206,7 +206,7 @@ values. A custom pattern must include a named `value` capture group.
 
 ```python
 from cyvest.extract import ExtractionPattern, extract_all
-from cyvest.model_enums import ObservableSubtype, ObservableType
+from cyvest.enums import ObservableSubtype, ObservableType
 
 text = "Event user=alice host=web01.example.com"
 
@@ -239,7 +239,7 @@ from cyvest.extract import (
     extract_all,
     register_extraction_pattern,
 )
-from cyvest.model_enums import ObservableSubtype, ObservableType
+from cyvest.enums import ObservableSubtype, ObservableType
 
 register_extraction_pattern(
     ExtractionPattern(
@@ -274,7 +274,7 @@ from cyvest.extract import extract_from_url
 observables = extract_from_url("https://example.com/ioc-feed.txt")
 
 # With type filtering
-from cyvest.model_enums import ObservableType
+from cyvest.enums import ObservableType
 observables = extract_from_url(
     "https://example.com/ioc-feed.txt",
     types={ObservableType.IPV4},
@@ -313,7 +313,7 @@ Convert indicators to safe, non-clickable format:
 ```python
 from cyvest.extract import defang
 
-defang("https://malware.com/payload")  # -> "hxxps://malware[.]com[/]payload"
+defang("https://malware.com/payload")  # -> "hxxps://malware[.]com/payload"
 defang("user@evil.com")  # -> "user[@]evil[.]com"
 ```
 

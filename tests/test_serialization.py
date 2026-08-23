@@ -200,6 +200,97 @@ class TestMigrationV6:
         migrated = self._migrated()
         assert migrated._investigation.store.header.root_key == "obs:file:root"
 
+    def test_every_migrated_fact_gets_its_own_seq(self) -> None:
+        """One shared ULID would leave every migrated fact tied with every other on merge."""
+        facts = list(self._migrated()._investigation.store.all_facts())
+        assert len({fact.seq for fact in facts}) == len(facts)
+
+
+class TestMigrationFragments:
+    """
+    ``origin_investigation_id`` *is* the fragment.
+
+    v6 gated a ``LOCAL_ONLY`` link on ``origin_investigation_id == investigation_id``; v7 states
+    the same gate as ``Scope.OWN_FRAGMENT`` resolved against the finding's own fragment. Dropping
+    the origin collapsed every finding onto the document fragment, so links that were inert in v6
+    started propagating and quietly inflated the score of any merged investigation.
+    """
+
+    def _document(self, origin: str, propagation: str = "LOCAL_ONLY") -> dict:
+        document = json.loads(json.dumps(V6_DOCUMENT))
+        document["findings"]["fnd:url_in_body"].update(
+            {
+                "origin_investigation_id": origin,
+                "score": 2.0,
+                "level": "NOTABLE",
+                "observable_links": [{"observable_key": "obs:url:hxxp://bad.example", "propagation_mode": propagation}],
+            }
+        )
+        return document
+
+    def _migrated(self, document: dict) -> Cyvest:
+        facade = Cyvest.__new__(Cyvest)
+        facade._investigation = load_investigation_dict(migrate_to_current(document))
+        facade._observable_resolvers = []
+        return facade
+
+    def test_a_finding_keeps_the_fragment_it_came_from(self) -> None:
+        store = self._migrated(self._document("fragment-proofpoint"))._investigation.store
+        finding = next(iter(store.findings.values()))
+        assert finding.fragment_id == "fragment-proofpoint"
+        assert "fragment-proofpoint" in store.header.fragment_ids
+
+    def test_an_imported_local_link_does_not_start_propagating(self) -> None:
+        """The observable is worth 6.0, but a foreign fragment only sees its own 2.0."""
+        migrated = self._migrated(self._document("fragment-proofpoint"))
+        assert migrated.get_global_score() == 2.0
+
+    def test_a_native_local_link_still_propagates(self) -> None:
+        """Same document, same link: only the origin differs, and it is what decides."""
+        migrated = self._migrated(self._document("inv-v6"))
+        assert migrated.get_global_score() == 6.0
+
+
+class TestMigrationWhitelists:
+    def _migrated(self, document: dict) -> Cyvest:
+        facade = Cyvest.__new__(Cyvest)
+        facade._investigation = load_investigation_dict(migrate_to_current(document))
+        facade._observable_resolvers = []
+        return facade
+
+    def _document(self) -> dict:
+        document = json.loads(json.dumps(V6_DOCUMENT))
+        document["whitelists"] = [
+            {"identifier": "SOC-TICKET-42", "name": "False positive", "justification": "cleared by L2"},
+            {"identifier": "obs:url:hxxp://bad.example", "name": "Known good", "justification": "corporate"},
+        ]
+        return document
+
+    def test_an_entry_naming_an_observable_becomes_a_decision_on_it(self) -> None:
+        decisions = self._migrated(self._document())._investigation.store.decisions
+        assert decisions["dec:allowlisted:obs:url:hxxp://bad.example"].justification == "corporate"
+
+    def test_an_investigation_wide_entry_lands_on_the_root(self) -> None:
+        """Its identifier names no observable, and v7 has no investigation-level decision."""
+        decisions = self._migrated(self._document())._investigation.store.decisions
+        justification = decisions["dec:allowlisted:obs:file:root"].justification
+        assert "SOC-TICKET-42" in justification
+        assert "False positive" in justification
+        assert "cleared by L2" in justification
+
+    def test_several_investigation_wide_entries_are_merged_not_overwritten(self) -> None:
+        """They would otherwise share one key and silently drop all but the last."""
+        document = json.loads(json.dumps(V6_DOCUMENT))
+        document["whitelists"] = [
+            {"identifier": "SOC-1", "name": "first", "justification": ""},
+            {"identifier": "SOC-2", "name": "second", "justification": ""},
+        ]
+        justification = (
+            self._migrated(document)._investigation.store.decisions["dec:allowlisted:obs:file:root"].justification
+        )
+        assert "SOC-1" in justification
+        assert "SOC-2" in justification
+
 
 class TestRelationDirection:
     def _relation(self, direction: str, relationship_type: str):
@@ -234,17 +325,34 @@ class TestRelationDirection:
 
 
 class TestMigrationChain:
+    V5_DOCUMENT = {
+        "investigation_id": "inv-v5",
+        "observables": {"obs:url:hxxp://old.example": {"type": "url", "value": "hxxp://old.example", "score": 4.0}},
+        "findings": {},
+        "threat_intels": {},
+        "stats": {"anything": 1},
+    }
+
+    def _v5(self) -> dict:
+        return json.loads(json.dumps(self.V5_DOCUMENT))
+
     def test_a_v5_document_reaches_v7_in_one_call(self) -> None:
-        v5 = {
-            "investigation_id": "inv-v5",
-            "observables": {"obs:url:hxxp://old.example": {"type": "url", "value": "hxxp://old.example", "score": 4.0}},
-            "findings": {},
-            "threat_intels": {},
-            "stats": {"anything": 1},
-        }
-        migrated = migrate_to_current(v5)
+        migrated = migrate_to_current(self._v5())
         assert migrated["schema_version"] == SCHEMA_VERSION
         assert load_investigation_dict(migrated) is not None
+
+    def test_an_unversioned_document_loads_through_migrate(self) -> None:
+        """
+        The readability check runs *before* the migration, and it used to unpack a version into
+        two parts unconditionally. An unversioned document detects as bare ``"5"``, so every v5
+        file crashed on load — including the documented ``migrate=True`` path.
+        """
+        investigation = load_investigation_dict(self._v5(), migrate=True)
+        assert "obs:url:hxxp://old.example" in investigation.store.observables
+
+    def test_an_unversioned_document_without_migrate_says_so(self) -> None:
+        with pytest.raises(ValueError, match="Document schema is 5"):
+            load_investigation_dict(self._v5())
 
 
 class TestCommittedSchema:

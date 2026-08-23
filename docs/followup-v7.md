@@ -138,9 +138,13 @@ and every derived value lives in `report`.
 2. **No `dict -> dict` migration for a minor bump.** Defaults are enough; `_MIGRATIONS` handles
    major transitions only.
 
-And two structural constraints, already load-bearing:
+And three structural constraints, already load-bearing:
 
 - fact collections stay maps `{key: object}` — 7.2 history goes into a sibling `facts.history`,
   because turning a map into `{key: [objects]}` would break every existing document;
 - nothing under `evaluation/` may read the clock, enforced by an AST test: an archived report must
-  produce the same numbers next year.
+  produce the same numbers next year;
+- no set may reach the report. The adjacency indexes in `FactStore` are sets, so every accessor
+  sorts on `(seq, key)` before returning. Enforced across processes by
+  `TestDeterminism::test_a_saved_document_reports_the_same_under_any_hash_seed` — an in-process
+  check cannot catch this, since set iteration is stable within a single interpreter run.

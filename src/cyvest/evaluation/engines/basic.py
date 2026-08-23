@@ -23,6 +23,7 @@ from cyvest.evaluation.report import (
     observable_index,
     round_half_up,
 )
+from cyvest.facts.decision import Decision
 from cyvest.facts.finding import Finding
 from cyvest.facts.signal import ObservableSignal
 from cyvest.facts.store import FactStore
@@ -63,6 +64,37 @@ class _Evaluation:
 
     def _visible(self, fragment_id: str, scope: ResolvedScope) -> bool:
         return scope.fragment_id is None or fragment_id == scope.fragment_id
+
+    # --- decisions -----------------------------------------------------------------------
+
+    @staticmethod
+    def _resolve_decision(decisions: list[Decision]) -> tuple[Decision | None, list[Contribution]]:
+        """
+        Pick the decision that applies, and account for the ones it supersedes.
+
+        ``ALLOWLISTED``/``BLOCKLISTED`` and ``CONFIRMED``/``DISMISSED`` carry different keys, so
+        a target may legitimately hold two contradictory ones. They are settled exactly like any
+        other conflict in v7 — the freshest assertion wins — rather than applied in sequence,
+        which would have made the result depend on iteration order.
+
+        The losers stay in the report as unretained contributions: a superseded human decision is
+        something an analyst needs to see, not something to drop silently.
+        """
+        if not decisions:
+            return None, []
+        winner = max(decisions, key=lambda decision: (*decision.merge_rank(), decision.key))
+        superseded = [
+            Contribution(
+                source_key=decision.key,
+                label=f"decision · {decision.kind.value}",
+                value=0.0,
+                retained=False,
+                detail=f"superseded by a fresher {winner.kind.value} decision",
+            )
+            for decision in decisions
+            if decision.key != winner.key
+        ]
+        return winner, superseded
 
     # --- observables ---------------------------------------------------------------------
 
@@ -116,13 +148,14 @@ class _Evaluation:
         score = combine(signal_scores, child_scores, self.policy.aggregation)
         suppressed = False
 
-        for decision in self.store.decisions_for(observable_key):
+        bounding = [d for d in self.store.decisions_for(observable_key) if d.kind.targets_observable]
+        decision, superseded = self._resolve_decision(bounding)
+        contributions.extend(superseded)
+        if decision is not None:
             if decision.kind is DecisionKind.ALLOWLISTED:
                 bounded = min(score, self.policy.allowlist_ceiling)
-            elif decision.kind is DecisionKind.BLOCKLISTED:
-                bounded = max(score, self.policy.blocklist_floor)
             else:
-                continue
+                bounded = max(score, self.policy.blocklist_floor)
             if bounded != score:
                 suppressed = True
                 contributions = [c.model_copy(update={"retained": False}) for c in contributions]
@@ -164,10 +197,10 @@ class _Evaluation:
         return ResolvedScope.own(finding.fragment_id)
 
     def finding_result(self, finding: Finding) -> FindingResult:
-        decisions = {d.kind: d for d in self.store.decisions_for(finding.key)}
+        forcing = [d for d in self.store.decisions_for(finding.key) if d.kind.targets_finding]
+        decision, superseded = self._resolve_decision(forcing)
 
-        dismissed = decisions.get(DecisionKind.DISMISSED)
-        if dismissed is not None:
+        if decision is not None and decision.kind is DecisionKind.DISMISSED:
             return FindingResult(
                 key=finding.key,
                 status=Status.NOT_APPLICABLE,
@@ -177,12 +210,13 @@ class _Evaluation:
                 confidence=finding.confidence,
                 suppressed_by_decision=True,
                 contributions=(
+                    *superseded,
                     Contribution(
-                        source_key=dismissed.key,
+                        source_key=decision.key,
                         label="decision · DISMISSED",
                         value=0.0,
                         retained=False,
-                        detail=dismissed.justification or "",
+                        detail=decision.justification or "",
                     ),
                 ),
             )
@@ -195,10 +229,10 @@ class _Evaluation:
                 score=None,
                 verdict=finding.verdict,
                 confidence=finding.confidence,
+                contributions=tuple(superseded),
             )
 
-        confirmed = decisions.get(DecisionKind.CONFIRMED)
-        if confirmed is not None:
+        if decision is not None and decision.kind is DecisionKind.CONFIRMED:
             score = self.policy.confirmed_floor
             return FindingResult(
                 key=finding.key,
@@ -208,11 +242,12 @@ class _Evaluation:
                 confidence=finding.confidence,
                 suppressed_by_decision=True,
                 contributions=(
+                    *superseded,
                     Contribution(
-                        source_key=confirmed.key,
+                        source_key=decision.key,
                         label="decision · CONFIRMED",
                         value=score,
-                        detail=confirmed.justification or "",
+                        detail=decision.justification or "",
                     ),
                 ),
             )

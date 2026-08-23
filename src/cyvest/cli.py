@@ -15,6 +15,7 @@ from typing import Any
 import click
 from logurich import get_logger
 from logurich.opt_click import click_logger_params
+from pydantic import ValidationError
 from rich.console import Console
 
 from cyvest import __version__
@@ -39,8 +40,14 @@ logger = get_logger(__name__)
 
 
 def _read_json(path: Path) -> dict[str, Any]:
-    with path.open("r", encoding="utf-8") as handle:
-        return json.load(handle)
+    """Read a JSON file, reporting a bad path or bad syntax as a clean CLI error."""
+    try:
+        with path.open("r", encoding="utf-8") as handle:
+            return json.load(handle)
+    except OSError as exc:
+        raise click.ClickException(f"Cannot read {path}: {exc.strerror or exc}") from exc
+    except json.JSONDecodeError as exc:
+        raise click.ClickException(f"{path} is not valid JSON: {exc}") from exc
 
 
 def _write_json(data: dict[str, Any], path: Path) -> Path:
@@ -48,6 +55,32 @@ def _write_json(data: dict[str, Any], path: Path) -> Path:
     resolved.parent.mkdir(parents=True, exist_ok=True)
     resolved.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     return resolved
+
+
+def _prepare_output(path: Path) -> Path:
+    """Make sure a destination is writable before the work that fills it is thrown away."""
+    resolved = Path(path).resolve()
+    try:
+        resolved.parent.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        raise click.ClickException(f"Cannot write to {resolved}: {exc.strerror or exc}") from exc
+    return resolved
+
+
+def _load_rules(path: Path) -> list[ExpectedResult]:
+    """
+    Read a tolerance-rules file.
+
+    The shape is validated before splatting: a JSON object, or a list of anything but objects,
+    would otherwise reach ``ExpectedResult(**rule)`` and surface as a ``TypeError`` traceback.
+    """
+    payload = _read_json(path)
+    if not isinstance(payload, list) or not all(isinstance(rule, dict) for rule in payload):
+        raise click.ClickException(f"{path} must contain a JSON list of rule objects.")
+    try:
+        return [ExpectedResult(**rule) for rule in payload]
+    except ValidationError as exc:
+        raise click.ClickException(f"Invalid rule in {path}: {exc}") from exc
 
 
 def _open(path: Path, engine: str | None, *, migrate: bool = True) -> Cyvest:
@@ -62,8 +95,17 @@ def _open(path: Path, engine: str | None, *, migrate: bool = True) -> Cyvest:
         cv = Cyvest.io_load_json(path, migrate=migrate)
     except ValueError as exc:
         raise click.ClickException(str(exc)) from exc
+    except OSError as exc:
+        raise click.ClickException(f"Cannot read {path}: {exc.strerror or exc}") from exc
+    except json.JSONDecodeError as exc:
+        raise click.ClickException(f"{path} is not valid JSON: {exc}") from exc
     if engine:
-        cv.reevaluate(engine=engine)
+        # An unknown engine raises KeyError, which Click does not catch: a typo would otherwise
+        # end in a traceback rather than the list of engines the user is asking for.
+        try:
+            cv.reevaluate(engine=engine)
+        except KeyError as exc:
+            raise click.ClickException(str(exc).strip("\"'")) from exc
     return cv
 
 
@@ -206,6 +248,10 @@ def merge(inputs: tuple[Path, ...], output: Path, stats: bool, engine: str | Non
     if len(inputs) < 2:
         raise click.BadParameter("Provide at least two input files.", param_hint="inputs")
 
+    # Checked up front: a missing parent directory would otherwise surface only after the whole
+    # merge has run, throwing the result away.
+    output = _prepare_output(output)
+
     logger.info(f"[cyan]Merging {len(inputs)} investigation files...[/cyan]")
     logger.info(f"  Loading: {inputs[0]}")
     merged = _open(inputs[0], engine)
@@ -245,6 +291,7 @@ def merge(inputs: tuple[Path, ...], output: Path, stats: bool, engine: str | Non
 @_engine_option
 def export(input: Path, output: Path, export_format: str, engine: str | None) -> None:
     """Export an investigation to another format."""
+    output = _prepare_output(output)
     cv = _open(input, engine)
     if export_format.lower() == "json":
         saved = cv.io_save_json(output)
@@ -252,7 +299,7 @@ def export(input: Path, output: Path, export_format: str, engine: str | None) ->
         return
 
     cv.io_save_markdown(output)
-    logger.info(f"[green]Exported to Markdown: {output.resolve()}[/green]")
+    logger.info(f"[green]Exported to Markdown: {output}[/green]")
 
 
 @cli.command(name="schema")
@@ -348,7 +395,7 @@ def diff(actual: Path, expected: Path, rules: Path | None, title: str, engine: s
     result_expected: list[ExpectedResult] | None = None
     if rules:
         logger.info(f"  Rules:    {rules}")
-        result_expected = [ExpectedResult(**rule) for rule in _read_json(rules)]  # type: ignore[union-attr]
+        result_expected = _load_rules(rules)
 
     logger.info("")
 
@@ -433,8 +480,7 @@ def _format_observables(
         # Text format: one per line, with type prefix
         lines = []
         for obs in observables:
-            obs_type_str = obs.obs_type.value if isinstance(obs.obs_type, ObservableType) else str(obs.obs_type)
-            lines.append(f"{obs_type_str}\t{obs.value}")
+            lines.append(f"{obs.obs_type}\t{obs.value}")
         return "\n".join(lines)
 
 

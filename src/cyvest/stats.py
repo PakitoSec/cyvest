@@ -216,7 +216,7 @@ class InvestigationStats:
 
     @staticmethod
     def _type_of(observable: Observable) -> str:
-        return observable.obs_type.value if hasattr(observable.obs_type, "value") else str(observable.obs_type)
+        return str(observable.obs_type)
 
 
 __all__ = ["InvestigationStats", "StatisticsSchema"]

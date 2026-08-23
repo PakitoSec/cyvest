@@ -142,23 +142,6 @@ function encodeKeyPart(value: string, keepSlash = false): string {
 }
 
 /**
- * Create a deterministic hash from a string using a simple hash algorithm.
- * Uses a subset of characters for shorter keys.
- */
-function hashString(content: string, length: number = 16): string {
-  // Simple hash implementation (similar to Java's hashCode)
-  // For production, consider using crypto.subtle or a library
-  let hash = 0;
-  for (let i = 0; i < content.length; i++) {
-    const char = content.charCodeAt(i);
-    hash = ((hash << 5) - hash + char) | 0;
-  }
-  // Convert to hex and pad/truncate
-  const hex = Math.abs(hash).toString(16).padStart(8, "0");
-  return hex.slice(0, length);
-}
-
-/**
  * Generate a unique key for an observable.
  *
  * Format: obs:{type}:{normalized_value}
@@ -419,6 +402,11 @@ export function validateKey(key: string, expectedType?: KeyType): boolean {
 /**
  * Extract components from an observable key.
  *
+ * Only reliable for the simple form `obs:{type}:{value}`. A key carrying a subtype or a
+ * namespace, and a `command_line` or oversized key folded into `obs:{type}:sha256:{digest}`,
+ * both return the remaining segments verbatim as `value` — a key is an identity token, not a
+ * record. Read the observable from the document instead of parsing its key.
+ *
  * @param key - Observable key to parse
  * @returns Object with type and value, or null if invalid
  *
@@ -439,61 +427,6 @@ export function parseObservableKey(
     return {
       type: parts[1],
       value: parts.slice(2).join(":"), // Handle values with colons
-    };
-  }
-  return null;
-}
-
-/**
- * Extract components from a finding key.
- *
- * @param key - Finding key to parse
- * @returns Object with findingName, or null if invalid
- *
- * @example
- * ```ts
- * parseFindingKey("fnd:sender_verification")
- * // => { findingName: "sender_verification" }
- * ```
- */
-export function parseFindingKey(
-  key: string
-): { findingName: string } | null {
-  if (!validateKey(key, "fnd")) {
-    return null;
-  }
-  const parts = key.split(":");
-  if (parts.length >= 2) {
-    return {
-      findingName: parts.slice(1).join(":"),
-    };
-  }
-  return null;
-}
-
-/**
- * Extract components from a threat intel key.
- *
- * @param key - Threat intel key to parse
- * @returns Object with source and observableKey, or null if invalid
- *
- * @example
- * ```ts
- * parseThreatIntelKey("ti:virustotal:obs:ipv4:192.168.1.1")
- * // => { source: "virustotal", observableKey: "obs:ipv4:192.168.1.1" }
- * ```
- */
-export function parseThreatIntelKey(
-  key: string
-): { source: string; observableKey: string } | null {
-  if (!validateKey(key, "ti")) {
-    return null;
-  }
-  const parts = key.split(":");
-  if (parts.length >= 3) {
-    return {
-      source: parts[1],
-      observableKey: parts.slice(2).join(":"),
     };
   }
   return null;

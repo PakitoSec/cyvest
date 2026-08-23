@@ -9,15 +9,20 @@ matching the document it came from.
 from __future__ import annotations
 
 import ast
+import os
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
 
-from cyvest.enums import Aggregation, RelationKind, Scope, SourceClass, Verdict
+from cyvest.enums import Aggregation, DecisionKind, RelationKind, Scope, SourceClass, Verdict
 from cyvest.evaluation import ResolvedScope, evaluate
 from cyvest.evaluation.engines import available_aliases, get_engine, resolve_engine_alias
 from cyvest.facts import Finding, Observable, ObservableLink, Relation, SourceRef, Tag, ThreatIntel
 from cyvest.facts.store import FactStore, InvestigationHeader
+from cyvest.investigation import Investigation
+from cyvest.io_serialization import save_investigation_json
 from cyvest.policy import DEFAULT_POLICY, Policy
 
 SRC = SourceRef(name="feed", source_class=SourceClass.VENDOR_FEED)
@@ -70,6 +75,84 @@ class TestPurity:
         obs = observable(target, "hxxp://a")
         intel(target, obs, 4.0)
         assert evaluate(target).model_dump() == evaluate(target).model_dump()
+
+
+class TestDeterminism:
+    """
+    Iteration order must never reach the report.
+
+    The adjacency indexes are sets, so before they were sorted the very same document could yield
+    a different verdict from one interpreter run to the next — precisely what the archived-report
+    invariant forbids. ``test_the_same_store_evaluates_identically_twice`` could not catch it:
+    set iteration is stable *within* a process, so the failure only appears across processes.
+    """
+
+    REPORT_SCRIPT = (
+        "import sys; from cyvest import Cyvest; print(Cyvest.io_load_json(sys.argv[1]).get_report().model_dump_json())"
+    )
+
+    def test_accessors_return_facts_in_a_stable_order(self) -> None:
+        target = store()
+        hub = observable(target, "hxxp://hub")
+        signals = [intel(target, hub, 1.0 + index, source_name=f"feed-{index}") for index in range(12)]
+        expected = [fact.key for fact in sorted(signals, key=lambda fact: (fact.seq, fact.key))]
+        assert [fact.key for fact in target.signals_for(hub.key)] == expected
+
+    def _document(self, path: Path) -> None:
+        investigation = Investigation(root_data={}, investigation_id="inv-determinism")
+        hub = investigation.add_observable(
+            Observable(type="url", value="hxxp://hub", source=SRC, fragment_id="inv-determinism")
+        )
+        for index in range(12):
+            investigation.append(
+                ThreatIntel(
+                    subject_key=hub.key,
+                    verdict=Verdict.MALICIOUS,
+                    weight=1.0 + index * 0.1,
+                    confidence=0.7 + index * 0.01,
+                    source=SourceRef(name=f"feed-{index}", source_class=SourceClass.VENDOR_FEED),
+                    fragment_id="inv-determinism",
+                )
+            )
+        for index in range(12):
+            child = investigation.add_observable(
+                Observable(
+                    type="domain",
+                    value=f"child{index}.example",
+                    source=SRC,
+                    fragment_id="inv-determinism",
+                )
+            )
+            investigation.append(
+                ThreatIntel(
+                    subject_key=child.key,
+                    verdict=Verdict.SUSPICIOUS,
+                    weight=0.3 + index * 0.11,
+                    source=SourceRef(name=f"child-feed-{index}", source_class=SourceClass.VENDOR_FEED),
+                    fragment_id="inv-determinism",
+                )
+            )
+            investigation.add_relation(hub, child, RelationKind.EXTRACTION, confidence=0.9)
+        # Two contradictory bounds: the branch that used to depend on iteration order.
+        investigation.add_decision(hub.key, DecisionKind.ALLOWLISTED, justification="a")
+        investigation.add_decision(hub.key, DecisionKind.BLOCKLISTED, justification="b")
+        save_investigation_json(investigation, path)
+
+    def _report_under_hash_seed(self, path: Path, seed: str) -> str:
+        completed = subprocess.run(
+            [sys.executable, "-c", self.REPORT_SCRIPT, str(path)],
+            capture_output=True,
+            text=True,
+            check=True,
+            env={**os.environ, "PYTHONHASHSEED": seed},
+        )
+        return completed.stdout
+
+    def test_a_saved_document_reports_the_same_under_any_hash_seed(self, tmp_path: Path) -> None:
+        document = tmp_path / "case.json"
+        self._document(document)
+        reports = {self._report_under_hash_seed(document, seed) for seed in ("0", "1", "2", "3")}
+        assert len(reports) == 1, "the same document produced different reports across interpreter runs"
 
 
 class TestEngineRegistry:

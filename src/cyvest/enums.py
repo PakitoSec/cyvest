@@ -8,6 +8,12 @@ Design note: this module carries no scoring arithmetic. ``Verdict`` exposes an i
 ``polarity`` (a benign claim points down, a malicious one points up — every engine agrees),
 but the mapping between score ranges and verdicts belongs to a specific engine and lives in
 ``cyvest.evaluation.projection``.
+
+Every enum a human ever reads defines ``__str__``. A bare ``str, Enum`` is a trap: ``str()``
+yields ``"ObservableType.DOMAIN"`` on every version, while an f-string yields ``"domain"`` on
+3.10 but ``"ObservableType.DOMAIN"`` on 3.11+, because 3.11 changed ``Enum.__format__`` to defer
+to ``__str__``. Rendering would then depend on the interpreter running it. Defining ``__str__``
+pins the value on both, and spares every call site a defensive ``.value``.
 """
 
 from __future__ import annotations
@@ -207,6 +213,9 @@ class ObservableType(str, Enum):
     COMMAND_LINE = "command_line"
     CLOUD_RESOURCE = "cloud_resource"
 
+    def __str__(self) -> str:
+        return self.value
+
     @classmethod
     def normalize_root_type(cls, root_type: ObservableType | str | None) -> ObservableType:
         if root_type is None:
@@ -245,6 +254,9 @@ class ObservableSubtype(str, Enum):
     CLOUD_AWS_ARN = "aws_arn"
     CLOUD_AZURE_RESOURCE_ID = "azure_resource_id"
     CLOUD_GCP_RESOURCE_NAME = "gcp_resource_name"
+
+    def __str__(self) -> str:
+        return self.value
 
 
 __all__ = [

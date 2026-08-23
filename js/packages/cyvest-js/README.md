@@ -4,9 +4,9 @@ TypeScript utilities and generated types for working with serialized Cyvest inve
 
 ## What it does
 
-- Validates Cyvest JSON payloads against the schema (AJV) and returns typed investigations.
+- Validates Cyvest JSON payloads against the schema (AJV), enforces the schema-version contract, and returns typed investigations.
 - Ships generated TypeScript types plus helpers to query observables, findings, threat intel, tags, and relationships.
-- Provides tag hierarchy utilities including aggregated score/level calculations.
+- Provides tag hierarchy utilities including aggregated score and verdict lookups, always read from `report`.
 - Builds lightweight graph representations for use in visualizers or custom tooling.
 
 ## Install & build
@@ -35,11 +35,11 @@ import {
   parseCyvest,
   findSourceObservables,
   getObservableGraph,
-  type CyvestInvestigation,
+  type Investigation,
 } from "@cyvest/cyvest-js";
 import raw from "./investigation.json";
 
-const investigation: CyvestInvestigation = parseCyvest(raw);
+const investigation: Investigation = parseCyvest(raw);
 const sources = findSourceObservables(investigation);
 const graph = getObservableGraph(investigation);
 

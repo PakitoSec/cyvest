@@ -392,7 +392,12 @@ describe("force-directed layout", () => {
     const domainId = "obs:domain:evil-phishing.com";
     const ipId = "obs:ipv4:185.220.101.50";
 
-    expect(elements.some((element) => element.data.id === "obs:file:root")).toBe(false);
+    // Asserted against the document's own root key: hardcoding the v6 `obs:file:root` made this
+    // vacuously true, so the technical root could have been rendered without failing anything.
+    expect(investigation.header.root_key).toBeTruthy();
+    expect(
+      elements.some((element) => element.data.id === investigation.header.root_key)
+    ).toBe(false);
     expect(targets[rootId]).toEqual({ x: 0, y: 0 });
     expect(Math.hypot(targets[loginId].x, targets[loginId].y)).toBeGreaterThan(0);
     expect(Math.hypot(targets[domainId].x, targets[domainId].y)).toBeGreaterThan(

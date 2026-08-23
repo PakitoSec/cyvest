@@ -9,7 +9,7 @@ construction, instead of by convention.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from typing import Annotated, Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -23,11 +23,11 @@ _SEQ_CONSISTENCY_TOLERANCE_MS = 1_000
 
 
 def utc_now() -> datetime:
-    return datetime.now(UTC)
+    return datetime.now(timezone.utc)
 
 
 def _as_utc(value: datetime) -> datetime:
-    return value if value.tzinfo is not None else value.replace(tzinfo=UTC)
+    return value if value.tzinfo is not None else value.replace(tzinfo=timezone.utc)
 
 
 class SourceRef(BaseModel):

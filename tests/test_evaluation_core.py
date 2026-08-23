@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 import pytest
 
 from cyvest.enums import DecisionKind, Effect, Scope, SourceClass, Status, Verdict, Weight
@@ -262,6 +264,92 @@ class TestDecisions:
             Decision(target_key="obs:url:x", kind=DecisionKind.CONFIRMED, source=source(), fragment_id="f1")
         with pytest.raises(ValueError, match="targets an observable"):
             Decision(target_key="fnd:r:obs:url:x", kind=DecisionKind.ALLOWLISTED, source=source(), fragment_id="f1")
+
+
+class TestContradictoryDecisions:
+    """
+    ``ALLOWLISTED``/``BLOCKLISTED`` and ``CONFIRMED``/``DISMISSED`` carry different keys, so one
+    target can legitimately hold two opposite decisions. They are settled by freshness, like every
+    other conflict in v7. Applied in sequence instead, the outcome followed set iteration order
+    and the same document could report ``SAFE`` or ``MALICIOUS`` from one run to the next.
+    """
+
+    JANUARY = datetime(2026, 1, 15, tzinfo=timezone.utc)
+    JUNE = datetime(2026, 6, 15, tzinfo=timezone.utc)
+
+    def _bounded(self, fresher: DecisionKind) -> tuple[FactStore, str]:
+        store = make_store()
+        url = add_url(store, "f1")
+        store.append(
+            ThreatIntel(subject_key=url.key, verdict=Verdict.MALICIOUS, weight=8.0, source=source(), fragment_id="f1")
+        )
+        for kind in (DecisionKind.ALLOWLISTED, DecisionKind.BLOCKLISTED):
+            store.append(
+                Decision(
+                    target_key=url.key,
+                    kind=kind,
+                    occurred_at=self.JUNE if kind is fresher else self.JANUARY,
+                    source=source("rssi", SourceClass.ORG_POLICY),
+                    fragment_id="f1",
+                )
+            )
+        return store, url.key
+
+    def test_the_freshest_bound_wins_on_an_observable(self) -> None:
+        store, url_key = self._bounded(DecisionKind.BLOCKLISTED)
+        result = evaluate(store).observable(url_key)
+        assert result.score == 9.0
+        assert result.verdict is Verdict.MALICIOUS
+
+    def test_the_opposite_bound_wins_when_it_is_the_fresher_one(self) -> None:
+        store, url_key = self._bounded(DecisionKind.ALLOWLISTED)
+        result = evaluate(store).observable(url_key)
+        assert result.score == -1.0
+        assert result.verdict is Verdict.SAFE
+
+    def test_the_superseded_decision_stays_visible_in_the_report(self) -> None:
+        """A human call that lost is still a human call: dropping it would hide the conflict."""
+        store, url_key = self._bounded(DecisionKind.BLOCKLISTED)
+        contributions = evaluate(store).observable(url_key).contributions
+        superseded = [c for c in contributions if c.source_key.startswith("dec:allowlisted:")]
+        assert len(superseded) == 1
+        assert superseded[0].retained is False
+        assert "superseded by a fresher BLOCKLISTED decision" in superseded[0].detail
+
+    def _forced(self, fresher: DecisionKind) -> tuple[FactStore, str]:
+        store = make_store()
+        finding = Finding(
+            rule_id="rule",
+            subject_key="obs:url:none",
+            source=source(),
+            fragment_id="f1",
+            verdict=Verdict.NOTABLE,
+        )
+        store.append(finding)
+        for kind in (DecisionKind.CONFIRMED, DecisionKind.DISMISSED):
+            store.append(
+                Decision(
+                    target_key=finding.key,
+                    kind=kind,
+                    occurred_at=self.JUNE if kind is fresher else self.JANUARY,
+                    source=source("alice", SourceClass.ORG_ANALYST),
+                    fragment_id="f1",
+                )
+            )
+        return store, finding.key
+
+    def test_a_fresher_confirmation_outranks_an_older_dismissal(self) -> None:
+        """Precedence used to be hardcoded: DISMISSED always won, however stale it was."""
+        store, finding_key = self._forced(DecisionKind.CONFIRMED)
+        result = evaluate(store).finding(finding_key)
+        assert result.counted is True
+        assert result.verdict is Verdict.MALICIOUS
+
+    def test_a_fresher_dismissal_outranks_an_older_confirmation(self) -> None:
+        store, finding_key = self._forced(DecisionKind.DISMISSED)
+        result = evaluate(store).finding(finding_key)
+        assert result.counted is False
+        assert result.status is Status.NOT_APPLICABLE
 
 
 class TestStatus:

@@ -11,6 +11,7 @@ import { describe, expect, it } from "vitest";
 import {
   assertReadableVersion,
   countRelationsByKind,
+  detectSchemaVersion,
   findContradictedFindings,
   findObservablesAtLeast,
   findObservablesByVerdict,
@@ -47,6 +48,8 @@ const URL_KEY = "obs:url:hxxp://bad.example/x";
 const CDN_KEY = "obs:domain:cdn.partner.example";
 
 describe("parsing and the version contract", () => {
+  const raw = () => JSON.parse(readFileSync(fixturePath, "utf-8"));
+
   it("accepts a document produced by Python", () => {
     expect(isCyvest(JSON.parse(readFileSync(fixturePath, "utf-8")))).toBe(true);
   });
@@ -57,6 +60,38 @@ describe("parsing and the version contract", () => {
 
   it("refuses an older document and points at the migration", () => {
     expect(() => assertReadableVersion("6.0.0")).toThrow(/migrate/);
+  });
+
+  // The checks above call the guard directly. These go through `parseCyvest`, which is what a
+  // consumer actually calls — the guard used to be unreachable from it, because the schema pins
+  // `schema_version` to a const and ajv rejected every mismatch first with a shape error.
+  it("applies the version contract through parseCyvest, not just in isolation", () => {
+    const document = raw();
+    document.schema_version = "7.1.0";
+    expect(() => parseCyvest(document)).toThrow(/newer than this SDK/);
+  });
+
+  it("points a v6 document at the migration rather than at a shape error", () => {
+    const document = raw();
+    document.schema_version = "6.0.0";
+    expect(() => parseCyvest(document)).toThrow(/migrate/);
+  });
+
+  it("treats a document with no schema_version as pre-v7", () => {
+    const document = raw();
+    delete document.schema_version;
+    expect(() => parseCyvest(document)).toThrow(/migrate/);
+  });
+
+  it("treats a non-semver schema_version as pre-v7", () => {
+    const document = raw();
+    document.schema_version = "seven";
+    expect(detectSchemaVersion(document)).toBe("5");
+    expect(() => parseCyvest(document)).toThrow(/migrate/);
+  });
+
+  it("reads the declared version when it is well formed", () => {
+    expect(detectSchemaVersion(raw())).toBe("7.0.0");
   });
 });
 

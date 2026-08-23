@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 
 from cyvest.enums import DecisionKind, Salience, Scope, SourceClass, Verdict
 from cyvest.evaluation import evaluate
@@ -13,9 +13,9 @@ from cyvest.facts.store import FactStore, InvestigationHeader
 SRC = SourceRef(name="feed", source_class=SourceClass.VENDOR_FEED)
 ANALYST = SourceRef(name="alice", source_class=SourceClass.ORG_ANALYST)
 
-JANUARY = datetime(2026, 1, 15, tzinfo=UTC)
-MARCH = datetime(2026, 3, 15, tzinfo=UTC)
-JUNE = datetime(2026, 6, 15, tzinfo=UTC)
+JANUARY = datetime(2026, 1, 15, tzinfo=timezone.utc)
+MARCH = datetime(2026, 3, 15, tzinfo=timezone.utc)
+JUNE = datetime(2026, 6, 15, tzinfo=timezone.utc)
 
 
 def build() -> tuple[FactStore, Observable, Finding]:

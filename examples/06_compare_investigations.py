@@ -134,8 +134,9 @@ def main() -> None:
     tolerance_rules = [
         # Allow roger-ai score to be >= 1.0
         ExpectedResult(rule_id="roger-ai", verdict=Verdict.NOTABLE, score=">= 1.0"),
-        # Allow domain-reputation score to be < 2.0
-        ExpectedResult(key="fnd:domain-reputation", score="< 2.0"),
+        # Allow domain-reputation score to be < 2.0. Matching on the rule id rather than the key
+        # keeps this readable: a v7 key is `fnd:{rule_id}:{subject_key}`.
+        ExpectedResult(rule_id="domain-reputation", score="< 2.0"),
     ]
 
     diffs_with_rules = compare_investigations(actual, expected, result_expected=tolerance_rules)

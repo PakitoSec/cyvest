@@ -10,8 +10,9 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from cyvest import Cyvest
+from cyvest import Cyvest, ObservableIdentity, ObservableResolution, ObservableResolver
 from cyvest.enums import SourceClass, Verdict
+from cyvest.facts import Observable
 
 
 def _response(**overrides: object) -> dict[str, object]:
@@ -91,3 +92,51 @@ class TestIdempotence:
 
         assert len(cv._investigation.store.signals) == 1
         assert cv.get_report().observable(url.key).score == pytest.approx(-1.0)
+
+
+class TestAliasCounts:
+    """
+    An alias keeps its own tally.
+
+    ``ObservableAlias.counts`` was never written, so ``count`` answered ``0`` where v6 answered at
+    least ``1``, and the CRDT merge in ``FactStore._merge_aliases`` folded empty dicts forever.
+    """
+
+    @staticmethod
+    def _lowercasing_email() -> ObservableResolver:
+        return ObservableResolver(
+            name="lowercase-email",
+            source_types={("email", None)},
+            resolve=lambda alias: ObservableResolution(
+                identity=ObservableIdentity(type="email", value=alias.value.lower())
+            ),
+        )
+
+    def _canonical(self, *spellings: str) -> Observable:
+        cv = Cyvest()
+        cv.observable_resolver_register(self._lowercasing_email())
+        for spelling in spellings:
+            cv.observable_create("email", spelling)
+        return next(o for o in cv._investigation.store.observables.values() if str(o.obs_type) == "email")
+
+    def test_an_alias_records_at_least_one_occurrence(self) -> None:
+        observable = self._canonical("Alice@Example.com")
+        assert [alias.count for alias in observable.aliases] == [1]
+
+    def test_each_spelling_is_tallied_separately(self) -> None:
+        observable = self._canonical("Alice@Example.com", "ALICE@example.com", "Alice@Example.com")
+        counts = {alias.value: alias.count for alias in observable.aliases}
+        assert counts == {"Alice@Example.com": 2, "ALICE@example.com": 1}
+
+    def test_the_alias_tallies_add_up_to_the_observable_occurrences(self) -> None:
+        observable = self._canonical("Alice@Example.com", "ALICE@example.com", "Alice@Example.com")
+        assert sum(alias.count for alias in observable.aliases) == observable.occurrence_count
+
+    def test_re_merging_a_fragment_does_not_inflate_the_tally(self) -> None:
+        """Counters are per fragment and merged by max, so a union stays idempotent."""
+        cv = Cyvest(investigation_id="inv-1")
+        cv.observable_resolver_register(self._lowercasing_email())
+        cv.observable_create("email", "Alice@Example.com")
+        cv._investigation.merge_investigation(cv._investigation)
+        observable = next(o for o in cv._investigation.store.observables.values() if str(o.obs_type) == "email")
+        assert [alias.count for alias in observable.aliases] == [1]

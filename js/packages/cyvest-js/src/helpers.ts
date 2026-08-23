@@ -4,6 +4,10 @@
  * ajv checks the shape; the version check enforces the rule ajv cannot see — a 7.0 SDK must
  * refuse a 7.1 document rather than silently ignore fields it does not know about. Python
  * applies exactly the same rule.
+ *
+ * Order matters. The schema pins `schema_version` to a `const`, so handing the payload to ajv
+ * first turns every version mismatch into an opaque shape error and makes the version check
+ * unreachable. The version is therefore read and judged before anything else.
  */
 
 import Ajv2020, { type ValidateFunction } from "ajv/dist/2020.js";
@@ -12,6 +16,8 @@ import schema from "../../../../schema/cyvest.schema.json" assert { type: "json"
 import type { Investigation } from "./types";
 
 export const SCHEMA_VERSION = "7.0.0";
+
+const SEMVER = /^\d+\.\d+\.\d+$/;
 
 const ajv = new Ajv2020({ allErrors: true });
 addFormats(ajv);
@@ -30,6 +36,19 @@ function versionTuple(version: string): [number, number] {
   return [Number(major), Number(minor)];
 }
 
+/**
+ * Read the declared schema version, falling back to `"5"` for anything unversioned.
+ *
+ * A document with no `schema_version` is a pre-v7 document, not a current one: `schema_version`
+ * is not in the schema's `required` list, so defaulting it to `SCHEMA_VERSION` would wave every
+ * legacy payload straight through. Python's `detect_schema_version` makes the same choice.
+ */
+export function detectSchemaVersion(json: unknown): string {
+  const raw = (json as { schema_version?: unknown } | null)?.schema_version;
+  const version = typeof raw === "string" ? raw.trim() : "";
+  return SEMVER.test(version) ? version : "5";
+}
+
 /** Upward compatibility only: read older documents, never newer ones. */
 export function assertReadableVersion(version: string): void {
   const [docMajor, docMinor] = versionTuple(version);
@@ -43,16 +62,18 @@ export function assertReadableVersion(version: string): void {
   if (docMajor < libMajor) {
     throw new Error(`Document schema ${version} predates this SDK (${SCHEMA_VERSION}); run 'cyvest migrate'.`);
   }
+  if (version !== SCHEMA_VERSION) {
+    throw new Error(`Document schema is ${version}, this SDK reads ${SCHEMA_VERSION}; run 'cyvest migrate'.`);
+  }
 }
 
 export function parseCyvest(json: unknown): Investigation {
+  assertReadableVersion(detectSchemaVersion(json));
   const validate = getValidator();
   if (!validate(json)) {
     throw new Error(`Invalid Cyvest payload: ${ajv.errorsText(validate.errors || [])}`);
   }
-  const document = json as Investigation;
-  assertReadableVersion(document.schema_version ?? SCHEMA_VERSION);
-  return document;
+  return json as Investigation;
 }
 
 export function isCyvest(json: unknown): json is Investigation {

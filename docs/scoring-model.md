@@ -181,6 +181,11 @@ Because a decision is a fact like any other, it merges, it is timestamped, and i
 A dismissed finding stays in the report with `counted = False`. Deleting it would erase the fact
 that someone looked.
 
+Two contradictory decisions may sit on one target — `ALLOWLISTED` and `BLOCKLISTED` carry
+different keys, as do `CONFIRMED` and `DISMISSED`. They are settled the way every conflict is
+settled in v7: **the freshest wins**, ranked on `occurred_at or asserted_at` then `seq`. The loser
+is reported as an unretained contribution rather than dropped, so the disagreement stays visible.
+
 ---
 
 ## Conclusions: a finding that concludes instead of accumulating

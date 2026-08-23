@@ -15,7 +15,7 @@ from __future__ import annotations
 from collections import defaultdict
 from collections.abc import Iterable, Iterator
 from datetime import datetime
-from typing import Any
+from typing import Any, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -27,6 +27,20 @@ from cyvest.facts.observable import Observable, ObservableAlias
 from cyvest.facts.relation import Relation
 from cyvest.facts.signal import ObservableSignal
 from cyvest.facts.tag import Tag
+
+_F = TypeVar("_F", bound=Fact)
+
+
+def _ordered(facts: Iterable[_F]) -> list[_F]:
+    """
+    Sort facts into a stable chronological order.
+
+    The adjacency indexes are sets, whose iteration order varies between interpreter runs. An
+    engine folding them would then produce a different report for the same facts, so every
+    accessor sorts before returning. ``key`` breaks ties, keeping the order total even when two
+    facts share a ``seq``.
+    """
+    return sorted(facts, key=lambda fact: (fact.seq, fact.key))
 
 
 class InvestigationHeader(BaseModel):
@@ -199,20 +213,20 @@ class FactStore:
         return None
 
     def signals_for(self, observable_key: str) -> list[ObservableSignal]:
-        return [self.signals[key] for key in self._signals_by_subject.get(observable_key, ())]
+        return _ordered(self.signals[key] for key in self._signals_by_subject.get(observable_key, ()))
 
     def child_relations(self, observable_key: str) -> list[Relation]:
         """Outgoing relations, i.e. the observables this one is the parent of."""
-        return [self.relations[key] for key in self._children.get(observable_key, ())]
+        return _ordered(self.relations[key] for key in self._children.get(observable_key, ()))
 
     def parent_relations(self, observable_key: str) -> list[Relation]:
-        return [self.relations[key] for key in self._parents.get(observable_key, ())]
+        return _ordered(self.relations[key] for key in self._parents.get(observable_key, ()))
 
     def decisions_for(self, target_key: str) -> list[Decision]:
-        return [self.decisions[key] for key in self._decisions_by_target.get(target_key, ())]
+        return _ordered(self.decisions[key] for key in self._decisions_by_target.get(target_key, ()))
 
     def findings_for(self, subject_key: str) -> list[Finding]:
-        return [self.findings[key] for key in self._findings_by_subject.get(subject_key, ())]
+        return _ordered(self.findings[key] for key in self._findings_by_subject.get(subject_key, ()))
 
     def __len__(self) -> int:
         return sum(

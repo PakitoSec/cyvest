@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
@@ -391,20 +393,25 @@ class TestCleanErrors:
         assert "basic-v1" in output
 
     @pytest.mark.parametrize(
-        "command",
+        "argv",
         [
-            ["policy", "show"],
-            ["migrate"],
+            pytest.param(["policy", "show", "{broken}"], id="policy-show"),
+            pytest.param(["migrate", "{broken}", "-o", "{out}"], id="migrate"),
+            # The three below reach the file through `_open`, where the `ValueError` clause used
+            # to shadow the `JSONDecodeError` one — `JSONDecodeError` subclasses `ValueError` —
+            # and reported bad syntax as an unlabelled parse error naming no file.
+            pytest.param(["show", "{broken}"], id="show"),
+            pytest.param(["stats", "{broken}"], id="stats"),
+            pytest.param(["diff", "{broken}", "{broken}"], id="diff"),
         ],
     )
-    def test_a_malformed_json_file_is_named(self, runner: CliRunner, tmp_path: Path, command: list[str]) -> None:
+    def test_a_malformed_json_file_is_named(self, runner: CliRunner, tmp_path: Path, argv: list[str]) -> None:
         broken = tmp_path / "broken.json"
         broken.write_text("this is not json", encoding="utf-8")
-        argv = [*command, str(broken)]
-        if command == ["migrate"]:
-            argv += ["-o", str(tmp_path / "out.json")]
-        output = self._fails_cleanly(runner.invoke(cli, argv))
+        formatted = [arg.format(broken=broken, out=tmp_path / "out.json") for arg in argv]
+        output = self._fails_cleanly(runner.invoke(cli, formatted))
         assert "not valid JSON" in output
+        assert str(broken) in output
 
     def test_a_rules_file_that_is_not_a_list_is_refused(
         self, runner: CliRunner, case: Path, other_case: Path, tmp_path: Path
@@ -437,3 +444,56 @@ class TestCleanErrors:
         result = runner.invoke(cli, ["export", str(case), "-o", str(output), "-f", export_format])
         assert result.exit_code == 0, result.output
         assert output.exists()
+
+    def test_migrate_creates_a_missing_output_directory(self, runner: CliRunner, tmp_path: Path) -> None:
+        """``migrate`` writes through ``_write_json``, which must share the destination guard."""
+        source = tmp_path / "v6.json"
+        source.write_text(json.dumps(V6_DOCUMENT), encoding="utf-8")
+
+        output = tmp_path / "deep" / "nested" / "migrated.json"
+        result = runner.invoke(cli, ["migrate", str(source), "-o", str(output)])
+        assert result.exit_code == 0, result.output
+        assert output.exists()
+
+
+@pytest.mark.skipif(os.name == "nt" or os.geteuid() == 0, reason="root and Windows ignore the write bit")
+class TestUnwritableDestination:
+    """
+    A destination that cannot be written is refused up front, not after the work.
+
+    ``mkdir(parents=True, exist_ok=True)`` *succeeds* on an existing read-only directory, so it
+    cannot carry this check on its own — the failure used to reappear as a raw ``PermissionError``
+    at the final write, with the whole merge or migration already done and discarded.
+    """
+
+    @pytest.fixture
+    def locked_dir(self, tmp_path: Path) -> Iterator[Path]:
+        locked = tmp_path / "locked"
+        locked.mkdir()
+        locked.chmod(0o500)
+        yield locked
+        # Restore, or pytest cannot clean the temp tree up.
+        locked.chmod(0o700)
+
+    def _fails_cleanly(self, result) -> str:
+        assert result.exit_code != 0
+        assert result.exception is None or isinstance(result.exception, SystemExit), result.output
+        assert "Traceback" not in result.output
+        return result.output
+
+    def test_merge_refuses_before_merging(
+        self, runner: CliRunner, case: Path, other_case: Path, locked_dir: Path
+    ) -> None:
+        argv = ["merge", str(case), str(other_case), "-o", str(locked_dir / "merged.json")]
+        assert "Cannot write to" in self._fails_cleanly(runner.invoke(cli, argv))
+
+    def test_export_refuses_before_exporting(self, runner: CliRunner, case: Path, locked_dir: Path) -> None:
+        argv = ["export", str(case), "-o", str(locked_dir / "export.md")]
+        assert "Cannot write to" in self._fails_cleanly(runner.invoke(cli, argv))
+
+    def test_migrate_refuses_before_migrating(self, runner: CliRunner, tmp_path: Path, locked_dir: Path) -> None:
+        source = tmp_path / "v6.json"
+        source.write_text(json.dumps(V6_DOCUMENT), encoding="utf-8")
+
+        argv = ["migrate", str(source), "-o", str(locked_dir / "migrated.json")]
+        assert "Cannot write to" in self._fails_cleanly(runner.invoke(cli, argv))

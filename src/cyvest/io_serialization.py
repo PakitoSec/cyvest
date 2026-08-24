@@ -263,6 +263,16 @@ def _iso(value: Any, fallback: datetime) -> datetime:
     return fallback
 
 
+def _translated(key_map: dict[str, str], key: str) -> str:
+    """
+    Map a v6 observable key onto the key v7 regenerates for the same observable.
+
+    Unknown keys pass through unchanged: a reference this migration cannot place is better left
+    as it was than rewritten into something equally wrong but harder to recognize.
+    """
+    return key_map.get(key, key)
+
+
 def _envelope(fragment_id: str, asserted_at: datetime, source: SourceRef = MIGRATION_SOURCE) -> dict[str, Any]:
     """
     Build a fresh envelope for **one** migrated fact.
@@ -333,6 +343,11 @@ def _migrate_v6_to_v7(data: dict[str, Any]) -> dict[str, Any]:
     tags: dict[str, Any] = {}
 
     root_key = None
+    # v6 keys are not always what v7 regenerates — the value is normalized now, so
+    # `obs:domain:EVIL.com` becomes `obs:domain:evil.com`. Every cross-reference below is
+    # translated through this map instead of being reused verbatim: a stale key silently detaches
+    # a signal or a link from its observable, and the migrated score stops matching v6.
+    key_map: dict[str, str] = {}
     for key, payload in (data.get("observables") or {}).items():
         observable = Observable(
             type=payload.get("type") or payload.get("obs_type"),
@@ -346,6 +361,7 @@ def _migrate_v6_to_v7(data: dict[str, Any]) -> dict[str, Any]:
             **_envelope(fragment_id, opened_at),
         )
         observables[observable.key] = observable
+        key_map[key] = observable.key
         # Read the regenerated key, not the v6 one: the header must point at a key that exists
         # in the migrated document.
         if payload.get("value") == "root":
@@ -360,8 +376,16 @@ def _migrate_v6_to_v7(data: dict[str, Any]) -> dict[str, Any]:
             )
             decisions[decision.key] = decision
 
+    # Relations come in a second pass: a relationship may point at an observable declared later
+    # in the document, whose regenerated key is only known once every observable is built.
+    for key, payload in (data.get("observables") or {}).items():
         for raw in payload.get("relationships") or []:
-            relation = _migrate_relationship(raw, source_key=key, envelope=_envelope(fragment_id, opened_at))
+            relation = _migrate_relationship(
+                raw,
+                source_key=_translated(key_map, key),
+                key_map=key_map,
+                envelope=_envelope(fragment_id, opened_at),
+            )
             if relation is not None:
                 relations[relation.key] = relation
 
@@ -370,7 +394,7 @@ def _migrate_v6_to_v7(data: dict[str, Any]) -> dict[str, Any]:
         if subject_key is None:
             continue
         signal = ThreatIntel(
-            subject_key=subject_key,
+            subject_key=_translated(key_map, subject_key),
             taxonomies=tuple(
                 item.get("name", "") if isinstance(item, dict) else str(item)
                 for item in (payload.get("taxonomies") or [])
@@ -414,10 +438,13 @@ def _migrate_v6_to_v7(data: dict[str, Any]) -> dict[str, Any]:
         )
         evidences[evidence.key] = evidence
 
-    for payload in (data.get("findings") or {}).values():
+    # v6 keyed a finding on its name alone; v7 keys it on `(rule_id, subject_key)`. A tag still
+    # points at the old key, so it needs the same translation the observables get.
+    finding_key_map: dict[str, str] = {}
+    for key, payload in (data.get("findings") or {}).items():
         links = tuple(
             ObservableLink(
-                observable_key=link["observable_key"],
+                observable_key=_translated(key_map, link["observable_key"]),
                 scope=Scope.ALL if str(link.get("propagation_mode", "")).upper() == "GLOBAL" else Scope.OWN_FRAGMENT,
             )
             for link in payload.get("observable_links") or []
@@ -444,19 +471,21 @@ def _migrate_v6_to_v7(data: dict[str, Any]) -> dict[str, Any]:
             **judgment,
         )
         findings[finding.key] = finding
+        finding_key_map[key] = finding.key
 
     for payload in (data.get("tags") or {}).values():
         tag = Tag(
             name=payload["name"],
             description=payload.get("description", ""),
             finding_keys=tuple(
-                item["key"] if isinstance(item, dict) else str(item) for item in payload.get("findings") or []
+                _translated(finding_key_map, item["key"] if isinstance(item, dict) else str(item))
+                for item in payload.get("findings") or []
             ),
             **_envelope(fragment_id, opened_at),
         )
         tags[tag.key] = tag
 
-    _migrate_whitelists(data, observables, decisions, root_key, fragment_id, opened_at)
+    _migrate_whitelists(data, observables, decisions, evidences, key_map, fragment_id, opened_at)
 
     # Findings carry their origin fragment, so the header must list every fragment present.
     fragment_ids = dict.fromkeys([fragment_id, *(finding.fragment_id for finding in findings.values())])
@@ -496,23 +525,29 @@ def _migrate_whitelists(
     data: dict[str, Any],
     observables: dict[str, Any],
     decisions: dict[str, Any],
-    root_key: str | None,
+    evidences: dict[str, Any],
+    key_map: dict[str, str],
     fragment_id: str,
     opened_at: datetime,
 ) -> None:
     """
-    Carry v6 whitelist entries over as allowlist decisions.
+    Carry v6 whitelist entries over.
 
     A v6 whitelist is investigation-level and its ``identifier`` is a free-form string, so only
-    some entries name an observable. Those become a decision on that observable; the rest land on
-    the root, the only investigation-wide anchor v7 offers. They are merged into a single
-    decision because they would otherwise share the key ``dec:allowlisted:{root}`` and overwrite
-    one another — and an analyst's call is not something to drop on the floor.
+    some entries name an observable. Those become an ``ALLOWLISTED`` decision on it, which is
+    exactly what v6 meant by them.
+
+    The rest — a ticket reference, an analyst note — name nothing v7 can bound, and are kept as
+    **evidence** rather than as a decision on the root. ``ALLOWLISTED`` is not inert: it caps its
+    target's score and marks every contribution on it unretained. Parking these entries there
+    would manufacture a verdict nobody asserted, out of a string that had no scoring effect in v6
+    either. Evidence keeps the analyst's words without inventing a claim.
     """
-    investigation_wide: list[str] = []
+    unplaceable: list[dict[str, str]] = []
 
     for payload in data.get("whitelists") or []:
-        target = payload.get("identifier")
+        identifier = str(payload.get("identifier") or "")
+        target = _translated(key_map, identifier)
         if target in observables:
             decision = Decision(
                 target_key=target,
@@ -522,21 +557,26 @@ def _migrate_whitelists(
             )
             decisions[decision.key] = decision
             continue
-        note = " · ".join(
-            part for part in (str(payload.get("name") or ""), str(payload.get("justification") or "")) if part
+        unplaceable.append(
+            {
+                "identifier": identifier,
+                "name": str(payload.get("name") or ""),
+                "justification": str(payload.get("justification") or ""),
+            }
         )
-        investigation_wide.append(f"{target}: {note}" if note else str(target))
 
-    if not investigation_wide or root_key is None:
+    if not unplaceable:
         return
 
-    decision = Decision(
-        target_key=root_key,
-        kind=DecisionKind.ALLOWLISTED,
-        justification="migrated from v6 investigation whitelist — " + "; ".join(investigation_wide),
+    # One evidence holding every entry: separate ones would collide on their content-derived key
+    # whenever two entries read alike, and an analyst's note is not something to drop on the floor.
+    evidence = Evidence(
+        evidence_type="legacy_whitelist",
+        title="v6 investigation whitelist",
+        content=unplaceable,
         **_envelope(fragment_id, opened_at),
     )
-    decisions[decision.key] = decision
+    evidences[evidence.key] = evidence
 
 
 def _empty_report(header: InvestigationHeader) -> Any:
@@ -555,7 +595,13 @@ def _subject_from_ti_key(key: str) -> str | None:
     return parts[2] if len(parts) == 3 else None
 
 
-def _migrate_relationship(raw: dict[str, Any], *, source_key: str, envelope: dict[str, Any]) -> Relation | None:
+def _migrate_relationship(
+    raw: dict[str, Any],
+    *,
+    source_key: str,
+    key_map: dict[str, str],
+    envelope: dict[str, Any],
+) -> Relation | None:
     """
     ⚠ Read ``direction`` first.
 
@@ -565,6 +611,7 @@ def _migrate_relationship(raw: dict[str, Any], *, source_key: str, envelope: dic
     target_key = raw.get("target_key")
     if not target_key:
         return None
+    target_key = _translated(key_map, target_key)
 
     direction = str(raw.get("direction", "outbound")).lower()
     raw_type = str(raw.get("relationship_type", "related-to")).lower()

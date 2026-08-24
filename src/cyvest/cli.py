@@ -9,6 +9,7 @@ whole point of separating facts from evaluation.
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -50,18 +51,29 @@ def _read_json(path: Path) -> dict[str, Any]:
         raise click.ClickException(f"{path} is not valid JSON: {exc}") from exc
 
 
-def _write_json(data: dict[str, Any], path: Path) -> Path:
-    resolved = path.resolve()
-    resolved.parent.mkdir(parents=True, exist_ok=True)
-    resolved.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    return resolved
-
-
 def _prepare_output(path: Path) -> Path:
-    """Make sure a destination is writable before the work that fills it is thrown away."""
+    """
+    Resolve a destination and confirm it can be written, before the work that fills it runs.
+
+    Both halves matter. ``mkdir`` creates a missing parent; the explicit probe catches a parent
+    that exists but refuses writes, which ``mkdir(exist_ok=True)`` reports as success. Without it
+    a read-only destination surfaced only at the final write, throwing away a whole merge.
+    """
     resolved = Path(path).resolve()
     try:
         resolved.parent.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        raise click.ClickException(f"Cannot write to {resolved}: {exc.strerror or exc}") from exc
+    if not os.access(resolved.parent, os.W_OK):
+        raise click.ClickException(f"Cannot write to {resolved}: Permission denied")
+    return resolved
+
+
+def _write_json(data: dict[str, Any], path: Path) -> Path:
+    """Write a JSON file, reporting an unwritable destination as a clean CLI error."""
+    resolved = _prepare_output(path)
+    try:
+        resolved.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     except OSError as exc:
         raise click.ClickException(f"Cannot write to {resolved}: {exc.strerror or exc}") from exc
     return resolved
@@ -93,12 +105,14 @@ def _open(path: Path, engine: str | None, *, migrate: bool = True) -> Cyvest:
     """
     try:
         cv = Cyvest.io_load_json(path, migrate=migrate)
+    except json.JSONDecodeError as exc:
+        # Before ``ValueError``: ``JSONDecodeError`` subclasses it, and Python matches clauses in
+        # order, so the broader one below would shadow this and report bad syntax unlabelled.
+        raise click.ClickException(f"{path} is not valid JSON: {exc}") from exc
     except ValueError as exc:
         raise click.ClickException(str(exc)) from exc
     except OSError as exc:
         raise click.ClickException(f"Cannot read {path}: {exc.strerror or exc}") from exc
-    except json.JSONDecodeError as exc:
-        raise click.ClickException(f"{path} is not valid JSON: {exc}") from exc
     if engine:
         # An unknown engine raises KeyError, which Click does not catch: a typo would otherwise
         # end in a traceback rather than the list of engines the user is asking for.

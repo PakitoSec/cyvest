@@ -324,7 +324,7 @@ docs = [
 [package.metadata]
 requires-dist = [
     { name = "click", specifier = ">=8" },
-    { name = "logurich", extras = ["click"], git = "https://github.com/PakitoSec/logurich.git?rev=7326a60e7d55b9c8e90f669ff5901cb3193cb382" },
+    { name = "logurich", extras = ["click"], specifier = ">=1.0.0" },
     { name = "pydantic", specifier = ">=2.12.5" },
     { name = "rich", specifier = ">=13" },
     { name = "typing-extensions", specifier = ">=4.15" },
@@ -486,9 +486,13 @@ wheels = [
 [[package]]
 name = "logurich"
 version = "1.0.0"
-source = { git = "https://github.com/PakitoSec/logurich.git?rev=7326a60e7d55b9c8e90f669ff5901cb3193cb382#7326a60e7d55b9c8e90f669ff5901cb3193cb382" }
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "rich" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/6c/2d/96a5b1c7eec4d3ae7fdc54c56bc4d1f864fddb1036a854b008789891e276/logurich-1.0.0.tar.gz", hash = "sha256:6538b55cf45d4c975411560fdec3e9a0c0747c387cf4dfa818e2ec5c395b9a28", size = 29776, upload-time = "2026-08-24T14:39:44.821Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b8/f7/4c8b0bb93b7dd9ce3a3e24f81a55ccfb937fa50747c8ecf87dc8b279b2c0/logurich-1.0.0-py3-none-any.whl", hash = "sha256:84dc14a7a344a842f3860276d8fc9721f7b8e603916a0ee0e4a2f3cc1f7871e6", size = 34162, upload-time = "2026-08-24T14:39:43.753Z" },
 ]
 
 [package.optional-dependencies]

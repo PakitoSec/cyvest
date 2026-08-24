@@ -75,6 +75,3 @@ addopts = [
     "--cov-report=term-missing",
     "--cov-report=html",
 ]
-
-[tool.uv.sources]
-logurich = { git = "https://github.com/PakitoSec/logurich.git", rev = "7326a60e7d55b9c8e90f669ff5901cb3193cb382" }

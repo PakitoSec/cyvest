@@ -99,7 +99,7 @@ filter above, which is why observables and relations rarely show up unaided:
 |---|---|
 | `signal` | `VirusTotal → MALICIOUS` |
 | `finding` | the finding's name, or its rule id |
-| `decision` | `allowlisted · Corporate sandbox` |
+| `decision` | `ALLOWLISTED · Corporate sandbox` |
 | `relation` | `extraction → obs:url:…` |
 | `evidence` | the evidence title, or its type |
 | `observable` | `url https://evil.test` |

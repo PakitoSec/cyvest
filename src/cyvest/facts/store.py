@@ -27,6 +27,7 @@ from cyvest.facts.observable import Observable, ObservableAlias
 from cyvest.facts.relation import Relation
 from cyvest.facts.signal import ObservableSignal
 from cyvest.facts.tag import Tag
+from cyvest.keys import generate_decision_key
 
 _F = TypeVar("_F", bound=Fact)
 
@@ -133,7 +134,6 @@ class FactStore:
         self._parents: dict[str, set[str]] = defaultdict(set)
         self._signals_by_subject: dict[str, set[str]] = defaultdict(set)
         self._findings_by_subject: dict[str, set[str]] = defaultdict(set)
-        self._decisions_by_target: dict[str, set[str]] = defaultdict(set)
 
     def _collection_for(self, fact: Fact) -> dict[str, Any]:
         if isinstance(fact, Observable):
@@ -173,8 +173,6 @@ class FactStore:
             self._signals_by_subject[fact.subject_key].add(fact.key)
         elif isinstance(fact, Finding):
             self._findings_by_subject[fact.subject_key].add(fact.key)
-        elif isinstance(fact, Decision):
-            self._decisions_by_target[fact.target_key].add(fact.key)
 
     def union(self, other: FactStore) -> FactStore:
         """
@@ -222,8 +220,15 @@ class FactStore:
     def parent_relations(self, observable_key: str) -> list[Relation]:
         return _ordered(self.relations[key] for key in self._parents.get(observable_key, ()))
 
-    def decisions_for(self, target_key: str) -> list[Decision]:
-        return _ordered(self.decisions[key] for key in self._decisions_by_target.get(target_key, ()))
+    def decision_for(self, target_key: str) -> Decision | None:
+        """
+        The single decision standing on a target, if any.
+
+        Keys carry the target alone, so the store holds at most one decision per target and the
+        merge law has already settled which stance is current. No arbitration is left to callers,
+        and no secondary index is needed — the primary key already answers the question.
+        """
+        return self.decisions.get(generate_decision_key(target_key))
 
     def findings_for(self, subject_key: str) -> list[Finding]:
         return _ordered(self.findings[key] for key in self._findings_by_subject.get(subject_key, ()))

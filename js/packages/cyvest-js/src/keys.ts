@@ -260,11 +260,12 @@ export function generateRelationKey(
 /**
  * Generate a decision key.
  *
- * Format: `dec:{kind}:{target_key}` — one decision of a given kind per target, so re-asserting
- * it is idempotent.
+ * Format: `dec:{target_key}` — one decision per target, whatever it says. The kind is content,
+ * not identity: a target holds a single current stance, and changing one's mind is a
+ * re-assertion the merge law settles by freshness.
  */
-export function generateDecisionKey(targetKey: string, kind: string): string {
-  return `dec:${normalizeValue(kind)}:${targetKey}`;
+export function generateDecisionKey(targetKey: string): string {
+  return `dec:${targetKey}`;
 }
 
 /**

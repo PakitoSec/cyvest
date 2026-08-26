@@ -11,6 +11,7 @@ reintroduce the confusion v7 exists to remove.
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 from cyvest.enums import DecisionKind, Effect, RelationKind, Scope, SourceClass, Status, Verdict
@@ -34,6 +35,9 @@ if TYPE_CHECKING:
     from cyvest.investigation import Investigation
 
 _T = TypeVar("_T", bound=Fact)
+# Annotates the fluent return of the shared decision methods: each concrete proxy gets itself
+# back, not the mixin.
+_D = TypeVar("_D", bound="_DecidableProxy[Any]")
 
 
 class ModelNotFoundError(RuntimeError):
@@ -99,7 +103,85 @@ class _JudgedProxy(_ReadOnlyProxy[_T]):
         return self._resolve().subject_key
 
 
-class ObservableProxy(_ReadOnlyProxy[Observable]):
+class _DecidableProxy(_ReadOnlyProxy[_T]):
+    """
+    The decision surface shared by the two families a stance can be taken on.
+
+    The named verbs (``allowlist``, ``dismiss``, …) live on the concrete proxies, because the
+    word an analyst uses depends on what is being decided. What they all reduce to is here.
+    """
+
+    __slots__ = ()
+
+    @property
+    def decision(self) -> Decision | None:
+        """The stance standing on this fact, if any — a single lookup, not a scan."""
+        return self._investigation.get_decision(self._key)
+
+    def _is(self, kind: DecisionKind) -> bool:
+        decision = self.decision
+        return decision is not None and decision.kind is kind
+
+    @property
+    def decided(self) -> bool:
+        """Whether a stance currently constrains this fact. A vacated one does not."""
+        decision = self.decision
+        return decision is not None and decision.kind.bounds
+
+    @property
+    def vacated(self) -> bool:
+        return self._is(DecisionKind.VACATED)
+
+    def decide(
+        self: _D,
+        kind: DecisionKind | str,
+        justification: str,
+        *,
+        decided_by: str | None = None,
+        source: SourceRef | None = None,
+        occurred_at: datetime | None = None,
+    ) -> _D:
+        """
+        Take a stance, with the kind carried as data.
+
+        The named verbs read better when the kind is known as you write; this is the path for
+        code that replays a feed or imports a corporate list, where it is a variable.
+        """
+        if source is None and decided_by is not None:
+            source = SourceRef(name=decided_by, source_class=SourceClass.ORG_ANALYST)
+        self._investigation.add_decision(
+            self._key,
+            kind,
+            justification,
+            source=source,
+            occurred_at=occurred_at,
+        )
+        return self
+
+    def vacate(
+        self: _D,
+        justification: str,
+        *,
+        decided_by: str | None = None,
+        source: SourceRef | None = None,
+        occurred_at: datetime | None = None,
+    ) -> _D:
+        """
+        Withdraw the stance and let the computation speak again.
+
+        Not the same as deciding the opposite: asserting ``blocklist`` to undo an ``allowlist``
+        would claim the target is malicious, which is a different statement — and usually a lie.
+        """
+        return self.decide(
+            DecisionKind.VACATED,
+            justification,
+            decided_by=decided_by,
+            source=source,
+            occurred_at=occurred_at,
+        )
+
+
+class ObservableProxy(_DecidableProxy[Observable]):
     """An observable, plus its result in a chosen scope."""
 
     __slots__ = ()
@@ -167,7 +249,17 @@ class ObservableProxy(_ReadOnlyProxy[Observable]):
 
     @property
     def allowlisted(self) -> bool:
-        return any(d.kind is DecisionKind.ALLOWLISTED for d in self._investigation.get_decisions(self._key))
+        return self._is(DecisionKind.REFUTE)
+
+    @property
+    def blocklisted(self) -> bool:
+        return self._is(DecisionKind.UPHOLD)
+
+    @property
+    def suppressed_by_decision(self) -> bool:
+        """Whether a decision actually changed this observable's score."""
+        result = self.result()
+        return result.suppressed_by_decision if result is not None else False
 
     @property
     def threat_intels(self) -> list[ThreatIntel]:
@@ -235,16 +327,42 @@ class ObservableProxy(_ReadOnlyProxy[Observable]):
         self._investigation.add_relation(self._key, target_key, kind, **kwargs)
         return self
 
-    def allowlist(self, justification: str | None = None) -> ObservableProxy:
-        self._investigation.add_decision(self._key, DecisionKind.ALLOWLISTED, justification=justification)
-        return self
+    def allowlist(
+        self,
+        justification: str,
+        *,
+        decided_by: str | None = None,
+        source: SourceRef | None = None,
+        occurred_at: datetime | None = None,
+    ) -> ObservableProxy:
+        """Cap this observable's score, whatever the signals say."""
+        return self.decide(
+            DecisionKind.REFUTE,
+            justification,
+            decided_by=decided_by,
+            source=source,
+            occurred_at=occurred_at,
+        )
 
-    def blocklist(self, justification: str | None = None) -> ObservableProxy:
-        self._investigation.add_decision(self._key, DecisionKind.BLOCKLISTED, justification=justification)
-        return self
+    def blocklist(
+        self,
+        justification: str,
+        *,
+        decided_by: str | None = None,
+        source: SourceRef | None = None,
+        occurred_at: datetime | None = None,
+    ) -> ObservableProxy:
+        """Raise this observable's score to the policy floor, whatever the signals say."""
+        return self.decide(
+            DecisionKind.UPHOLD,
+            justification,
+            decided_by=decided_by,
+            source=source,
+            occurred_at=occurred_at,
+        )
 
 
-class FindingProxy(_JudgedProxy[Finding]):
+class FindingProxy(_DecidableProxy[Finding], _JudgedProxy[Finding]):
     """A finding, plus its result."""
 
     __slots__ = ()
@@ -393,13 +511,53 @@ class FindingProxy(_JudgedProxy[Finding]):
         self._investigation.supersede(self._resolve(), **updates)
         return self
 
-    def confirm(self, justification: str | None = None) -> FindingProxy:
-        self._investigation.add_decision(self._key, DecisionKind.CONFIRMED, justification=justification)
-        return self
+    def confirm(
+        self,
+        justification: str,
+        *,
+        decided_by: str | None = None,
+        source: SourceRef | None = None,
+        occurred_at: datetime | None = None,
+    ) -> FindingProxy:
+        """Hold this claim as established, and score it at the policy floor."""
+        return self.decide(
+            DecisionKind.UPHOLD,
+            justification,
+            decided_by=decided_by,
+            source=source,
+            occurred_at=occurred_at,
+        )
 
-    def dismiss(self, justification: str | None = None) -> FindingProxy:
-        self._investigation.add_decision(self._key, DecisionKind.DISMISSED, justification=justification)
-        return self
+    def dismiss(
+        self,
+        justification: str,
+        *,
+        decided_by: str | None = None,
+        source: SourceRef | None = None,
+        occurred_at: datetime | None = None,
+    ) -> FindingProxy:
+        """Take this claim out of the evaluation. It stays in the report, uncounted."""
+        return self.decide(
+            DecisionKind.REFUTE,
+            justification,
+            decided_by=decided_by,
+            source=source,
+            occurred_at=occurred_at,
+        )
+
+    @property
+    def confirmed(self) -> bool:
+        return self._is(DecisionKind.UPHOLD)
+
+    @property
+    def dismissed(self) -> bool:
+        return self._is(DecisionKind.REFUTE)
+
+    @property
+    def suppressed_by_decision(self) -> bool:
+        """Whether a decision actually changed this finding's outcome."""
+        result = self.result()
+        return result.suppressed_by_decision if result is not None else False
 
 
 class ThreatIntelProxy(_JudgedProxy[ThreatIntel]):

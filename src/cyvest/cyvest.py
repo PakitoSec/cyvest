@@ -668,25 +668,31 @@ class Cyvest:
         self,
         target: ObservableProxy | FindingProxy | str,
         kind: DecisionKind | str,
+        justification: str,
         *,
-        justification: str | None = None,
         decided_by: str | None = None,
         occurred_at: datetime | None = None,
     ) -> DecisionProxy:
         """
         Override the computation with a declared act.
 
-        ``ALLOWLISTED``/``BLOCKLISTED`` bound an observable; ``CONFIRMED``/``DISMISSED`` force a
-        finding. The who and the when come from the fact envelope, not from duplicated fields.
+        ``UPHOLD`` forces the target, ``REFUTE`` neutralises it, ``VACATED`` withdraws a previous
+        stance. What each of them does depends on the family of the target, which the key already
+        states. The who and the when come from the fact envelope, not from duplicated fields.
         """
         stored = self._investigation.add_decision(
             self._key_of(target),
             kind,
-            justification=justification,
+            justification,
             source=self._source(decided_by, SourceClass.ORG_ANALYST) if decided_by else None,
             occurred_at=occurred_at,
         )
         return DecisionProxy(self._investigation, stored.key)
+
+    def decision_get(self, target: ObservableProxy | FindingProxy | str) -> DecisionProxy | None:
+        """The stance standing on a target, if any."""
+        stored = self._investigation.get_decision(self._key_of(target))
+        return None if stored is None else DecisionProxy(self._investigation, stored.key)
 
     def decision_get_all(self) -> dict[str, DecisionProxy]:
         return {key: DecisionProxy(self._investigation, key) for key in self._investigation.get_all_decisions()}

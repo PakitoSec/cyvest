@@ -49,7 +49,7 @@ read-only and never reimplement a scoring rule — but the report is an output, 
 | `Relationship` (embedded in the observable) | `Relation` (standalone fact) | §5 |
 | `score` (on facts) | `weight` | A magnitude *asserted*, not derived |
 | `score` (derived) | `report.*.score` | §1 |
-| `whitelisted` | `Decision(ALLOWLISTED)` | §6 |
+| `whitelisted` | `Decision(REFUTE)` | §6 |
 | `origin_investigation_id` | `fragment_id` (on the finding) | Carried over, because it *is* the fragment; §7 |
 | `propagation_mode` | `ObservableLink.scope` | Still **per link**, not per finding |
 | `observable_add_relationship` | `observable_add_relation` | |
@@ -163,33 +163,38 @@ displayed, but it never entered the score: the string `whitelisted` appears nowh
 
 In v7 a `Decision` **bounds** the derivation:
 
-| Decision | Effect |
-|---|---|
-| `ALLOWLISTED` | caps the observable at `policy.allowlist_ceiling` (`-1.0`) |
-| `BLOCKLISTED` | floors the observable at `policy.blocklist_floor` (`9.0`) |
-| `CONFIRMED` | pins the finding at `policy.confirmed_floor` (`9.0`) |
-| `DISMISSED` | removes the finding from the total |
+| Decision | Target | Effect |
+|---|---|---|
+| `REFUTE` | observable | caps the observable at `policy.refute_ceiling` (`-1.0`) |
+| `UPHOLD` | observable | floors the observable at `policy.uphold_floor` (`9.0`) |
+| `UPHOLD` | finding | floors the finding at `policy.uphold_floor` (`9.0`) |
+| `REFUTE` | finding | removes the finding from the total |
+| `VACATED` | either | retracts an earlier decision; the natural score stands |
+
+The kind carries the **intent**; the target key already carries the family, so the analyst's words
+— *allowlisted*, *blocklisted*, *confirmed*, *dismissed* — are rebuilt for display rather than
+enumerated in the model. The façade still speaks them:
 
 ```python
-url.allowlist(justification="Corporate sandbox")
+url.allowlist("Corporate sandbox", decided_by="rssi")
 cv.get_report().observable(url.key).score   # <= -1.0, whatever the intel says
 ```
 
 **A migrated v6 investigation containing whitelisted observables will therefore score lower than
 it did in v6.** That is the intended correction.
 
-A decision carries only `target_key`, `kind` and an optional `justification`. Who decided and when
+A decision carries `target_key`, `kind` and a **required** `justification`. Who decided and when
 come from the `Fact` envelope (`source`, `asserted_at`), like every other fact.
 
 ### Investigation-level whitelists
 
 v6 also had whitelist entries on the investigation itself, whose `identifier` was a free-form
-string. Those that name an observable become an `ALLOWLISTED` decision on it, which is what v6
+string. Those that name an observable become a `REFUTE` decision on it, which is what v6
 meant by them.
 
 The rest name nothing v7 can bound — a ticket reference, an analyst note. They are kept as
 **evidence** (`evidence_type="legacy_whitelist"`), one entry per record, and deliberately *not* as
-a decision on the root: `ALLOWLISTED` caps its target's score and marks every contribution on it
+a decision on the root: `REFUTE` caps its target's score and marks every contribution on it
 unretained, so anchoring them there would manufacture a verdict nobody asserted, out of a string
 that had no scoring effect in v6 either.
 
@@ -206,11 +211,10 @@ members go through the same translation.
 
 ### Two contradictory decisions on one target
 
-`ALLOWLISTED` and `BLOCKLISTED` carry different keys, so one observable can hold both — likewise
-`CONFIRMED` and `DISMISSED` on one finding. The conflict is settled exactly like any other in v7:
-**the freshest assertion wins**, on `occurred_at or asserted_at` then `seq`. The superseded
-decision stays in the report as an unretained contribution, because a human call that lost is
-still a human call.
+A decision is keyed `dec:{target_key}`, so **one target holds exactly one stance**. Asserting the
+opposite kind does not create a second fact competing at evaluation time — it replaces the first
+one through the ordinary merge law: **the freshest assertion wins**, on `occurred_at or
+asserted_at` then `seq`. To withdraw a stance without asserting its opposite, use `VACATED`.
 
 ---
 

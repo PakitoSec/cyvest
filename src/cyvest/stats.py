@@ -87,7 +87,7 @@ class InvestigationStats:
         return sum(
             1
             for key in self.store.observables
-            if any(d.kind is DecisionKind.ALLOWLISTED for d in self.store.decisions_for(key))
+            if (decision := self.store.decision_for(key)) is not None and decision.kind is DecisionKind.REFUTE
         )
 
     def get_observable_count_by_type(self) -> dict[str, int]:

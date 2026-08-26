@@ -111,8 +111,8 @@ deliberately does not.
 facts — dated, attributed, mergeable.
 
 ```python
-url.allowlist(justification="Corporate sandbox")     # caps the score
-finding.dismiss(justification="Known false positive") # excluded from the total
+url.allowlist("Corporate sandbox", decided_by="rssi")        # caps the score
+finding.dismiss("Known false positive", decided_by="alice")  # excluded from the total
 ```
 
 **Scope keeps merges honest.** Each finding-to-observable link carries a scope, `OWN_FRAGMENT` by

@@ -148,12 +148,14 @@ Creating `header:auth:dkim` auto-creates `header` and `header:auth`.
 Judgment overrules arithmetic — and stays a fact, so it merges and it is dated.
 
 ```python
-url.allowlist(justification="Corporate sandbox")     # caps the score
-finding.dismiss(justification="Known false positive") # excluded from the total
+url.allowlist("Corporate sandbox", decided_by="rssi")        # caps the score
+finding.dismiss("Known false positive", decided_by="alice")  # excluded from the total
+url.vacate("No longer in scope", decided_by="soc-lead")      # back to the computed value
 ```
 
 A dismissed finding remains in the report with `counted = False`. Deleting it would erase the fact
-that someone looked at it.
+that someone looked at it. The justification is required, and `decided_by` travels on the fluent
+path — the shortest way to decide is also the one that records who did.
 
 ---
 

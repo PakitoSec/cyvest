@@ -11,6 +11,7 @@ import { describe, expect, it } from "vitest";
 import {
   assertReadableVersion,
   countRelationsByKind,
+  decisionLabel,
   detectSchemaVersion,
   findContradictedFindings,
   findObservablesAtLeast,
@@ -23,6 +24,7 @@ import {
   getAllDecisions,
   getAllObservables,
   getCounts,
+  getDecisionFor,
   getEvidencesByType,
   getGlobalScore,
   getGlobalVerdict,
@@ -129,9 +131,14 @@ describe("decisions", () => {
   it("exposes an allowlist as a declared act", () => {
     const decisions = Object.values(getAllDecisions(investigation));
     expect(decisions).toHaveLength(1);
-    expect(decisions[0].kind).toBe("ALLOWLISTED");
+    expect(decisions[0].kind).toBe("REFUTE");
     expect(decisions[0].justification).toBe("CDN partenaire");
     expect(decisions[0].source.name).toBe("alice");
+  });
+
+  it("names a stance the way the analyst who took it would", () => {
+    const decision = getDecisionFor(investigation, CDN_KEY)!;
+    expect(decisionLabel(decision)).toBe("ALLOWLISTED");
   });
 
   it("makes an allowlisted observable derive to SAFE", () => {
@@ -205,13 +212,13 @@ describe("keys", () => {
     );
   });
 
-  it("keys a decision by target and kind", () => {
-    expect(generateDecisionKey(URL_KEY, "ALLOWLISTED")).toBe(`dec:allowlisted:${URL_KEY}`);
+  it("keys a decision by its target alone", () => {
+    expect(generateDecisionKey(URL_KEY)).toBe(`dec:${URL_KEY}`);
   });
 
   it("recognizes the v7 prefixes and no longer knows enr:", () => {
     expect(parseKeyType("rel:extraction:obs:a>obs:b")).toBe("rel");
-    expect(parseKeyType("dec:allowlisted:obs:a")).toBe("dec");
+    expect(parseKeyType("dec:obs:a")).toBe("dec");
     expect(parseKeyType("enr:whois")).toBeNull();
   });
 });

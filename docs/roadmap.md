@@ -57,7 +57,7 @@ A dedicated file with **two separate lots**:
 
 1. **strict equality** — a migrated v6 document scores exactly what it scored in v6;
 2. **allowlisted investigations** — expected to diverge, since v6 ignored the allowlist and v7
-   bounds the observable at `policy.allowlist_ceiling`.
+   bounds the observable at `policy.refute_ceiling`.
 
 The test must **fail loudly** if an allowlisted fixture drifts into the strict-equality lot:
 silently tolerating the divergence would erase the one behaviour change that was chosen.

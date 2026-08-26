@@ -55,10 +55,20 @@ class TestKeyTable:
         )
         assert forward.key != backward.key
 
-    def test_decision_identity_is_target_and_kind(self) -> None:
-        first = Decision(target_key="obs:url:a", kind=DecisionKind.ALLOWLISTED, source=SRC, fragment_id="f1")
-        second = Decision(target_key="obs:url:a", kind=DecisionKind.ALLOWLISTED, source=SRC, fragment_id="f2")
-        assert first.key == second.key
+    def test_decision_identity_is_its_target_alone(self) -> None:
+        """
+        The kind is content, not identity: one target holds one stance.
+
+        Keying on the kind too let ``UPHOLD`` and ``REFUTE`` coexist on the same target and made
+        the engine arbitrate what the merge law already settles.
+        """
+        first = Decision(
+            target_key="obs:url:a", kind=DecisionKind.REFUTE, justification="a", source=SRC, fragment_id="f1"
+        )
+        second = Decision(
+            target_key="obs:url:a", kind=DecisionKind.UPHOLD, justification="b", source=SRC, fragment_id="f2"
+        )
+        assert first.key == second.key == "dec:obs:url:a"
 
     def test_no_raw_content_enters_a_key(self) -> None:
         """A volatile payload field must not change identity."""

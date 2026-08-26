@@ -8,6 +8,7 @@
 
 import type {
   Decision,
+  DecisionKind,
   Evidence,
   Finding,
   FindingResult,
@@ -20,6 +21,7 @@ import type {
   ThreatIntel,
   Verdict,
 } from "./types";
+import { generateDecisionKey } from "./keys";
 
 /** Index used by the report to key an observable result by key *and* resolved scope. */
 export function observableIndex(observableKey: string, scope?: { scope?: string; fragment_id?: string | null }): string {
@@ -92,12 +94,47 @@ export function getAllDecisions(inv: Investigation): Record<string, Decision> {
   return inv.decisions ?? {};
 }
 
-export function getDecisionsFor(inv: Investigation, targetKey: string): Decision[] {
-  return Object.values(getAllDecisions(inv)).filter((decision) => decision.target_key === targetKey);
+/** The single stance standing on a target — the key carries the target alone. */
+export function getDecisionFor(inv: Investigation, targetKey: string): Decision | undefined {
+  return getDecision(inv, generateDecisionKey(targetKey));
+}
+
+function hasKind(inv: Investigation, targetKey: string, kind: DecisionKind): boolean {
+  return getDecisionFor(inv, targetKey)?.kind === kind;
 }
 
 export function isAllowlisted(inv: Investigation, observableKey: string): boolean {
-  return getDecisionsFor(inv, observableKey).some((decision) => decision.kind === "ALLOWLISTED");
+  return hasKind(inv, observableKey, "REFUTE");
+}
+
+export function isBlocklisted(inv: Investigation, observableKey: string): boolean {
+  return hasKind(inv, observableKey, "UPHOLD");
+}
+
+export function isConfirmed(inv: Investigation, findingKey: string): boolean {
+  return hasKind(inv, findingKey, "UPHOLD");
+}
+
+export function isDismissed(inv: Investigation, findingKey: string): boolean {
+  return hasKind(inv, findingKey, "REFUTE");
+}
+
+/** True when a stance was withdrawn and the computed value applies again. */
+export function isVacated(inv: Investigation, targetKey: string): boolean {
+  return hasKind(inv, targetKey, "VACATED");
+}
+
+/**
+ * The analyst's word for a stance, rebuilt from the intent and the family of its target.
+ *
+ * The model carries one axis on purpose; the vocabulary that reads naturally carries two, and
+ * the display layer is the right place to pay for that.
+ */
+export function decisionLabel(decision: Decision): string {
+  if (decision.kind === "VACATED") return "VACATED";
+  const observable = decision.target_key.startsWith("obs:");
+  if (decision.kind === "UPHOLD") return observable ? "BLOCKLISTED" : "CONFIRMED";
+  return observable ? "ALLOWLISTED" : "DISMISSED";
 }
 
 export function getTag(inv: Investigation, key: string): Tag | undefined {

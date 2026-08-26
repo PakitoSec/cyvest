@@ -91,16 +91,15 @@ def main(output: Path | None = None) -> None:
         .with_ti("URLhaus", weight=4.5, comment="Low-confidence redirect")
         .relate_to(suspicious_domain, cv.REL.RELATED_TO)
     )
-    # An allowlist is a declared act in v7, not a flag on the observable.
-    trusted_url = cv.observable(
-        cv.OBS.URL,
-        "https://accounts.google.com/security",
-    ).with_ti("Internal Whitelist", weight=-2.0, comment="Known safe link")
-    cv.decision_create(
-        trusted_url,
-        cv.DECISION.ALLOWLISTED,
-        justification="Domaine d'authentification Google, validé par la RSSI",
-        decided_by="rssi",
+    # An allowlist is a declared act in v7, not a flag on the observable — and the fluent path
+    # carries the attribution, so it never has to be traded for traceability.
+    trusted_url = (
+        cv.observable(cv.OBS.URL, "https://accounts.google.com/security")
+        .with_ti("Internal Whitelist", weight=-2.0, comment="Known safe link")
+        .allowlist(
+            "Domaine d'authentification Google, validé par la RSSI",
+            decided_by="rssi",
+        )
     )
 
     email_message.relate_to(suspicious_url, cv.REL.EXTRACTION)

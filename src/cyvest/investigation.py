@@ -297,8 +297,8 @@ class Investigation:
         self,
         target_key: str,
         kind: DecisionKind | str,
+        justification: str,
         *,
-        justification: str | None = None,
         source: SourceRef | None = None,
         occurred_at: datetime | None = None,
     ) -> Decision:
@@ -312,8 +312,9 @@ class Investigation:
         )
         return self.append(decision)  # type: ignore[return-value]
 
-    def get_decisions(self, target_key: str) -> list[Decision]:
-        return self.store.decisions_for(target_key)
+    def get_decision(self, target_key: str) -> Decision | None:
+        """The stance standing on a target — at most one, the merge law having settled it."""
+        return self.store.decision_for(target_key)
 
     def get_all_decisions(self) -> dict[str, Decision]:
         return dict(self.store.decisions)

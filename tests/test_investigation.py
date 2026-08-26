@@ -145,7 +145,7 @@ class TestDecisions:
         inv = Investigation()
         target = url(inv, "hxxp://a")
         intel(inv, target, 8.0)
-        inv.add_decision(target.key, DecisionKind.ALLOWLISTED, justification="CDN partenaire")
+        inv.add_decision(target.key, DecisionKind.REFUTE, "CDN partenaire")
 
         result = inv.report.observable(target.key)
         assert result.verdict is Verdict.SAFE
@@ -155,7 +155,7 @@ class TestDecisions:
         inv = Investigation()
         target = url(inv, "hxxp://a")
         created = finding(inv, "r", target, observable_links=[{"observable_key": target.key, "scope": Scope.ALL}])
-        inv.add_decision(created.key, DecisionKind.CONFIRMED)
+        inv.add_decision(created.key, DecisionKind.UPHOLD, "confirmé par l'analyse mémoire")
         assert inv.get_global_verdict() is Verdict.MALICIOUS
 
 

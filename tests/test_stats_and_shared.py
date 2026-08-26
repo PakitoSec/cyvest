@@ -59,7 +59,7 @@ class TestStatistics:
         url = cv.observable_get(cv.OBS.URL, "hxxp://bad.example")
         assert stats_of(cv).get_allowlisted_observable_count() == 0
 
-        cv.decision_create(url, cv.DECISION.ALLOWLISTED)
+        cv.decision_create(url, cv.DECISION.REFUTE, "infra interne")
         assert stats_of(cv).get_allowlisted_observable_count() == 1
 
     def test_confidence_bands_summarize_findings(self) -> None:

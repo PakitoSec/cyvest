@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from cyvest.facts.base import Fact, Judgment, Label, SourceRef, utc_now
-from cyvest.facts.decision import Decision
+from cyvest.facts.decision import Decision, decision_label
 from cyvest.facts.evidence import Evidence
 from cyvest.facts.finding import Finding, ObservableLink
 from cyvest.facts.observable import Observable, ObservableAlias, ObservableIdentity
@@ -28,5 +28,6 @@ __all__ = [
     "SourceRef",
     "Tag",
     "ThreatIntel",
+    "decision_label",
     "utc_now",
 ]

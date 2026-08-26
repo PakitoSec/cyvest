@@ -7,7 +7,13 @@ export type OccurredAt = string | null;
  * Family a source belongs to, used by the policy to weigh its reliability.
  */
 export type SourceClass =
-  "vendor_feed" | "sandbox" | "osint" | "internal_tool" | "org_analyst" | "org_policy" | "unknown";
+  | "vendor_feed"
+  | "sandbox"
+  | "osint"
+  | "internal_tool"
+  | "org_analyst"
+  | "org_policy"
+  | "unknown";
 export type ExternalId = string | null;
 export type EvidenceKeys = string[];
 export type Subtype = string | null;
@@ -95,10 +101,18 @@ export type EvidenceKeys5 = string[];
  * A named override of the computation.
  *
  * Forcing a score has to be a declared act — never the side effect of an inflated weight.
- * Each kind targets exactly one fact family, enforced by :class:`cyvest.facts.Decision`.
+ *
+ * The kind states the **intent**; the mechanism follows from the family of the target, which
+ * the key already carries. An earlier design enumerated one value per ``(intent, family)``
+ * pair — ``ALLOWLISTED``/``BLOCKLISTED``/``CONFIRMED``/``DISMISSED`` — and then needed a
+ * validator to forbid the half of that product which made no sense. An enum requiring a
+ * validator to reject half its combinations encodes one axis too many: the family is the
+ * target's business, not the decision's.
+ *
+ * The domain vocabulary survives untouched on the façade (``allowlist``, ``blocklist``,
+ * ``confirm``, ``dismiss``), where it belongs.
  */
-export type DecisionKind = "ALLOWLISTED" | "BLOCKLISTED" | "CONFIRMED" | "DISMISSED";
-export type Justification = string | null;
+export type DecisionKind = "UPHOLD" | "REFUTE" | "VACATED";
 export type OccurredAt6 = string | null;
 export type ExternalId6 = string | null;
 export type EvidenceKeys6 = string[];
@@ -347,8 +361,13 @@ export interface Decisions {
 /**
  * A human (or automated) call that overrides the computed result for one target.
  *
- * ``ALLOWLISTED``/``BLOCKLISTED`` bound an observable's score; ``CONFIRMED``/``DISMISSED``
- * force a finding. The kind and the target family must agree.
+ * ``UPHOLD`` forces the target to the policy floor, ``REFUTE`` neutralises it, ``VACATED``
+ * withdraws a previous stance and restores the computed value. How each is applied depends on
+ * the family of the target — an observable is bounded, a claim is taken out of the count — but
+ * that is the engine's dispatch, not a second axis of this model.
+ *
+ * ``justification`` is required: an override whose reason is optional is an override that
+ * cannot be audited, which defeats the point of recording it as a fact at all.
  */
 export interface Decision {
   key: string;
@@ -361,7 +380,7 @@ export interface Decision {
   evidence_keys?: EvidenceKeys5;
   target_key: string;
   kind: DecisionKind;
-  justification?: Justification;
+  justification: string;
 }
 export interface Tags {
   [k: string]: Tag;

@@ -7,13 +7,7 @@ export type OccurredAt = string | null;
  * Family a source belongs to, used by the policy to weigh its reliability.
  */
 export type SourceClass =
-  | "vendor_feed"
-  | "sandbox"
-  | "osint"
-  | "internal_tool"
-  | "org_analyst"
-  | "org_policy"
-  | "unknown";
+  "vendor_feed" | "sandbox" | "osint" | "internal_tool" | "org_analyst" | "org_policy" | "unknown";
 export type ExternalId = string | null;
 export type EvidenceKeys = string[];
 export type Subtype = string | null;

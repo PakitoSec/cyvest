@@ -43,7 +43,7 @@
   },
   "sideEffects": false,
   "scripts": {
-    "build": "tsup src/index.ts --dts --format cjs,esm",
+    "build": "tsdown",
     "generate:types": "node ../../tools/generate_ts_types.mjs",
     "test": "vitest",
     "test:ci": "vitest run --reporter=dot"
@@ -53,11 +53,11 @@
     "ajv-formats": "^3.0.1"
   },
   "devDependencies": {
-    "@types/node": "^26.1.1",
+    "@types/node": "^26.3.0",
     "json-schema-to-typescript": "^15.0.4",
-    "tsup": "^8.5.1",
-    "typescript": "^6.0.3",
-    "vitest": "^4.1.9"
+    "tsdown": "^0.22.14",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.11"
   },
   "engines": {
     "node": ">=22"

@@ -372,7 +372,7 @@ def _migrate_v6_to_v7(data: dict[str, Any]) -> dict[str, Any]:
         if payload.get("whitelisted"):
             decision = Decision(
                 target_key=observable.key,
-                kind=DecisionKind.ALLOWLISTED,
+                kind=DecisionKind.REFUTE,
                 justification="migrated from v6 whitelisted flag",
                 **_envelope(fragment_id, opened_at),
             )
@@ -553,8 +553,10 @@ def _migrate_whitelists(
         if target in observables:
             decision = Decision(
                 target_key=target,
-                kind=DecisionKind.ALLOWLISTED,
-                justification=payload.get("justification"),
+                kind=DecisionKind.REFUTE,
+                # v6 let a whitelist carry no reason. v7 requires one, so migration states the
+                # truth it has — that the entry predates the requirement — rather than failing.
+                justification=str(payload.get("justification") or "migrated from a v6 whitelist entry"),
                 **_envelope(fragment_id, opened_at),
             )
             decisions[decision.key] = decision

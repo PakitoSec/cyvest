@@ -126,21 +126,32 @@ class DecisionKind(str, Enum):
     A named override of the computation.
 
     Forcing a score has to be a declared act — never the side effect of an inflated weight.
-    Each kind targets exactly one fact family, enforced by :class:`cyvest.facts.Decision`.
+
+    The kind states the **intent**; the mechanism follows from the family of the target, which
+    the key already carries. An earlier design enumerated one value per ``(intent, family)``
+    pair — ``ALLOWLISTED``/``BLOCKLISTED``/``CONFIRMED``/``DISMISSED`` — and then needed a
+    validator to forbid the half of that product which made no sense. An enum requiring a
+    validator to reject half its combinations encodes one axis too many: the family is the
+    target's business, not the decision's.
+
+    The domain vocabulary survives untouched on the façade (``allowlist``, ``blocklist``,
+    ``confirm``, ``dismiss``), where it belongs.
     """
 
-    ALLOWLISTED = "ALLOWLISTED"
-    BLOCKLISTED = "BLOCKLISTED"
-    CONFIRMED = "CONFIRMED"
-    DISMISSED = "DISMISSED"
+    UPHOLD = "UPHOLD"
+    REFUTE = "REFUTE"
+    VACATED = "VACATED"
 
     @property
-    def targets_observable(self) -> bool:
-        return self in (DecisionKind.ALLOWLISTED, DecisionKind.BLOCKLISTED)
+    def bounds(self) -> bool:
+        """
+        Whether the kind constrains the result at all.
 
-    @property
-    def targets_finding(self) -> bool:
-        return self in (DecisionKind.CONFIRMED, DecisionKind.DISMISSED)
+        ``VACATED`` is the identity: recorded, reported, and without effect. Withdrawing a
+        judgment must be expressible without asserting the opposite one — which would be a lie —
+        and an append-only model cannot express it by deletion.
+        """
+        return self is not DecisionKind.VACATED
 
 
 class Scope(str, Enum):

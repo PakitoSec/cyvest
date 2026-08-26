@@ -178,15 +178,21 @@ def generate_relation_key(
     return f"rel:{normalized_kind}:{source_key}>{target_key}"
 
 
-def generate_decision_key(target_key: str, kind: str) -> str:
+def generate_decision_key(target_key: str) -> str:
     """
     Generate a decision key.
 
-    Format: ``dec:{kind}:{target_key}``
+    Format: ``dec:{target_key}``
 
-    One decision of a given kind per target, so re-asserting it is idempotent.
+    **One decision per target**, whatever it says. The kind is content, not identity: a target
+    holds a single current stance, and changing one's mind is a re-assertion the merge law
+    settles by freshness — not a second fact competing with the first.
+
+    Keying on the kind as well would let ``UPHOLD`` and ``REFUTE`` coexist under distinct keys
+    and force the engine to arbitrate them itself, duplicating the very law the store already
+    applies.
     """
-    return f"dec:{_normalize_value(kind)}:{target_key}"
+    return f"dec:{target_key}"
 
 
 def generate_evidence_key(

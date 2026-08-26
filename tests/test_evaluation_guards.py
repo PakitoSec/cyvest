@@ -133,9 +133,10 @@ class TestDeterminism:
                 )
             )
             investigation.add_relation(hub, child, RelationKind.EXTRACTION, confidence=0.9)
-        # Two contradictory bounds: the branch that used to depend on iteration order.
-        investigation.add_decision(hub.key, DecisionKind.ALLOWLISTED, justification="a")
-        investigation.add_decision(hub.key, DecisionKind.BLOCKLISTED, justification="b")
+        # Two contradictory stances on one target: the branch that used to depend on iteration
+        # order. They now share a key, so the merge law settles them before evaluation ever runs.
+        investigation.add_decision(hub.key, DecisionKind.REFUTE, "a")
+        investigation.add_decision(hub.key, DecisionKind.UPHOLD, "b")
         save_investigation_json(investigation, path)
 
     def _report_under_hash_seed(self, path: Path, seed: str) -> str:

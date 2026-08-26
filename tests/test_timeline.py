@@ -58,7 +58,7 @@ class TestTimeline:
         store.append(
             Decision(
                 target_key=url.key,
-                kind=DecisionKind.ALLOWLISTED,
+                kind=DecisionKind.REFUTE,
                 justification="CDN partenaire",
                 occurred_at=JUNE,
                 asserted_at=JUNE,
@@ -71,6 +71,45 @@ class TestTimeline:
         assert len(decisions) == 1
         assert decisions[0].salience is Salience.KEY
         assert "CDN partenaire" in decisions[0].title
+
+    def test_a_decision_is_titled_in_the_analyst_s_words(self) -> None:
+        """
+        The model keeps one axis; the reader gets two.
+
+        ``REFUTE`` on an observable is what an analyst calls *allowlisting*, and on a finding what
+        they call *dismissing*. Collapsing the enum is only defensible if that vocabulary survives
+        where it is read, so the label is rebuilt from the intent and the target's family.
+        """
+        store, url, finding = build()
+        store.append(
+            Decision(
+                target_key=url.key,
+                kind=DecisionKind.REFUTE,
+                justification="CDN partenaire",
+                occurred_at=JUNE,
+                asserted_at=JUNE,
+                source=ANALYST,
+                fragment_id="f1",
+            )
+        )
+        store.append(
+            Decision(
+                target_key=finding.key,
+                kind=DecisionKind.REFUTE,
+                justification="Faux positif connu",
+                occurred_at=JUNE,
+                asserted_at=JUNE,
+                source=ANALYST,
+                fragment_id="f1",
+            )
+        )
+        titles = {
+            entry.subject_key: entry.title
+            for entry in build_timeline(store, evaluate(store), min_salience=Salience.KEY)
+            if entry.kind == "decision"
+        }
+        assert titles[url.key] == "ALLOWLISTED · CDN partenaire"
+        assert titles[finding.key] == "DISMISSED · Faux positif connu"
 
     def test_the_time_basis_switches_the_axis(self) -> None:
         store = FactStore(InvestigationHeader(investigation_id="inv", fragment_ids=("f1",)))

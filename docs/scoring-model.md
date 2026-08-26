@@ -160,31 +160,53 @@ even link the same observable twice with two different ones.
 ## Decisions bound the derivation
 
 An analyst does not argue with the arithmetic — they overrule it. A `Decision` clamps a result
-rather than adding a term:
+rather than adding a term.
 
-| Decision | Effect |
-|---|---|
-| `ALLOWLISTED` | `min(score, policy.allowlist_ceiling)` — default `-1.0` |
-| `BLOCKLISTED` | `max(score, policy.blocklist_floor)` — default `9.0` |
-| `CONFIRMED` | the finding is pinned at `policy.confirmed_floor` |
-| `DISMISSED` | the finding is excluded from the total |
+The kind states the **intent**; what it does follows from the family of the target, which the key
+already carries:
+
+| Kind | On an observable (`obs:`) | On a finding (`fnd:`) |
+|---|---|---|
+| `UPHOLD` | `max(score, policy.uphold_floor)` — default `9.0` | same floor on the finding's score |
+| `REFUTE` | `min(score, policy.refute_ceiling)` — default `-1.0` | excluded from the total, `counted = False` |
+| `VACATED` | the stance is withdrawn; the computed value applies again | idem |
+
+Earlier drafts enumerated one kind per `(intent, family)` pair — `ALLOWLISTED`, `BLOCKLISTED`,
+`CONFIRMED`, `DISMISSED` — and then needed a validator to forbid the half of that product which
+made no sense. The family is the target's business, not the decision's. The words themselves are
+not lost: they are exactly what the façade speaks.
 
 ```python
-url.allowlist(justification="Corporate sandbox")
-finding.dismiss(justification="Known false positive on this tenant")
+url.allowlist("Corporate sandbox", decided_by="rssi")             # REFUTE on an observable
+finding.dismiss("Known false positive on this tenant", decided_by="analyst-3")  # REFUTE on a finding
+url.vacate("No longer owned by the RSSI", decided_by="soc-lead")  # back to the computed value
 ```
 
 Because a decision is a fact like any other, it merges, it is timestamped, and it says who decided
 — the `Fact` envelope carries `source` and `asserted_at`, so the decision itself only needs
-`target_key`, `kind` and an optional `justification`.
+`target_key`, `kind` and a `justification`. That justification is **required**: an override whose
+reason is optional is an override nobody can audit.
 
-A dismissed finding stays in the report with `counted = False`. Deleting it would erase the fact
+A refuted finding stays in the report with `counted = False`. Deleting it would erase the fact
 that someone looked.
 
-Two contradictory decisions may sit on one target — `ALLOWLISTED` and `BLOCKLISTED` carry
-different keys, as do `CONFIRMED` and `DISMISSED`. They are settled the way every conflict is
-settled in v7: **the freshest wins**, ranked on `occurred_at or asserted_at` then `seq`. The loser
-is reported as an unretained contribution rather than dropped, so the disagreement stays visible.
+### The result is computed first, then bounded
+
+An overridden result still reports what the evidence alone produced. The terms that lost are kept
+as contributions with `retained = False`, and the decision appears as the retained one. `retained`
+therefore carries a single meaning throughout the report — *this term determined the outcome* — and
+so does `suppressed_by_decision`: **the decision changed the result**, not merely that one applied.
+A decision that changed nothing is itself reported unretained.
+
+### One target, one stance
+
+A decision is keyed `dec:{target_key}`: the kind is content, not identity. Two contradictory calls
+therefore share a key and are settled the way every conflict is settled in v7 — **the freshest
+wins**, ranked on `occurred_at or asserted_at` then `seq` — before evaluation ever runs.
+
+Withdrawing a stance is `VACATED`, an act of its own. Asserting the opposite one would say
+something different, and usually false; and an append-only model cannot express a retraction by
+deletion.
 
 ---
 
@@ -269,12 +291,14 @@ from the order you created them in — only the sum of the credits is meaningful
 !!! warning "One over-confident analyser is enough"
     Confidence does not attenuate, so a lone `MALICIOUS` conclusion asserted at `0.3` still floors
     the investigation at `5.0`, even against three `NOTABLE` ones. There is no confidence
-    threshold in the policy: the recourse is a `DISMISSED` decision, which is a declared act and
+    threshold in the policy: the recourse is a `REFUTE` decision, which is a declared act and
     stays in the record.
 
-A `DISMISSED` conclusion applies nothing, a `CONFIRMED` one is pinned at `policy.confirmed_floor`
-like any other finding, and anything other than `EVALUATED` is excluded — a conclusion is a finding
-first.
+A refuted conclusion applies nothing, and anything other than `EVALUATED` is excluded — a
+conclusion is a finding first. `UPHOLD`, on the other hand, does nothing here: a conclusion has no
+magnitude of its own to raise, since it already asserts its verdict. The engine used to answer this
+by turning the conclusion into an additive finding scored at the floor, silently changing its
+`effect` and double-counting what it had just read.
 
 ---
 

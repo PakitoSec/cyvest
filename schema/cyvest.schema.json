@@ -36,7 +36,7 @@
     },
     "Decision": {
       "additionalProperties": false,
-      "description": "A human (or automated) call that overrides the computed result for one target.\n\n``ALLOWLISTED``/``BLOCKLISTED`` bound an observable's score; ``CONFIRMED``/``DISMISSED``\nforce a finding. The kind and the target family must agree.",
+      "description": "A human (or automated) call that overrides the computed result for one target.\n\n``UPHOLD`` forces the target to the policy floor, ``REFUTE`` neutralises it, ``VACATED``\nwithdraws a previous stance and restores the computed value. How each is applied depends on\nthe family of the target — an observable is bounded, a claim is taken out of the count — but\nthat is the engine's dispatch, not a second axis of this model.\n\n``justification`` is required: an override whose reason is optional is an override that\ncannot be audited, which defeats the point of recording it as a fact at all.",
       "properties": {
         "key": {
           "minLength": 1,
@@ -103,16 +103,9 @@
           "$ref": "#/$defs/DecisionKind"
         },
         "justification": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Justification"
+          "minLength": 1,
+          "title": "Justification",
+          "type": "string"
         }
       },
       "required": [
@@ -122,18 +115,18 @@
         "source",
         "fragment_id",
         "target_key",
-        "kind"
+        "kind",
+        "justification"
       ],
       "title": "Decision",
       "type": "object"
     },
     "DecisionKind": {
-      "description": "A named override of the computation.\n\nForcing a score has to be a declared act — never the side effect of an inflated weight.\nEach kind targets exactly one fact family, enforced by :class:`cyvest.facts.Decision`.",
+      "description": "A named override of the computation.\n\nForcing a score has to be a declared act — never the side effect of an inflated weight.\n\nThe kind states the **intent**; the mechanism follows from the family of the target, which\nthe key already carries. An earlier design enumerated one value per ``(intent, family)``\npair — ``ALLOWLISTED``/``BLOCKLISTED``/``CONFIRMED``/``DISMISSED`` — and then needed a\nvalidator to forbid the half of that product which made no sense. An enum requiring a\nvalidator to reject half its combinations encodes one axis too many: the family is the\ntarget's business, not the decision's.\n\nThe domain vocabulary survives untouched on the façade (``allowlist``, ``blocklist``,\n``confirm``, ``dismiss``), where it belongs.",
       "enum": [
-        "ALLOWLISTED",
-        "BLOCKLISTED",
-        "CONFIRMED",
-        "DISMISSED"
+        "UPHOLD",
+        "REFUTE",
+        "VACATED"
       ],
       "title": "DecisionKind",
       "type": "string"

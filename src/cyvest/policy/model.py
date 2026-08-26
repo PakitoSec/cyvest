@@ -45,9 +45,12 @@ class Policy(BaseModel):
         }
     )
 
-    allowlist_ceiling: float = Field(default=-1.0)
-    blocklist_floor: float = Field(default=9.0)
-    confirmed_floor: float = Field(default=9.0)
+    # A decision does not add a term, it constrains the result: ``UPHOLD`` raises it to the
+    # floor, ``REFUTE`` caps it at the ceiling. One pair for both families — an upheld claim and
+    # a blocklisted observable are the same operation, and shipping them as two identically
+    # valued parameters only invited them to drift apart.
+    uphold_floor: float = Field(default=9.0)
+    refute_ceiling: float = Field(default=-1.0)
 
     salience_threshold: float = Field(default=3.0)
     output_precision: int = Field(default=2, ge=0, le=12)

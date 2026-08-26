@@ -20,6 +20,7 @@ from rich.tree import Tree
 
 from cyvest.enums import DecisionKind, Effect, Status, Verdict
 from cyvest.evaluation.report import Contribution, Report
+from cyvest.facts.decision import decision_label
 from cyvest.stats import InvestigationStats
 
 if TYPE_CHECKING:
@@ -34,11 +35,10 @@ VERDICT_STYLES: dict[Verdict, str] = {
     Verdict.MALICIOUS: "red",
 }
 
-DECISION_LABELS: dict[DecisionKind, str] = {
-    DecisionKind.ALLOWLISTED: "ALLOWLISTED",
-    DecisionKind.BLOCKLISTED: "BLOCKLISTED",
-    DecisionKind.CONFIRMED: "CONFIRMED",
-    DecisionKind.DISMISSED: "DISMISSED",
+_DECISION_STYLES: dict[DecisionKind, str] = {
+    DecisionKind.REFUTE: "bold green",
+    DecisionKind.UPHOLD: "bold red",
+    DecisionKind.VACATED: "bold dim",
 }
 
 
@@ -69,16 +69,17 @@ def _age(moment: datetime) -> str:
 
 def _decision_badges(investigation: Investigation, key: str) -> Text:
     badge = Text()
-    for decision in investigation.get_decisions(key):
-        badge.append(" ")
-        badge.append(
-            f"[{DECISION_LABELS[decision.kind]}]",
-            style="bold green" if decision.kind in (DecisionKind.ALLOWLISTED, DecisionKind.DISMISSED) else "bold red",
-        )
-        when = decision.occurred_at or decision.asserted_at
-        badge.append(f" {decision.source.name} · {_age(when)}", style="dim")
-        if decision.justification:
-            badge.append(f" « {decision.justification} »", style="dim italic")
+    decision = investigation.get_decision(key)
+    if decision is None:
+        return badge
+    badge.append(" ")
+    badge.append(
+        f"[{decision_label(decision)}]",
+        style=_DECISION_STYLES.get(decision.kind, "bold red"),
+    )
+    when = decision.occurred_at or decision.asserted_at
+    badge.append(f" {decision.source.name} · {_age(when)}", style="dim")
+    badge.append(f" « {decision.justification} »", style="dim italic")
     return badge
 
 

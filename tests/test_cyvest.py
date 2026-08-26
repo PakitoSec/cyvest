@@ -72,14 +72,38 @@ class TestFluentDsl:
 
 class TestDecisions:
     def test_allowlisting_reads_as_a_declared_act(self) -> None:
+        """The fluent path must carry the attribution, or the short path is the untraceable one."""
         cv = build_email_case()
         url = cv.observable_get(cv.OBS.URL, "hxxp://bad.example/x")
-        decision = cv.decision_create(url, cv.DECISION.ALLOWLISTED, justification="CDN partenaire", decided_by="alice")
+        url.allowlist("CDN partenaire", decided_by="alice")
 
+        decision = cv.decision_get(url)
         assert decision.decided_by == "alice"
         assert decision.justification == "CDN partenaire"
         assert url.verdict is Verdict.SAFE
         assert url.allowlisted is True
+
+    def test_vacating_gives_the_computation_back(self) -> None:
+        cv = build_email_case()
+        url = cv.observable_get(cv.OBS.URL, "hxxp://bad.example/x")
+        computed = url.score
+
+        url.allowlist("CDN partenaire", decided_by="alice")
+        assert url.score == -1.0
+
+        url.vacate("plus dans le périmètre", decided_by="soc-lead")
+        assert url.score == computed
+        assert url.allowlisted is False
+        assert url.vacated is True
+
+    def test_a_kind_carried_as_data_needs_no_named_verb(self) -> None:
+        """The path for code replaying a feed, where the stance is a variable."""
+        cv = Cyvest()
+        url = cv.observable(cv.OBS.URL, "hxxp://unknown.example")
+        url.decide(cv.DECISION.UPHOLD, "importé de la blocklist groupe", decided_by="feed")
+
+        assert url.blocklisted is True
+        assert url.verdict is Verdict.MALICIOUS
 
     def test_confirming_a_finding_beats_a_clean_graph(self) -> None:
         cv = Cyvest()
@@ -88,6 +112,7 @@ class TestDecisions:
         finding.confirm("confirmé par l'analyse mémoire")
 
         assert cv.get_global_verdict() is Verdict.MALICIOUS
+        assert finding.confirmed is True
 
     def test_dismissing_keeps_it_visible_but_uncounted(self) -> None:
         cv = build_email_case()
@@ -96,6 +121,7 @@ class TestDecisions:
 
         assert cv.finding_get(finding.key) is not None
         assert cv.get_global_score() == 0.0
+        assert finding.dismissed is True
 
 
 class TestVerdictSemantics:

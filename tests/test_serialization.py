@@ -26,7 +26,7 @@ def build_case() -> Cyvest:
     cv.finding("url_in_body", "URL in body", subject=url).link_observable(url, cv.SCOPE.ALL)
     cv.tag_create("phishing")
     cv.evidence_create("enrichment", title="whois", content={"registrar": "x"})
-    cv.decision_create(ip, cv.DECISION.ALLOWLISTED, justification="infra interne", decided_by="alice")
+    cv.decision_create(ip, cv.DECISION.REFUTE, "infra interne", decided_by="alice")
     return cv
 
 
@@ -288,7 +288,7 @@ class TestMigrationWhitelists:
 
     def test_an_entry_naming_an_observable_becomes_a_decision_on_it(self) -> None:
         decisions = self._migrated(self._document())._investigation.store.decisions
-        assert decisions["dec:allowlisted:obs:url:hxxp://bad.example"].justification == "corporate"
+        assert decisions["dec:obs:url:hxxp://bad.example"].justification == "corporate"
 
     def _legacy_evidence(self, document: dict):
         evidences = self._migrated(document)._investigation.store.evidences
@@ -303,7 +303,7 @@ class TestMigrationWhitelists:
 
     def test_an_unplaceable_entry_does_not_bound_the_root(self) -> None:
         """
-        ``ALLOWLISTED`` caps its target and unretains every contribution on it.
+        ``REFUTE`` caps its target and unretains every contribution on it.
 
         Parking a ticket reference on the root manufactured a verdict nobody asserted — out of a
         string that had no scoring effect in v6 either. The migrated score must not move.
@@ -312,7 +312,7 @@ class TestMigrationWhitelists:
         with_notes = self._migrated(self._document())
 
         root_key = plain._investigation.store.header.root_key
-        assert "dec:allowlisted:" + root_key not in with_notes._investigation.store.decisions
+        assert "dec:" + root_key not in with_notes._investigation.store.decisions
 
         root_result = with_notes.get_report().observable(root_key)
         assert root_result.suppressed_by_decision is False
@@ -413,7 +413,7 @@ class TestMigrationKeyTranslation:
 
     def test_a_whitelist_entry_finds_its_re_keyed_observable(self) -> None:
         store = self._migrated().store
-        assert "dec:allowlisted:obs:domain:evil.com" in store.decisions
+        assert "dec:obs:domain:evil.com" in store.decisions
 
     def test_the_score_still_reflects_the_signal(self) -> None:
         """

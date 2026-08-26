@@ -134,15 +134,35 @@ cv.finding_link_evidence(finding.key, evidence.key)
 A human overruling the arithmetic. A decision **bounds** a result rather than adding a term.
 
 ```python
-url.allowlist(justification="Corporate sandbox")
-url.blocklist(justification="Confirmed C2")
-finding.confirm(justification="Reproduced in sandbox")
-finding.dismiss(justification="Known false positive")
+url.allowlist("Corporate sandbox", decided_by="ciso")
+url.blocklist("Confirmed C2", decided_by="analyst-3")
+finding.confirm("Reproduced in sandbox", decided_by="analyst-3")
+finding.dismiss("Known false positive", decided_by="analyst-3")
+url.vacate("No longer owned by the RSSI", decided_by="soc-lead")
 ```
 
-The decision itself holds only `target_key`, `kind` and an optional `justification`; who decided
-and when come from the fact envelope. A dismissed finding stays visible with `counted = False` —
-erasing it would erase the fact that someone looked.
+Under those four verbs the model holds two intents — `UPHOLD` and `REFUTE` — plus `VACATED` to
+withdraw a stance. What each does follows from the family of the target, which the key already
+says; the vocabulary lives on the façade, where it reads naturally.
+
+When the kind is a variable rather than something you know as you write — replaying a feed,
+importing a corporate list — use `decide`:
+
+```python
+url.decide(cv.DECISION.REFUTE, entry.reason, decided_by=entry.owner, occurred_at=entry.decided_at)
+```
+
+The decision itself holds only `target_key`, `kind` and a `justification`; who decided and when
+come from the fact envelope. The justification is required — an override nobody has to justify is
+an override nobody can audit. A dismissed finding stays visible with `counted = False` — erasing it
+would erase the fact that someone looked.
+
+Reading back is a single lookup, since one target holds one stance:
+
+```python
+url.decision        # Decision | None
+url.allowlisted     # and .blocklisted, .vacated, .decided
+```
 
 ### Tags
 
@@ -167,7 +187,7 @@ Every fact has a deterministic key, which is what makes merging work without coo
 - **Signal**: `ti:{source}:{observable_key}`
 - **Relation**: `rel:{kind}:{source_key}>{target_key}`
 - **Evidence**: `evd:{source}:{external_id}`, or `evd:sha256:{digest}` for inline content
-- **Decision**: `dec:{kind}:{target_key}`
+- **Decision**: `dec:{target_key}` — one stance per target, whatever it says
 - **Tag**: `tag:{name}`
 
 Getters accept either a key or its components:

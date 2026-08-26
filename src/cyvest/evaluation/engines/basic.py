@@ -67,34 +67,65 @@ class _Evaluation:
 
     # --- decisions -----------------------------------------------------------------------
 
+    def _bound(self, score: float, kind: DecisionKind) -> float:
+        """
+        Apply a stance to a computed magnitude.
+
+        A decision constrains, it never adds a term: the result stays inside the band the
+        decision asserts, whatever the evidence said.
+        """
+        if kind is DecisionKind.UPHOLD:
+            return max(score, self.policy.uphold_floor)
+        if kind is DecisionKind.REFUTE:
+            return min(score, self.policy.refute_ceiling)
+        return score
+
     @staticmethod
-    def _resolve_decision(decisions: list[Decision]) -> tuple[Decision | None, list[Contribution]]:
+    def _decision_contribution(decision: Decision, value: float, *, changed: bool) -> Contribution:
         """
-        Pick the decision that applies, and account for the ones it supersedes.
+        Report the stance itself as a term of the result.
 
-        ``ALLOWLISTED``/``BLOCKLISTED`` and ``CONFIRMED``/``DISMISSED`` carry different keys, so
-        a target may legitimately hold two contradictory ones. They are settled exactly like any
-        other conflict in v7 — the freshest assertion wins — rather than applied in sequence,
-        which would have made the result depend on iteration order.
-
-        The losers stay in the report as unretained contributions: a superseded human decision is
-        something an analyst needs to see, not something to drop silently.
+        ``retained`` carries a single meaning throughout the report — *this term determined the
+        outcome* — so a decision that changed nothing is reported unretained, exactly like the
+        evidence a decision does override. The two are dual, and the analyst sees both.
         """
-        if not decisions:
-            return None, []
-        winner = max(decisions, key=lambda decision: (*decision.merge_rank(), decision.key))
-        superseded = [
-            Contribution(
-                source_key=decision.key,
-                label=f"decision · {decision.kind.value}",
-                value=0.0,
-                retained=False,
-                detail=f"superseded by a fresher {winner.kind.value} decision",
-            )
-            for decision in decisions
-            if decision.key != winner.key
-        ]
-        return winner, superseded
+        detail = decision.justification
+        if not decision.kind.bounds:
+            detail = f"{detail} — stance withdrawn, computed value restored"
+        elif not changed:
+            detail = f"{detail} — computed value already within bounds"
+        return Contribution(
+            source_key=decision.key,
+            label=f"decision · {decision.kind.value}",
+            value=value,
+            retained=changed,
+            detail=detail,
+        )
+
+    def _apply_decision(
+        self,
+        decision: Decision | None,
+        computed: float,
+        contributions: list[Contribution],
+    ) -> tuple[float, list[Contribution], bool]:
+        """
+        Bound a computed score by the stance standing on its target.
+
+        The score is always computed first, then bounded — never short-circuited. That is what
+        keeps the counterfactual in the report: an overridden result must still show what the
+        evidence alone would have produced, or the override cannot be reviewed.
+        """
+        if decision is None:
+            return computed, contributions, False
+        bounded = self._bound(computed, decision.kind)
+        changed = bounded != computed
+        if changed:
+            contributions = [
+                c.model_copy(update={"retained": False, "detail": c.detail or "overridden by a decision"})
+                for c in contributions
+            ]
+        contributions.append(self._decision_contribution(decision, bounded, changed=changed))
+        return bounded, contributions, changed
 
     # --- observables ---------------------------------------------------------------------
 
@@ -146,28 +177,9 @@ class _Evaluation:
             )
 
         score = combine(signal_scores, child_scores, self.policy.aggregation)
-        suppressed = False
-
-        bounding = [d for d in self.store.decisions_for(observable_key) if d.kind.targets_observable]
-        decision, superseded = self._resolve_decision(bounding)
-        contributions.extend(superseded)
-        if decision is not None:
-            if decision.kind is DecisionKind.ALLOWLISTED:
-                bounded = min(score, self.policy.allowlist_ceiling)
-            else:
-                bounded = max(score, self.policy.blocklist_floor)
-            if bounded != score:
-                suppressed = True
-                contributions = [c.model_copy(update={"retained": False}) for c in contributions]
-            contributions.append(
-                Contribution(
-                    source_key=decision.key,
-                    label=f"decision · {decision.kind.value}",
-                    value=bounded,
-                    detail=decision.justification or "",
-                )
-            )
-            score = bounded
+        score, contributions, suppressed = self._apply_decision(
+            self.store.decision_for(observable_key), score, contributions
+        )
 
         self._record_observable(observable_key, scope, score, contributions, suppressed)
         return score
@@ -197,64 +209,36 @@ class _Evaluation:
         return ResolvedScope.own(finding.fragment_id)
 
     def finding_result(self, finding: Finding) -> FindingResult:
-        forcing = [d for d in self.store.decisions_for(finding.key) if d.kind.targets_finding]
-        decision, superseded = self._resolve_decision(forcing)
+        decision = self.store.decision_for(finding.key)
 
-        if decision is not None and decision.kind is DecisionKind.DISMISSED:
-            return FindingResult(
-                key=finding.key,
-                status=Status.NOT_APPLICABLE,
-                counted=False,
-                score=None,
-                verdict=finding.verdict,
-                confidence=finding.confidence,
-                suppressed_by_decision=True,
-                contributions=(
-                    *superseded,
-                    Contribution(
-                        source_key=decision.key,
-                        label="decision · DISMISSED",
-                        value=0.0,
-                        retained=False,
-                        detail=decision.justification or "",
-                    ),
-                ),
-            )
-
+        # A claim that was never evaluated has no magnitude to override; a stance on it can only
+        # say whether it applies at all.
         if finding.status is not Status.EVALUATED:
-            return FindingResult(
-                key=finding.key,
-                status=finding.status,
-                counted=False,
-                score=None,
-                verdict=finding.verdict,
-                confidence=finding.confidence,
-                contributions=tuple(superseded),
-            )
-
-        if decision is not None and decision.kind is DecisionKind.CONFIRMED:
-            score = self.policy.confirmed_floor
-            return FindingResult(
-                key=finding.key,
-                status=finding.status,
-                score=round_half_up(score, self.policy.output_precision),
-                verdict=verdict_from_score(score),
-                confidence=finding.confidence,
-                suppressed_by_decision=True,
-                contributions=(
-                    *superseded,
-                    Contribution(
-                        source_key=decision.key,
-                        label="decision · CONFIRMED",
-                        value=score,
-                        detail=decision.justification or "",
-                    ),
-                ),
-            )
-
+            return self._unevaluated_result(finding, decision)
         if finding.effect is Effect.FLOOR:
-            return self._conclusion_result(finding)
+            return self._conclusion_result(finding, decision)
 
+        contributions, computed, own_suppressed = self._compute_finding(finding)
+        score, contributions, suppressed = self._apply_decision(decision, computed, contributions)
+
+        # Refuting a claim takes it out of the count entirely: capping its score would leave it
+        # weighing on the aggregate confidence of claims that do hold.
+        refuted = decision is not None and decision.kind is DecisionKind.REFUTE
+        return FindingResult(
+            key=finding.key,
+            status=Status.NOT_APPLICABLE if refuted else finding.status,
+            effect=finding.effect,
+            counted=not refuted,
+            score=None if refuted else round_half_up(score, self.policy.output_precision),
+            verdict=finding.verdict if refuted else verdict_from_score(score),
+            confidence=finding.confidence,
+            contributions=tuple(contributions),
+            own_term_suppressed=own_suppressed and not suppressed,
+            suppressed_by_decision=suppressed,
+        )
+
+    def _compute_finding(self, finding: Finding) -> tuple[list[Contribution], float, bool]:
+        """The evidence alone: what the finding scores before any stance is applied to it."""
         contributions: list[Contribution] = []
 
         own_term = NEG_INF
@@ -295,31 +279,44 @@ class _Evaluation:
                 else c
                 for c in contributions
             ]
+        return contributions, score, own_suppressed
 
+    def _unevaluated_result(self, finding: Finding, decision: Decision | None) -> FindingResult:
+        refuted = decision is not None and decision.kind is DecisionKind.REFUTE
+        contributions: list[Contribution] = []
+        if decision is not None:
+            contributions.append(self._decision_contribution(decision, 0.0, changed=refuted))
         return FindingResult(
             key=finding.key,
-            status=finding.status,
-            score=round_half_up(score, self.policy.output_precision),
-            verdict=verdict_from_score(score),
+            status=Status.NOT_APPLICABLE if refuted else finding.status,
+            effect=finding.effect,
+            counted=False,
+            score=None,
+            verdict=finding.verdict,
             confidence=finding.confidence,
             contributions=tuple(contributions),
-            own_term_suppressed=own_suppressed,
+            suppressed_by_decision=refuted,
         )
 
     # --- conclusions ---------------------------------------------------------------------
 
-    def _conclusion_result(self, finding: Finding) -> FindingResult:
+    def _conclusion_result(self, finding: Finding, decision: Decision | None = None) -> FindingResult:
         """
         A conclusion has no magnitude: ``score`` is ``None``, not ``0.0``.
 
         ``0.0`` would read as a neutral term of the sum, which is precisely what a conclusion is
         not. Its effect is applied on the total by :meth:`_apply_floors` and reported there.
+
+        Only ``REFUTE`` bites here. Upholding something that has no magnitude cannot raise it —
+        a conclusion already asserts its verdict — so the stance is recorded and left unretained.
         """
+        refuted = decision is not None and decision.kind is DecisionKind.REFUTE
         contributions = [
             Contribution(
                 source_key=finding.key,
                 label=f"conclusion · {finding.verdict.value}",
                 value=0.0,
+                retained=not refuted,
                 detail="floor applied on the investigation total",
             )
         ]
@@ -334,14 +331,18 @@ class _Evaluation:
             )
             for link in finding.observable_links
         )
+        if decision is not None:
+            contributions.append(self._decision_contribution(decision, 0.0, changed=refuted))
         return FindingResult(
             key=finding.key,
-            status=finding.status,
+            status=Status.NOT_APPLICABLE if refuted else finding.status,
             effect=Effect.FLOOR,
+            counted=not refuted,
             score=None,
             verdict=finding.verdict,
             confidence=finding.confidence,
             contributions=tuple(contributions),
+            suppressed_by_decision=refuted,
         )
 
     def _apply_floors(

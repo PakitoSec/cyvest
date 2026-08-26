@@ -190,7 +190,7 @@ class TestFindingLevels:
 
 
 class TestDecisions:
-    def test_confirmed_forces_malicious_against_clean_observables(self) -> None:
+    def test_upholding_forces_malicious_against_clean_observables(self) -> None:
         store = make_store()
         url = add_url(store, "f1")
         finding = Finding(
@@ -204,7 +204,7 @@ class TestDecisions:
         store.append(
             Decision(
                 target_key=finding.key,
-                kind=DecisionKind.CONFIRMED,
+                kind=DecisionKind.UPHOLD,
                 justification="confirmé par l'analyse mémoire",
                 source=source("alice", SourceClass.ORG_ANALYST),
                 fragment_id="f1",
@@ -215,7 +215,7 @@ class TestDecisions:
         assert result.verdict is Verdict.MALICIOUS
         assert result.suppressed_by_decision is True
 
-    def test_dismissed_leaves_the_finding_visible_but_uncounted(self) -> None:
+    def test_refuting_leaves_the_finding_visible_but_uncounted(self) -> None:
         store = make_store()
         finding = Finding(
             rule_id="rule",
@@ -228,7 +228,8 @@ class TestDecisions:
         store.append(
             Decision(
                 target_key=finding.key,
-                kind=DecisionKind.DISMISSED,
+                kind=DecisionKind.REFUTE,
+                justification="faux positif connu",
                 source=source("alice", SourceClass.ORG_ANALYST),
                 fragment_id="f1",
             )
@@ -239,7 +240,7 @@ class TestDecisions:
         assert report.finding(finding.key).counted is False
         assert report.investigation.score == 0.0
 
-    def test_allowlisted_observable_derives_to_safe_without_a_forced_verdict(self) -> None:
+    def test_refuted_observable_derives_to_safe_without_a_forced_verdict(self) -> None:
         store = make_store()
         url = add_url(store, "f1")
         store.append(
@@ -248,7 +249,8 @@ class TestDecisions:
         store.append(
             Decision(
                 target_key=url.key,
-                kind=DecisionKind.ALLOWLISTED,
+                kind=DecisionKind.REFUTE,
+                justification="infrastructure d'authentification interne",
                 source=source("rssi", SourceClass.ORG_POLICY),
                 fragment_id="f1",
             )
@@ -259,19 +261,181 @@ class TestDecisions:
         assert result.verdict is Verdict.SAFE
         assert result.suppressed_by_decision is True
 
-    def test_decision_kind_must_match_its_target_family(self) -> None:
-        with pytest.raises(ValueError, match="targets a finding"):
-            Decision(target_key="obs:url:x", kind=DecisionKind.CONFIRMED, source=source(), fragment_id="f1")
-        with pytest.raises(ValueError, match="targets an observable"):
-            Decision(target_key="fnd:r:obs:url:x", kind=DecisionKind.ALLOWLISTED, source=source(), fragment_id="f1")
+    def test_a_decision_targets_an_observable_or_a_finding(self) -> None:
+        """The family is the target's business — but it still has to be one that can be decided."""
+        with pytest.raises(ValueError, match="observable or a finding"):
+            Decision(
+                target_key="tag:phishing",
+                kind=DecisionKind.UPHOLD,
+                justification="peu importe",
+                source=source(),
+                fragment_id="f1",
+            )
+
+    def test_every_kind_is_valid_on_every_decidable_family(self) -> None:
+        """No combination to forbid: that is the point of taking the family out of the kind."""
+        for target in ("obs:url:x", "fnd:r:obs:url:x"):
+            for kind in DecisionKind:
+                decision = Decision(
+                    target_key=target,
+                    kind=kind,
+                    justification="motif",
+                    source=source(),
+                    fragment_id="f1",
+                )
+                assert decision.key == f"dec:{target}"
+
+    def test_a_decision_requires_a_reason(self) -> None:
+        """An override nobody has to justify is an override nobody can audit."""
+        with pytest.raises(ValueError):
+            Decision(
+                target_key="obs:url:x",
+                kind=DecisionKind.REFUTE,
+                justification="",
+                source=source(),
+                fragment_id="f1",
+            )
+
+    def test_the_counterfactual_survives_an_override(self) -> None:
+        """
+        An overridden result must still show what the evidence alone produced.
+
+        The engine used to short-circuit on a decided finding and never compute the natural
+        score, so the report could not say what had been overruled — only that something was.
+        """
+        store = make_store()
+        url = add_url(store, "f1")
+        store.append(
+            ThreatIntel(subject_key=url.key, verdict=Verdict.MALICIOUS, weight=8.0, source=source(), fragment_id="f1")
+        )
+        finding = Finding(
+            rule_id="rule",
+            subject_key=url.key,
+            source=source(),
+            fragment_id="f1",
+            observable_links=[ObservableLink(observable_key=url.key, scope=Scope.ALL)],
+        )
+        store.append(finding)
+        store.append(
+            Decision(
+                target_key=finding.key,
+                kind=DecisionKind.REFUTE,
+                justification="faux positif connu",
+                source=source("alice", SourceClass.ORG_ANALYST),
+                fragment_id="f1",
+            )
+        )
+
+        contributions = evaluate(store).finding(finding.key).contributions
+        link = next(c for c in contributions if c.source_key == url.key)
+        assert link.value == 8.0
+        assert link.retained is False
+
+
+class TestVacating:
+    """
+    Withdrawing a stance is an act of its own.
+
+    Asserting the opposite one would say something different — and usually false — and an
+    append-only model cannot express a retraction by deletion.
+    """
+
+    @staticmethod
+    def _refuted_url() -> tuple[FactStore, str]:
+        store = make_store()
+        url = add_url(store, "f1")
+        store.append(
+            ThreatIntel(subject_key=url.key, verdict=Verdict.MALICIOUS, weight=8.0, source=source(), fragment_id="f1")
+        )
+        store.append(
+            Decision(
+                target_key=url.key,
+                kind=DecisionKind.REFUTE,
+                justification="infra interne",
+                occurred_at=datetime(2026, 1, 15, tzinfo=timezone.utc),
+                source=source("rssi", SourceClass.ORG_POLICY),
+                fragment_id="f1",
+            )
+        )
+        return store, url.key
+
+    def test_vacating_restores_the_computed_value(self) -> None:
+        store, url_key = self._refuted_url()
+        assert evaluate(store).observable(url_key).score == -1.0
+
+        store.append(
+            Decision(
+                target_key=url_key,
+                kind=DecisionKind.VACATED,
+                justification="le domaine n'est plus géré par la RSSI",
+                occurred_at=datetime(2026, 6, 15, tzinfo=timezone.utc),
+                source=source("soc-lead", SourceClass.ORG_ANALYST),
+                fragment_id="f1",
+            )
+        )
+
+        result = evaluate(store).observable(url_key)
+        assert result.score == 8.0
+        assert result.verdict is Verdict.MALICIOUS
+        assert result.suppressed_by_decision is False
+
+    def test_a_vacated_stance_stays_in_the_report(self) -> None:
+        """Un-deciding is itself a decision: the analyst must see that someone withdrew."""
+        store, url_key = self._refuted_url()
+        store.append(
+            Decision(
+                target_key=url_key,
+                kind=DecisionKind.VACATED,
+                justification="plus dans le périmètre",
+                occurred_at=datetime(2026, 6, 15, tzinfo=timezone.utc),
+                source=source("soc-lead", SourceClass.ORG_ANALYST),
+                fragment_id="f1",
+            )
+        )
+
+        contributions = evaluate(store).observable(url_key).contributions
+        vacated = next(c for c in contributions if c.source_key.startswith("dec:"))
+        assert vacated.retained is False
+        assert "stance withdrawn" in vacated.detail
+        assert "plus dans le périmètre" in vacated.detail
+
+    def test_a_vacated_finding_is_counted_again(self) -> None:
+        store = make_store()
+        finding = Finding(
+            rule_id="rule",
+            subject_key="obs:url:none",
+            source=source(),
+            fragment_id="f1",
+            verdict=Verdict.MALICIOUS,
+        )
+        store.append(finding)
+        for kind, when in (
+            (DecisionKind.REFUTE, datetime(2026, 1, 15, tzinfo=timezone.utc)),
+            (DecisionKind.VACATED, datetime(2026, 6, 15, tzinfo=timezone.utc)),
+        ):
+            store.append(
+                Decision(
+                    target_key=finding.key,
+                    kind=kind,
+                    justification="motif",
+                    occurred_at=when,
+                    source=source("alice", SourceClass.ORG_ANALYST),
+                    fragment_id="f1",
+                )
+            )
+
+        result = evaluate(store).finding(finding.key)
+        assert result.counted is True
+        assert result.status is Status.EVALUATED
 
 
 class TestContradictoryDecisions:
     """
-    ``ALLOWLISTED``/``BLOCKLISTED`` and ``CONFIRMED``/``DISMISSED`` carry different keys, so one
-    target can legitimately hold two opposite decisions. They are settled by freshness, like every
-    other conflict in v7. Applied in sequence instead, the outcome followed set iteration order
-    and the same document could report ``SAFE`` or ``MALICIOUS`` from one run to the next.
+    A target holds one stance, whatever it says.
+
+    The kind is content, not identity, so two opposite calls share a key and the store's own
+    merge law settles them by freshness — the same law every other fact obeys. Keying on the kind
+    let them coexist and forced the engine to arbitrate them itself, duplicating that law.
     """
 
     JANUARY = datetime(2026, 1, 15, tzinfo=timezone.utc)
@@ -283,11 +447,12 @@ class TestContradictoryDecisions:
         store.append(
             ThreatIntel(subject_key=url.key, verdict=Verdict.MALICIOUS, weight=8.0, source=source(), fragment_id="f1")
         )
-        for kind in (DecisionKind.ALLOWLISTED, DecisionKind.BLOCKLISTED):
+        for kind in (DecisionKind.REFUTE, DecisionKind.UPHOLD):
             store.append(
                 Decision(
                     target_key=url.key,
                     kind=kind,
+                    justification="motif",
                     occurred_at=self.JUNE if kind is fresher else self.JANUARY,
                     source=source("rssi", SourceClass.ORG_POLICY),
                     fragment_id="f1",
@@ -295,26 +460,22 @@ class TestContradictoryDecisions:
             )
         return store, url.key
 
-    def test_the_freshest_bound_wins_on_an_observable(self) -> None:
-        store, url_key = self._bounded(DecisionKind.BLOCKLISTED)
+    def test_one_target_holds_exactly_one_decision(self) -> None:
+        store, url_key = self._bounded(DecisionKind.UPHOLD)
+        assert len(store.decisions) == 1
+        assert store.decision_for(url_key) is store.decisions[f"dec:{url_key}"]
+
+    def test_the_freshest_stance_wins_on_an_observable(self) -> None:
+        store, url_key = self._bounded(DecisionKind.UPHOLD)
         result = evaluate(store).observable(url_key)
         assert result.score == 9.0
         assert result.verdict is Verdict.MALICIOUS
 
-    def test_the_opposite_bound_wins_when_it_is_the_fresher_one(self) -> None:
-        store, url_key = self._bounded(DecisionKind.ALLOWLISTED)
+    def test_the_opposite_stance_wins_when_it_is_the_fresher_one(self) -> None:
+        store, url_key = self._bounded(DecisionKind.REFUTE)
         result = evaluate(store).observable(url_key)
         assert result.score == -1.0
         assert result.verdict is Verdict.SAFE
-
-    def test_the_superseded_decision_stays_visible_in_the_report(self) -> None:
-        """A human call that lost is still a human call: dropping it would hide the conflict."""
-        store, url_key = self._bounded(DecisionKind.BLOCKLISTED)
-        contributions = evaluate(store).observable(url_key).contributions
-        superseded = [c for c in contributions if c.source_key.startswith("dec:allowlisted:")]
-        assert len(superseded) == 1
-        assert superseded[0].retained is False
-        assert "superseded by a fresher BLOCKLISTED decision" in superseded[0].detail
 
     def _forced(self, fresher: DecisionKind) -> tuple[FactStore, str]:
         store = make_store()
@@ -326,11 +487,12 @@ class TestContradictoryDecisions:
             verdict=Verdict.NOTABLE,
         )
         store.append(finding)
-        for kind in (DecisionKind.CONFIRMED, DecisionKind.DISMISSED):
+        for kind in (DecisionKind.UPHOLD, DecisionKind.REFUTE):
             store.append(
                 Decision(
                     target_key=finding.key,
                     kind=kind,
+                    justification="motif",
                     occurred_at=self.JUNE if kind is fresher else self.JANUARY,
                     source=source("alice", SourceClass.ORG_ANALYST),
                     fragment_id="f1",
@@ -340,13 +502,13 @@ class TestContradictoryDecisions:
 
     def test_a_fresher_confirmation_outranks_an_older_dismissal(self) -> None:
         """Precedence used to be hardcoded: DISMISSED always won, however stale it was."""
-        store, finding_key = self._forced(DecisionKind.CONFIRMED)
+        store, finding_key = self._forced(DecisionKind.UPHOLD)
         result = evaluate(store).finding(finding_key)
         assert result.counted is True
         assert result.verdict is Verdict.MALICIOUS
 
     def test_a_fresher_dismissal_outranks_an_older_confirmation(self) -> None:
-        store, finding_key = self._forced(DecisionKind.DISMISSED)
+        store, finding_key = self._forced(DecisionKind.REFUTE)
         result = evaluate(store).finding(finding_key)
         assert result.counted is False
         assert result.status is Status.NOT_APPLICABLE
@@ -548,13 +710,14 @@ class TestConclusions:
         links = [c for c in report.finding(conclusion.key).contributions if c.label.startswith("link")]
         assert links and not any(c.retained for c in links)
 
-    def test_dismissed_cancels_the_floor_entirely(self) -> None:
+    def test_refuting_cancels_the_floor_entirely(self) -> None:
         store = make_store()
         conclusion = self._conclusion(store, verdict=Verdict.MALICIOUS)
         store.append(
             Decision(
                 target_key=conclusion.key,
-                kind=DecisionKind.DISMISSED,
+                kind=DecisionKind.REFUTE,
+                justification="l'analyse s'appuyait sur un artefact effacé depuis",
                 source=source("alice", SourceClass.ORG_ANALYST),
                 fragment_id="f1",
             )
@@ -564,21 +727,31 @@ class TestConclusions:
         assert report.finding(conclusion.key).counted is False
         assert report.investigation.score == 0.0
 
-    def test_confirmed_overrides_the_floor_with_its_own(self) -> None:
+    def test_upholding_a_conclusion_cannot_raise_what_has_no_magnitude(self) -> None:
+        """
+        A conclusion already asserts its verdict; upholding it adds nothing to raise.
+
+        The engine used to answer this by turning the conclusion into an additive finding scored
+        at the floor — silently changing its ``effect`` and double-counting what it had read.
+        """
         store = make_store()
         conclusion = self._conclusion(store, verdict=Verdict.SUSPICIOUS)
         store.append(
             Decision(
                 target_key=conclusion.key,
-                kind=DecisionKind.CONFIRMED,
+                kind=DecisionKind.UPHOLD,
+                justification="revue par le RSSI",
                 source=source("alice", SourceClass.ORG_ANALYST),
                 fragment_id="f1",
             )
         )
 
         report = evaluate(store)
-        assert report.finding(conclusion.key).score == DEFAULT_POLICY.confirmed_floor
-        assert report.investigation.score == DEFAULT_POLICY.confirmed_floor
+        result = report.finding(conclusion.key)
+        assert result.effect is Effect.FLOOR
+        assert result.score is None
+        assert result.counted is True
+        assert report.investigation.score == 3.0
 
     def test_a_non_evaluated_conclusion_applies_nothing(self) -> None:
         store = make_store()

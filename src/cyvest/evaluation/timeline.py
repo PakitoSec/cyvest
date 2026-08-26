@@ -20,7 +20,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from cyvest.enums import Salience, Status, Verdict
 from cyvest.evaluation.report import Report, ResolvedScope
 from cyvest.facts.base import Fact
-from cyvest.facts.decision import Decision
+from cyvest.facts.decision import Decision, decision_label
 from cyvest.facts.evidence import Evidence
 from cyvest.facts.finding import Finding
 from cyvest.facts.observable import Observable
@@ -59,7 +59,7 @@ def _describe(fact: Fact) -> tuple[str, str, str]:
     if isinstance(fact, Finding):
         return "finding", fact.name or fact.rule_id, fact.subject_key
     if isinstance(fact, Decision):
-        return "decision", f"{fact.kind.value} · {fact.justification or ''}".strip(" ·"), fact.target_key
+        return "decision", f"{decision_label(fact)} · {fact.justification}".strip(" ·"), fact.target_key
     if isinstance(fact, Relation):
         return "relation", f"{fact.kind.value} → {fact.target_key}", fact.source_key
     if isinstance(fact, Evidence):

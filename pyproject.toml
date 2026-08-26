@@ -18,13 +18,17 @@ dependencies = [
 ]
 keywords = ["cybersecurity", "investigation", "threat-intel", "security-analysis"]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
+    "Intended Audience :: Information Technology",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Security",
+    "Typing :: Typed",
 ]
 
 [project.scripts]
@@ -32,6 +36,7 @@ cyvest = "cyvest.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/PakitoSec/cyvest"
+Documentation = "https://pakitosec.github.io/cyvest/"
 Repository = "https://github.com/PakitoSec/cyvest"
 Issues = "https://github.com/PakitoSec/cyvest/issues"
 
@@ -67,6 +72,11 @@ ignore = []
 
 [tool.ruff.lint.isort]
 known-first-party = ["cyvest"]
+
+# Ruff >= 0.16 formats fenced code blocks in Markdown, which collapses the multi-line fluent
+# chains the docs use to teach the API. Prose is out of scope for the formatter.
+[tool.ruff.format]
+exclude = ["*.md"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -1,6 +1,7 @@
 # Installation
 
-The fastest way to evaluate Cyvest is to install it in editable mode so the CLI, fluent helpers, and docs stay in sync with your workspace.
+Cyvest is published on PyPI. Installing the package gives you both the `cyvest` module and the
+`cyvest` CLI; nothing else is required to build, score, and serialize an investigation.
 
 ---
 
@@ -8,35 +9,28 @@ The fastest way to evaluate Cyvest is to install it in editable mode so the CLI,
 
 | Component | Minimum |
 | --- | --- |
-| Python | `>= 3.10` (3.11+ recommended for perf) |
+| Python | `>= 3.10` |
 | Package manager | [uv](https://github.com/astral-sh/uv) **or** pip |
-| Tooling (dev profile) | `pytest`, `pytest-cov`, `ruff`, `mypy`, `mkdocs-material` |
-
-!!! tip "Using the repository CLI?"
-    Run `uv pip install -e .` after syncing dependencies so local changes are immediately reflected in the `cyvest` command.
+| Node.js | `>= 22`, only for the `@cyvest/*` JavaScript packages |
 
 ---
 
 ## Option 1 · uv (recommended)
 
 ```bash
-# Install uv (macOS/Linux)
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# Install uv (Windows PowerShell)
-powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
+uv add cyvest
 ```
 
+To get the CLI without adding Cyvest to a project:
+
 ```bash
-# Clone and bootstrap
-git clone https://github.com/PAKITOSEC/cyvest.git
-cd cyvest
+uv tool install cyvest
+```
 
-# Sync runtime + dev extras defined in pyproject/uv.lock
-uv sync --all-extras
+Or run it once without installing anything:
 
-# Editable install to expose the CLI + module
-uv pip install -e .
+```bash
+uvx --from cyvest cyvest --help
 ```
 
 ---
@@ -44,19 +38,40 @@ uv pip install -e .
 ## Option 2 · pip
 
 ```bash
-git clone https://github.com/PAKITOSEC/cyvest.git
-cd cyvest
-
-# (Recommended) create an isolated environment
 python -m venv .venv
 source .venv/bin/activate       # Windows: .venv\Scripts\activate
 
-# Install runtime
-pip install -e .
-
-# Install development profile
-pip install -e ".[dev]"
+pip install cyvest
 ```
+
+---
+
+## Option 3 · From source
+
+Use this only to work **on** Cyvest — see [Contributing](../contributing.md) for the full loop.
+
+```bash
+git clone https://github.com/PakitoSec/cyvest.git
+cd cyvest
+
+# Runtime + dev + docs dependency groups, resolved from uv.lock
+uv sync --all-groups
+```
+
+`uv sync` installs the project in editable mode, so `uv run cyvest` reflects your working tree
+immediately. There is no separate `uv pip install -e .` step.
+
+---
+
+## JavaScript packages
+
+```bash
+pnpm add @cyvest/cyvest-js          # typed reader for the JSON documents
+pnpm add @cyvest/cyvest-vis         # React graph components
+```
+
+Their version tracks the Python one: `@cyvest/cyvest-js@7.0.0` reads the documents written by
+`cyvest==7.0.0`. See [JS packages](../js-packages.md).
 
 ---
 
@@ -67,18 +82,10 @@ pip install -e ".[dev]"
 python -c "import cyvest; print(cyvest.__version__)"
 
 # Confirm the CLI entrypoint
-cyvest --help
+cyvest --version
 ```
 
-When dependencies change upstream, re-run `uv sync --all-extras` (or `pip install -e ".[dev]"`) to stay aligned with CI.
-
----
-
-## Optional Integrations
-
-- `mkdocs` + `mkdocs-material` for local docs previews (`mkdocs serve`)
-- `@cyvest/cyvest-vis` for interactive graph rendering, see [JS packages](../js-packages.md)
-- Any asyncio, queue, or orchestration library—Cyvest stays synchronous but interoperates through shared context managers
+Both must report the same version.
 
 ---
 
@@ -86,5 +93,4 @@ When dependencies change upstream, re-run `uv sync --all-extras` (or `pip instal
 
 - Build your first investigation in [Quick Start](quickstart.md)
 - Deep dive into [Core Concepts](concepts.md)
-- Upgrade an existing integration with the [v5 to v6 migration guide](../migration-v5-to-v6.md)
-- Preview the docs site with `mkdocs serve`
+- Upgrade an existing integration with the [v6 to v7 migration guide](../migration-v6-to-v7.md)

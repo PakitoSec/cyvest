@@ -202,7 +202,9 @@ def load_investigation_dict(data: dict[str, Any], *, migrate: bool = False) -> I
     # Refuse a newer document before anything else: migrating it would be nonsense.
     _check_readable(version)
 
-    if version != SCHEMA_VERSION:
+    # Only a major bump needs a migration. Within 7.x every added field is optional and carries a
+    # default, so a 7.0 document validates unchanged against a later 7.x model.
+    if _version_tuple(version)[0] != _version_tuple(SCHEMA_VERSION)[0]:
         if not migrate:
             raise ValueError(
                 f"Document schema is {version}, this library reads {SCHEMA_VERSION}. "
@@ -639,10 +641,11 @@ _MIGRATIONS = {
 
 
 def migrate_to_current(data: dict[str, Any]) -> dict[str, Any]:
-    """Chain migrations up to the current schema, so a 5.x document upgrades in one call."""
+    """Chain migrations up to the current major, so a 5.x document upgrades in one call."""
     version = detect_schema_version(data)
     migrated = data
-    while version != SCHEMA_VERSION:
+    # Stop on the major: minor bumps are additive by contract and have no migration step.
+    while _version_tuple(version)[0] != _version_tuple(SCHEMA_VERSION)[0]:
         step = _MIGRATIONS.get(version)
         if step is None:
             raise ValueError(f"No migration path from schema version {version!r}")

@@ -55,6 +55,18 @@ class TestContract:
         draft = Cyvest.io_load_signal(_response(source_class="internal_tool"))
         assert draft["source_class"] is SourceClass.INTERNAL_TOOL
 
+    def test_an_envelope_from_an_earlier_patch_is_accepted(self) -> None:
+        assert Cyvest.io_load_signal(_response(schema_version="7.0.0"))["source"] == "virustotal"
+
+    def test_an_envelope_from_a_newer_minor_is_refused(self) -> None:
+        """Accepting it would silently drop the fields that minor added."""
+        with pytest.raises(ValidationError, match="newer than this library"):
+            Cyvest.io_load_signal(_response(schema_version="7.1.0"))
+
+    def test_an_envelope_from_another_major_is_refused(self) -> None:
+        with pytest.raises(ValidationError):
+            Cyvest.io_load_signal(_response(schema_version="6.0.0"))
+
 
 class TestIdempotence:
     def test_ingesting_the_same_response_twice_yields_one_signal(self) -> None:

@@ -1,9 +1,30 @@
 {
   "name": "@cyvest/cyvest-js",
   "version": "7.0.0",
+  "description": "Typed reader for Cyvest investigation documents: schema validation, fact accessors, and graph helpers.",
+  "keywords": [
+    "cybersecurity",
+    "investigation",
+    "threat-intel",
+    "security-analysis",
+    "cyvest"
+  ],
+  "homepage": "https://github.com/PakitoSec/cyvest#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/PakitoSec/cyvest.git",
+    "directory": "js/packages/cyvest-js"
+  },
+  "bugs": {
+    "url": "https://github.com/PakitoSec/cyvest/issues"
+  },
+  "license": "MIT",
+  "author": "PakitoSec",
   "type": "module",
   "files": [
-    "dist"
+    "dist",
+    "README.md",
+    "LICENSE"
   ],
   "main": "dist/index.cjs",
   "module": "dist/index.js",

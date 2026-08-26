@@ -5,9 +5,9 @@
  * refuse a 7.1 document rather than silently ignore fields it does not know about. Python
  * applies exactly the same rule.
  *
- * Order matters. The schema pins `schema_version` to a `const`, so handing the payload to ajv
- * first turns every version mismatch into an opaque shape error and makes the version check
- * unreachable. The version is therefore read and judged before anything else.
+ * Order matters. The schema constrains `schema_version` to the current major, so the minor
+ * window is the SDK's job alone; reading and judging the version first also keeps the error
+ * message explicit instead of an opaque ajv shape error.
  */
 
 import Ajv2020, { type ValidateFunction } from "ajv/dist/2020.js";
@@ -61,9 +61,6 @@ export function assertReadableVersion(version: string): void {
   }
   if (docMajor < libMajor) {
     throw new Error(`Document schema ${version} predates this SDK (${SCHEMA_VERSION}); run 'cyvest migrate'.`);
-  }
-  if (version !== SCHEMA_VERSION) {
-    throw new Error(`Document schema is ${version}, this SDK reads ${SCHEMA_VERSION}; run 'cyvest migrate'.`);
   }
 }
 

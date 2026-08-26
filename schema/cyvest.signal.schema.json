@@ -32,8 +32,8 @@
   "description": "One judgment about one observable, as produced by an external system.\n\n``verdict`` and ``weight`` are the two halves of a magnitude and either one is enough: a\nsource that only knows \"this is bad\" states the verdict, a source that returns a number\nstates the weight, and the missing half is completed from the score bands.",
   "properties": {
     "schema_version": {
-      "const": "7.0.0",
       "default": "7.0.0",
+      "pattern": "^7\\.\\d+\\.\\d+$",
       "title": "Schema Version",
       "type": "string"
     },

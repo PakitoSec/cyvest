@@ -7,5 +7,6 @@ export default defineConfig({
   // keep dist/index.js + dist/index.cjs as declared in package.json exports
   fixedExtension: false,
   deps: { neverBundle: ["react", "react-dom"] },
-  copy: [{ from: "src/styles.css", to: "dist/styles.css" }],
+  // `to` is treated as a directory: pointing it at dist/styles.css nests the file.
+  copy: [{ from: "src/styles.css", to: "dist" }],
 });

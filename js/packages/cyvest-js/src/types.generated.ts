@@ -121,7 +121,7 @@ export type FragmentId = string | null;
  * A complete serialized investigation.
  */
 export interface InvestigationSchema {
-  schema_version?: "7.0.0";
+  schema_version?: string;
   header: InvestigationHeader;
   policy_version?: string;
   engine_id?: string;

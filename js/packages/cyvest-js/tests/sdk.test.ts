@@ -62,9 +62,14 @@ describe("parsing and the version contract", () => {
     expect(() => assertReadableVersion("6.0.0")).toThrow(/migrate/);
   });
 
+  it("accepts an earlier minor of the same major, which is what lets a 7.1 SDK read 7.0 data", () => {
+    const document = raw();
+    document.schema_version = "7.0.99";
+    expect(() => parseCyvest(document)).not.toThrow();
+  });
+
   // The checks above call the guard directly. These go through `parseCyvest`, which is what a
-  // consumer actually calls — the guard used to be unreachable from it, because the schema pins
-  // `schema_version` to a const and ajv rejected every mismatch first with a shape error.
+  // consumer actually calls.
   it("applies the version contract through parseCyvest, not just in isolation", () => {
     const document = raw();
     document.schema_version = "7.1.0";

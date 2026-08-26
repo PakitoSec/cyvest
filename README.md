@@ -1,5 +1,6 @@
 # Cyvest
 
+[![PyPI](https://img.shields.io/pypi/v/cyvest.svg)](https://pypi.org/project/cyvest/)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -31,19 +32,22 @@ compatibility layer.
 
 ## Installation
 
-### Using uv (recommended)
+```bash
+uv add cyvest          # or: pip install cyvest
+```
+
+The CLI ships with the package:
+
+```bash
+uvx --from cyvest cyvest --help
+```
+
+To work on Cyvest itself:
 
 ```bash
 git clone https://github.com/PakitoSec/cyvest.git
 cd cyvest
-uv sync
-uv pip install -e .
-```
-
-### Using pip
-
-```bash
-pip install -e .
+uv sync --all-groups
 ```
 
 Graph visualization is provided by the `@cyvest/cyvest-vis` React package, see

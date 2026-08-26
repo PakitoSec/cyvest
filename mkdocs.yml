@@ -1,8 +1,8 @@
 site_name: Cyvest
 site_description: Build, score, and narrate cybersecurity investigations with confidence.
-site_url: https://example.com/cyvest
-repo_url: https://github.com/PAKITOSEC/cyvest
-repo_name: PAKITOSEC/cyvest
+site_url: https://pakitosec.github.io/cyvest/
+repo_url: https://github.com/PakitoSec/cyvest
+repo_name: PakitoSec/cyvest
 edit_uri: edit/main/docs/
 
 docs_dir: docs
@@ -40,7 +40,7 @@ theme:
 extra:
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/PAKITOSEC/cyvest
+      link: https://github.com/PakitoSec/cyvest
       name: Cyvest on GitHub
     - icon: fontawesome/brands/twitter
       link: https://twitter.com/pakitosec
@@ -63,7 +63,7 @@ nav:
   - Observable Extraction: observable-extraction.md
   - JavaScript Packages: js-packages.md
   - Contributing: contributing.md
-  - Follow-up (v7): followup-v7.md
+  - Roadmap: roadmap.md
 
 markdown_extensions:
   - admonition

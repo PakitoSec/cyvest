@@ -16,7 +16,7 @@ every existing document.
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -32,6 +32,11 @@ from cyvest.facts.tag import Tag
 
 SCHEMA_VERSION = "7.0.0"
 SCHEMA_ID = "https://cyvest.io/schema/investigation-7.json"
+
+# The schema only guards the major: pinning the exact version here would make every 7.x release
+# refuse the documents written by the previous one. The minor window is enforced at load time by
+# ``io_serialization._check_readable``, which ajv and pydantic cannot express.
+SCHEMA_VERSION_PATTERN = rf"^{SCHEMA_VERSION.split('.')[0]}\.\d+\.\d+$"
 
 
 class FactsSchema(BaseModel):
@@ -55,7 +60,7 @@ class InvestigationSchema(BaseModel):
 
     model_config = ConfigDict(extra="forbid", json_schema_extra={"$id": SCHEMA_ID})
 
-    schema_version: Literal["7.0.0"] = Field(default=SCHEMA_VERSION)
+    schema_version: str = Field(default=SCHEMA_VERSION, pattern=SCHEMA_VERSION_PATTERN)
     header: InvestigationHeader = Field(...)
     policy_version: str = Field(default="default-v1")
     engine_id: str = Field(default="basic-v1")
@@ -67,4 +72,4 @@ class InvestigationSchema(BaseModel):
     report: Report = Field(...)
 
 
-__all__ = ["SCHEMA_ID", "SCHEMA_VERSION", "FactsSchema", "InvestigationSchema"]
+__all__ = ["SCHEMA_ID", "SCHEMA_VERSION", "SCHEMA_VERSION_PATTERN", "FactsSchema", "InvestigationSchema"]

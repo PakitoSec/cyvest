@@ -5,8 +5,9 @@ Cyvest ships a small JavaScript/TypeScript workspace alongside the Python API. U
 The JS packages follow the generated schema. A serialized investigation is a v7 document: facts
 live under `facts.*` (`observables`, `relations`, `signals`, `evidences`, `findings`), decisions
 and tags sit beside them, and **every derived value is read from `report`** — the SDK never
-recomputes a score. `parseCyvest` refuses any document whose `schema_version` is not `7.0.0`,
-pointing at `cyvest migrate` for older ones.
+recomputes a score. `parseCyvest` reads any document of the same major up to its own minor: a
+`7.1` SDK accepts a `7.0` document, a `7.0` SDK refuses a `7.1` one rather than dropping the
+fields it does not know, and a 6.x document is pointed at `cyvest migrate`.
 
 ## Packages
 

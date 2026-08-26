@@ -89,6 +89,20 @@ class TestUpwardCompatibility:
         with pytest.raises(ValueError, match="upgrade cyvest"):
             load_investigation_dict(document, migrate=True)
 
+    def test_a_patch_release_of_the_same_minor_loads_untouched(self) -> None:
+        document = investigation_to_dict(build_case()._investigation)
+        document["schema_version"] = "7.0.99"
+        assert load_investigation_dict(document) is not None
+
+    def test_a_later_minor_library_reads_an_earlier_minor_document(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """The invariant a 7.1 release must honour: no migration, no opt-in flag, just a read."""
+        import cyvest.io_serialization as io_serialization
+
+        monkeypatch.setattr(io_serialization, "SCHEMA_VERSION", "7.1.0")
+        document = investigation_to_dict(build_case()._investigation)
+        assert document["schema_version"] == "7.0.0"
+        assert io_serialization.load_investigation_dict(document) is not None
+
     def test_an_older_document_needs_an_explicit_migration(self) -> None:
         with pytest.raises(ValueError, match="migrate"):
             load_investigation_dict({"schema_version": "6.0.0", "observables": {}})
@@ -97,6 +111,12 @@ class TestUpwardCompatibility:
         assert detect_schema_version({}) == "5"
         assert detect_schema_version({"schema_version": "6.0.0"}) == "6.0.0"
         assert detect_schema_version({"schema_version": SCHEMA_VERSION}) == SCHEMA_VERSION
+
+    def test_a_document_from_another_major_is_never_mistaken_for_a_readable_one(self) -> None:
+        document = investigation_to_dict(build_case()._investigation)
+        document["schema_version"] = "8.0.0"
+        with pytest.raises(ValueError, match="upgrade cyvest"):
+            load_investigation_dict(document)
 
 
 V6_DOCUMENT = {

@@ -56,7 +56,7 @@
     "react-dom": "^19.0.0"
   },
   "dependencies": {
-    "@cyvest/cyvest-js": "workspace:*",
+    "@cyvest/cyvest-js": "workspace:^",
     "cytoscape": "^3.34.1",
     "d3-force": "^3.0.0"
   },

@@ -66,7 +66,7 @@ from cyvest.proxies import (
     ThreatIntelProxy,
 )
 from cyvest.resolvers import ObservableResolution, ObservableResolver
-from cyvest.signal_schema import SIGNAL_SCHEMA_VERSION, SignalEnvelope
+from cyvest.schema.signal import SIGNAL_SCHEMA_VERSION, SignalEnvelope
 
 __version__ = "7.0.0"
 

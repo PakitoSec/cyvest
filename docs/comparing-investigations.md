@@ -122,7 +122,7 @@ actual.display_diff(expected, title="Nightly regression")
 ```
 
 ```python
-from cyvest.io_rich import display_diff
+from cyvest.io.render import display_diff
 
 display_diff(diffs, title="Nightly regression")
 display_diff(diffs, lambda renderable: logger.rich("INFO", renderable, width=150))

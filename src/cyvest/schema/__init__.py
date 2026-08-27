@@ -1,20 +1,31 @@
 """
-JSON Schema definition for serialized Cyvest investigations.
+The published contracts: what a document looks like, and what a producer must send.
 
-The schema mirrors the structure emitted by `serialize_investigation` in
-`cyvest.io_serialization` so consumers can validate exports or generate
-typed bindings.
+``investigation`` is the shape Cyvest **emits**, ``signal`` the shape it **accepts**. The JSON
+Schema generators live here rather than beside them because both answer the same question from
+the outside — "what do I validate against?" — and both are derived, never hand-written.
 
-This module uses Pydantic's `model_json_schema(mode='serialization')` to generate
-schemas that match the actual serialized output (respecting field_serializer decorators).
+Generation goes through Pydantic's ``model_json_schema``, so ``field_serializer`` decorators are
+respected and the schema matches the real payload rather than the declared types.
 """
 
 from __future__ import annotations
 
 from typing import Any
 
-from cyvest.model_schema import InvestigationSchema
-from cyvest.signal_schema import SignalEnvelope
+from cyvest.schema.investigation import (
+    SCHEMA_ID,
+    SCHEMA_VERSION,
+    SCHEMA_VERSION_PATTERN,
+    FactsSchema,
+    InvestigationSchema,
+)
+from cyvest.schema.signal import (
+    SIGNAL_SCHEMA_ID,
+    SIGNAL_SCHEMA_VERSION,
+    SIGNAL_SCHEMA_VERSION_PATTERN,
+    SignalEnvelope,
+)
 
 
 def get_investigation_schema() -> dict[str, Any]:
@@ -44,3 +55,18 @@ def get_signal_schema() -> dict[str, Any]:
     producer must send, not what Cyvest emits.
     """
     return SignalEnvelope.model_json_schema(mode="validation", by_alias=True)
+
+
+__all__ = [
+    "SCHEMA_ID",
+    "SCHEMA_VERSION",
+    "SCHEMA_VERSION_PATTERN",
+    "SIGNAL_SCHEMA_ID",
+    "SIGNAL_SCHEMA_VERSION",
+    "SIGNAL_SCHEMA_VERSION_PATTERN",
+    "FactsSchema",
+    "InvestigationSchema",
+    "SignalEnvelope",
+    "get_investigation_schema",
+    "get_signal_schema",
+]

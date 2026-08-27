@@ -96,6 +96,11 @@ $$
 with `a` from `policy.attenuation`. `related-to` has attenuation `0.0`, which is the formal way of
 saying a symmetric association carries no blame.
 
+The same ordering drives the picture: `@cyvest/cyvest-vis` builds its hierarchy from the propagating
+kinds only, and reads `related-to` as context. See
+[Relationship semantics](js-packages.md#relationship-semantics) — the visual scale mirrors the
+ordering of the kinds, not the numbers in `policy.attenuation`.
+
 !!! note "Cycles terminate"
     An observable being evaluated contributes `0.0` to itself, so a cyclic graph converges instead
     of recursing forever.

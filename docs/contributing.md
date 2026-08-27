@@ -9,9 +9,9 @@ Thank you for helping us build a better investigation framework. This guide capt
 | Task | Command |
 | --- | --- |
 | Fork and clone | `git clone https://github.com/PAKITOSEC/cyvest.git && cd cyvest` |
-| Install runtime + dev deps (uv) | `uv sync --all-extras && uv pip install -e .` |
+| Install runtime + dev deps (uv) | `uv sync --all-groups` |
 | Install runtime + dev deps (pip) | `pip install -e . && pip install -e ".[dev]"` |
-| Smoke test environment | `pytest && ruff check . && mypy src/cyvest` |
+| Smoke test environment | `uv run pytest && uv run ruff check .` |
 
 !!! note "Code of Conduct"
     We expect respectful, inclusive collaboration. Report unacceptable behaviour via GitHub Discussions or email.
@@ -35,7 +35,6 @@ Thank you for helping us build a better investigation framework. This guide capt
 # Fast feedback loop
 ruff format .
 ruff check .
-mypy src/cyvest
 pytest
 
 # Full coverage / HTML report when touching scoring logic
@@ -51,11 +50,12 @@ pytest --cov=cyvest --cov-report=term-missing --cov-report=html
 
 | Layer | Role | Files |
 | --- | --- | --- |
-| **Investigation** | Authoritative state: observables, findings, TI, tags, score engine | `src/cyvest/investigation.py` |
+| **Investigation** | Authoritative state: the fact store, decisions, tags, and the evaluation entry point | `src/cyvest/investigation.py`, `src/cyvest/facts/store.py` |
 | **Cyvest facade** | Public API + CLI entry, manages deterministic keys, exposes fluent helpers | `src/cyvest/cyvest.py`, `src/cyvest/cli.py` |
 | **Proxy helpers** | Fluent builders for observables/findings/tags with merge-on-create semantics | `src/cyvest/proxies.py` |
-| **Models** | Dataclasses for Observables, Findings, ThreatIntel, etc. | `src/cyvest/model.py` |
-| **Scoring** | Score modes, propagation, and level determination | `src/cyvest/score.py` |
+| **Facts** | Immutable models for Observables, Findings, Signals, Evidences, Relations, Decisions, Tags | `src/cyvest/facts/` |
+| **Evaluation** | Score engines, contribution combination, verdict projection, report and timeline derivation | `src/cyvest/evaluation/` |
+| **Policy** | Weights, thresholds, attenuation and aggregation knobs handed to the engine | `src/cyvest/policy/` |
 
 **Merge-on-create** keeps duplicates out by checking keys before inserts. When extending the fluent helpers, call back into `Investigation` for validation rather than mutating models directly.
 

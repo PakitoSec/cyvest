@@ -30,10 +30,10 @@ from cyvest.extract import (
     observables_to_markdown,
     observables_to_markdown_table,
 )
-from cyvest.io_rich import display_diff
-from cyvest.io_schema import get_investigation_schema, get_signal_schema
-from cyvest.io_serialization import detect_schema_version, migrate_to_current
+from cyvest.io.render import display_diff
+from cyvest.io.serialization import detect_schema_version, migrate_to_current
 from cyvest.policy import DEFAULT_POLICY
+from cyvest.schema import get_investigation_schema, get_signal_schema
 
 CONTEXT_SETTINGS = {"help_option_names": ["-h", "--help"]}
 console = Console()

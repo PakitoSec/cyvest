@@ -8,7 +8,7 @@ Shows differences in findings, observables, and threat intelligence between inve
 from logurich import get_logger, init_logger
 
 from cyvest import Cyvest, ExpectedResult, Verdict, compare_investigations
-from cyvest.io_rich import display_diff
+from cyvest.io.render import display_diff
 
 logger = get_logger(__name__)
 

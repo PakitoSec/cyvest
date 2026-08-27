@@ -35,7 +35,7 @@ SCHEMA_ID = "https://cyvest.io/schema/investigation-7.json"
 
 # The schema only guards the major: pinning the exact version here would make every 7.x release
 # refuse the documents written by the previous one. The minor window is enforced at load time by
-# ``io_serialization._check_readable``, which ajv and pydantic cannot express.
+# ``io.serialization._check_readable``, which ajv and pydantic cannot express.
 SCHEMA_VERSION_PATTERN = rf"^{SCHEMA_VERSION.split('.')[0]}\.\d+\.\d+$"
 
 

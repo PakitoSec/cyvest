@@ -45,7 +45,79 @@ import "@cyvest/cyvest-vis/styles.css";
 | `CyvestGraph` | Main force-directed graph of observables and relationships |
 | `CyvestObservablesView` | Force-directed graph of observables and relationships |
 
-See `js/packages/cyvest-vis/README.md` for the full v6 API and theming details.
+See `js/packages/cyvest-vis/README.md` for the full v7 API and theming details.
+
+### Relationship semantics
+
+A relation is not decoration: `RelationKind` records the pivot an analyst made, and the picture is
+built from that. Direction is implied — `source_key` is the parent, `target_key` the child — so the
+kind carries the whole meaning.
+
+| Kind | Propagates score | Default attenuation | Visual family |
+| --- | --- | --- | --- |
+| `extraction` | yes | `1.0` | `extraction` |
+| `pivot` | yes | `1.0` | `pivot` |
+| `related-to` | no (symmetric) | `0.0` | `association` |
+
+Any relationship string the SDK does not know falls back to `association`, the weakest family, so an
+unrecognised kind can never pass itself off as evidence.
+
+Each family carries a complete physical and visual profile:
+
+| Family | Distance | Strength | Line | Width | Opacity |
+| --- | --- | --- | --- | --- | --- |
+| `extraction` | 84 | 0.90 | solid | 1.7 | 0.88 |
+| `pivot` | 124 | 0.64 | dashed | 1.4 | 0.78 |
+| `association` | 176 | 0.16 | dotted | 1.2 | 0.78 |
+
+The progression is monotonic on purpose: the more causal the link, the shorter, stronger, thicker and
+more solid it is drawn. A `related-to` sits twice as far and pulls five times less than an
+`extraction`, which is what makes context read as context.
+
+### How edge kind shapes the layout
+
+The graph is not a free force simulation with per-edge lengths. The kind feeds three separate
+channels, and the second one dominates.
+
+**1. Link force.** The family's `distance` and `strength` are handed straight to `d3-force`'s
+`forceLink`.
+
+**2. The hierarchy.** Only `extraction` and `pivot` are treated as hierarchy links. The tree that
+gives every node its parent, depth, branch and angular sector is a breadth-first walk over those
+links alone, from the investigation root outward; `related-to` edges are excluded. An observable
+reachable only through weak links is attached by fallback, and hangs off the root as a last resort.
+
+That tree produces a radial target position per node (`depth × layerSpacing`, angle allocated by
+subtree weight), and the forces pulling nodes toward those targets are stronger than any link force.
+The result is a constrained radial tree that the simulation relaxes, not a cloud that happens to
+settle. This is what keeps a handful of `related-to` edges from collapsing every branch into one
+blob.
+
+**3. Sibling promotion and branch ordering.** A `pivot` between two nodes that share a parent
+re-parents the child under the source, so `domain → hosted url` becomes a real descent instead of a
+chord across the ring. Cross-branch links are then weighted by their family strength to order the
+sectors around the root and cut down crossings — an `extraction` bridging two branches weighs 0.9
+against 0.16 for a `related-to`.
+
+!!! note "The layout scale is not the policy"
+    `association` keeps a residual strength of `0.16` where the default policy gives `related-to` an
+    attenuation of `0.0`. A weak link still has to be visible and still has to hold its endpoints
+    loosely together. The visual scale mirrors the *ordering* of the kinds, not the numbers in
+    `Policy.attenuation`; a custom policy will not move the graph.
+
+### What modulates an edge without moving it
+
+- **`confidence`** scales opacity, `familyOpacity × (0.3 + 0.7 × confidence)`, so a tentative pivot
+  looks tentative. It never changes geometry — unlike the engine, where confidence multiplies the
+  propagated score.
+- **A credited relation** — one the report lists as a retained contribution — is drawn 1.6× wider.
+  An edge that actually carried score should stand out from one that merely exists.
+- **Arrow heads** follow the kind: `related-to` gets none because it is symmetric, `extraction` and
+  `pivot` get a head on the target.
+- **Curvature** separates parallel edges, and bows a lone `related-to` so it reads as an aside.
+
+Edges touching the root override their family with a longer, weaker profile so the subject has room
+to breathe. Profiles you pass through `relationshipProfiles` still win over both.
 
 ## Workspace commands
 

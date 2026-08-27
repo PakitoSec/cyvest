@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from cyvest import Cyvest, Verdict
-from cyvest.io_serialization import (
+from cyvest.io.serialization import (
     SCHEMA_VERSION,
     detect_schema_version,
     investigation_to_dict,
@@ -96,12 +96,12 @@ class TestUpwardCompatibility:
 
     def test_a_later_minor_library_reads_an_earlier_minor_document(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """The invariant a 7.1 release must honour: no migration, no opt-in flag, just a read."""
-        import cyvest.io_serialization as io_serialization
+        import cyvest.io.serialization as serialization
 
-        monkeypatch.setattr(io_serialization, "SCHEMA_VERSION", "7.1.0")
+        monkeypatch.setattr(serialization, "SCHEMA_VERSION", "7.1.0")
         document = investigation_to_dict(build_case()._investigation)
         assert document["schema_version"] == "7.0.0"
-        assert io_serialization.load_investigation_dict(document) is not None
+        assert serialization.load_investigation_dict(document) is not None
 
     def test_an_older_document_needs_an_explicit_migration(self) -> None:
         with pytest.raises(ValueError, match="migrate"):
@@ -499,7 +499,7 @@ class TestMigrationChain:
 class TestCommittedSchema:
     def test_the_committed_schema_matches_the_models(self) -> None:
         """Without this check, the Python models and the generated TS types drift in silence."""
-        from cyvest.io_schema import get_investigation_schema
+        from cyvest.schema import get_investigation_schema
 
         committed = json.loads(Path("schema/cyvest.schema.json").read_text(encoding="utf-8"))
         assert committed == get_investigation_schema(), "run scripts/generate.sh — schema is stale"
@@ -516,18 +516,18 @@ class TestCommittedSchema:
         jsonschema.validate(investigation_to_dict(build_case()._investigation), committed)
 
     def test_the_schema_id_is_versioned(self) -> None:
-        from cyvest.io_schema import get_investigation_schema
+        from cyvest.schema import get_investigation_schema
 
         assert get_investigation_schema()["$id"].endswith("investigation-7.json")
 
     def test_the_report_is_a_required_key(self) -> None:
-        from cyvest.io_schema import get_investigation_schema
+        from cyvest.schema import get_investigation_schema
 
         assert "report" in get_investigation_schema()["required"]
 
     def test_the_committed_signal_contract_matches_the_model(self) -> None:
         """Producers validate against the committed file, so a silent drift breaks them, not us."""
-        from cyvest.io_schema import get_signal_schema
+        from cyvest.schema import get_signal_schema
 
         committed = json.loads(Path("schema/cyvest.signal.schema.json").read_text(encoding="utf-8"))
         assert committed == get_signal_schema(), "run scripts/generate.sh — signal schema is stale"

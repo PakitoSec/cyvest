@@ -90,7 +90,7 @@ cyvest show investigation-v6.json --no-graph
 For application-level validation:
 
 ```python
-from cyvest.io_serialization import load_investigation_json
+from cyvest.io.serialization import load_investigation_json
 
 cv = load_investigation_json("investigation-v6.json")
 assert cv.finding_get_all()

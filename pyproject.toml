@@ -80,8 +80,3 @@ exclude = ["*.md"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = [
-    "--cov=cyvest",
-    "--cov-report=term-missing",
-    "--cov-report=html",
-]

@@ -58,6 +58,54 @@ cyvest schema --which signal -o schema/cyvest.signal.schema.json
 
 ---
 
+## Emitting an envelope
+
+A producer that runs Python does not have to assemble the JSON by hand. `io_dump_signal` is the
+mirror of `io_load_signal` — same contract, same strictness, other direction:
+
+```python
+import json
+
+from cyvest import Cyvest
+
+payload = Cyvest.io_dump_signal(
+    "virustotal",
+    verdict="MALICIOUS",
+    comment="12/70 engines",
+    observed_at=scan.completed_at,
+    taxonomies=("malware-type:trojan",),
+    payload=raw_response,
+)
+
+requests.post("https://soar.internal/signals", data=json.dumps(payload))
+```
+
+The result is the wire form, not the in-process draft `threat_intel_draft` returns: it carries
+`schema_version` and `kind`, and renders enums, datetimes and tuples as JSON, so it goes straight
+through `json.dumps`. A typo raises here, in the producer's own pipeline, which is where a
+producer's mistake belongs.
+
+**Both halves of the judgment are always emitted.** An envelope in flight has no consumer policy
+to fall back on, so a stated `verdict` leaves with the weight of its band and a stated `weight`
+leaves with the verdict of its band:
+
+```python
+Cyvest.io_dump_signal("misp", verdict="SAFE")["weight"]    # 1.5
+Cyvest.io_dump_signal("vt", weight=6.0)["verdict"]         # "MALICIOUS"
+Cyvest.io_dump_signal("vt", weight=-2.0)                   # SAFE, weight 2.0
+```
+
+Polarity belongs to the verdict, so the wire always carries a magnitude, never a signed score.
+
+!!! note "Completing pins the producer's calibration"
+    Sending `verdict: "SAFE"` on its own leaves the weight to the *consumer's* policy;
+    `io_dump_signal` resolves it before the payload leaves, which fixes it at the producer's
+    bands. That is what makes an archived envelope replayable. Pass `policy=` when the default
+    bands are not yours, or build the dict by hand when you genuinely want the consumer to
+    decide.
+
+---
+
 ## Strict on purpose
 
 There is no tolerant parsing and no `preprocessor` hook. An unknown field, a nameless source or a

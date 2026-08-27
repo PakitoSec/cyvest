@@ -68,9 +68,34 @@ accepted for API compatibility.
 ## Relationship profiles
 
 Edges are grouped into three families that mirror the analyst pivot recorded in
-the investigation: `extraction`, `pivot`, and `association`. Custom relationship
-strings default to the weak `association` family. Override them without adding
-visual metadata to the investigation JSON:
+the investigation. Direction is implied by the relation itself — `source_key` is
+the parent, `target_key` the child — so the kind carries the whole meaning.
+
+| Kind | Family | Distance | Strength | Line | Width | Opacity |
+| --- | --- | --- | --- | --- | --- | --- |
+| `extraction` | `extraction` | 84 | 0.90 | solid | 1.7 | 0.88 |
+| `pivot` | `pivot` | 124 | 0.64 | dashed | 1.4 | 0.78 |
+| `related-to` | `association` | 176 | 0.16 | dotted | 1.2 | 0.78 |
+
+Custom relationship strings default to the weak `association` family, so an
+unrecognised kind can never pass itself off as evidence. The progression is
+monotonic on purpose: the more causal the link, the shorter, stronger, thicker
+and more solid it is drawn.
+
+The kind also shapes the layout, and not only through link length. Only
+`extraction` and `pivot` count as hierarchy links: the tree that gives every node
+its parent, depth, branch and angular sector is walked over those alone, and the
+forces pulling nodes toward their radial slot are stronger than any link force.
+A node reachable only through `related-to` is attached by fallback. That is what
+keeps weak context links from collapsing every branch into one cloud. A `pivot`
+between two siblings additionally re-parents the child under the source, so
+`domain → hosted url` becomes a real descent rather than a chord across the ring.
+
+`confidence` scales edge opacity and a relation the report credits with a
+retained contribution is drawn 1.6× wider; neither moves a node. Edges touching
+the root override their family with a longer, weaker profile.
+
+Override any of it without adding visual metadata to the investigation JSON:
 
 ```tsx
 <CyvestGraph
@@ -85,6 +110,9 @@ visual metadata to the investigation JSON:
   }}
 />
 ```
+
+Profiles passed this way win over both the family defaults and the root
+override.
 
 ## Theming
 

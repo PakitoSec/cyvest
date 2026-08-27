@@ -846,13 +846,15 @@ class TestWeightResolution:
         resolved = DEFAULT_POLICY.resolve_weight(verdict=Verdict.MALICIOUS, weight=0.0)
         assert resolved == 0.0
 
-    def test_the_band_representative_applies_when_the_fact_states_nothing(self) -> None:
+    def test_the_assumed_magnitude_applies_when_the_fact_states_nothing(self) -> None:
         resolved = DEFAULT_POLICY.resolve_weight(verdict=Verdict.MALICIOUS, weight=None)
         assert resolved == Weight.HIGH.value
 
-    def test_retuning_a_band_recalibrates_every_fact_that_states_no_weight(self) -> None:
+    def test_retuning_a_default_recalibrates_every_fact_that_states_no_weight(self) -> None:
         """The one retuning axis left, and the only one that stays coherent across verdicts."""
-        policy = self._policy(weight_by_verdict={**DEFAULT_POLICY.weight_by_verdict, Verdict.MALICIOUS: 8.5})
+        policy = self._policy(
+            default_weight_by_verdict={**DEFAULT_POLICY.default_weight_by_verdict, Verdict.MALICIOUS: 8.5}
+        )
         assert policy.resolve_weight(verdict=Verdict.MALICIOUS, weight=None) == 8.5
         assert policy.resolve_weight(verdict=Verdict.SAFE, weight=None) == Weight.LOW.value
 

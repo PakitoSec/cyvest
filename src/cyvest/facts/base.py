@@ -124,8 +124,8 @@ class Judgment(BaseModel):
     The triplet every engine reads: direction, certainty, force.
 
     Shared by ``ObservableSignal`` and ``Finding`` — same abstraction, two uses. ``weight=None``
-    defers to the policy, which falls back to the band representative of ``verdict`` so that
-    stating a verdict alone is enough.
+    defers to the policy, which assumes a magnitude for ``verdict`` so that stating a verdict
+    alone is enough.
 
     ``weight`` is an unsigned magnitude: direction is the verdict's job alone. Allowing a
     negative one would let a fact read ``MALICIOUS`` while scoring ``SAFE``.

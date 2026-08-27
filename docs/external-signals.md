@@ -86,8 +86,8 @@ through `json.dumps`. A typo raises here, in the producer's own pipeline, which 
 producer's mistake belongs.
 
 **Both halves of the judgment are always emitted.** An envelope in flight has no consumer policy
-to fall back on, so a stated `verdict` leaves with the weight of its band and a stated `weight`
-leaves with the verdict of its band:
+to fall back on, so a stated `verdict` leaves with the magnitude its producer assumes, and a
+stated `weight` leaves with the verdict of its band:
 
 ```python
 Cyvest.io_dump_signal("misp", verdict="SAFE")["weight"]    # 1.5
@@ -100,8 +100,8 @@ Polarity belongs to the verdict, so the wire always carries a magnitude, never a
 !!! note "Completing pins the producer's calibration"
     Sending `verdict: "SAFE"` on its own leaves the weight to the *consumer's* policy;
     `io_dump_signal` resolves it before the payload leaves, which fixes it at the producer's
-    bands. That is what makes an archived envelope replayable. Pass `policy=` when the default
-    bands are not yours, or build the dict by hand when you genuinely want the consumer to
+    calibration. That is what makes an archived envelope replayable. Pass `policy=` when the
+    defaults are not yours, or build the dict by hand when you genuinely want the consumer to
     decide.
 
 ---

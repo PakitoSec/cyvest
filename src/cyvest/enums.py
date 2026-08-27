@@ -67,9 +67,14 @@ class Weight(float, Enum):
     """
     How grave the claim is, *if* it holds.
 
-    Values sit mid-band on purpose. A scale aligned on the level thresholds (``3.0``/``5.0``)
-    would put every ordinal exactly on a boundary, so any confidence below the maximum would
-    drop the reported verdict by one notch.
+    The three values are the midpoints of ``basic-v1``'s score bands: ``1.5`` for ``]0,3[``,
+    ``4.0`` for ``[3,5[``, and ``7.0`` for ``[5,∞[`` — the last band being open, its width is
+    extrapolated from the previous one. ``SAFE`` reuses the ``NOTABLE`` magnitude; polarity
+    carries the sign.
+
+    Midpoints rather than thresholds: a scale aligned on ``3.0``/``5.0`` would put every ordinal
+    exactly on a boundary, so any confidence below the maximum would drop the reported verdict by
+    one notch.
     """
 
     LOW = 1.5

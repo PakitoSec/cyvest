@@ -128,7 +128,8 @@ class Cyvest:
         Weight and verdict are the same scale since v7 merged ``Level`` into ``Verdict``, so each
         one implies the other and stating both is optional:
 
-        - a verdict alone takes the weight of its band (``policy.weight_by_verdict``);
+        - a verdict alone leaves the magnitude unstated, for the policy to assume later
+          (``policy.default_weight_by_verdict``);
         - a weight alone takes the verdict of its band, sign included.
 
         Without this, ``weight=8.5`` with no verdict would score ``0`` — the mirror image of the

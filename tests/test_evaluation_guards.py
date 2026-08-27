@@ -22,7 +22,7 @@ from cyvest.evaluation.engines import available_aliases, get_engine, resolve_eng
 from cyvest.facts import Finding, Observable, ObservableLink, Relation, SourceRef, Tag, ThreatIntel
 from cyvest.facts.store import FactStore, InvestigationHeader
 from cyvest.investigation import Investigation
-from cyvest.io_serialization import save_investigation_json
+from cyvest.io.serialization import save_investigation_json
 from cyvest.policy import DEFAULT_POLICY, Policy
 
 SRC = SourceRef(name="feed", source_class=SourceClass.VENDOR_FEED)

@@ -25,7 +25,7 @@ jobs:
       - name: Install deps
         run: uv sync --group dev
       - name: Run tests
-        run: uv run pytest -q
+        run: uv run pytest -q --cov=cyvest --cov-report=term-missing
 
   js_tests:
     name: JS test suite (node${{ matrix.node-version }})

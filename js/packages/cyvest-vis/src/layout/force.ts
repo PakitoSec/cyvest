@@ -34,8 +34,6 @@ interface ForceLink extends SimulationLinkDatum<ForceNode> {
   distance: number;
   strength: number;
   family: CyvestRelationshipFamily;
-  relationshipType: string;
-  direction: "outbound" | "inbound" | "bidirectional";
   isRootLink: boolean;
 }
 
@@ -148,9 +146,7 @@ function calculateTopology(
   const allNeighbors = new Map(nodeIds.map((id) => [id, [] as string[]]));
   const hierarchyNeighbors = new Map(nodeIds.map((id) => [id, [] as string[]]));
   const isHierarchyLink = (link: ForceLink) =>
-    link.direction !== "bidirectional" && (
-      link.family === "extraction" || link.family === "pivot"
-    );
+    link.family === "extraction" || link.family === "pivot";
 
   for (const link of links) {
     const source = endpointId(link.source);
@@ -202,12 +198,11 @@ function calculateTopology(
 
   // Pivot links between siblings form a clearer local tree than a
   // chord across the same ring (for example domain -> hosted URL).
+  // A v7 relation implies its direction: source is the parent, target the child.
   for (const link of links) {
-    if (link.family !== "pivot" || link.direction === "bidirectional") continue;
-    const source = endpointId(link.source);
-    const target = endpointId(link.target);
-    const semanticParent = link.direction === "inbound" ? target : source;
-    const semanticChild = link.direction === "inbound" ? source : target;
+    if (link.family !== "pivot") continue;
+    const semanticParent = endpointId(link.source);
+    const semanticChild = endpointId(link.target);
     if (
       semanticParent !== rootId &&
       parent.get(semanticParent) === parent.get(semanticChild)
@@ -462,8 +457,6 @@ function elementToLink(edge: ElementDefinition, options: Required<CyvestForceOpt
     distance: Number(edge.data.distance ?? options.linkDistance),
     strength: Number(edge.data.strength ?? options.linkStrength),
     family: (edge.data.relationshipFamily ?? "association") as CyvestRelationshipFamily,
-    relationshipType: String(edge.data.relationshipType ?? "related-to"),
-    direction: (edge.data.direction ?? "outbound") as ForceLink["direction"],
     isRootLink: edge.data.isRootLink === true,
   };
 }
@@ -579,8 +572,6 @@ export function startForceSimulation(
       (compact ? 0.72 : 1),
     strength: Number(edge.data("strength") ?? simulationOptions.linkStrength),
     family: (edge.data("relationshipFamily") ?? "association") as CyvestRelationshipFamily,
-    relationshipType: String(edge.data("relationshipType") ?? "related-to"),
-    direction: (edge.data("direction") ?? "outbound") as ForceLink["direction"],
     isRootLink: edge.data("isRootLink") === true,
   }));
   const topology = calculateTopology(

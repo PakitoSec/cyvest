@@ -98,7 +98,7 @@ the models disagree.
 
 1. **Any field added in a minor release is optional and carries a default.** The serialized shape
    only pins the major (`^7\.\d+\.\d+$`); the minor window — read older, never newer — is enforced
-   by `io_serialization._check_readable` in Python and `assertReadableVersion` in
+   by `io.serialization._check_readable` in Python and `assertReadableVersion` in
    `@cyvest/cyvest-js`. Break rule 1 and a 7.1 library silently mis-reads a 7.0 document.
 2. **No `dict -> dict` migration for a minor bump.** Defaults are enough; `_MIGRATIONS` handles
    major transitions only, and `migrate_to_current` stops as soon as the major matches.

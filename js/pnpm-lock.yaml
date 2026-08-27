@@ -77,7 +77,7 @@ importers:
   packages/cyvest-vis:
     dependencies:
       '@cyvest/cyvest-js':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../cyvest-js
       cytoscape:
         specifier: ^3.34.1

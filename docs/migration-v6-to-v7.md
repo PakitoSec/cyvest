@@ -57,6 +57,7 @@ read-only and never reimplement a scoring rule — but the report is an output, 
 | `get_global_level` | `get_global_verdict` | |
 | `get_statistics` | `statistics()` | Computed on demand, nothing registered |
 | `io_load_threat_intel_draft` | `io_load_signal` | Declared contract, strict validation; §10 |
+| `cyvest.io_serialization` / `io_schema` / `io_rich` | `cyvest.io.*` / `cyvest.schema.*` | Import paths only; §8 |
 | *(new)* | `Finding.effect` | Defaults to `ADDITIVE`; a migrated v6 document is numerically unchanged. See §4 |
 
 ---
@@ -295,6 +296,35 @@ cv = Cyvest.io_load_json("old.json", migrate=True)
 Migration is a chain of pure dict-to-dict steps, so a 5.x document passes through 6.0 on its way
 to 7.0. Loading a **newer** document than the library understands is refused rather than guessed
 at.
+
+### Module prefixes became packages
+
+`io_` and `_schema` were both packages waiting to happen, like `facts/` and `evaluation/` before
+them. The split follows the boundary itself: `schema/` declares the *shapes* that cross it, `io/`
+moves the data.
+
+| v6 | v7 |
+|---|---|
+| `cyvest.io_serialization` | `cyvest.io.serialization` |
+| `cyvest.io_rich` | `cyvest.io.render` |
+| `cyvest.model_schema` | `cyvest.schema.investigation` |
+| `cyvest.signal_schema` | `cyvest.schema.signal` |
+| `cyvest.io_schema` | `cyvest.schema` (the `get_*_schema()` generators) |
+
+Contents are unchanged — only the import paths move. Three notes:
+
+- `cyvest.io` does **not** shadow the standard library `io`; Python 3 resolves imports absolutely,
+  so a module doing `import io` still gets the stdlib one.
+- `cyvest/io/__init__.py` re-exports nothing on purpose. `render` pulls in `rich`, and the facade
+  imports `serialization` lazily, so writing a JSON file must not drag a terminal renderer in.
+  Import the submodule you need.
+- `cyvest/schema/__init__.py` *does* re-export, and hosts the JSON Schema generators that used to
+  sit in `io_schema`. Generating a schema and declaring one are the same concern seen from two
+  sides, and neither costs an import the library was not already paying.
+
+Nothing exported from the `cyvest` root moved: `SignalEnvelope` and `SIGNAL_SCHEMA_VERSION` are
+still `from cyvest import ...`. Facade methods (`io_save_json`, `display_summary`, …) keep their
+names too — they were never the module path.
 
 ---
 

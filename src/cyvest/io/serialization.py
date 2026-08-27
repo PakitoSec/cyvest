@@ -37,7 +37,7 @@ from cyvest.facts import (
 )
 from cyvest.facts.store import FactStore, InvestigationHeader
 from cyvest.investigation import Investigation
-from cyvest.model_schema import SCHEMA_VERSION, FactsSchema, InvestigationSchema
+from cyvest.schema.investigation import SCHEMA_VERSION, FactsSchema, InvestigationSchema
 from cyvest.ulid import generate_ulid
 
 MIGRATION_SOURCE = SourceRef(name="migration", source_class=SourceClass.ORG_POLICY)

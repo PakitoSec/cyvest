@@ -31,7 +31,7 @@ Build, score, and narrate cybersecurity investigations with a single fluent Pyth
 | **Timeline** | A chronology projected from the log, on two clocks | `cyvest.evaluation.timeline`, [Guide](timeline.md) |
 | **Comparison** | Diff investigations with tolerance bands for regression testing | `cyvest.compare`, [Guide](comparing-investigations.md) |
 | **Observable extraction** | Extract IOCs from text, markdown, or URLs with defang/refang support | `cyvest.extract`, [Guide](observable-extraction.md) |
-| **Reporting** | Export JSON, Markdown, or render rich terminal summaries | `cyvest.io_serialization`, `cyvest.io_rich`, [Quick Start](getting-started/quickstart.md#exporting-results) |
+| **Reporting** | Export JSON, Markdown, or render rich terminal summaries | `cyvest.io.serialization`, `cyvest.io.render`, [Quick Start](getting-started/quickstart.md#exporting-results) |
 
 ---
 

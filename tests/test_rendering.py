@@ -15,8 +15,8 @@ from rich.console import Console
 
 from cyvest import Cyvest
 from cyvest.enums import ObservableSubtype, ObservableType, Salience
-from cyvest.io_rich import build_graph, build_statistics, build_summary, build_timeline
-from cyvest.io_serialization import generate_markdown_report
+from cyvest.io.render import build_graph, build_statistics, build_summary, build_timeline
+from cyvest.io.serialization import generate_markdown_report
 
 
 def render(renderable: object) -> str:

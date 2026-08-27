@@ -54,7 +54,7 @@ from cyvest.proxies import (
     ThreatIntelProxy,
 )
 from cyvest.resolvers import ObservableResolution, ObservableResolver, ObservableResolverResult
-from cyvest.signal_schema import SignalEnvelope
+from cyvest.schema.signal import SignalEnvelope
 from cyvest.stats import InvestigationStats, StatisticsSchema
 
 if TYPE_CHECKING:
@@ -751,35 +751,35 @@ class Cyvest:
     # ------------------------------------------------------------------ io
 
     def io_to_dict(self) -> dict[str, Any]:
-        from cyvest.io_serialization import investigation_to_dict
+        from cyvest.io.serialization import investigation_to_dict
 
         return investigation_to_dict(self._investigation)
 
     def io_save_json(self, filepath: str | Path) -> str:
-        from cyvest.io_serialization import save_investigation_json
+        from cyvest.io.serialization import save_investigation_json
 
         save_investigation_json(self._investigation, filepath)
         return str(filepath)
 
     def io_to_markdown(self, **kwargs: Any) -> str:
-        from cyvest.io_serialization import generate_markdown_report
+        from cyvest.io.serialization import generate_markdown_report
 
         return generate_markdown_report(self._investigation, **kwargs)
 
     def io_save_markdown(self, filepath: str | Path, **kwargs: Any) -> str:
-        from cyvest.io_serialization import save_investigation_markdown
+        from cyvest.io.serialization import save_investigation_markdown
 
         return save_investigation_markdown(self._investigation, filepath, **kwargs)
 
     @classmethod
     def io_load_dict(cls, data: dict[str, Any], *, migrate: bool = False) -> Cyvest:
-        from cyvest.io_serialization import load_investigation_dict
+        from cyvest.io.serialization import load_investigation_dict
 
         return cls._wrap(load_investigation_dict(data, migrate=migrate))
 
     @classmethod
     def io_load_json(cls, filepath: str | Path, *, migrate: bool = False) -> Cyvest:
-        from cyvest.io_serialization import load_investigation_json
+        from cyvest.io.serialization import load_investigation_json
 
         return cls._wrap(load_investigation_json(filepath, migrate=migrate))
 
@@ -793,22 +793,22 @@ class Cyvest:
     # ------------------------------------------------------------------ display
 
     def display_summary(self, *, show_graph: bool = False) -> None:
-        from cyvest.io_rich import build_summary, print_renderable
+        from cyvest.io.render import build_summary, print_renderable
 
         print_renderable(build_summary(self._investigation, show_graph=show_graph))
 
     def display_statistics(self) -> None:
-        from cyvest.io_rich import build_statistics, print_renderable
+        from cyvest.io.render import build_statistics, print_renderable
 
         print_renderable(build_statistics(self._investigation))
 
     def display_explanation(self, key: str) -> None:
-        from cyvest.io_rich import build_explanation, print_renderable
+        from cyvest.io.render import build_explanation, print_renderable
 
         print_renderable(build_explanation(self._investigation, key))
 
     def display_timeline(self, **kwargs: Any) -> None:
-        from cyvest.io_rich import build_timeline, print_renderable
+        from cyvest.io.render import build_timeline, print_renderable
 
         print_renderable(build_timeline(self._investigation, **kwargs))
 
@@ -820,7 +820,7 @@ class Cyvest:
         title: str = "Investigation diff",
     ) -> None:
         from cyvest.compare import compare_investigations
-        from cyvest.io_rich import build_diff, print_renderable
+        from cyvest.io.render import build_diff, print_renderable
 
         diffs = compare_investigations(self, expected, result_expected)
         print_renderable(build_diff(diffs, title=title))
@@ -880,6 +880,34 @@ class Cyvest:
         if draft["weight"] is None:
             draft.pop("weight")
         return draft
+
+    @staticmethod
+    def io_dump_signal(
+        source: str,
+        *,
+        verdict: Verdict | str | None = None,
+        weight: float | None = None,
+        confidence: float = Confidence.HIGH.value,
+        policy: Policy | None = None,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        """
+        Build the payload an external system sends Cyvest — the mirror of ``io_load_signal``.
+
+        Unlike ``threat_intel_draft``, which never leaves the process, this is the wire form: it
+        keeps ``schema_version`` and ``kind``, and renders enums, datetimes and tuples as JSON, so
+        the result goes straight through ``json.dumps``. Validation happens here too, which is the
+        whole point — a producer's typo fails in its own pipeline rather than in the consumer's.
+
+        Both halves of the judgment are stated. An envelope in flight has no consumer policy to
+        fall back on, so the missing half is completed from ``policy``: pass your own calibration
+        when the default bands are not yours.
+        """
+        envelope = SignalEnvelope(source=source, verdict=verdict, weight=weight, confidence=confidence, **kwargs)
+        judged, magnitude = Cyvest._judgment(envelope.verdict, envelope.weight)
+        resolved = (policy or DEFAULT_POLICY).resolve_weight(verdict=judged, weight=magnitude)
+        completed = envelope.model_copy(update={"verdict": judged, "weight": resolved})
+        return completed.model_dump(mode="json", exclude_none=True)
 
 
 __all__ = ["Cyvest"]

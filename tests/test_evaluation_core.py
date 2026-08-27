@@ -578,6 +578,16 @@ class TestConclusions:
         assert len(contributions) == 1
         return contributions[0].value
 
+    @staticmethod
+    def _ceiling_of(report, key: str) -> float:
+        contributions = [
+            c
+            for c in report.investigation.contributions
+            if c.source_key == key and c.label.startswith("conclusion ceiling")
+        ]
+        assert len(contributions) == 1
+        return contributions[0].value
+
     def test_a_lone_conclusion_lands_exactly_on_the_floor_of_its_verdict(self) -> None:
         store = make_store()
         conclusion = self._conclusion(store, verdict=Verdict.MALICIOUS)
@@ -770,6 +780,145 @@ class TestConclusions:
         store = make_store()
         with pytest.raises(ValueError, match="never from a weight"):
             self._conclusion(store, verdict=Verdict.MALICIOUS, weight=8.0)
+
+
+class TestCeilingConclusions:
+    """
+    A ceiling lowers the total to the verdict it asserts, and no further.
+
+    This is what states a **declared benign context** — an awareness campaign, a sanctioned
+    pentest, an authorised scanner. Without it the model could force a case up but never down,
+    and the only way to say "whatever the evidence, this is benign" would be to guess a large
+    negative weight.
+    """
+
+    @staticmethod
+    def _ceiling(store: FactStore, rule_id: str = "campaign", **kwargs) -> Finding:
+        finding = Finding(
+            rule_id=rule_id,
+            subject_key="inv:f1",
+            source=source("psat", SourceClass.INTERNAL_TOOL),
+            fragment_id="f1",
+            effect=Effect.CEILING,
+            **kwargs,
+        )
+        store.append(finding)
+        return finding
+
+    def test_it_brings_a_malicious_total_down_into_the_safe_band(self) -> None:
+        store = make_store()
+        TestConclusions._additive(store, 8.0)
+        ceiling = self._ceiling(store, verdict=Verdict.SAFE)
+
+        report = evaluate(store)
+        assert report.investigation.verdict is Verdict.SAFE
+        assert report.investigation.score < 0.0
+        assert TestConclusions._ceiling_of(report, ceiling.key) < 0.0
+
+    def test_it_only_removes_what_exceeds_the_verdict(self) -> None:
+        store = make_store()
+        TestConclusions._additive(store, 8.0)
+        ceiling = self._ceiling(store, verdict=Verdict.INFO)
+
+        report = evaluate(store)
+        assert report.investigation.score == 0.0
+        assert TestConclusions._ceiling_of(report, ceiling.key) == -8.0
+
+    def test_it_removes_nothing_once_the_total_is_already_below(self) -> None:
+        store = make_store()
+        TestConclusions._additive(store, 1.0)
+        ceiling = self._ceiling(store, verdict=Verdict.SUSPICIOUS)
+
+        report = evaluate(store)
+        assert report.investigation.score == 1.0
+        assert TestConclusions._ceiling_of(report, ceiling.key) == 0.0
+
+    def test_the_finding_itself_carries_no_score(self) -> None:
+        store = make_store()
+        TestConclusions._additive(store, 8.0)
+        ceiling = self._ceiling(store, verdict=Verdict.SAFE)
+
+        result = evaluate(store).finding(ceiling.key)
+        assert result.score is None
+        assert result.counted is True
+        assert result.effect is Effect.CEILING
+        assert result.verdict is Verdict.SAFE
+
+    def test_ceilings_never_compound(self) -> None:
+        """Two sources agreeing the case is benign must not drive the total twice as low."""
+        store = make_store()
+        TestConclusions._additive(store, 8.0)
+        first = self._ceiling(store, "psat", verdict=Verdict.INFO)
+        second = self._ceiling(store, "knowbe4", verdict=Verdict.INFO)
+
+        report = evaluate(store)
+        assert report.investigation.score == 0.0
+        assert TestConclusions._ceiling_of(report, first.key) + TestConclusions._ceiling_of(report, second.key) == -8.0
+
+    def test_a_ceiling_outranks_a_floor(self) -> None:
+        """A campaign that happens to contain a malicious-looking URL is still a campaign."""
+        store = make_store()
+        TestConclusions._additive(store, 2.0)
+        TestConclusions._conclusion(store, "ai_review", verdict=Verdict.MALICIOUS)
+        self._ceiling(store, verdict=Verdict.SAFE)
+
+        report = evaluate(store)
+        assert report.investigation.verdict is Verdict.SAFE
+
+    def test_the_total_does_not_depend_on_insertion_order(self) -> None:
+        forward, backward = make_store(), make_store()
+        for store, reverse in ((forward, False), (backward, True)):
+            steps = [
+                lambda s: TestConclusions._additive(s, 8.0),
+                lambda s: TestConclusions._conclusion(s, "ai_review", verdict=Verdict.MALICIOUS),
+                lambda s: self._ceiling(s, verdict=Verdict.SAFE),
+            ]
+            for step in reversed(steps) if reverse else steps:
+                step(store)
+
+        assert evaluate(forward).investigation.score == evaluate(backward).investigation.score
+
+    def test_refuting_a_ceiling_restores_the_computed_total(self) -> None:
+        store = make_store()
+        TestConclusions._additive(store, 8.0)
+        ceiling = self._ceiling(store, verdict=Verdict.SAFE)
+        store.append(
+            Decision(
+                target_key=ceiling.key,
+                kind=DecisionKind.REFUTE,
+                justification="la campagne invoquée n'a jamais eu lieu",
+                source=source("alice", SourceClass.ORG_ANALYST),
+                fragment_id="f1",
+            )
+        )
+
+        report = evaluate(store)
+        assert report.finding(ceiling.key).counted is False
+        assert report.investigation.score == 8.0
+
+    def test_a_malicious_ceiling_is_refused(self) -> None:
+        """``MALICIOUS`` is unbounded above: capping there could never lower anything."""
+        with pytest.raises(ValueError, match="may only de-escalate"):
+            Finding(
+                rule_id="campaign",
+                subject_key="inv:f1",
+                source=source(),
+                fragment_id="f1",
+                effect=Effect.CEILING,
+                verdict=Verdict.MALICIOUS,
+            )
+
+    def test_weighting_a_ceiling_is_refused(self) -> None:
+        with pytest.raises(ValueError, match="never from a weight"):
+            Finding(
+                rule_id="campaign",
+                subject_key="inv:f1",
+                source=source(),
+                fragment_id="f1",
+                effect=Effect.CEILING,
+                verdict=Verdict.SAFE,
+                weight=4.0,
+            )
 
 
 class TestJudgmentInvariants:

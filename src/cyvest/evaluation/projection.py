@@ -3,8 +3,8 @@ Score → verdict, and back.
 
 :func:`verdict_from_score` *is* v6's ``get_level_from_score``. Because ``Verdict`` absorbed
 ``Level``, a divergence between the two is structurally impossible — there is nothing left to
-keep in sync. :func:`score_floor_for` inverts it, for conclusions that must reach a stated
-verdict rather than assert a magnitude.
+keep in sync. :func:`score_floor_for` and :func:`score_ceiling_for` invert it, for conclusions
+that must reach a stated verdict rather than assert a magnitude.
 
 The bands below are ``basic-v1``'s convention, not a rule of the report contract: a probabilistic
 engine maps its own posterior thresholds onto the same five labels.
@@ -47,4 +47,28 @@ def score_floor_for(verdict: Verdict, *, epsilon: float) -> float | None:
     return None
 
 
-__all__ = ["MALICIOUS_THRESHOLD", "SUSPICIOUS_THRESHOLD", "score_floor_for", "verdict_from_score"]
+def score_ceiling_for(verdict: Verdict, *, epsilon: float) -> float | None:
+    """
+    Largest score that reads as ``verdict`` — the dual of :func:`score_floor_for`.
+
+    ``None`` for ``MALICIOUS``: its band is unbounded above, so no score *lowers* a total into
+    it. ``SAFE``, ``NOTABLE`` and ``SUSPICIOUS`` have open upper bounds, hence ``epsilon``.
+    """
+    if verdict is Verdict.SAFE:
+        return -epsilon
+    if verdict is Verdict.INFO:
+        return 0.0
+    if verdict is Verdict.NOTABLE:
+        return SUSPICIOUS_THRESHOLD - epsilon
+    if verdict is Verdict.SUSPICIOUS:
+        return MALICIOUS_THRESHOLD - epsilon
+    return None
+
+
+__all__ = [
+    "MALICIOUS_THRESHOLD",
+    "SUSPICIOUS_THRESHOLD",
+    "score_ceiling_for",
+    "score_floor_for",
+    "verdict_from_score",
+]

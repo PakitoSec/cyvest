@@ -123,8 +123,17 @@ cv.conclusion("ai_review", "Analyse IA", verdict=cv.VERDICT.MALICIOUS)
 ```
 
 Such a finding carries `effect=FLOOR`: it raises the total just enough to reach `MALICIOUS`, and
-adds nothing if the case is already there. It takes no `weight` — its magnitude *is* the floor of
-its verdict — and stating one raises. See
+adds nothing if the case is already there. It takes no `weight` — its magnitude *is* the bound of
+its verdict — and stating one raises.
+
+A conclusion may also point the other way. `verdict=SAFE` carries `effect=CEILING` and *lowers*
+the total to the band it asserts — the declared benign context v6 could not express either:
+
+```python
+cv.conclusion("awareness_campaign", "Campagne PSAT", verdict=cv.VERDICT.SAFE)
+```
+
+The direction is never passed, it follows the verdict; ceilings apply after floors. See
 [conclusions](scoring-model.md#conclusions-a-finding-that-concludes-instead-of-accumulating).
 
 Every finding coming from a v6 document is `ADDITIVE`, so migration changes no number.
@@ -198,6 +207,24 @@ The rest name nothing v7 can bound — a ticket reference, an analyst note. They
 a decision on the root: `REFUTE` caps its target's score and marks every contribution on it
 unretained, so anchoring them there would manufacture a verdict nobody asserted, out of a string
 that had no scoring effect in v6 either.
+
+What migration cannot guess, you state. When such an entry did mean *"this whole case is a known
+benign context"* — an awareness campaign, a sanctioned pentest, an authorised scanner — the v7
+form is a **ceiling conclusion**, which bounds the investigation total the way `REFUTE` bounds an
+observable:
+
+```python
+cv.conclusion("awareness_campaign", "Campagne PSAT", verdict=cv.VERDICT.SAFE)
+```
+
+Do **not** model it as a finding with a large negative weight: a weight is a term of the sum, so
+enough inculpatory findings climb back over it. A ceiling caps.
+
+!!! note "Gating is not scoring"
+    v6's `is_whitelisted()` was often read mid-run to skip expensive enrichment. That is an
+    orchestration decision, not a fact about the case, and v7 exposes no equivalent on purpose:
+    reading it means evaluating the whole store on every call. Keep the flag in your own
+    orchestrator and let the conclusion carry the score and the audit trail.
 
 ### Keys are regenerated, and every reference follows
 

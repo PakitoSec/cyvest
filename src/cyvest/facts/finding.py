@@ -5,8 +5,8 @@ A finding's score comes from its observables. Its own judgment is a **floor** th
 raise, never whitewash. Overriding the computation outright is a :class:`Decision`, not an
 inflated weight.
 
-A finding carrying :attr:`Effect.FLOOR` is the one exception: it is a conclusion *about* the
-investigation, so it has no score of its own — it floors the total instead.
+A conclusion (:attr:`Effect.FLOOR` or :attr:`Effect.CEILING`) is the one exception: it is a
+verdict *about* the investigation, so it has no score of its own — it bounds the total instead.
 """
 
 from __future__ import annotations
@@ -20,9 +20,10 @@ from cyvest.enums import Effect, Scope, Status, Verdict
 from cyvest.facts.base import Fact, Judgment, Label
 
 _VERDICTS_WITHOUT_FLOOR = (Verdict.SAFE, Verdict.INFO)
+_VERDICTS_WITHOUT_CEILING = (Verdict.MALICIOUS,)
 
 CONCLUSION_TAKES_NO_WEIGHT = (
-    "a conclusion takes its magnitude from the floor of the verdict it asserts, never from a "
+    "a conclusion takes its magnitude from the band of the verdict it asserts, never from a "
     "weight; drop the weight or make the finding ADDITIVE"
 )
 
@@ -82,13 +83,18 @@ class Finding(Fact, Judgment):
 
     @model_validator(mode="after")
     def _check_conclusion(self) -> Finding:
-        if self.effect is not Effect.FLOOR:
+        if not self.effect.concludes:
             return self
-        # Refused rather than ignored: both combinations would be silent no-ops at evaluation.
-        if self.verdict in _VERDICTS_WITHOUT_FLOOR:
+        # Refused rather than ignored: each combination would be a silent no-op at evaluation.
+        if self.effect is Effect.FLOOR and self.verdict in _VERDICTS_WITHOUT_FLOOR:
             raise ValueError(
-                f"a conclusion must assert a verdict that has a floor, got {self.verdict.value}; "
-                "SAFE and INFO have none, and a conclusion may only escalate"
+                f"a FLOOR conclusion must assert a verdict that has a floor, got {self.verdict.value}; "
+                "SAFE and INFO have none, and a floor may only escalate — use CEILING to de-escalate"
+            )
+        if self.effect is Effect.CEILING and self.verdict in _VERDICTS_WITHOUT_CEILING:
+            raise ValueError(
+                f"a CEILING conclusion must assert a verdict that has a ceiling, got {self.verdict.value}; "
+                "MALICIOUS is unbounded above, and a ceiling may only de-escalate — use FLOOR to escalate"
             )
         if self.weight is not None:
             raise ValueError(CONCLUSION_TAKES_NO_WEIGHT)
@@ -100,7 +106,7 @@ class Finding(Fact, Judgment):
 
     @property
     def is_conclusion(self) -> bool:
-        return self.effect is Effect.FLOOR
+        return self.effect.concludes
 
 
 __all__ = ["CONCLUSION_TAKES_NO_WEIGHT", "Finding", "ObservableLink"]

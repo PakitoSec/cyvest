@@ -550,23 +550,28 @@ class Cyvest:
         external_id: str | None = None,
     ) -> FindingProxy:
         """
-        Create a conclusion: a finding that raises the total to the verdict it asserts.
+        Create a conclusion: a finding that moves the total to the verdict it asserts.
 
         Meant for an analysis that already read the other findings — an LLM most of the time. It
-        adds just enough to reach ``verdict``, and nothing at all when the investigation is
+        moves just enough to reach ``verdict``, and nothing at all when the investigation is
         already there, so several analysers can conclude without inflating each other.
 
+        The direction follows the verdict: an inculpatory one raises the total (``Effect.FLOOR``),
+        ``SAFE`` and ``INFO`` lower it (``Effect.CEILING``) — which is how a declared benign
+        context, an awareness campaign or a sanctioned pentest, neutralises a case.
+
         ``verdict`` is required and no ``weight`` is accepted: a conclusion's magnitude *is* the
-        floor of its verdict.
+        bound of its verdict.
         """
+        resolved = Verdict(verdict) if isinstance(verdict, str) else verdict
         return self.finding_create(
             rule_id,
             name,
             comment,
-            verdict=verdict,
+            verdict=resolved,
             confidence=confidence,
             subject=subject,
-            effect=Effect.FLOOR,
+            effect=Effect.FLOOR if resolved.polarity > 0 else Effect.CEILING,
             labels=labels,
             extra=extra or {},
             external_id=external_id,
@@ -793,10 +798,10 @@ class Cyvest:
 
     # ------------------------------------------------------------------ display
 
-    def display_summary(self, *, show_graph: bool = False) -> None:
+    def display_summary(self, **kwargs: Any) -> None:
         from cyvest.io.render import build_summary, print_renderable
 
-        print_renderable(build_summary(self._investigation, show_graph=show_graph))
+        print_renderable(build_summary(self._investigation, **kwargs))
 
     def display_statistics(self) -> None:
         from cyvest.io.render import build_statistics, print_renderable

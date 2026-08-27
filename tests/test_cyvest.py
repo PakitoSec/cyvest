@@ -69,6 +69,29 @@ class TestFluentDsl:
 
         assert parent.score == 6.0
 
+    def test_describe_fills_in_the_story_without_touching_the_judgment(self) -> None:
+        """A rule usually creates its finding before it knows the answer."""
+        cv = Cyvest()
+        finding = cv.finding("spf", "SPF", comment="pending").with_weight(3.0)
+
+        finding.describe(comment="> Sending IP is not authorized", extra={"raw": "fail"})
+
+        assert finding.comment == "> Sending IP is not authorized"
+        assert finding.extra == {"raw": "fail"}
+        assert finding.name == "SPF"
+        assert finding.score == 3.0
+        assert finding.verdict is Verdict.SUSPICIOUS
+
+    def test_describe_leaves_omitted_fields_alone(self) -> None:
+        cv = Cyvest()
+        finding = cv.finding("spf", "SPF", comment="pending", extra={"raw": "fail"})
+
+        finding.describe(name="SPF check")
+
+        assert finding.name == "SPF check"
+        assert finding.comment == "pending"
+        assert finding.extra == {"raw": "fail"}
+
 
 class TestDecisions:
     def test_allowlisting_reads_as_a_declared_act(self) -> None:
@@ -167,7 +190,18 @@ class TestConclusions:
         assert cv.get_global_score() == 5.0
         assert conclusion.is_conclusion is True
         assert conclusion.effect is cv.EFFECT.FLOOR
-        assert conclusion.applied_floor == pytest.approx(1.8)
+        assert conclusion.applied_bound == pytest.approx(1.8)
+
+    def test_a_safe_conclusion_brings_the_total_down_to_its_verdict(self) -> None:
+        """A declared benign context — an awareness campaign — neutralises what the rules found."""
+        cv = Cyvest()
+        cv.finding("spf_fail", "SPF invalide", verdict=cv.VERDICT.MALICIOUS, weight=8.0)
+        conclusion = cv.conclusion("awareness_campaign", "Campagne PSAT", verdict=cv.VERDICT.SAFE)
+
+        assert cv.get_global_verdict() is cv.VERDICT.SAFE
+        assert cv.get_global_score() < 0.0
+        assert conclusion.effect is cv.EFFECT.CEILING
+        assert conclusion.applied_bound < 0.0
 
     def test_a_conclusion_that_changes_nothing_says_so(self) -> None:
         cv = Cyvest()
@@ -175,14 +209,14 @@ class TestConclusions:
         conclusion = cv.conclusion("ai_review", "Analyse IA", verdict=cv.VERDICT.MALICIOUS)
 
         assert cv.get_global_score() == 8.0
-        assert conclusion.applied_floor == 0.0
+        assert conclusion.applied_bound == 0.0
 
     def test_a_conclusion_has_no_score_of_its_own(self) -> None:
         cv = Cyvest()
         conclusion = cv.conclusion("ai_review", verdict=cv.VERDICT.MALICIOUS)
 
         assert cv.get_report().finding(conclusion.key).score is None
-        assert conclusion.applied_floor == 5.0
+        assert conclusion.applied_bound == 5.0
 
     def test_weighting_a_conclusion_is_refused(self) -> None:
         cv = Cyvest()

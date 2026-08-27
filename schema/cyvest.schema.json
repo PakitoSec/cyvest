@@ -132,10 +132,11 @@
       "type": "string"
     },
     "Effect": {
-      "description": "How a finding enters the investigation total. :class:`Status` says *whether*, this says *how*.\n\n``ADDITIVE`` is every finding v6 ever had: a term of the sum.\n\n``FLOOR`` is a **conclusion** — typically an AI analysis that read the other findings. It is\nnot a term: it raises the total just enough to reach the verdict it asserts, and adds nothing\nwhen that verdict is already reached. Conclusions therefore never compound, which is what\nmakes it safe to plug several analysers into the same investigation.\n\nThe floor a verdict maps to is ``basic-v1``'s band convention, like every other number here —\nsee :mod:`cyvest.evaluation.projection`.",
+      "description": "How a finding enters the investigation total. :class:`Status` says *whether*, this says *how*.\n\n``ADDITIVE`` is every finding v6 ever had: a term of the sum.\n\n``FLOOR`` and ``CEILING`` are the two halves of a **conclusion** — typically an analysis that\nread the other findings. Neither is a term: a floor raises the total just enough to reach the\nverdict it asserts, a ceiling lowers it just enough. Both add nothing once the investigation\nis already there, so conclusions never compound and several analysers may conclude on the\nsame case without inflating — or deflating — each other.\n\nA ceiling is what states a **declared benign context**: an awareness campaign, a sanctioned\npentest window, an authorised scanner. Without it the model could force a case up but never\ndown, and the only way to say \"whatever the evidence, this is benign\" would be to guess a\nlarge negative weight — the v6 mistake.\n\nThe band a verdict maps to is ``basic-v1``'s convention, like every other number here — see\n:mod:`cyvest.evaluation.projection`.",
       "enum": [
         "ADDITIVE",
-        "FLOOR"
+        "FLOOR",
+        "CEILING"
       ],
       "title": "Effect",
       "type": "string"
@@ -451,7 +452,7 @@
       "type": "object"
     },
     "FindingResult": {
-      "description": "A finding's verdict.\n\n``own_term_suppressed`` flags that the rule's own claim was overridden by a stronger link —\na contradiction worth surfacing rather than silently dropping.\n\nThree combinations of ``(counted, score)`` are meaningful, and a consumer must not conflate\nthe last two:\n\n- ``(True, float)`` — an additive finding, a term of the total;\n- ``(False, None)`` — dismissed or not evaluated: visible, but out of the evaluation;\n- ``(True, None)`` — a conclusion (``effect`` is ``FLOOR``): it takes part, but it has no\n  magnitude of its own. Its effect is a floor on the investigation total, reported as a\n  contribution of :class:`InvestigationResult`.",
+      "description": "A finding's verdict.\n\n``own_term_suppressed`` flags that the rule's own claim was overridden by a stronger link —\na contradiction worth surfacing rather than silently dropping.\n\nThree combinations of ``(counted, score)`` are meaningful, and a consumer must not conflate\nthe last two:\n\n- ``(True, float)`` — an additive finding, a term of the total;\n- ``(False, None)`` — dismissed or not evaluated: visible, but out of the evaluation;\n- ``(True, None)`` — a conclusion (``effect`` is ``FLOOR`` or ``CEILING``): it takes part, but\n  it has no magnitude of its own. Its effect is a bound on the investigation total, reported\n  as a contribution of :class:`InvestigationResult`.",
       "properties": {
         "key": {
           "title": "Key",

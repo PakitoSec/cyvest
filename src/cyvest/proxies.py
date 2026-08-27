@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, Any, Generic, TypeVar
 from cyvest.enums import DecisionKind, Effect, RelationKind, Scope, SourceClass, Status, Verdict
 from cyvest.evaluation import ResolvedScope
 from cyvest.evaluation.projection import verdict_from_score
-from cyvest.evaluation.report import Contribution, FindingResult, ObservableResult
+from cyvest.evaluation.report import CONCLUSION_BOUND_LABELS, Contribution, FindingResult, ObservableResult
 from cyvest.facts import (
     Decision,
     Evidence,
@@ -400,7 +400,7 @@ class FindingProxy(_DecidableProxy[Finding], _JudgedProxy[Finding]):
 
     @property
     def is_conclusion(self) -> bool:
-        return self._resolve().effect is Effect.FLOOR
+        return self._resolve().effect.concludes
 
     @property
     def observable_links(self) -> tuple:
@@ -419,17 +419,17 @@ class FindingProxy(_DecidableProxy[Finding], _JudgedProxy[Finding]):
 
     @property
     def score(self) -> float:
-        """The finding's own magnitude — always ``0.0`` for a conclusion, see :attr:`applied_floor`."""
+        """The finding's own magnitude — always ``0.0`` for a conclusion, see :attr:`applied_bound`."""
         result = self.result()
         return result.score if result is not None and result.score is not None else 0.0
 
     @property
-    def applied_floor(self) -> float:
-        """How much this conclusion actually lifted the total; ``0.0`` once the verdict was reached."""
+    def applied_bound(self) -> float:
+        """How much this conclusion moved the total: positive for a floor, negative for a ceiling."""
         if not self.is_conclusion:
             return 0.0
         for contribution in self._investigation.report.investigation.contributions:
-            if contribution.source_key == self._key and contribution.label.startswith("conclusion floor"):
+            if contribution.source_key == self._key and contribution.label.startswith(CONCLUSION_BOUND_LABELS):
                 return contribution.value
         return 0.0
 
@@ -502,6 +502,31 @@ class FindingProxy(_DecidableProxy[Finding], _JudgedProxy[Finding]):
         if current.verdict is Verdict.INFO:
             updates["verdict"] = verdict_from_score(float(weight))
         self._investigation.supersede(current, **updates)
+        return self
+
+    def describe(
+        self,
+        *,
+        name: str | None = None,
+        comment: str | None = None,
+        extra: dict[str, Any] | None = None,
+    ) -> FindingProxy:
+        """
+        Re-assert what this finding says about itself, leaving its judgment untouched.
+
+        A rule usually creates its finding before it knows the answer, then fills in the story it
+        tells. Each argument replaces its field outright; omitted ones are left alone. ``extra``
+        is not merged — a rule that means to merge already holds the previous value.
+        """
+        updates: dict[str, Any] = {}
+        if name is not None:
+            updates["name"] = name
+        if comment is not None:
+            updates["comment"] = comment
+        if extra is not None:
+            updates["extra"] = extra
+        if updates:
+            self._investigation.supersede(self._resolve(), **updates)
         return self
 
     def set_verdict(self, verdict: Verdict | str, confidence: float | None = None) -> FindingProxy:

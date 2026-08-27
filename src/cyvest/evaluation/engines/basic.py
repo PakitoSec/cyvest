@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from cyvest.enums import DecisionKind, Effect, Scope, Status, Verdict
 from cyvest.evaluation.combine import NEG_INF, bounded_max, combine
-from cyvest.evaluation.projection import score_floor_for, verdict_from_score
+from cyvest.evaluation.projection import score_ceiling_for, score_floor_for, verdict_from_score
 from cyvest.evaluation.report import (
     Contribution,
     FindingResult,
@@ -29,12 +29,18 @@ from cyvest.facts.signal import ObservableSignal
 from cyvest.facts.store import FactStore
 from cyvest.policy import Policy
 
+#: How each conclusion effect reads in a contribution label, and how it bounds the total.
+_BOUNDS = {
+    Effect.FLOOR: ("floor", max, False),
+    Effect.CEILING: ("ceiling", min, True),
+}
+
 
 class BasicEngine:
     """Sum of findings, each backed by the strongest of its own claim and its observables.
 
-    Conclusions (``Effect.FLOOR``) sit outside that sum: once it is settled, they raise the total
-    to the floor of the verdict they assert.
+    Conclusions (``Effect.FLOOR`` and ``Effect.CEILING``) sit outside that sum: once it is
+    settled, they raise or lower the total to the verdict they assert.
     """
 
     engine_id = "basic-v1"
@@ -215,7 +221,7 @@ class _Evaluation:
         # say whether it applies at all.
         if finding.status is not Status.EVALUATED:
             return self._unevaluated_result(finding, decision)
-        if finding.effect is Effect.FLOOR:
+        if finding.effect.concludes:
             return self._conclusion_result(finding, decision)
 
         contributions, computed, own_suppressed = self._compute_finding(finding)
@@ -305,19 +311,20 @@ class _Evaluation:
         A conclusion has no magnitude: ``score`` is ``None``, not ``0.0``.
 
         ``0.0`` would read as a neutral term of the sum, which is precisely what a conclusion is
-        not. Its effect is applied on the total by :meth:`_apply_floors` and reported there.
+        not. Its effect is applied on the total by :meth:`_apply_bounds` and reported there.
 
-        Only ``REFUTE`` bites here. Upholding something that has no magnitude cannot raise it —
+        Only ``REFUTE`` bites here. Upholding something that has no magnitude cannot move it —
         a conclusion already asserts its verdict — so the stance is recorded and left unretained.
         """
         refuted = decision is not None and decision.kind is DecisionKind.REFUTE
+        bound_name = _BOUNDS[finding.effect][0]
         contributions = [
             Contribution(
                 source_key=finding.key,
                 label=f"conclusion · {finding.verdict.value}",
                 value=0.0,
                 retained=not refuted,
-                detail="floor applied on the investigation total",
+                detail=f"{bound_name} applied on the investigation total",
             )
         ]
         # Links stay documentary: propagating them would push the total past "just enough".
@@ -336,7 +343,7 @@ class _Evaluation:
         return FindingResult(
             key=finding.key,
             status=Status.NOT_APPLICABLE if refuted else finding.status,
-            effect=Effect.FLOOR,
+            effect=finding.effect,
             counted=not refuted,
             score=None,
             verdict=finding.verdict,
@@ -345,41 +352,52 @@ class _Evaluation:
             suppressed_by_decision=refuted,
         )
 
-    def _apply_floors(
+    def _apply_bounds(
         self,
         total: float,
         results: dict[str, FindingResult],
     ) -> tuple[float, list[Contribution]]:
-        """Raise ``total`` to the floor each conclusion asserts, weakest first."""
-        pending: list[tuple[float, str, str]] = []
-        for key, result in results.items():
-            if result.effect is not Effect.FLOOR or not result.counted:
-                continue
-            target = score_floor_for(result.verdict, epsilon=10**-self.policy.output_precision)
-            if target is None:  # pragma: no cover - Finding rejects floorless verdicts
-                continue
-            pending.append((target, self.store.findings[key].seq, key))
+        """
+        Bound ``total`` by every conclusion: floors raise it, ceilings lower it.
 
+        Floors are credited weakest first and ceilings loosest first, so each conclusion is
+        reported for what it actually moved rather than for what it asserted. Ceilings are
+        applied last: a declared benign context outranks an escalation, exactly as ``REFUTE``
+        bounds an observable once every signal has had its say.
+        """
+        epsilon = 10**-self.policy.output_precision
+        bound_for = {Effect.FLOOR: score_floor_for, Effect.CEILING: score_ceiling_for}
         contributions: list[Contribution] = []
-        for target, _seq, key in sorted(pending):
-            before = total
-            # `max` rather than `total += target - total`: the latter is not exact in binary
-            # floating point, and landing at 4.999999999999999 would report SUSPICIOUS.
-            total = max(total, target)
-            applied = total - before
-            contributions.append(
-                Contribution(
-                    source_key=key,
-                    label=f"conclusion floor · {results[key].verdict.value}",
-                    value=round_half_up(applied, self.policy.output_precision),
-                    retained=applied > 0.0,
-                    detail=(
-                        f"target {target}, total was {round_half_up(before, self.policy.output_precision)}"
-                        if applied > 0.0
-                        else "verdict already reached"
-                    ),
+
+        for effect, (bound_name, clamp, loosest_first) in _BOUNDS.items():
+            pending: list[tuple[float, str, str]] = []
+            for key, result in results.items():
+                if result.effect is not effect or not result.counted:
+                    continue
+                target = bound_for[effect](result.verdict, epsilon=epsilon)
+                if target is None:  # pragma: no cover - Finding rejects unbounded verdicts
+                    continue
+                pending.append((target, self.store.findings[key].seq, key))
+
+            for target, _seq, key in sorted(pending, reverse=loosest_first):
+                before = total
+                # `max`/`min` rather than an increment: the latter is not exact in binary
+                # floating point, and landing at 4.999999999999999 would report SUSPICIOUS.
+                total = clamp(total, target)
+                applied = total - before
+                contributions.append(
+                    Contribution(
+                        source_key=key,
+                        label=f"conclusion {bound_name} · {results[key].verdict.value}",
+                        value=round_half_up(applied, self.policy.output_precision),
+                        retained=applied != 0.0,
+                        detail=(
+                            f"target {target}, total was {round_half_up(before, self.policy.output_precision)}"
+                            if applied != 0.0
+                            else "verdict already reached"
+                        ),
+                    )
                 )
-            )
         return total, contributions
 
     # --- entry point ---------------------------------------------------------------------
@@ -404,8 +422,8 @@ class _Evaluation:
             for key, result in finding_results.items()
             if result.counted and result.effect is Effect.ADDITIVE
         ]
-        total, floor_contributions = self._apply_floors(total, finding_results)
-        contributions.extend(floor_contributions)
+        total, bound_contributions = self._apply_bounds(total, finding_results)
+        contributions.extend(bound_contributions)
 
         # Every observable gets a result in the global scope, even when no finding links it.
         for observable_key in self.store.observables:

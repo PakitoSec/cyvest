@@ -257,15 +257,52 @@ cv.finding("spf_fail", "SPF invalide", verdict=cv.VERDICT.SUSPICIOUS, weight=3.2
 conclusion = cv.conclusion("ai_review", "Analyse IA", verdict=cv.VERDICT.MALICIOUS)
 
 cv.get_global_score()       # 5.0 — the floor of MALICIOUS
-conclusion.applied_floor    # 1.8 — all it had to add
+conclusion.applied_bound    # 1.8 — all it had to add
 ```
 
 The floors are the lower bounds of the same bands as everywhere else: `5.0` for `MALICIOUS`, `3.0`
 for `SUSPICIOUS`, and an epsilon for `NOTABLE`, whose band `]0, 3[` has no closed bound. `SAFE`
-and `INFO` have no floor at all, so asserting one on a conclusion is **refused at construction**
-rather than silently doing nothing — a conclusion may only escalate.
+and `INFO` have no floor at all — they are the ceiling's business, below.
 
-For the same reason a conclusion **takes no weight**: its magnitude *is* the floor of its verdict.
+A conclusion **takes no weight**: its magnitude *is* the bound of its verdict.
+
+### Ceilings: the declared benign context
+
+A conclusion may also point the other way. `cv.conclusion(..., verdict=SAFE)` carries
+`effect=CEILING` and lowers the total *just enough* to reach the verdict it asserts:
+
+$$
+\text{total} = \min(\text{total}, \text{ceiling}(\text{verdict}))
+$$
+
+```python
+cv.finding("spf_fail", "SPF invalide", verdict=cv.VERDICT.MALICIOUS, weight=8.0)
+cv.conclusion("awareness_campaign", "Campagne PSAT", verdict=cv.VERDICT.SAFE)
+
+cv.get_global_verdict()     # SAFE — whatever the rules found
+```
+
+This is what states a case the evidence alone cannot: an **awareness campaign**, a sanctioned
+pentest window, an authorised scanner, a backup job that trips the EDR every night. Without it a
+model can force a case up but never down, and the only way to say "whatever the evidence, this is
+benign" is to guess a large negative weight — the mistake v7 exists to remove.
+
+The direction is not something you pass: it follows the verdict. An inculpatory verdict floors,
+`SAFE` and `INFO` cap. Asserting a `MALICIOUS` ceiling is **refused at construction** rather than
+silently doing nothing, exactly like a `SAFE` floor: `MALICIOUS` is unbounded above, so capping
+there could never lower anything.
+
+| Verdict | Floor | Ceiling |
+|---|---|---|
+| `SAFE` | — | `-ε` |
+| `INFO` | — | `0.0` |
+| `NOTABLE` | `ε` | `3.0 - ε` |
+| `SUSPICIOUS` | `3.0` | `5.0 - ε` |
+| `MALICIOUS` | `5.0` | — |
+
+**Ceilings are applied after floors.** A campaign that happens to contain a genuinely
+malicious-looking URL is still a campaign — and it mirrors `REFUTE`, which bounds an observable
+once every signal has had its say.
 
 ### What a conclusion looks like in the report
 
@@ -276,7 +313,9 @@ confidence still weighs on the investigation's mean confidence.
 The lift appears where it actually happened, as a contribution of the investigation result:
 
 ```python
-[c for c in cv.get_report().investigation.contributions if c.label.startswith("conclusion floor")]
+from cyvest.evaluation.report import CONCLUSION_BOUND_LABELS
+
+[c for c in cv.get_report().investigation.contributions if c.label.startswith(CONCLUSION_BOUND_LABELS)]
 ```
 
 This is deliberate. Were the lift stored on the finding, adding an unrelated finding elsewhere

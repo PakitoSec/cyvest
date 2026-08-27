@@ -184,7 +184,7 @@ Every fact has a deterministic key, which is what makes merging work without coo
 
 - **Observable**: `obs:{type}:{normalized_value}`, or `obs:{type}:{subtype}:{namespace}:{value}`
 - **Finding**: `fnd:{rule_id}:{subject_key}`
-- **Signal**: `ti:{source}:{observable_key}`
+- **Signal**: `sig:{source}:{observable_key}`
 - **Relation**: `rel:{kind}:{source_key}>{target_key}`
 - **Evidence**: `evd:{source}:{external_id}`, or `evd:sha256:{digest}` for inline content
 - **Decision**: `dec:{target_key}` — one stance per target, whatever it says

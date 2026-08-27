@@ -172,12 +172,12 @@
       }
     },
     "signals": {
-      "ti:virustotal:obs:url:hxxp://bad.example/x": {
+      "sig:virustotal:obs:url:hxxp://bad.example/x": {
         "subject_key": "obs:url:hxxp://bad.example/x",
         "verdict": "MALICIOUS",
         "confidence": 1.0,
         "weight": 6.0,
-        "key": "ti:virustotal:obs:url:hxxp://bad.example/x",
+        "key": "sig:virustotal:obs:url:hxxp://bad.example/x",
         "seq": "01KZXZ4FZKW78KTQ653RJ97HKN",
         "asserted_at": "2026-08-13T16:26:25.139253Z",
         "occurred_at": null,
@@ -196,12 +196,12 @@
         "taxonomies": [],
         "comment": ""
       },
-      "ti:virustotal:obs:domain:cdn.partner.example": {
+      "sig:virustotal:obs:domain:cdn.partner.example": {
         "subject_key": "obs:domain:cdn.partner.example",
         "verdict": "MALICIOUS",
         "confidence": 1.0,
         "weight": 8.0,
-        "key": "ti:virustotal:obs:domain:cdn.partner.example",
+        "key": "sig:virustotal:obs:domain:cdn.partner.example",
         "seq": "01KZXZ4FZKSAEVWR4FR728CT67",
         "asserted_at": "2026-08-13T16:26:25.139272Z",
         "occurred_at": null,
@@ -466,7 +466,7 @@
         "score": 6.0,
         "contributions": [
           {
-            "source_key": "ti:virustotal:obs:url:hxxp://bad.example/x",
+            "source_key": "sig:virustotal:obs:url:hxxp://bad.example/x",
             "label": "virustotal \u00b7 MALICIOUS",
             "value": 6.0,
             "retained": true,
@@ -521,7 +521,7 @@
         "score": -1.0,
         "contributions": [
           {
-            "source_key": "ti:virustotal:obs:domain:cdn.partner.example",
+            "source_key": "sig:virustotal:obs:domain:cdn.partner.example",
             "label": "virustotal \u00b7 MALICIOUS",
             "value": 8.0,
             "retained": false,

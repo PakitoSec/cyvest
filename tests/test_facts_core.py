@@ -32,7 +32,7 @@ class TestKeyTable:
     def test_signal_key_is_byte_identical_to_v6(self) -> None:
         obs = observable()
         signal = ThreatIntel(subject_key=obs.key, source=SRC, fragment_id="f1")
-        assert signal.key == f"ti:virustotal:{obs.key}"
+        assert signal.key == f"sig:virustotal:{obs.key}"
 
     def test_external_id_is_an_opt_in_discriminant(self) -> None:
         obs = observable()

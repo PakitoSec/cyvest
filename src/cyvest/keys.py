@@ -232,16 +232,16 @@ def generate_signal_key(source: str, subject_key: str, external_id: str | None =
     """
     Generate an observable-signal key.
 
-    Format: ``ti:{source}:{subject_key}`` — **byte-identical to v6** when no ``external_id`` is
-    given, so migrated documents need no remapping on this side.
+    Format: ``sig:{source}:{subject_key}``. The prefix names the *family*, not its first member:
+    v6's ``ti:`` would have locked every future signal kind behind a threat-intel name.
 
     Passing an ``external_id`` is how a caller opts into keeping a source's history instead of
     letting the freshest assertion win.
     """
     normalized_source = _normalize_value(source)
     if external_id:
-        return f"ti:{normalized_source}:{external_id.strip()}:{subject_key}"
-    return f"ti:{normalized_source}:{subject_key}"
+        return f"sig:{normalized_source}:{external_id.strip()}:{subject_key}"
+    return f"sig:{normalized_source}:{subject_key}"
 
 
 # Kept under its v6 name for the migration path; new code calls generate_signal_key.
@@ -311,7 +311,7 @@ def is_tag_descendant_of(descendant_name: str, ancestor_name: str) -> bool:
     return descendant_name.startswith(ancestor_name + ":")
 
 
-KEY_PREFIXES = frozenset({"obs", "fnd", "evd", "ti", "rel", "dec", "tag"})
+KEY_PREFIXES = frozenset({"obs", "fnd", "evd", "sig", "rel", "dec", "tag"})
 
 
 def parse_key_type(key: str) -> str | None:

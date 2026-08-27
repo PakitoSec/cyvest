@@ -210,6 +210,11 @@ was rather than rewritten.
 Findings are re-keyed too, from v6's `fnd:{name}` to `fnd:{rule_id}:{subject_key}`, so a tag's
 members go through the same translation.
 
+Signals change prefix: v6's `ti:{source}:{observable_key}` becomes `sig:{source}:{observable_key}`.
+The prefix names the *family*, not its first member — `ThreatIntel` is one signal kind among the
+ones to come, and `ti:` would have locked the namespace behind it. The migration regenerates these
+keys, so nothing in a v6 document needs to be rewritten by hand.
+
 ### Two contradictory decisions on one target
 
 A decision is keyed `dec:{target_key}`, so **one target holds exactly one stance**. Asserting the

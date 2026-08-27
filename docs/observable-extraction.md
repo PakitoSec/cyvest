@@ -282,6 +282,11 @@ observables = extract_from_url(
 )
 ```
 
+Only `http` and `https` are dialled — anything else raises `ValueError` before a request is made,
+so a URL you did not author cannot turn into `file:///etc/passwd`. The response is capped at
+`max_bytes` (32 MiB by default) and a body past that limit raises rather than being truncated
+silently.
+
 ---
 
 ## Defang/Refang Utilities

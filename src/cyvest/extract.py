@@ -987,6 +987,12 @@ def extract_all(
 # =============================================================================
 
 
+_FETCHABLE_SCHEMES = frozenset({"http", "https"})
+
+#: 32 MiB. Past that the quadratic domain scan dominates anyway.
+_MAX_FETCH_BYTES = 32 * 1024 * 1024
+
+
 def extract_from_url(
     url: str,
     types: set[ObservableType] | None = None,
@@ -994,9 +1000,13 @@ def extract_from_url(
     timeout: int = 30,
     extraction_patterns: Iterable[ExtractionPattern] | None = None,
     include_registered_patterns: bool = True,
+    max_bytes: int = _MAX_FETCH_BYTES,
 ) -> list[ExtractedObservable]:
     """
     Fetch content from a URL and extract observables.
+
+    Only ``http`` and ``https`` are accepted: this is a library entry point, and handing an
+    unvalidated URL to ``urlopen`` would turn ``file:///etc/passwd`` into a readable feed.
 
     Args:
         url: URL to fetch content from.
@@ -1005,14 +1015,21 @@ def extract_from_url(
         timeout: Request timeout in seconds.
         extraction_patterns: Optional per-call custom extraction patterns.
         include_registered_patterns: Include globally registered extraction patterns.
+        max_bytes: Stop reading past this many bytes.
 
     Returns:
         Deduplicated list of extracted observables.
 
     Raises:
+        ValueError: If the URL scheme is not http(s), or the response exceeds ``max_bytes``.
         URLError: If the URL cannot be fetched.
         HTTPError: If the server returns an error response.
     """
+    scheme = urllib.parse.urlparse(url).scheme.lower()
+    if scheme not in _FETCHABLE_SCHEMES:
+        allowed = "/".join(sorted(_FETCHABLE_SCHEMES))
+        raise ValueError(f"Refusing to fetch {scheme or 'scheme-less'} URL; only {allowed}")
+
     request = urllib.request.Request(
         url,
         headers={"User-Agent": "Mozilla/5.0 (compatible; Cyvest/1.0; +https://github.com/PakitoSec/cyvest)"},
@@ -1026,10 +1043,18 @@ def extract_from_url(
         if "charset=" in content_type:
             charset = content_type.split("charset=")[-1].split(";")[0].strip()
 
-        try:
-            text = response.read().decode(charset)
-        except (UnicodeDecodeError, LookupError):
-            text = response.read().decode("utf-8", errors="replace")
+        # One extra byte, so a body sitting exactly on the limit is not reported as truncated.
+        raw = response.read(max_bytes + 1)
+
+    if len(raw) > max_bytes:
+        raise ValueError(f"Response exceeds {max_bytes} bytes")
+
+    # Read once: retrying `response.read()` on a consumed stream returns b"" and silently
+    # extracts nothing.
+    try:
+        text = raw.decode(charset)
+    except (UnicodeDecodeError, LookupError):
+        text = raw.decode("utf-8", errors="replace")
 
     return extract_all(
         text,

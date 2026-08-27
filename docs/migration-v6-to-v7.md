@@ -104,10 +104,10 @@ A judgment now has three separable parts, where v6 had one number:
 - **`weight`** — *how much* it is worth (the magnitude).
 - **`confidence`** — *how sure* the source is (0–1), which scales the weight.
 
-Stating one of `verdict` / `weight` is enough; the other is supplied by the score bands. A weight
+Stating one of `verdict` / `weight` is enough; the other is supplied at evaluation time. A weight
 alone yields the verdict of its band (`finding_create("phishing", weight=8.5)` → `MALICIOUS`,
-score `8.5`). A verdict alone leaves the weight unset on the fact, and the engine resolves it from
-`policy.weight_by_verdict` at evaluation time — so
+score `8.5`). A verdict alone leaves the weight unset on the fact, and the engine falls back on
+`policy.default_weight_by_verdict` — so
 `finding_create("phishing", verdict=Verdict.MALICIOUS)` scores `7.0` under the default policy, and
 follows the policy if you change it.
 

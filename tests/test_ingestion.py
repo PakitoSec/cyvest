@@ -155,8 +155,8 @@ class TestEmission:
         assert (payload["verdict"], payload["weight"]) == (Verdict.SAFE.value, pytest.approx(2.0))
 
     def test_a_custom_policy_recalibrates_the_completed_weight(self) -> None:
-        """The producer's bands travel with the payload — that is why they are an argument."""
-        policy = Policy(weight_by_verdict={**Policy().weight_by_verdict, Verdict.MALICIOUS: 9.5})
+        """The producer's calibration travels with the payload — that is why it is an argument."""
+        policy = Policy(default_weight_by_verdict={**Policy().default_weight_by_verdict, Verdict.MALICIOUS: 9.5})
         assert Cyvest.io_dump_signal("vt", verdict="MALICIOUS", policy=policy)["weight"] == pytest.approx(9.5)
 
     def test_a_producer_typo_is_rejected_before_the_wire(self) -> None:

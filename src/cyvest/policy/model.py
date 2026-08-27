@@ -23,10 +23,11 @@ class Policy(BaseModel):
     engine_id: str = Field(default="basic-v1")
     aggregation: Aggregation = Field(default=Aggregation.MAX)
 
-    # Used whenever a fact states a verdict but no weight: the representative of the verdict's
-    # own band. Without it, asserting MALICIOUS with no weight would report INFO. Retuning these
-    # five values recalibrates a whole corpus without touching a single rule.
-    weight_by_verdict: dict[Verdict, float] = Field(
+    # The magnitude assumed when a fact states a verdict but no weight. A verdict does not
+    # derive a score: it is simply the only key available to pick a default. Without it,
+    # asserting MALICIOUS with no weight would report INFO. Retuning these five values
+    # recalibrates a whole corpus without touching a single rule.
+    default_weight_by_verdict: dict[Verdict, float] = Field(
         default_factory=lambda: {
             Verdict.SAFE: Weight.LOW.value,
             Verdict.INFO: 0.0,
@@ -64,14 +65,14 @@ class Policy(BaseModel):
         """
         Resolve the magnitude of a judgment.
 
-        An explicit weight wins; otherwise the judgment takes the band representative of its
+        An explicit weight wins; otherwise the judgment takes the magnitude assumed for its
         verdict. Per-rule and per-source defaults were removed in v7: keyed on the rule alone,
         they applied the same magnitude to that rule's exculpatory and inculpatory conclusions
         alike, and silently overruled the intent of whoever wrote the rule.
         """
         if weight is not None:
             return float(weight)
-        return self.weight_by_verdict.get(verdict, 0.0)
+        return self.default_weight_by_verdict.get(verdict, 0.0)
 
 
 __all__ = ["Policy"]

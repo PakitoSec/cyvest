@@ -36,29 +36,51 @@ s_{\text{signal}} = \text{polarity}(\text{verdict}) \times w \times c
 $$
 
 Stating one of `verdict` / `weight` is enough. A weight implies the verdict of its band; a verdict
-with no weight is resolved at evaluation time from `policy.weight_by_verdict`, which means the
-same fact can be worth more or less under a different policy — as it should be.
+with no weight leaves the magnitude unstated, and the policy assumes one at evaluation time from
+`policy.default_weight_by_verdict`, which means the same fact can be worth more or less under a
+different policy — as it should be.
 
 ### Where the weight comes from
 
 `policy.resolve_weight()` takes the first that applies:
 
 1. **the weight stated on the fact** — a source that returns a number is believed;
-2. `weight_by_verdict[verdict]` — the band representative of the verdict.
+2. `default_weight_by_verdict[verdict]` — the magnitude assumed for a claim of that kind.
+
+The second is a *fallback*, not a conversion: a verdict does not produce a score. When nobody
+stated a magnitude, the verdict is simply the only key available to pick a default.
 
 The fact wins over the policy, deliberately: "VirusTotal returned 6" is an observation, and a
 policy that could silently rewrite it would put us back to v6, where the displayed value and the
 computed one could disagree. The policy fills gaps; it does not overrule.
 
-Retuning the five band representatives is the one lever the policy offers, and it stays coherent
-by construction: it moves every verdict on the same scale, so an exculpatory conclusion and an
+### Why 1.5, 4.0 and 7.0
+
+The five defaults are not free parameters — they are the **midpoints of the score bands** the
+verdicts label:
+
+| Verdict | Band | Assumed magnitude |
+|---|---|---|
+| `NOTABLE` | `]0, 3[` | `1.5` |
+| `SUSPICIOUS` | `[3, 5[` | `4.0` |
+| `MALICIOUS` | `[5, ∞[` | `7.0` — open band, width extrapolated from the previous one |
+| `SAFE` | `< 0` | `1.5` — the `NOTABLE` magnitude, polarity carrying the sign |
+| `INFO` | `= 0` | `0.0` |
+
+Midpoints rather than thresholds. Aligning the defaults on `3.0` and `5.0` would look tidier and
+would make the table redundant with `projection.py`, but it puts every default exactly on a
+boundary: `5.0 × 0.99` reads `SUSPICIOUS`, so *any* confidence below `1.0` costs a notch. It also
+leaves `SAFE` and `NOTABLE` undefined, their bands having no closed lower bound.
+
+Retuning the five defaults is the one lever the policy offers, and it stays coherent by
+construction: it moves every verdict on the same scale, so an exculpatory conclusion and an
 inculpatory one never drift apart. Earlier drafts also allowed per-rule and per-source defaults;
 they were dropped because, keyed on the rule or the feed alone, they applied one magnitude to
 that rule's `SAFE` and `MALICIOUS` conclusions alike.
 
 The practical consequence is worth stating plainly: **you cannot down-weight a noisy feed that
 reports its own magnitudes** by editing the policy. Either the connector stops sending a weight —
-and the band representative then applies — or you attenuate elsewhere.
+and the default then applies — or you attenuate elsewhere.
 
 !!! note "A weight is never negative"
     Direction is the verdict's job alone. A signed weight would let a fact read `MALICIOUS` while

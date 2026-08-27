@@ -105,15 +105,20 @@ class FindingResult(_ResultBase):
 
     - ``(True, float)`` — an additive finding, a term of the total;
     - ``(False, None)`` — dismissed or not evaluated: visible, but out of the evaluation;
-    - ``(True, None)`` — a conclusion (``effect`` is ``FLOOR``): it takes part, but it has no
-      magnitude of its own. Its effect is a floor on the investigation total, reported as a
-      contribution of :class:`InvestigationResult`.
+    - ``(True, None)`` — a conclusion (``effect`` is ``FLOOR`` or ``CEILING``): it takes part, but
+      it has no magnitude of its own. Its effect is a bound on the investigation total, reported
+      as a contribution of :class:`InvestigationResult`.
     """
 
     status: Status = Field(default=Status.EVALUATED)
     effect: Effect = Field(default=Effect.ADDITIVE)
     own_term_suppressed: bool = Field(default=False)
     counted: bool = Field(default=True)
+
+
+#: Label prefixes of the investigation-level contribution a conclusion produces. Published so a
+#: consumer recognises the term a floor or a ceiling actually moved without hardcoding the string.
+CONCLUSION_BOUND_LABELS = ("conclusion floor", "conclusion ceiling")
 
 
 class InvestigationResult(_ResultBase):
@@ -145,6 +150,7 @@ def observable_index(observable_key: str, scope: ResolvedScope) -> str:
 
 
 __all__ = [
+    "CONCLUSION_BOUND_LABELS",
     "Contribution",
     "FindingResult",
     "InvestigationResult",

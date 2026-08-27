@@ -13,13 +13,14 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 from rich.console import Console, Group
+from rich.padding import Padding
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 from rich.tree import Tree
 
-from cyvest.enums import DecisionKind, Effect, Status, Verdict
-from cyvest.evaluation.report import Contribution, Report
+from cyvest.enums import DecisionKind, Verdict
+from cyvest.evaluation.report import CONCLUSION_BOUND_LABELS, Contribution, Report
 from cyvest.facts.decision import decision_label
 from cyvest.stats import InvestigationStats
 
@@ -34,6 +35,15 @@ VERDICT_STYLES: dict[Verdict, str] = {
     Verdict.SUSPICIOUS: "dark_orange",
     Verdict.MALICIOUS: "red",
 }
+
+#: Strongest band first: a report is read to find what is wrong.
+_VERDICT_ORDER: tuple[Verdict, ...] = (
+    Verdict.MALICIOUS,
+    Verdict.SUSPICIOUS,
+    Verdict.NOTABLE,
+    Verdict.INFO,
+    Verdict.SAFE,
+)
 
 _DECISION_STYLES: dict[DecisionKind, str] = {
     DecisionKind.REFUTE: "bold green",
@@ -50,9 +60,9 @@ def _score(value: float | None) -> str:
     return "—" if value is None else f"{value:.2f}"
 
 
-def _applied_floor(report: Report, finding_key: str) -> float:
+def _applied_bound(report: Report, finding_key: str) -> float:
     for contribution in report.investigation.contributions:
-        if contribution.source_key == finding_key and contribution.label.startswith("conclusion floor"):
+        if contribution.source_key == finding_key and contribution.label.startswith(CONCLUSION_BOUND_LABELS):
             return contribution.value
     return 0.0
 
@@ -83,7 +93,23 @@ def _decision_badges(investigation: Investigation, key: str) -> Text:
     return badge
 
 
-def build_summary(investigation: Investigation, *, show_graph: bool = False) -> Group:
+def build_summary(
+    investigation: Investigation,
+    *,
+    show_graph: bool = False,
+    show_observables: bool = False,
+    show_silent: bool = False,
+) -> Group:
+    """
+    One table, read top to bottom, ending on the number that matters.
+
+    Findings are grouped by verdict rather than listed by key: an analyst reads a report to find
+    what is wrong, and alphabetical order buries the one malicious rule under forty benign ones.
+
+    Two kinds of row stay out by default and are counted in the caption instead: observables,
+    which are the *inputs*, and silent findings — the rules that ran and concluded nothing. Both
+    are legitimate output; neither belongs between the analyst and the global score.
+    """
     report = investigation.report
     header = investigation.store.header
 
@@ -95,61 +121,183 @@ def build_summary(investigation: Investigation, *, show_graph: bool = False) -> 
     # The engine id always travels with the score: comparing scores across engines is meaningless.
     title.append(f"   [{report.engine_id} · {report.policy_version}]", style="dim")
 
-    findings = Table(title="Findings", expand=True, title_justify="left")
-    findings.add_column("Rule")
-    findings.add_column("Score", justify="right")
-    findings.add_column("Verdict")
-    findings.add_column("Conf.", justify="right")
-    findings.add_column("Status")
-    findings.add_column("")
+    table = Table(title="Investigation Report", expand=True, show_lines=False)
+    table.add_column("Name", overflow="fold", ratio=1)
+    # Sized to their content: `SUSPICIOUS` truncated to `SUSPIC…` is the one thing a verdict
+    # column must never do.
+    table.add_column("Score", justify="right", no_wrap=True, min_width=7)
+    table.add_column("Verdict", no_wrap=True, min_width=10)
 
-    for key, finding in sorted(investigation.get_all_findings().items()):
-        result = report.finding(key)
-        if result is None:
-            continue
-        notes = _decision_badges(investigation, key)
-        if result.own_term_suppressed:
-            notes.append(" contredit par un observable", style="dim italic")
-        if finding.effect is Effect.FLOOR:
-            applied = _applied_floor(report, key)
-            note = f" conclusion · +{applied:.2f} sur le total" if applied > 0 else " conclusion · verdict déjà atteint"
-            notes.append(note, style="dim italic")
-        findings.add_row(
-            finding.name or finding.rule_id,
-            _score(result.score),
-            verdict_text(result.verdict),
-            f"{result.confidence:.2f}",
-            Text(result.status.value, style="dim" if result.status is not Status.EVALUATED else ""),
-            notes,
-        )
+    displayed, silent, counted = _add_findings(table, investigation, report, show_silent=show_silent)
+    _add_tags(table, investigation)
+    _add_evidences(table, investigation)
+    if show_observables:
+        _add_observables(table, investigation, report)
+    _add_statistics(table, investigation)
 
-    observables = Table(title="Observables", expand=True, title_justify="left")
-    observables.add_column("Type")
-    observables.add_column("Value", overflow="fold")
-    observables.add_column("Score", justify="right")
-    observables.add_column("Verdict")
-    observables.add_column("")
+    table.add_section()
+    table.add_row(
+        Text("GLOBAL SCORE", style="bold"),
+        Text(_score(report.investigation.score), style="bold"),
+        verdict_text(report.investigation.verdict),
+    )
 
-    for key, observable in sorted(investigation.get_all_observables().items()):
-        if key == header.root_key:
-            continue
-        result = report.observable(key)
-        observables.add_row(
-            str(observable.obs_type),
-            observable.value,
-            _score(result.score if result else None),
-            verdict_text(result.verdict if result else Verdict.INFO),
-            _decision_badges(investigation, key),
-        )
+    caption = f"Total findings: {displayed + silent} | Displayed: {displayed}"
+    if silent:
+        caption += f" (excluding {silent} silent)"
+    caption += f" | Counted: {counted} | Confidence: {report.investigation.confidence:.2f}"
+    table.caption = caption
 
-    parts = [
-        Panel(title, border_style=VERDICT_STYLES.get(report.investigation.verdict, "white")),
-        findings,
-        observables,
-    ]
+    parts = [Panel(title, border_style=VERDICT_STYLES.get(report.investigation.verdict, "white")), table]
     if show_graph:
         parts.append(build_graph(investigation))
     return Group(*parts)
+
+
+def _section(table: Table, label: str) -> None:
+    table.add_section()
+    table.add_row(Text(label, style="bold cyan", justify="center"), "", "")
+
+
+def _row(label: Text) -> Padding:
+    """Indent through padding, not spaces, so a folded long name keeps its indent."""
+    return Padding(label, (0, 0, 0, 2))
+
+
+def _finding_notes(investigation: Investigation, report: Report, key: str) -> Text:
+    finding = investigation.get_finding(key)
+    result = report.finding(key)
+    notes = _decision_badges(investigation, key)
+    if result is not None and result.own_term_suppressed:
+        notes.append(" · contredit par un observable", style="dim italic")
+    if finding is not None and finding.effect.concludes:
+        applied = _applied_bound(report, key)
+        notes.append(
+            f" · conclusion {applied:+.2f} sur le total" if applied else " · conclusion, verdict déjà atteint",
+            style="dim italic",
+        )
+    if result is not None and not result.counted:
+        notes.append(f" · hors calcul ({result.status.value})", style="dim italic")
+    return notes
+
+
+def _is_silent(investigation: Investigation, report: Report, key: str) -> bool:
+    """
+    A rule that ran and concluded nothing — v6 called this level ``NONE``.
+
+    A conclusion is never silent, since it always asserts a verdict, and neither is a finding an
+    analyst took a stance on: hiding a declared act would hide the decision that produced it.
+    """
+    result = report.finding(key)
+    finding = investigation.get_finding(key)
+    if result is None or finding is None or finding.effect.concludes:
+        return False
+    if investigation.get_decision(key) is not None:
+        return False
+    return result.verdict is Verdict.INFO and (result.score or 0.0) == 0.0
+
+
+def _add_findings(
+    table: Table,
+    investigation: Investigation,
+    report: Report,
+    *,
+    show_silent: bool,
+) -> tuple[int, int, int]:
+    """Group by verdict, strongest band first; returns (displayed, silent, counted)."""
+    by_verdict: dict[Verdict, list[tuple[str, str]]] = {verdict: [] for verdict in _VERDICT_ORDER}
+    silent = 0
+    counted = 0
+    for key, finding in investigation.get_all_findings().items():
+        result = report.finding(key)
+        if result is None:
+            continue
+        counted += 1 if result.counted else 0
+        if not show_silent and _is_silent(investigation, report, key):
+            silent += 1
+            continue
+        by_verdict.setdefault(result.verdict, []).append((finding.name or finding.rule_id, key))
+
+    displayed = sum(len(rows) for rows in by_verdict.values())
+    _section(table, f"FINDINGS: {displayed} findings")
+
+    for verdict in _VERDICT_ORDER:
+        rows = by_verdict.get(verdict) or []
+        if not rows:
+            continue
+        table.add_row(
+            Text(f"{verdict.value}: {len(rows)} finding(s)", style=VERDICT_STYLES[verdict], justify="center"),
+            "",
+            "",
+        )
+        for name, key in sorted(rows):
+            result = report.finding(key)
+            label = Text(name)
+            label.append_text(_finding_notes(investigation, report, key))
+            table.add_row(_row(label), _score(result.score), verdict_text(result.verdict))
+    return displayed, silent, counted
+
+
+def _add_tags(table: Table, investigation: Investigation) -> None:
+    tags = investigation.get_all_tags()
+    if not tags:
+        return
+    _section(table, f"TAGS: {len(tags)} tags")
+    for tag in sorted(tags.values(), key=lambda item: item.name):
+        score = investigation.get_tag_aggregated_score(tag.name)
+        table.add_row(
+            _row(Text(tag.name)),
+            _score(score),
+            verdict_text(investigation.get_tag_aggregated_verdict(tag.name)),
+        )
+
+
+def _add_evidences(table: Table, investigation: Investigation) -> None:
+    evidences = investigation.get_all_evidences()
+    if not evidences:
+        return
+    _section(table, f"EVIDENCES: {len(evidences)} evidences")
+    for evidence in sorted(evidences.values(), key=lambda item: (item.evidence_type, item.external_id or item.key)):
+        label = Text(evidence.external_id or evidence.key)
+        label.append(f"  ({evidence.evidence_type})", style="dim")
+        table.add_row(_row(label), "—", "—")
+
+
+def _add_observables(table: Table, investigation: Investigation, report: Report) -> None:
+    observables = {
+        key: observable
+        for key, observable in investigation.get_all_observables().items()
+        if key != investigation.store.header.root_key
+    }
+    if not observables:
+        return
+    _section(table, f"OBSERVABLES: {len(observables)} observables")
+    for key, observable in sorted(observables.items(), key=lambda item: (str(item[1].obs_type), item[1].value)):
+        result = report.observable(key)
+        label = Text(f"{observable.obs_type} ", style="dim")
+        label.append(observable.value)
+        label.append_text(_decision_badges(investigation, key))
+        table.add_row(
+            _row(label),
+            _score(result.score if result else None),
+            verdict_text(result.verdict if result else Verdict.INFO),
+        )
+
+
+def _add_statistics(table: Table, investigation: Investigation) -> None:
+    stats = InvestigationStats(investigation.store, investigation.report).get_summary()
+    _section(table, "STATISTICS")
+    rows = (
+        ("Total Observables", stats.total_observables),
+        ("Internal Observables", stats.internal_observables),
+        ("External Observables", stats.external_observables),
+        ("Allowlisted Observables", stats.allowlisted_observables),
+        ("Total Threat Intel", stats.total_signals),
+        ("Total Relations", stats.total_relations),
+        ("Total Decisions", stats.total_decisions),
+    )
+    for label, value in rows:
+        table.add_row(_row(Text(label)), str(value), "—")
 
 
 def build_graph(investigation: Investigation) -> Tree:

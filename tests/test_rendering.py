@@ -48,9 +48,72 @@ class TestEnumRendering:
         assert f"{member}" == member.value
 
     def test_the_summary_table_shows_the_type_not_the_repr(self) -> None:
-        output = render(build_summary(case()._investigation))
+        output = render(build_summary(case()._investigation, show_observables=True))
         assert "ObservableType." not in output
         assert "url" in output
+
+
+class TestSummaryLayout:
+    """One table read top to bottom, grouped by verdict, ending on the global score."""
+
+    def test_sections_appear_in_reading_order(self) -> None:
+        cv = case()
+        cv.finding("url_analysis").tagged(cv.tag("body", "Body"))
+        cv.evidence_create("enrichment", content={"a": 1}, external_id="from-enrich")
+
+        output = render(build_summary(cv._investigation))
+
+        sections = ("FINDINGS:", "TAGS:", "EVIDENCES:", "STATISTICS", "GLOBAL SCORE")
+        positions = [output.index(section) for section in sections]
+        assert positions == sorted(positions)
+
+    def test_an_empty_section_is_left_out(self) -> None:
+        assert "EVIDENCES:" not in render(build_summary(case()._investigation))
+
+    def test_findings_are_grouped_by_verdict_strongest_first(self) -> None:
+        cv = Cyvest(investigation_name="IR-1")
+        cv.finding_create("benign", "benign rule", weight=-1.0)
+        cv.finding_create("bad", "bad rule", weight=8.0)
+
+        output = render(build_summary(cv._investigation))
+
+        assert output.index("MALICIOUS: 1 finding(s)") < output.index("SAFE: 1 finding(s)")
+        assert output.index("bad rule") < output.index("benign rule")
+
+    def test_observables_stay_out_unless_asked_for(self) -> None:
+        """They are the inputs: a hundred relay domains would push the score off the screen."""
+        investigation = case()._investigation
+
+        assert "OBSERVABLES:" not in render(build_summary(investigation))
+        assert "OBSERVABLES:" in render(build_summary(investigation, show_observables=True))
+
+    def test_the_global_score_is_the_last_row(self) -> None:
+        cv = Cyvest(investigation_name="IR-1")
+        cv.finding_create("bad", "bad rule", weight=8.0)
+
+        output = render(build_summary(cv._investigation))
+
+        assert "GLOBAL SCORE" in output
+        assert output.index("GLOBAL SCORE") > output.index("bad rule")
+
+    def test_a_rule_that_concluded_nothing_is_counted_not_listed(self) -> None:
+        """v6 called this level ``NONE``; forty of them bury the one rule that fired."""
+        cv = Cyvest(investigation_name="IR-1")
+        cv.finding_create("bad", "bad rule", weight=8.0)
+        cv.finding_create("quiet", "quiet rule")
+
+        output = render(build_summary(cv._investigation))
+
+        assert "quiet rule" not in output
+        assert "excluding 1 silent" in output
+        assert "quiet rule" in render(build_summary(cv._investigation, show_silent=True))
+
+    def test_a_stance_keeps_a_silent_finding_visible(self) -> None:
+        """Hiding it would hide the analyst's act along with it."""
+        cv = Cyvest(investigation_name="IR-1")
+        cv.finding("quiet", "quiet rule").dismiss("out of scope", decided_by="alice")
+
+        assert "quiet rule" in render(build_summary(cv._investigation))
 
     def test_the_graph_shows_the_type_not_the_repr(self) -> None:
         output = render(build_graph(case()._investigation))

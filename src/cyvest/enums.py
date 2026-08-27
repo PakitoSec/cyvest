@@ -101,17 +101,29 @@ class Effect(str, Enum):
 
     ``ADDITIVE`` is every finding v6 ever had: a term of the sum.
 
-    ``FLOOR`` is a **conclusion** — typically an AI analysis that read the other findings. It is
-    not a term: it raises the total just enough to reach the verdict it asserts, and adds nothing
-    when that verdict is already reached. Conclusions therefore never compound, which is what
-    makes it safe to plug several analysers into the same investigation.
+    ``FLOOR`` and ``CEILING`` are the two halves of a **conclusion** — typically an analysis that
+    read the other findings. Neither is a term: a floor raises the total just enough to reach the
+    verdict it asserts, a ceiling lowers it just enough. Both add nothing once the investigation
+    is already there, so conclusions never compound and several analysers may conclude on the
+    same case without inflating — or deflating — each other.
 
-    The floor a verdict maps to is ``basic-v1``'s band convention, like every other number here —
-    see :mod:`cyvest.evaluation.projection`.
+    A ceiling is what states a **declared benign context**: an awareness campaign, a sanctioned
+    pentest window, an authorised scanner. Without it the model could force a case up but never
+    down, and the only way to say "whatever the evidence, this is benign" would be to guess a
+    large negative weight — the v6 mistake.
+
+    The band a verdict maps to is ``basic-v1``'s convention, like every other number here — see
+    :mod:`cyvest.evaluation.projection`.
     """
 
     ADDITIVE = "ADDITIVE"
     FLOOR = "FLOOR"
+    CEILING = "CEILING"
+
+    @property
+    def concludes(self) -> bool:
+        """Whether this effect bounds the total instead of adding a term to it."""
+        return self is not Effect.ADDITIVE
 
 
 class SourceClass(str, Enum):

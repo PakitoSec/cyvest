@@ -1235,7 +1235,7 @@
     },
     "ThreatIntel": {
       "additionalProperties": false,
-      "description": "A verdict from a threat-intelligence source.\n\nIdentity is ``(source, subject_key)`` — byte-identical to v6 — so a source re-asserting the\nsame observable updates in place instead of piling up duplicates. Pass ``external_id`` to\nkeep history on purpose.",
+      "description": "A verdict from a threat-intelligence source.\n\nIdentity is ``(source, subject_key)``, so a source re-asserting the same observable updates\nin place instead of piling up duplicates. Pass ``external_id`` to keep history on purpose.",
       "properties": {
         "subject_key": {
           "minLength": 1,

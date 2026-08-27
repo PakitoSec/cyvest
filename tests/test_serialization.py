@@ -181,9 +181,9 @@ class TestMigrationV6:
         assert migrated.get_global_score() == 6.0
         assert migrated.get_global_verdict() is Verdict.MALICIOUS
 
-    def test_threat_intel_keys_are_unchanged(self) -> None:
+    def test_threat_intel_keys_are_rebuilt_under_the_signal_prefix(self) -> None:
         migrated = self._migrated()
-        assert "ti:virustotal:obs:url:hxxp://bad.example" in migrated._investigation.store.signals
+        assert "sig:virustotal:obs:url:hxxp://bad.example" in migrated._investigation.store.signals
 
     def test_a_negative_score_keeps_its_sign(self) -> None:
         """Migrating from the level would flip this to +2; the score is authoritative."""

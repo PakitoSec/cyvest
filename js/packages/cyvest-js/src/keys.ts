@@ -8,10 +8,10 @@
 /**
  * Key type prefixes used in Cyvest.
  */
-export type KeyType = "obs" | "fnd" | "evd" | "ti" | "rel" | "dec" | "tag";
+export type KeyType = "obs" | "fnd" | "evd" | "sig" | "rel" | "dec" | "tag";
 
 /** Every prefix a v7 document can carry. `enr:` is gone — enrichments are evidence now. */
-export const KEY_PREFIXES: readonly KeyType[] = ["obs", "fnd", "evd", "ti", "rel", "dec", "tag"] as const;
+export const KEY_PREFIXES: readonly KeyType[] = ["obs", "fnd", "evd", "sig", "rel", "dec", "tag"] as const;
 
 /**
  * Normalize a string value for consistent key generation.
@@ -218,21 +218,21 @@ export function generateFindingKey(ruleId: string, subjectKey: string, externalI
 /**
  * Generate an observable-signal key.
  *
- * Format: `ti:{source}:{subject_key}` — byte-identical to v6 when no `externalId` is given, so
- * migrated documents need no remapping on this side.
+ * Format: `sig:{source}:{subject_key}`. The prefix names the *family*, not its first member:
+ * v6's `ti:` would have locked every future signal kind behind a threat-intel name.
  *
  * @example
  * ```ts
  * generateSignalKey("virustotal", "obs:ipv4:192.168.1.1")
- * // => "ti:virustotal:obs:ipv4:192.168.1.1"
+ * // => "sig:virustotal:obs:ipv4:192.168.1.1"
  * ```
  */
 export function generateSignalKey(source: string, subjectKey: string, externalId?: string): string {
   const normalizedSource = normalizeValue(source);
   if (externalId) {
-    return `ti:${normalizedSource}:${externalId.trim()}:${subjectKey}`;
+    return `sig:${normalizedSource}:${externalId.trim()}:${subjectKey}`;
   }
-  return `ti:${normalizedSource}:${subjectKey}`;
+  return `sig:${normalizedSource}:${subjectKey}`;
 }
 
 /** Kept under its v6 name; new code calls {@link generateSignalKey}. */

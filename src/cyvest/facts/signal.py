@@ -61,9 +61,8 @@ class ThreatIntel(ObservableSignal):
     """
     A verdict from a threat-intelligence source.
 
-    Identity is ``(source, subject_key)`` — byte-identical to v6 — so a source re-asserting the
-    same observable updates in place instead of piling up duplicates. Pass ``external_id`` to
-    keep history on purpose.
+    Identity is ``(source, subject_key)``, so a source re-asserting the same observable updates
+    in place instead of piling up duplicates. Pass ``external_id`` to keep history on purpose.
     """
 
     kind: Literal["threat_intel"] = "threat_intel"

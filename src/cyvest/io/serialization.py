@@ -594,7 +594,7 @@ def _empty_report(header: InvestigationHeader) -> Any:
 
 
 def _subject_from_ti_key(key: str) -> str | None:
-    """``ti:{source}:{observable_key}`` — the observable key is everything past the source."""
+    """v6 form ``ti:{source}:{observable_key}`` — the observable key is everything past the source."""
     parts = key.split(":", 2)
     return parts[2] if len(parts) == 3 else None
 

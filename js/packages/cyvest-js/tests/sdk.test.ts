@@ -199,7 +199,7 @@ describe("evidence", () => {
 
 describe("keys", () => {
   it("keeps the v6 signal format", () => {
-    expect(generateSignalKey("virustotal", URL_KEY)).toBe(`ti:virustotal:${URL_KEY}`);
+    expect(generateSignalKey("virustotal", URL_KEY)).toBe(`sig:virustotal:${URL_KEY}`);
   });
 
   it("includes the subject in a finding identity", () => {

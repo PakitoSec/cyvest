@@ -7,13 +7,7 @@ export type OccurredAt = string | null;
  * Family a source belongs to, used by the policy to weigh its reliability.
  */
 export type SourceClass =
-  | "vendor_feed"
-  | "sandbox"
-  | "osint"
-  | "internal_tool"
-  | "org_analyst"
-  | "org_policy"
-  | "unknown";
+  "vendor_feed" | "sandbox" | "osint" | "internal_tool" | "org_analyst" | "org_policy" | "unknown";
 export type ExternalId = string | null;
 export type EvidenceKeys = string[];
 export type Subtype = string | null;
@@ -246,9 +240,8 @@ export interface Signals {
 /**
  * A verdict from a threat-intelligence source.
  *
- * Identity is ``(source, subject_key)`` — byte-identical to v6 — so a source re-asserting the
- * same observable updates in place instead of piling up duplicates. Pass ``external_id`` to
- * keep history on purpose.
+ * Identity is ``(source, subject_key)``, so a source re-asserting the same observable updates
+ * in place instead of piling up duplicates. Pass ``external_id`` to keep history on purpose.
  */
 export interface ThreatIntel {
   subject_key: string;

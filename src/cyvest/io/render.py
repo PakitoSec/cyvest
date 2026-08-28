@@ -99,7 +99,7 @@ def build_summary(
     *,
     show_graph: bool = False,
     show_observables: bool = False,
-    show_silent: bool = False,
+    show_rule_ids: bool = True,
 ) -> Group:
     """
     One table, read top to bottom, ending on the number that matters.
@@ -107,9 +107,10 @@ def build_summary(
     Findings are grouped by verdict rather than listed by key: an analyst reads a report to find
     what is wrong, and alphabetical order buries the one malicious rule under forty benign ones.
 
-    Two kinds of row stay out by default and are counted in the caption instead: observables,
-    which are the *inputs*, and silent findings — the rules that ran and concluded nothing. Both
-    are legitimate output; neither belongs between the analyst and the global score.
+    Every finding is listed. A rule that has nothing to say must not assert a finding in the first
+    place; hiding one at render time would only paper over a rule that should never have fired.
+    Observables stay out by default: they are the *inputs*, and they do not belong between the
+    analyst and the global score.
     """
     report = investigation.report
     header = investigation.store.header
@@ -129,7 +130,7 @@ def build_summary(
     table.add_column("Score", justify="right", no_wrap=True, min_width=7)
     table.add_column("Verdict", no_wrap=True, min_width=10)
 
-    displayed, silent, counted = _add_findings(table, investigation, report, show_silent=show_silent)
+    displayed, counted = _add_findings(table, investigation, report, show_rule_ids=show_rule_ids)
     _add_tags(table, investigation)
     _add_evidences(table, investigation)
     if show_observables:
@@ -143,9 +144,7 @@ def build_summary(
         verdict_text(report.investigation.verdict),
     )
 
-    caption = f"Total findings: {displayed + silent} | Displayed: {displayed}"
-    if silent:
-        caption += f" (excluding {silent} silent)"
+    caption = f"Total findings: {displayed}"
     caption += f" | Counted: {counted} | Confidence: {report.investigation.confidence:.2f}"
     table.caption = caption
 
@@ -182,42 +181,23 @@ def _finding_notes(investigation: Investigation, report: Report, key: str) -> Te
     return notes
 
 
-def is_silent_finding(investigation: Investigation, report: Report, key: str) -> bool:
-    """
-    A rule that ran and concluded nothing — v6 called this level ``NONE``.
-
-    A conclusion is never silent, since it always asserts a verdict, and neither is a finding an
-    analyst took a stance on: hiding a declared act would hide the decision that produced it.
-    """
-    result = report.finding(key)
-    finding = investigation.get_finding(key)
-    if result is None or finding is None or finding.effect.concludes:
-        return False
-    if investigation.get_decision(key) is not None:
-        return False
-    return result.verdict is Verdict.INFO and (result.score or 0.0) == 0.0
-
-
 def _add_findings(
     table: Table,
     investigation: Investigation,
     report: Report,
     *,
-    show_silent: bool,
-) -> tuple[int, int, int]:
-    """Group by verdict, strongest band first; returns (displayed, silent, counted)."""
+    show_rule_ids: bool = True,
+) -> tuple[int, int]:
+    """Group by verdict, strongest band first; returns (displayed, counted)."""
     by_verdict: dict[Verdict, list[tuple[str, str]]] = {verdict: [] for verdict in _VERDICT_ORDER}
-    silent = 0
     counted = 0
     for key, finding in investigation.get_all_findings().items():
         result = report.finding(key)
         if result is None:
             continue
         counted += 1 if result.counted else 0
-        if not show_silent and is_silent_finding(investigation, report, key):
-            silent += 1
-            continue
-        by_verdict.setdefault(result.verdict, []).append((finding.name or finding.rule_id, key))
+        label = finding.rule_id if show_rule_ids else (finding.name or finding.rule_id)
+        by_verdict.setdefault(result.verdict, []).append((label, key))
 
     displayed = sum(len(rows) for rows in by_verdict.values())
     _section(table, f"FINDINGS: {displayed} findings")
@@ -236,7 +216,7 @@ def _add_findings(
             label = Text(name)
             label.append_text(_finding_notes(investigation, report, key))
             table.add_row(_row(label), _score(result.score), verdict_text(result.verdict))
-    return displayed, silent, counted
+    return displayed, counted
 
 
 def _add_tags(table: Table, investigation: Investigation) -> None:

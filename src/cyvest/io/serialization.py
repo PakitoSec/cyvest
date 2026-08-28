@@ -99,7 +99,6 @@ def generate_markdown_report(
     *,
     include_tags: bool = True,
     include_observables: bool = True,
-    show_silent: bool = False,
 ) -> str:
     """
     A human-readable report.
@@ -107,11 +106,9 @@ def generate_markdown_report(
     Every figure comes from the report, and each one travels with the engine that produced it —
     comparing scores across engines is meaningless, so the id is never dropped.
 
-    Rules that concluded nothing are left out unless ``show_silent`` asks for them, and the
-    observable table can be dropped entirely: a report handed to a model is mostly noise budget.
+    The observable table can be dropped entirely: a report handed to a model is mostly noise
+    budget.
     """
-    from cyvest.io.render import is_silent_finding
-
     report = investigation.report
     header = investigation.store.header
     lines: list[str] = [
@@ -137,8 +134,6 @@ def generate_markdown_report(
     for key, finding in sorted(investigation.get_all_findings().items()):
         result = report.finding(key)
         if result is None:
-            continue
-        if not show_silent and is_silent_finding(investigation, report, key):
             continue
         score = "—" if result.score is None else f"{result.score:.2f}"
         lines.append(
@@ -172,13 +167,11 @@ def save_investigation_markdown(
     *,
     include_tags: bool = True,
     include_observables: bool = True,
-    show_silent: bool = False,
 ) -> str:
     report = generate_markdown_report(
         investigation,
         include_tags=include_tags,
         include_observables=include_observables,
-        show_silent=show_silent,
     )
     Path(filepath).write_text(report.rstrip("\n") + "\n", encoding="utf-8")
     return str(filepath)

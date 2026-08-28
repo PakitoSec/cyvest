@@ -801,7 +801,6 @@ class Cyvest:
         *,
         include_tags: bool = True,
         include_observables: bool = True,
-        show_silent: bool = False,
     ) -> str:
         from cyvest.io.serialization import generate_markdown_report
 
@@ -809,7 +808,6 @@ class Cyvest:
             self._investigation,
             include_tags=include_tags,
             include_observables=include_observables,
-            show_silent=show_silent,
         )
 
     def io_save_markdown(
@@ -818,7 +816,6 @@ class Cyvest:
         *,
         include_tags: bool = True,
         include_observables: bool = True,
-        show_silent: bool = False,
     ) -> str:
         from cyvest.io.serialization import save_investigation_markdown
 
@@ -827,7 +824,6 @@ class Cyvest:
             filepath,
             include_tags=include_tags,
             include_observables=include_observables,
-            show_silent=show_silent,
         )
 
     @classmethod
@@ -856,7 +852,7 @@ class Cyvest:
         *,
         show_graph: bool = False,
         show_observables: bool = False,
-        show_silent: bool = False,
+        show_rule_ids: bool = True,
     ) -> None:
         from cyvest.io.render import build_summary, print_renderable
 
@@ -865,7 +861,7 @@ class Cyvest:
                 self._investigation,
                 show_graph=show_graph,
                 show_observables=show_observables,
-                show_silent=show_silent,
+                show_rule_ids=show_rule_ids,
             )
         )
 

@@ -78,7 +78,15 @@ class TestSummaryLayout:
         output = render(build_summary(cv._investigation))
 
         assert output.index("MALICIOUS: 1 finding(s)") < output.index("SAFE: 1 finding(s)")
-        assert output.index("bad rule") < output.index("benign rule")
+        assert output.index("bad") < output.index("benign")
+
+    def test_findings_are_listed_by_rule_id_unless_names_are_asked_for(self) -> None:
+        """A rule id is what an analyst greps for; the name is prose."""
+        cv = Cyvest(investigation_name="IR-1")
+        cv.finding_create("bad", "bad rule", weight=8.0)
+
+        assert "bad rule" not in render(build_summary(cv._investigation))
+        assert "bad rule" in render(build_summary(cv._investigation, show_rule_ids=False))
 
     def test_observables_stay_out_unless_asked_for(self) -> None:
         """They are the inputs: a hundred relay domains would push the score off the screen."""
@@ -94,26 +102,25 @@ class TestSummaryLayout:
         output = render(build_summary(cv._investigation))
 
         assert "GLOBAL SCORE" in output
-        assert output.index("GLOBAL SCORE") > output.index("bad rule")
+        assert output.index("GLOBAL SCORE") > output.index("bad")
 
-    def test_a_rule_that_concluded_nothing_is_counted_not_listed(self) -> None:
-        """v6 called this level ``NONE``; forty of them bury the one rule that fired."""
+    def test_a_rule_that_concluded_nothing_is_still_listed(self) -> None:
+        """Asserting a finding is a deliberate act: v6 hid these as level ``NONE``, v7 shows them."""
         cv = Cyvest(investigation_name="IR-1")
         cv.finding_create("bad", "bad rule", weight=8.0)
         cv.finding_create("quiet", "quiet rule")
 
         output = render(build_summary(cv._investigation))
 
-        assert "quiet rule" not in output
-        assert "excluding 1 silent" in output
-        assert "quiet rule" in render(build_summary(cv._investigation, show_silent=True))
+        assert "quiet" in output
+        assert "Total findings: 2" in output
 
-    def test_a_stance_keeps_a_silent_finding_visible(self) -> None:
+    def test_a_stance_keeps_a_finding_visible(self) -> None:
         """Hiding it would hide the analyst's act along with it."""
         cv = Cyvest(investigation_name="IR-1")
         cv.finding("quiet", "quiet rule").dismiss("out of scope", decided_by="alice")
 
-        assert "quiet rule" in render(build_summary(cv._investigation))
+        assert "quiet" in render(build_summary(cv._investigation))
 
     def test_the_graph_shows_the_type_not_the_repr(self) -> None:
         output = render(build_graph(case()._investigation))
@@ -144,13 +151,10 @@ class TestMarkdownTrimming:
         cv.observable(ObservableType.DOMAIN, "bad.example")
         return cv
 
-    def test_a_silent_finding_is_left_out_by_default(self) -> None:
+    def test_every_finding_is_listed(self) -> None:
         markdown = generate_markdown_report(self._case()._investigation)
         assert "loud rule" in markdown
-        assert "quiet rule" not in markdown
-
-    def test_show_silent_brings_it_back(self) -> None:
-        assert "quiet rule" in generate_markdown_report(self._case()._investigation, show_silent=True)
+        assert "quiet rule" in markdown
 
     def test_the_observable_table_can_be_dropped(self) -> None:
         markdown = generate_markdown_report(self._case()._investigation, include_observables=False)

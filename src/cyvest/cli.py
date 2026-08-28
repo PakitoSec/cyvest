@@ -142,11 +142,17 @@ def cli() -> None:
 @click.argument("input", type=click.Path(exists=True, dir_okay=False, path_type=Path))
 @click.option("--stats/--no-stats", default=False, help="Display statistics tables after the summary.")
 @click.option("--graph/--no-graph", default=True, show_default=True, help="Toggle observable graph rendering.")
+@click.option(
+    "--rule-ids/--no-rule-ids",
+    default=True,
+    show_default=True,
+    help="Show finding rule ids instead of their names.",
+)
 @_engine_option
-def show(input: Path, stats: bool, graph: bool, engine: str | None) -> None:
+def show(input: Path, stats: bool, graph: bool, rule_ids: bool, engine: str | None) -> None:
     """Display an investigation from a JSON file."""
     cv = _open(input, engine)
-    cv.display_summary(show_graph=graph)
+    cv.display_summary(show_graph=graph, show_rule_ids=rule_ids)
     if stats:
         logger.info("")
         cv.display_statistics()

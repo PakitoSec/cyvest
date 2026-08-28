@@ -1,5 +1,5 @@
 """
-Guards on the evaluation layer itself: purity, the engine registry, scopes and relations.
+Guards on the evaluation layer itself: purity, the engine registry, link bases and relations.
 
 The purity check is static rather than behavioural because the failure mode it prevents — an
 engine quietly consulting the clock — only shows up years later, when an archived report stops
@@ -16,8 +16,8 @@ from pathlib import Path
 
 import pytest
 
-from cyvest.enums import Aggregation, DecisionKind, RelationKind, Scope, SourceClass, Verdict
-from cyvest.evaluation import ResolvedScope, evaluate
+from cyvest.enums import Aggregation, DecisionKind, LinkBasis, RelationKind, SourceClass, Verdict
+from cyvest.evaluation import evaluate
 from cyvest.evaluation.engines import available_aliases, get_engine, resolve_engine_alias
 from cyvest.facts import Finding, Observable, ObservableLink, Relation, SourceRef, Tag, ThreatIntel
 from cyvest.facts.store import FactStore, InvestigationHeader
@@ -177,19 +177,18 @@ class TestEngineRegistry:
         assert get_engine("basic-v1").experimental is False
 
 
-class TestLinkScope:
-    def test_a_finding_may_mix_scopes_on_one_observable(self) -> None:
+class TestLinkBasis:
+    def test_a_finding_may_mix_bases_on_one_observable(self) -> None:
         left = store("i1")
         url = observable(left, "hxxp://a", "i1")
-        intel(left, url, 2.0, "i1", source_name="proofpoint")
+        pinned = intel(left, url, 2.0, "i1", source_name="proofpoint")
         finding = Finding(
             rule_id="mixed",
-            subject_key=url.key,
             source=SRC,
             fragment_id="i1",
             observable_links=[
-                ObservableLink(observable_key=url.key, scope=Scope.OWN_FRAGMENT),
-                ObservableLink(observable_key=url.key, scope=Scope.ALL),
+                ObservableLink(observable_key=url.key, basis=LinkBasis.SIGNALS, signal_keys=(pinned.key,)),
+                ObservableLink(observable_key=url.key, basis=LinkBasis.OBSERVABLE),
             ],
         )
         left.append(finding)
@@ -199,20 +198,34 @@ class TestLinkScope:
         intel(right, url2, 5.0, "i2", source_name="virustotal")
 
         report = evaluate(left.union(right))
-        # The ALL link sees both fragments and wins over the local one.
+        # The strongest link wins: the observable one sees virustotal, the pin does not.
         assert report.finding(finding.key).score == 5.0
-        assert report.observable(url.key, ResolvedScope.own("i1")).score == 2.0
 
-    def test_links_dedupe_on_key_and_scope_not_on_key_alone(self) -> None:
+    def test_an_inert_link_contributes_nothing(self) -> None:
+        target = store()
+        url = observable(target, "hxxp://a")
+        intel(target, url, 8.0)
+        finding = Finding(
+            rule_id="documentary",
+            source=SRC,
+            fragment_id="f1",
+            observable_links=[ObservableLink(observable_key=url.key, basis=LinkBasis.NONE)],
+        )
+        target.append(finding)
+
+        result = evaluate(target).finding(finding.key)
+        assert result.score == 0.0
+        assert [c.retained for c in result.contributions] == [False]
+
+    def test_links_dedupe_on_key_and_basis_not_on_key_alone(self) -> None:
         finding = Finding(
             rule_id="r",
-            subject_key="obs:url:a",
             source=SRC,
             fragment_id="f1",
             observable_links=[
-                ObservableLink(observable_key="obs:url:a", scope=Scope.OWN_FRAGMENT),
-                ObservableLink(observable_key="obs:url:a", scope=Scope.ALL),
-                ObservableLink(observable_key="obs:url:a", scope=Scope.ALL),
+                ObservableLink(observable_key="obs:url:a", basis=LinkBasis.NONE),
+                ObservableLink(observable_key="obs:url:a", basis=LinkBasis.OBSERVABLE),
+                ObservableLink(observable_key="obs:url:a", basis=LinkBasis.OBSERVABLE),
             ],
         )
         assert len(finding.observable_links) == 2

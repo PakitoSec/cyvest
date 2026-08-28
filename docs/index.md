@@ -26,7 +26,7 @@ Build, score, and narrate cybersecurity investigations with a single fluent Pyth
 | --- | --- | --- |
 | **Immutable facts** | An append-only log you can audit, merge and re-score | `cyvest.facts`, [Concepts](getting-started/concepts.md#the-facts) |
 | **Derived scoring** | No score is ever stored; every number comes with the terms that produced it | `cyvest.evaluation`, [Scoring Model](scoring-model.md) |
-| **Fluent helpers** | Builder-style methods with deterministic keys and safe merges | `cyvest.cyvest`, [Quick Start](getting-started/quickstart.md#using-the-fluent-api) |
+| **Link basis** | Each link states what it scores on, so a finding can hold at the intel it fetched | `cyvest.enums.LinkBasis`, [Scoring Model](scoring-model.md#basis-what-a-link-scores-on) || **Fluent helpers** | Builder-style methods with deterministic keys and safe merges | `cyvest.cyvest`, [Quick Start](getting-started/quickstart.md#using-the-fluent-api) |
 | **Shared context** | Thread-safe fragments that reconcile into a single story | `cyvest.shared.SharedInvestigationContext`, [Guide](shared-investigation-context.md) |
 | **Timeline** | A chronology projected from the log, on two clocks | `cyvest.evaluation.timeline`, [Guide](timeline.md) |
 | **Comparison** | Diff investigations with tolerance bands for regression testing | `cyvest.compare`, [Guide](comparing-investigations.md) |
@@ -84,6 +84,7 @@ Cyvest (facade + fluent proxies)
 - Facts are immutable and semantically keyed, so merges are lossless and idempotent.
 - No derived value is ever stored; the report is the single place numbers live.
 - A relation's *kind* decides whether score propagates — there is no direction flag.
+- A link's *basis* decides what it reads: the whole observable, named signals, or nothing at all.
 - The evaluator never reads the clock, so an archived report stays reproducible.
 
 ---
@@ -97,6 +98,7 @@ Cyvest (facade + fluent proxies)
 | Upgrade an existing Cyvest 5.x integration | [Migration from v5 to v6](migration-v5-to-v6.md) |
 | Understand observables vs. findings | [Core Concepts](getting-started/concepts.md#the-facts) |
 | Understand where a number comes from | [Scoring Model](scoring-model.md) |
+| Keep a finding at the intel it fetched | [Scoring Model → Basis](scoring-model.md#basis-what-a-link-scores-on) |
 | Share state across threads | [Shared Investigation Context](shared-investigation-context.md) |
 | Compare investigations or regression test | [Comparing Investigations](comparing-investigations.md) |
 | Extract IOCs from text or URLs | [Observable Extraction](observable-extraction.md) |

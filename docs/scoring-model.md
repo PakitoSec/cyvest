@@ -142,8 +142,9 @@ s_finding = max(own term, propagated term)
 
 - **own term** = `polarity(verdict) × weight × confidence`, or `−∞` when the verdict is `INFO`
   (a finding that claims nothing should not floor its observables' evidence at zero);
-- **propagated term** = the maximum score among the linked observables, each read **in its own
-  resolved scope**, or `−∞` when the finding links nothing.
+- **propagated term** = the maximum score among the linked observables, each read **on its own
+  resolved basis**, or `−∞` when the finding links nothing. A link pinned to signals contributes
+  the strongest of those signals instead, without evaluating the observable at all;
 
 When both are absent the finding scores `0.0`.
 
@@ -156,31 +157,52 @@ when someone asks why a finding weighted 2 is showing 6.
 
 ---
 
-## Scope: why a finding can hold its value
+## Basis: what a link scores on
 
-Each `ObservableLink` carries a **scope**, resolved before lookup:
+Each `ObservableLink` carries a **basis**:
 
-| Scope | The finding sees |
+| Basis | The finding sees |
 |---|---|
-| `OWN_FRAGMENT` (default) | the observable as scored **within the finding's own fragment** |
-| `ALL` | the observable as scored across every merged fragment |
+| `OBSERVABLE` (default) | the observable as it stands, whoever contributed to it |
+| `SIGNALS` | only the signals the link **names** |
+| `NONE` | nothing — the edge is kept for the graph, but it is inert |
 
-This is what makes merging non-destructive. Merge an investigation from ProofPoint (finding worth
-2) with one from VirusTotal (finding worth 3), both pointing at the same URL:
+One question, three answers, none of which depends on how the run was threaded.
 
-```
-F1 = 2     F2 = 3     observable = 3     total = 5
-```
+### Pinning: a finding that scores on the intel it fetched
 
-F1 keeps its own value even though the URL rose to 3, because its link only sees the ProofPoint
-fragment. Opt into the global view per link:
+A rule that fetches its own verdict should report *that* verdict, not whatever the observable
+accumulates afterwards. `pin` names the signals it scores on:
 
 ```python
-cv.finding_link_observable(finding.key, url.key, scope=cv.SCOPE.ALL)
+trap = cv.observable_add_threat_intel(url, "proofpoint-trap", verdict=cv.VERDICT.SUSPICIOUS, weight=4.0)
+cv.finding("pp-trap-hit", "Proofpoint TRAP").pin(trap)
 ```
 
-Scope is deliberately **per link**, not a flag on the finding: one finding may mix scopes, and may
+The observable is **derived** from the signal — a signal's identity already carries its subject, so
+restating it could only introduce a disagreement. A pinned link never evaluates the observable, so
+neither other intel on it nor its children reach the finding:
+
+| Basis | Sees | Score |
+|---|---|---|
+| `SIGNALS` (pinned to TRAP) | proofpoint-trap | **4.0** |
+| `OBSERVABLE` | + urlhaus, + virustotal, + the extracted IP | 8.0 |
+| `NONE` | — | 0.0 |
+
+Pinning resolves at evaluation, not at creation: re-fetching that same source moves the finding
+with it. What pinning does **not** do is override an analyst — a `Decision` on the observable still
+applies, so pinning cannot launder a `REFUTE`.
+
+Basis is deliberately **per link**, not a flag on the finding: one finding may mix bases, and may
 even link the same observable twice with two different ones.
+
+!!! note "Merging accumulates, and that is deliberate"
+    Two investigations flagging the same URL give two findings, both reading the merged
+    observable, so the total is the sum of both. v7.0 briefly damped this with a `FRAGMENT` basis
+    that showed a finding only its own worker's facts. It was dropped before release: it damped a
+    *merged* total but never a *local* one, so the same two rules scored differently depending on
+    whether enrichment ran in its own worker. A finding that must hold its value now says so, by
+    pinning.
 
 ---
 

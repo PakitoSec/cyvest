@@ -32,7 +32,7 @@ for diff in diffs:
 ✗ phishing-page 4.0 → 7.0
 ```
 
-Because a finding's identity is `(rule_id, subject)` and is stable across investigations, a changed
+Because a finding's identity is its `rule_id` and is stable across investigations, a changed
 score shows up as **one mismatch** rather than an addition plus a removal.
 
 | Status | Meaning |
@@ -63,7 +63,7 @@ diffs = compare_investigations(
     actual,
     result_expected=[
         ExpectedResult(rule_id="phishing-page", score=">= 1.0", verdict=Verdict.SUSPICIOUS),
-        ExpectedResult(key="fnd:domain-reputation:obs:file:__cyvest_root__", score="< 2.0"),
+        ExpectedResult(key="fnd:domain-reputation", score="< 2.0"),
     ],
 )
 ```
@@ -140,7 +140,7 @@ cyvest diff actual.json expected.json --rules tolerances.json --engine basic-v1
 ```json
 [
   {"rule_id": "domain-reputation", "score": ">= 1.0"},
-  {"key": "fnd:ai-analysis:obs:url:https://evil.test", "verdict": "SUSPICIOUS", "score": "< 3.0"}
+  {"key": "fnd:ai-analysis", "verdict": "SUSPICIOUS", "score": "< 3.0"}
 ]
 ```
 

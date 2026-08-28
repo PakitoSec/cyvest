@@ -28,6 +28,7 @@ class ObservableSignal(Fact, Judgment):
     and it is what merge conflicts are settled on.
     """
 
+    subject_key: str = Field(..., min_length=1)
     kind: str = Field(...)
     observed_at: datetime | None = Field(default=None)
     labels: tuple[Label, ...] = Field(default=())

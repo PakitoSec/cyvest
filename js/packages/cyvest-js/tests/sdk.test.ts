@@ -36,7 +36,6 @@ import {
   getThreatIntelsFor,
   isAllowlisted,
   isCyvest,
-  observableIndex,
   parseCyvest,
   parseKeyType,
   wasSuppressed,
@@ -113,9 +112,8 @@ describe("results come from the report", () => {
     expect(getObservableResult(investigation, URL_KEY)?.score).toBe(6);
   });
 
-  it("indexes observable results by key and resolved scope", () => {
-    expect(observableIndex(URL_KEY)).toBe(`${URL_KEY}@ALL`);
-    expect(observableIndex(URL_KEY, { scope: "OWN_FRAGMENT", fragment_id: "i1" })).toBe(`${URL_KEY}@fragment:i1`);
+  it("keys observable results by the observable key alone", () => {
+    expect(Object.keys(investigation.report.observables ?? {})).toContain(URL_KEY);
   });
 
   it("aggregates a tag by summing what the engine produced", () => {
@@ -202,7 +200,8 @@ describe("keys", () => {
     expect(generateSignalKey("virustotal", URL_KEY)).toBe(`sig:virustotal:${URL_KEY}`);
   });
 
-  it("includes the subject in a finding identity", () => {
+  it("identifies a finding by its rule, split by an external id", () => {
+    expect(generateFindingKey("url_in_body")).toBe("fnd:url_in_body");
     expect(generateFindingKey("url_in_body", URL_KEY)).toBe(`fnd:url_in_body:${URL_KEY}`);
   });
 

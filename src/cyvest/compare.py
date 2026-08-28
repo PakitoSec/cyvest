@@ -278,7 +278,7 @@ def _unsettled_rule_diffs(
     """
     Run the rules the structural comparison left unanswered.
 
-    A rule whose every subject was settled above has had its say — re-running it would report the
+    A rule whose every finding was settled above has had its say — re-running it would report the
     same key twice. But a finding *identical on both sides* is never settled: the comparison has
     nothing to say about it, while the rule still does. Marking a rule consumed on match alone
     dropped exactly those violations, which is the one case a tolerance rule is least able to
@@ -286,12 +286,12 @@ def _unsettled_rule_diffs(
     """
     diffs: list[DiffItem] = []
     for rule in rules:
-        subjects = {
+        matched = {
             key
             for key, finding in (*actual_findings.items(), *expected_findings.items())
             if rule.matches(key, finding.rule_id)
         }
-        if subjects and subjects <= settled:
+        if matched and matched <= settled:
             continue
         diffs.extend(diff for diff in _check_rule(actual, rule) if diff.key not in settled)
     return diffs

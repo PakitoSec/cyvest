@@ -16,8 +16,6 @@ from cyvest.evaluation.report import (
     InvestigationResult,
     ObservableResult,
     Report,
-    ResolvedScope,
-    observable_index,
     round_half_up,
 )
 from cyvest.evaluation.timeline import TimelineEntry, build_timeline
@@ -41,13 +39,11 @@ __all__ = [
     "InvestigationResult",
     "ObservableResult",
     "Report",
-    "ResolvedScope",
     "ScoringEngine",
     "TimelineEntry",
     "build_timeline",
     "evaluate",
     "get_engine",
-    "observable_index",
     "resolve_engine_alias",
     "round_half_up",
     "verdict_from_score",

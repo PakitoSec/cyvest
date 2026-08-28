@@ -23,10 +23,10 @@ def build_case() -> Cyvest:
     ip = cv.observable(cv.OBS.IPV4, "203.0.113.50")
     cv.observable_add_threat_intel(url, "virustotal", verdict=cv.VERDICT.MALICIOUS, weight=6.0)
     cv.observable_add_relation(ip, url, cv.REL.EXTRACTION)
-    cv.finding("url_in_body", "URL in body", subject=url).link_observable(url, cv.SCOPE.ALL)
+    cv.finding("url_in_body", "URL in body").link_observable(url, cv.BASIS.OBSERVABLE)
     cv.tag_create("phishing")
     cv.evidence_create("enrichment", title="whois", content={"registrar": "x"})
-    cv.decision_create(ip, cv.DECISION.REFUTE, "infra interne", decided_by="alice")
+    cv.decision_create(ip, cv.DECISION.REFUTE, "internal infra", decided_by="alice")
     return cv
 
 
@@ -62,7 +62,7 @@ class TestRoundTrip:
 
     def test_a_conclusion_survives_the_json_boundary(self) -> None:
         original = build_case()
-        original.conclusion("ai_review", "Analyse IA", verdict=Verdict.MALICIOUS)
+        original.conclusion("ai_review", "AI review", verdict=Verdict.MALICIOUS)
         document = json.loads(json.dumps(investigation_to_dict(original._investigation)))
 
         reloaded = load_investigation_dict(document)
@@ -207,7 +207,7 @@ class TestMigrationV6:
     def test_propagation_mode_maps_one_to_one(self) -> None:
         migrated = self._migrated()
         finding = next(iter(migrated.finding_get_all().values()))
-        assert finding.observable_links[0].scope.value == "ALL"
+        assert finding.observable_links[0].basis.value == "OBSERVABLE"
 
     def test_whitelisted_becomes_an_operative_decision(self) -> None:
         """Documented parity exception: v6 ignored the flag when scoring, v7 applies it."""
@@ -228,12 +228,12 @@ class TestMigrationV6:
 
 class TestMigrationFragments:
     """
-    ``origin_investigation_id`` *is* the fragment.
+    ``origin_investigation_id`` decides what an imported link scores on.
 
-    v6 gated a ``LOCAL_ONLY`` link on ``origin_investigation_id == investigation_id``; v7 states
-    the same gate as ``Scope.OWN_FRAGMENT`` resolved against the finding's own fragment. Dropping
-    the origin collapsed every finding onto the document fragment, so links that were inert in v6
-    started propagating and quietly inflated the score of any merged investigation.
+    v6 gated a ``LOCAL_ONLY`` link on ``origin_investigation_id == investigation_id``, so an
+    imported one was simply inert; v7 states that as ``LinkBasis.NONE``, resolved once at import.
+    Reading it as a live link would make links that scored nothing in v6 start propagating and
+    quietly inflate the score of any merged investigation.
     """
 
     def _document(self, origin: str, propagation: str = "LOCAL_ONLY") -> dict:
@@ -406,7 +406,7 @@ class TestMigrationKeyTranslation:
         assert [link.observable_key for link in finding.observable_links] == ["obs:domain:evil.com"]
 
     def test_a_tag_follows_its_re_keyed_finding(self) -> None:
-        """v6 keyed a finding on its name alone; v7 keys it on `(rule_id, subject_key)`."""
+        """v6 keyed a finding on its name; v7 keys it on its `rule_id`, through the same map."""
         store = self._migrated().store
         tag = next(iter(store.tags.values()))
         assert set(tag.finding_keys) == set(store.findings)

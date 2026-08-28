@@ -143,20 +143,20 @@ def resolve_observable_key(*args: Any, **kwargs: Any) -> str:
     )
 
 
-def generate_finding_key(rule_id: str, subject_key: str, external_id: str | None = None) -> str:
+def generate_finding_key(rule_id: str, external_id: str | None = None) -> str:
     """
     Generate a finding key.
 
-    Format: ``fnd:{rule_id}:{subject_key}`` or ``fnd:{rule_id}:{external_id}:{subject_key}``
+    Format: ``fnd:{rule_id}`` or ``fnd:{rule_id}:{external_id}``
 
-    The subject is part of the identity: the same rule firing on two observables yields two
-    findings. v6 keyed on the name alone, which is why it needed ``origin_investigation_id`` to
-    keep merged findings apart.
+    A finding is identified by the rule that produced it. Running the same rule on several
+    observables means several findings, so pass an ``external_id`` to keep them apart — usually
+    the observable key.
     """
     normalized_rule = _normalize_value(rule_id)
     if external_id:
-        return f"fnd:{normalized_rule}:{external_id.strip()}:{subject_key}"
-    return f"fnd:{normalized_rule}:{subject_key}"
+        return f"fnd:{normalized_rule}:{external_id.strip()}"
+    return f"fnd:{normalized_rule}"
 
 
 def generate_relation_key(

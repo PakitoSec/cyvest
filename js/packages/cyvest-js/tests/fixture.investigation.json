@@ -244,12 +244,11 @@
       }
     },
     "findings": {
-      "fnd:url_in_body:obs:url:hxxp://bad.example/x": {
-        "subject_key": "obs:url:hxxp://bad.example/x",
+      "fnd:url_in_body": {
         "verdict": "INFO",
         "confidence": 1.0,
         "weight": null,
-        "key": "fnd:url_in_body:obs:url:hxxp://bad.example/x",
+        "key": "fnd:url_in_body",
         "seq": "01KZXZ4FZKYX8VPN6X8CEZRT45",
         "asserted_at": "2026-08-13T16:26:25.139342Z",
         "occurred_at": null,
@@ -268,18 +267,17 @@
         "observable_links": [
           {
             "observable_key": "obs:url:hxxp://bad.example/x",
-            "scope": "ALL"
+            "basis": "OBSERVABLE"
           }
         ],
         "labels": [],
         "extra": {}
       },
-      "fnd:spf_pass:obs:url:hxxp://bad.example/x": {
-        "subject_key": "obs:url:hxxp://bad.example/x",
+      "fnd:spf_pass": {
         "verdict": "SAFE",
         "confidence": 1.0,
         "weight": 4.0,
-        "key": "fnd:spf_pass:obs:url:hxxp://bad.example/x",
+        "key": "fnd:spf_pass",
         "seq": "01KZXZ4FZKVSXEAM4PRHX17RFB",
         "asserted_at": "2026-08-13T16:26:25.139384Z",
         "occurred_at": null,
@@ -298,18 +296,17 @@
         "observable_links": [
           {
             "observable_key": "obs:url:hxxp://bad.example/x",
-            "scope": "ALL"
+            "basis": "OBSERVABLE"
           }
         ],
         "labels": [],
         "extra": {}
       },
-      "fnd:not_applicable:inv-fixture": {
-        "subject_key": "inv-fixture",
+      "fnd:not_applicable": {
         "verdict": "INFO",
         "confidence": 1.0,
         "weight": null,
-        "key": "fnd:not_applicable:inv-fixture",
+        "key": "fnd:not_applicable",
         "seq": "01KZXZ4FZKX4V4FY2PPRTVTQDE",
         "asserted_at": "2026-08-13T16:26:25.139395Z",
         "occurred_at": null,
@@ -366,7 +363,7 @@
       "name": "phishing",
       "description": "",
       "finding_keys": [
-        "fnd:url_in_body:obs:url:hxxp://bad.example/x"
+        "fnd:url_in_body"
       ]
     }
   },
@@ -380,14 +377,14 @@
       "score": 12.0,
       "contributions": [
         {
-          "source_key": "fnd:url_in_body:obs:url:hxxp://bad.example/x",
+          "source_key": "fnd:url_in_body",
           "label": "finding",
           "value": 6.0,
           "retained": true,
           "detail": ""
         },
         {
-          "source_key": "fnd:spf_pass:obs:url:hxxp://bad.example/x",
+          "source_key": "fnd:spf_pass",
           "label": "finding",
           "value": 6.0,
           "retained": true,
@@ -398,8 +395,8 @@
       "raw": {}
     },
     "findings": {
-      "fnd:url_in_body:obs:url:hxxp://bad.example/x": {
-        "key": "fnd:url_in_body:obs:url:hxxp://bad.example/x",
+      "fnd:url_in_body": {
+        "key": "fnd:url_in_body",
         "verdict": "MALICIOUS",
         "confidence": 1.0,
         "score": 6.0,
@@ -418,14 +415,14 @@
         "own_term_suppressed": false,
         "counted": true
       },
-      "fnd:spf_pass:obs:url:hxxp://bad.example/x": {
-        "key": "fnd:spf_pass:obs:url:hxxp://bad.example/x",
+      "fnd:spf_pass": {
+        "key": "fnd:spf_pass",
         "verdict": "MALICIOUS",
         "confidence": 1.0,
         "score": 6.0,
         "contributions": [
           {
-            "source_key": "fnd:spf_pass:obs:url:hxxp://bad.example/x",
+            "source_key": "fnd:spf_pass",
             "label": "rule floor \u00b7 SAFE",
             "value": -4.0,
             "retained": false,
@@ -445,8 +442,8 @@
         "own_term_suppressed": true,
         "counted": true
       },
-      "fnd:not_applicable:inv-fixture": {
-        "key": "fnd:not_applicable:inv-fixture",
+      "fnd:not_applicable": {
+        "key": "fnd:not_applicable",
         "verdict": "INFO",
         "confidence": 1.0,
         "score": null,
@@ -459,7 +456,7 @@
       }
     },
     "observables": {
-      "obs:url:hxxp://bad.example/x@ALL": {
+      "obs:url:hxxp://bad.example/x": {
         "key": "obs:url:hxxp://bad.example/x",
         "verdict": "MALICIOUS",
         "confidence": 1.0,
@@ -474,26 +471,18 @@
           }
         ],
         "suppressed_by_decision": false,
-        "raw": {},
-        "scope": {
-          "scope": "ALL",
-          "fragment_id": null
-        }
+        "raw": {}
       },
-      "obs:file:__cyvest_root__@ALL": {
+      "obs:file:__cyvest_root__": {
         "key": "obs:file:__cyvest_root__",
         "verdict": "INFO",
         "confidence": 1.0,
         "score": 0.0,
         "contributions": [],
         "suppressed_by_decision": false,
-        "raw": {},
-        "scope": {
-          "scope": "ALL",
-          "fragment_id": null
-        }
+        "raw": {}
       },
-      "obs:ipv4:203.0.113.50@ALL": {
+      "obs:ipv4:203.0.113.50": {
         "key": "obs:ipv4:203.0.113.50",
         "verdict": "MALICIOUS",
         "confidence": 1.0,
@@ -508,13 +497,9 @@
           }
         ],
         "suppressed_by_decision": false,
-        "raw": {},
-        "scope": {
-          "scope": "ALL",
-          "fragment_id": null
-        }
+        "raw": {}
       },
-      "obs:domain:cdn.partner.example@ALL": {
+      "obs:domain:cdn.partner.example": {
         "key": "obs:domain:cdn.partner.example",
         "verdict": "SAFE",
         "confidence": 1.0,
@@ -536,11 +521,7 @@
           }
         ],
         "suppressed_by_decision": true,
-        "raw": {},
-        "scope": {
-          "scope": "ALL",
-          "fragment_id": null
-        }
+        "raw": {}
       }
     }
   }

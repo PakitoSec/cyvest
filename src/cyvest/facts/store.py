@@ -133,7 +133,6 @@ class FactStore:
         self._children: dict[str, set[str]] = defaultdict(set)
         self._parents: dict[str, set[str]] = defaultdict(set)
         self._signals_by_subject: dict[str, set[str]] = defaultdict(set)
-        self._findings_by_subject: dict[str, set[str]] = defaultdict(set)
 
     def _collection_for(self, fact: Fact) -> dict[str, Any]:
         if isinstance(fact, Observable):
@@ -171,8 +170,6 @@ class FactStore:
             self._parents[fact.target_key].add(fact.key)
         elif isinstance(fact, ObservableSignal):
             self._signals_by_subject[fact.subject_key].add(fact.key)
-        elif isinstance(fact, Finding):
-            self._findings_by_subject[fact.subject_key].add(fact.key)
 
     def union(self, other: FactStore) -> FactStore:
         """
@@ -229,9 +226,6 @@ class FactStore:
         and no secondary index is needed — the primary key already answers the question.
         """
         return self.decisions.get(generate_decision_key(target_key))
-
-    def findings_for(self, subject_key: str) -> list[Finding]:
-        return _ordered(self.findings[key] for key in self._findings_by_subject.get(subject_key, ()))
 
     def __len__(self) -> int:
         return sum(

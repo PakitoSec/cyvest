@@ -10,7 +10,7 @@ years yields the same report.
 
 from __future__ import annotations
 
-from cyvest.enums import DecisionKind, Effect, Scope, Status, Verdict
+from cyvest.enums import DecisionKind, Effect, LinkBasis, Status, Verdict
 from cyvest.evaluation.combine import NEG_INF, bounded_max, combine
 from cyvest.evaluation.projection import score_ceiling_for, score_floor_for, verdict_from_score
 from cyvest.evaluation.report import (
@@ -19,12 +19,10 @@ from cyvest.evaluation.report import (
     InvestigationResult,
     ObservableResult,
     Report,
-    ResolvedScope,
-    observable_index,
     round_half_up,
 )
 from cyvest.facts.decision import Decision
-from cyvest.facts.finding import Finding
+from cyvest.facts.finding import Finding, ObservableLink
 from cyvest.facts.signal import ObservableSignal
 from cyvest.facts.store import FactStore
 from cyvest.policy import Policy
@@ -60,16 +58,13 @@ class _Evaluation:
         # `compare_investigations` would happily diff two incomparable scales.
         self.engine_id = engine_id
         self.observable_results: dict[str, ObservableResult] = {}
-        self._memo: dict[tuple[str, ResolvedScope], float] = {}
+        self._memo: dict[str, float] = {}
 
     # --- signals -------------------------------------------------------------------------
 
     def _signal_score(self, signal: ObservableSignal) -> float:
         weight = self.policy.resolve_weight(verdict=signal.verdict, weight=signal.weight)
         return signal.verdict.polarity * weight * signal.confidence
-
-    def _visible(self, fragment_id: str, scope: ResolvedScope) -> bool:
-        return scope.fragment_id is None or fragment_id == scope.fragment_id
 
     # --- decisions -----------------------------------------------------------------------
 
@@ -135,25 +130,22 @@ class _Evaluation:
 
     # --- observables ---------------------------------------------------------------------
 
-    def observable_score(self, observable_key: str, scope: ResolvedScope) -> float:
-        memo_key = (observable_key, scope)
-        cached = self._memo.get(memo_key)
+    def observable_score(self, observable_key: str) -> float:
+        cached = self._memo.get(observable_key)
         if cached is not None:
             return cached
         # Placeholder breaks cycles: a node being visited contributes nothing to itself.
-        self._memo[memo_key] = 0.0
-        score = self._compute_observable(observable_key, scope)
-        self._memo[memo_key] = score
+        self._memo[observable_key] = 0.0
+        score = self._compute_observable(observable_key)
+        self._memo[observable_key] = score
         return score
 
-    def _compute_observable(self, observable_key: str, scope: ResolvedScope) -> float:
+    def _compute_observable(self, observable_key: str) -> float:
         contributions: list[Contribution] = []
         signal_scores: list[float] = []
         child_scores: list[float] = []
 
         for signal in self.store.signals_for(observable_key):
-            if not self._visible(signal.fragment_id, scope):
-                continue
             value = self._signal_score(signal)
             signal_scores.append(value)
             contributions.append(
@@ -165,13 +157,13 @@ class _Evaluation:
             )
 
         for relation in self.store.child_relations(observable_key):
-            if not relation.propagates or not self._visible(relation.fragment_id, scope):
+            if not relation.propagates:
                 continue
             # The root is a presentation anchor, not evidence: it never feeds score upward.
             if relation.target_key == self.store.header.root_key:
                 continue
             attenuation = self.policy.attenuation.get(relation.kind, 1.0)
-            child = self.observable_score(relation.target_key, scope)
+            child = self.observable_score(relation.target_key)
             value = child * relation.confidence * attenuation
             child_scores.append(value)
             contributions.append(
@@ -187,32 +179,65 @@ class _Evaluation:
             self.store.decision_for(observable_key), score, contributions
         )
 
-        self._record_observable(observable_key, scope, score, contributions, suppressed)
-        return score
-
-    def _record_observable(
-        self,
-        observable_key: str,
-        scope: ResolvedScope,
-        score: float,
-        contributions: list[Contribution],
-        suppressed: bool,
-    ) -> None:
-        self.observable_results[observable_index(observable_key, scope)] = ObservableResult(
+        self.observable_results[observable_key] = ObservableResult(
             key=observable_key,
-            scope=scope,
             score=round_half_up(score, self.policy.output_precision),
             verdict=verdict_from_score(score),
             contributions=tuple(contributions),
             suppressed_by_decision=suppressed,
         )
+        return score
 
     # --- findings ------------------------------------------------------------------------
 
-    def _resolve_scope(self, finding: Finding, link_scope: Scope) -> ResolvedScope:
-        if link_scope is Scope.ALL:
-            return ResolvedScope.all()
-        return ResolvedScope.own(finding.fragment_id)
+    def _pinned_value(self, link: ObservableLink) -> tuple[float, list[Contribution]]:
+        """
+        What a pinned link scores: the signals it names, and nothing else.
+
+        The observable is never evaluated, so neither other intel on it nor its children reach
+        the finding — which is the whole point of pinning. A stance on that observable still
+        governs, though: pinning must not become a way to launder an analyst's override.
+        """
+        contributions: list[Contribution] = []
+        values: list[float] = []
+        for signal_key in link.signal_keys:
+            signal = self.store.signals.get(signal_key)
+            if signal is None:
+                # A fragment can carry the link without the signal it pins, until the rest merges.
+                contributions.append(
+                    Contribution(
+                        source_key=signal_key,
+                        label="pin · unresolved",
+                        value=0.0,
+                        retained=False,
+                        detail="pinned signal absent from this store",
+                    )
+                )
+                continue
+            value = self._signal_score(signal)
+            values.append(value)
+            contributions.append(
+                Contribution(
+                    source_key=signal.key,
+                    label=f"pin · {signal.source.name} · {signal.verdict.value}",
+                    value=value,
+                )
+            )
+
+        score, contributions, _ = self._apply_decision(
+            self.store.decision_for(link.observable_key), bounded_max(values), contributions
+        )
+        return score, contributions
+
+    @staticmethod
+    def _inert_contribution(link: ObservableLink, detail: str) -> Contribution:
+        return Contribution(
+            source_key=link.observable_key,
+            label="link · none",
+            value=0.0,
+            retained=False,
+            detail=detail,
+        )
 
     def finding_result(self, finding: Finding) -> FindingResult:
         decision = self.store.decision_for(finding.key)
@@ -261,16 +286,22 @@ class _Evaluation:
 
         link_values: list[float] = []
         for link in finding.observable_links:
-            scope = self._resolve_scope(finding, link.scope)
-            value = self.observable_score(link.observable_key, scope)
-            link_values.append(value)
-            contributions.append(
-                Contribution(
-                    source_key=link.observable_key,
-                    label=f"link · {scope}",
-                    value=value,
+            if link.basis is LinkBasis.NONE:
+                contributions.append(self._inert_contribution(link, "documentary link"))
+                continue
+            if link.basis is LinkBasis.SIGNALS:
+                value, pinned = self._pinned_value(link)
+                contributions.extend(pinned)
+            else:
+                value = self.observable_score(link.observable_key)
+                contributions.append(
+                    Contribution(
+                        source_key=link.observable_key,
+                        label="link · observable",
+                        value=value,
+                    )
                 )
-            )
+            link_values.append(value)
 
         propagated = bounded_max(link_values)
         score = max(own_term, propagated)
@@ -328,16 +359,7 @@ class _Evaluation:
             )
         ]
         # Links stay documentary: propagating them would push the total past "just enough".
-        contributions.extend(
-            Contribution(
-                source_key=link.observable_key,
-                label=f"link · {self._resolve_scope(finding, link.scope)}",
-                value=0.0,
-                retained=False,
-                detail="documentary link",
-            )
-            for link in finding.observable_links
-        )
+        contributions.extend(self._inert_contribution(link, "documentary link") for link in finding.observable_links)
         if decision is not None:
             contributions.append(self._decision_contribution(decision, 0.0, changed=refuted))
         return FindingResult(
@@ -425,9 +447,9 @@ class _Evaluation:
         total, bound_contributions = self._apply_bounds(total, finding_results)
         contributions.extend(bound_contributions)
 
-        # Every observable gets a result in the global scope, even when no finding links it.
+        # Every observable gets a result, even when no finding links it.
         for observable_key in self.store.observables:
-            self.observable_score(observable_key, ResolvedScope.all())
+            self.observable_score(observable_key)
 
         mean_confidence = sum(confidences) / len(confidences) if confidences else 1.0
 

@@ -196,23 +196,24 @@ export function generateObservableKey(
 /**
  * Generate a finding key.
  *
- * Format: `fnd:{rule_id}:{subject_key}`, or `fnd:{rule_id}:{external_id}:{subject_key}`.
+ * Format: `fnd:{rule_id}`, or `fnd:{rule_id}:{external_id}`.
  *
- * The subject is part of the identity: the same rule firing on two observables yields two
- * findings. v6 keyed on the name alone, which is why it needed `origin_investigation_id`.
+ * A finding is identified by the rule that produced it. Running the same rule on several
+ * observables means several findings, so pass an `externalId` to keep them apart — usually the
+ * observable key.
  *
  * @example
  * ```ts
- * generateFindingKey("url_in_body", "obs:url:hxxp://bad.example")
- * // => "fnd:url_in_body:obs:url:hxxp://bad.example"
+ * generateFindingKey("url_in_body")
+ * // => "fnd:url_in_body"
  * ```
  */
-export function generateFindingKey(ruleId: string, subjectKey: string, externalId?: string): string {
+export function generateFindingKey(ruleId: string, externalId?: string): string {
   const normalizedRule = normalizeValue(ruleId);
   if (externalId) {
-    return `fnd:${normalizedRule}:${externalId.trim()}:${subjectKey}`;
+    return `fnd:${normalizedRule}:${externalId.trim()}`;
   }
-  return `fnd:${normalizedRule}:${subjectKey}`;
+  return `fnd:${normalizedRule}`;
 }
 
 /**

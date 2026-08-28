@@ -9,21 +9,22 @@ cache is dropped the moment a fact lands.
 from __future__ import annotations
 
 from collections import deque
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable, Sequence
 from datetime import datetime
 from typing import Any, Literal
 
 from cyvest import keys
 from cyvest.enums import (
     DecisionKind,
+    LinkBasis,
     ObservableType,
     RelationKind,
-    Scope,
+    Salience,
     SourceClass,
     Verdict,
 )
-from cyvest.evaluation import Report, ResolvedScope, evaluate, resolve_engine_alias
-from cyvest.evaluation.timeline import TimelineEntry, build_timeline
+from cyvest.evaluation import Report, evaluate, resolve_engine_alias
+from cyvest.evaluation.timeline import TimeBasis, TimelineEntry, build_timeline
 from cyvest.facts import (
     Decision,
     Evidence,
@@ -31,6 +32,7 @@ from cyvest.facts import (
     Finding,
     Observable,
     ObservableLink,
+    ObservableSignal,
     Relation,
     SourceRef,
     Tag,
@@ -144,11 +146,35 @@ class Investigation:
             return observable.contributions
         raise KeyError(key)
 
-    def timeline(self, **kwargs: Any) -> list[TimelineEntry]:
-        kwargs.setdefault("policy", self.policy)
-        if kwargs.get("track_verdict_changes"):
-            kwargs.setdefault("evaluator", lambda store, policy: evaluate(store, policy, self.store.header.engine_id))
-        return build_timeline(self.store, self.report, **kwargs)
+    def timeline(
+        self,
+        *,
+        time: TimeBasis = "occurred",
+        since: datetime | None = None,
+        until: datetime | None = None,
+        entity_key: str | None = None,
+        min_salience: Salience = Salience.NOTABLE,
+        policy: Policy | None = None,
+        track_verdict_changes: bool = False,
+        evaluator: Callable[[FactStore, Policy], Report] | None = None,
+    ) -> list[TimelineEntry]:
+        if track_verdict_changes and evaluator is None:
+            # Replaying verdict changes must use the engine this investigation was built with.
+            def evaluator(store: FactStore, policy: Policy) -> Report:
+                return evaluate(store, policy, self.store.header.engine_id)
+
+        return build_timeline(
+            self.store,
+            self.report,
+            time=time,
+            since=since,
+            until=until,
+            entity_key=entity_key,
+            min_salience=min_salience,
+            policy=policy or self.policy,
+            track_verdict_changes=track_verdict_changes,
+            evaluator=evaluator,
+        )
 
     # ---------------------------------------------------------------- facts
 
@@ -271,17 +297,54 @@ class Investigation:
         self,
         finding_key: str,
         observable_key: str,
-        scope: Scope | str = Scope.OWN_FRAGMENT,
+        basis: LinkBasis | str = LinkBasis.OBSERVABLE,
+        signal_keys: Sequence[str] = (),
     ) -> Finding:
         finding = self.store.findings.get(finding_key)
         if finding is None:
             raise KeyError(f"Unknown finding: {finding_key}")
         if observable_key not in self.store.observables:
             raise KeyError(f"Unknown observable: {observable_key}")
-        link = ObservableLink(observable_key=observable_key, scope=Scope(scope) if isinstance(scope, str) else scope)
+        resolved = LinkBasis(basis) if isinstance(basis, str) else basis
+        for signal_key in signal_keys:
+            signal = self.store.signals.get(signal_key)
+            if signal is None:
+                raise KeyError(f"Unknown signal: {signal_key}")
+            if signal.subject_key != observable_key:
+                raise ValueError(
+                    f"signal {signal_key} judges {signal.subject_key}, not {observable_key}; "
+                    "a pinned link may only name signals about the observable it links"
+                )
+        link = ObservableLink(observable_key=observable_key, basis=resolved, signal_keys=tuple(signal_keys))
         if link in finding.observable_links:
             return finding
         return self.supersede(finding, observable_links=(*finding.observable_links, link))  # type: ignore[return-value]
+
+    def pin_finding_signals(self, finding_key: str, *signals: ObservableSignal | str) -> Finding:
+        """
+        Pin a finding to the signals it fetched, so later intel on the same observable cannot
+        move it.
+
+        The observable is *derived* from the signals: a signal's identity already carries its
+        subject, so restating it could only introduce a disagreement. All signals must share that
+        subject — one pin is one link.
+        """
+        if not signals:
+            raise ValueError("pinning takes at least one signal")
+        keys_ = [s if isinstance(s, str) else s.key for s in signals]
+        subjects = {self._pinned_subject(key) for key in keys_}
+        if len(subjects) > 1:
+            raise ValueError(
+                f"cannot pin one link to signals about different observables: {sorted(subjects)}; "
+                "pin once per observable"
+            )
+        return self.link_finding_observable(finding_key, subjects.pop(), basis=LinkBasis.SIGNALS, signal_keys=keys_)
+
+    def _pinned_subject(self, signal_key: str) -> str:
+        signal = self.store.signals.get(signal_key)
+        if signal is None:
+            raise KeyError(f"Unknown signal: {signal_key}")
+        return signal.subject_key
 
     def link_finding_evidence(self, finding_key: str, evidence_key: str) -> Finding:
         finding = self.store.findings.get(finding_key)
@@ -449,8 +512,8 @@ class Investigation:
     def set_investigation_name(self, name: str | None) -> None:
         self.store.header = self.store.header.model_copy(update={"name": name or ""})
 
-    def observable_result(self, observable_key: str, scope: ResolvedScope | None = None):
-        return self.report.observable(observable_key, scope)
+    def observable_result(self, observable_key: str):
+        return self.report.observable(observable_key)
 
 
 __all__ = ["ROOT_SENTINEL", "Investigation"]

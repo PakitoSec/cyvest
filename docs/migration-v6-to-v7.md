@@ -51,7 +51,7 @@ read-only and never reimplement a scoring rule — but the report is an output, 
 | `score` (derived) | `report.*.score` | §1 |
 | `whitelisted` | `Decision(REFUTE)` | §6 |
 | `origin_investigation_id` | `fragment_id` (on the finding) | Carried over, because it *is* the fragment; §7 |
-| `propagation_mode` | `ObservableLink.scope` | Still **per link**, not per finding |
+| `propagation_mode` | `ObservableLink.basis` | Still **per link**, not per finding |
 | `observable_add_relationship` | `observable_add_relation` | |
 | `enrichment_create` | `evidence_create` | |
 | `get_global_level` | `get_global_verdict` | |
@@ -234,8 +234,8 @@ both ends, threat-intel subjects, finding links, tag members and whitelist ident
 the map it builds while regenerating the observables. A reference it cannot place is left as it
 was rather than rewritten.
 
-Findings are re-keyed too, from v6's `fnd:{name}` to `fnd:{rule_id}:{subject_key}`, so a tag's
-members go through the same translation.
+Findings keep the shape v6 gave them: `fnd:{name}` becomes `fnd:{rule_id}`, the same string under
+a new name, so a tag's members go through the same translation as a formality.
 
 Signals change prefix: v6's `ti:{source}:{observable_key}` becomes `sig:{source}:{observable_key}`.
 The prefix names the *family*, not its first member — `ThreatIntel` is one signal kind among the
@@ -263,33 +263,41 @@ the most recently asserted wins. v6 resolved conflicts by `max`, so a score coul
     If VirusTotal said `MALICIOUS` on Monday and `SAFE` on Tuesday, v6 kept Monday. v7 keeps
     Tuesday. This is the point — but it means a re-run can legitimately reduce a score.
 
-Identity no longer needs `origin_investigation_id`, because a finding's identity is
-`(rule_id, subject_key)`: the same rule on two observables is two findings, and the same rule on
-the same observable is one finding, in any number of investigations.
+Identity no longer needs `origin_investigation_id`, because a finding's identity is its `rule_id`:
+reusing it is one finding, in any number of investigations. A rule that must fire once per
+observable says so with `external_id=observable.key`.
 
-The origin itself is **not** dropped, though: it becomes the finding's `fragment_id`. v6 gated a
-`LOCAL_ONLY` link on `origin_investigation_id == investigation_id`, and v7 states that same gate
-as `Scope.OWN_FRAGMENT` resolved against the finding's own fragment. Collapsing every migrated
-finding onto the document-level fragment would make links that were inert in v6 start
-propagating, silently raising the score of any merged investigation.
+The origin itself is **not** dropped, though: it becomes the finding's `fragment_id`, which keeps
+every migrated fact attributable to the investigation that asserted it.
 
-### The scenario this was designed for
+It also decides, **at import time**, what each link scores on. v6 gated a `LOCAL_ONLY` link on
+`origin_investigation_id == investigation_id`: an imported one was simply inert. So:
 
-Merging an investigation from ProofPoint (finding weight 2) with one from VirusTotal (finding
-weight 3), both touching the same observable:
+| v6 `propagation_mode` | origin | v7 `ObservableLink.basis` |
+|---|---|---|
+| `GLOBAL` | any | `OBSERVABLE` |
+| `LOCAL_ONLY` | matches the document | `OBSERVABLE` |
+| `LOCAL_ONLY` | foreign | `NONE` — inert, exactly as in v6 |
 
-```
-F1 = 2      F2 = 3      observable = 3      total = 5
-```
+Reading an imported `LOCAL_ONLY` link as a live one would make links that scored nothing in v6
+start propagating, silently raising the score of any merged investigation. The third basis,
+`SIGNALS`, has no v6 counterpart and is never produced by migration.
 
-F1 keeps its own value even though the observable it points at has risen, because its link's
-**scope** is `OWN_FRAGMENT` by default: it only sees the score of the observable as computed
-within its own fragment. Scope is resolved **per link**, so one finding may mix scopes — and may
-link the same observable twice with two different scopes.
+### What v6 could not state
+
+A finding that scores on the intel **it** fetched, whatever else lands on the observable
+afterwards — including intel fetched moments later by the very same worker:
 
 ```python
-cv.finding_link_observable(finding.key, url.key, scope=cv.SCOPE.ALL)  # opt in to the global view
+trap = cv.observable_add_threat_intel(url, "proofpoint-trap", verdict=cv.VERDICT.SUSPICIOUS, weight=4.0)
+cv.finding("pp-trap-hit").pin(trap)
 ```
+
+!!! warning "A merged total is a sum, and it is not damped"
+    Merging two investigations that both flag the same URL yields two findings, both reading the
+    merged observable, so the total is the sum of both. v6's `LOCAL_ONLY` damped this by accident
+    of topology — it depended on which investigation had produced the finding. If a finding must
+    hold its own value, pin it; that is explicit and survives any refactoring of your workers.
 
 ---
 
@@ -429,11 +437,11 @@ equivalents replace them one for one.
 
 ### Key parsing is gone
 
-`parseFindingKey` and `parseThreatIntelKey` were removed rather than updated. A v7 key embeds the
-subject — `fnd:{rule_id}:{subject_key}`, with an optional `external_id` in between — and both
-`rule_id` and `source` may themselves contain `:`, so the result cannot be split back apart
-unambiguously. Python deliberately exposes no equivalent: a key is an identity token, not a
-record. Read the fact from the document instead.
+`parseFindingKey` and `parseThreatIntelKey` were removed rather than updated. A v7 key may embed
+an `external_id` — `fnd:{rule_id}:{external_id}` — and `rule_id`, `source` and the subject may
+themselves contain `:`, so the result cannot be split back apart unambiguously. Python
+deliberately exposes no equivalent: a key is an identity token, not a record. Read the fact from
+the document instead.
 
 `parseObservableKey` stays, with the same caveat it has always had on both sides: it is only
 reliable for the simple `obs:{type}:{value}` form.
@@ -463,10 +471,13 @@ url.with_ti("VirusTotal", 6.0, external_id="scan-2024-03-01")
 url.with_ti("VirusTotal", 2.0, external_id="scan-2024-06-01")
 ```
 
-The same applies to findings: reusing a `rule_id` on the same subject updates that finding rather
-than adding one.
+The same applies to findings: reusing a `rule_id` updates that finding rather than adding one.
 
-**A finding with no subject is anchored to the root.** `finding_create("rule")` attaches to the
-root observable, whose key is identical in every investigation. That is deliberate — a conclusion
-about the *case* must survive a merge — but it means two investigations of different cases will
-merge their case-level findings if you merge them.
+**A finding is identified by its rule alone.** Like v6, but without `origin_investigation_id` to
+split it per investigation. `finding_create("rule")` called in two investigations of different
+cases is **one** finding once they are merged. A rule that fires per observable — or that must
+stay distinct across cases — says so explicitly:
+
+```python
+cv.finding("url_reputation", external_id=url.key).link_observable(url)
+```

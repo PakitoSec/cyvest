@@ -6,11 +6,11 @@ from datetime import datetime, timezone
 
 import pytest
 
-from cyvest.enums import DecisionKind, Effect, Scope, SourceClass, Status, Verdict, Weight
-from cyvest.evaluation import ResolvedScope, evaluate
+from cyvest.enums import DecisionKind, Effect, LinkBasis, RelationKind, SourceClass, Status, Verdict, Weight
+from cyvest.evaluation import evaluate
 from cyvest.evaluation.combine import NEG_INF
 from cyvest.evaluation.projection import score_floor_for, verdict_from_score
-from cyvest.facts import Decision, Finding, Observable, ObservableLink, SourceRef, ThreatIntel
+from cyvest.facts import Decision, Finding, Observable, ObservableLink, Relation, SourceRef, ThreatIntel
 from cyvest.facts.store import FactStore, InvestigationHeader
 from cyvest.investigation import Investigation
 from cyvest.policy import DEFAULT_POLICY, Policy
@@ -32,8 +32,15 @@ def add_url(store: FactStore, fragment_id: str) -> Observable:
     return observable
 
 
-class TestReferenceScenario:
-    """The hand-drawn requirement: F1 keeps its value while the observable keeps evolving."""
+class TestMergeScenario:
+    """
+    Merging accumulates on the observable and adds terms to the total.
+
+    v7.0 briefly damped this with a ``FRAGMENT`` basis, so a finding only saw its own worker's
+    facts. It was dropped: it damped a merged total but never a local one, so the same two rules
+    scored 10 or 16 depending on how the run was threaded. A finding that must hold its value now
+    says so explicitly, by pinning.
+    """
 
     @staticmethod
     def _fragment(fragment_id: str, source_name: str, weight: float, rule_id: str):
@@ -50,45 +57,219 @@ class TestReferenceScenario:
         )
         finding = Finding(
             rule_id=rule_id,
-            subject_key=url.key,
             source=source(source_name),
             fragment_id=fragment_id,
-            observable_links=[ObservableLink(observable_key=url.key, scope=Scope.OWN_FRAGMENT)],
+            observable_links=[ObservableLink(observable_key=url.key)],
         )
         store.append(finding)
         return store, url.key, finding.key
 
-    def test_local_scope_keeps_each_finding_at_its_own_value(self) -> None:
+    def test_every_finding_reads_the_merged_observable(self) -> None:
         i1, url_key, f1 = self._fragment("i1", "proofpoint", 2.0, "url_in_body")
         i2, _, f2 = self._fragment("i2", "virustotal", 3.0, "url_reputation")
 
         report = evaluate(i1.union(i2))
 
-        assert report.finding(f1).score == 2.0
+        assert report.finding(f1).score == 3.0
         assert report.finding(f2).score == 3.0
         assert report.observable(url_key).score == 3.0
-        assert report.investigation.score == 5.0
+        assert report.investigation.score == 6.0
 
-    def test_same_observable_under_two_local_scopes_yields_two_results(self) -> None:
-        """Fails if the report indexes on the raw scope label instead of the resolved one."""
+    def test_an_observable_yields_exactly_one_result(self) -> None:
+        """The graph holds every fact anyone contributed; it is the links that filter."""
         i1, url_key, _ = self._fragment("i1", "proofpoint", 2.0, "url_in_body")
         i2, _, _ = self._fragment("i2", "virustotal", 3.0, "url_reputation")
 
         report = evaluate(i1.union(i2))
 
-        assert report.observable(url_key, ResolvedScope.own("i1")).score == 2.0
-        assert report.observable(url_key, ResolvedScope.own("i2")).score == 3.0
+        assert [key for key in report.observables if key.startswith(url_key)] == [url_key]
 
-    def test_global_scope_lets_the_finding_rise(self) -> None:
-        i1, url_key, f1 = self._fragment("i1", "proofpoint", 2.0, "url_in_body")
-        i2, _, _ = self._fragment("i2", "virustotal", 3.0, "url_reputation")
-        merged = i1.union(i2)
-        finding = merged.findings[f1]
-        merged.findings[f1] = finding.model_copy(
-            update={"observable_links": (ObservableLink(observable_key=url_key, scope=Scope.ALL),)}
+    def test_the_damping_is_the_same_within_one_fragment(self) -> None:
+        """What made ``FRAGMENT`` indefensible: identical rules, identical total, either way."""
+        merged_across = evaluate(
+            self._fragment("i1", "proofpoint", 2.0, "url_in_body")[0].union(
+                self._fragment("i2", "virustotal", 3.0, "url_reputation")[0]
+            )
         )
 
-        assert evaluate(merged).finding(f1).score == 3.0
+        store, url, _, _ = _one_fragment_two_feeds()
+        assert evaluate(store).investigation.score == merged_across.investigation.score
+
+
+def _one_fragment_two_feeds():
+    """The same two feeds and two rules, fetched by a single worker."""
+    store = make_store("f1")
+    url = add_url(store, "f1")
+    findings = []
+    for source_name, weight, rule_id in (("proofpoint", 2.0, "url_in_body"), ("virustotal", 3.0, "url_reputation")):
+        store.append(
+            ThreatIntel(
+                subject_key=url.key,
+                verdict=Verdict.MALICIOUS,
+                weight=weight,
+                source=source(source_name),
+                fragment_id="f1",
+            )
+        )
+        finding = Finding(
+            rule_id=rule_id,
+            source=source(source_name),
+            fragment_id="f1",
+            observable_links=[ObservableLink(observable_key=url.key)],
+        )
+        store.append(finding)
+        findings.append(finding)
+    return store, url, *findings
+
+
+class TestPinnedBasis:
+    """
+    A finding that fetched its own intel must hold that value, whoever enriches the observable
+    next — and whether or not that enrichment ran in the same worker.
+    """
+
+    @staticmethod
+    def _case(fragment_id: str = "f1"):
+        store = make_store(fragment_id)
+        url = add_url(store, fragment_id)
+        trap = ThreatIntel(
+            subject_key=url.key,
+            verdict=Verdict.SUSPICIOUS,
+            weight=4.0,
+            source=source("proofpoint-trap"),
+            fragment_id=fragment_id,
+        )
+        store.append(trap)
+        finding = Finding(
+            rule_id="pp-trap-hit",
+            source=source("proofpoint-trap"),
+            fragment_id=fragment_id,
+            observable_links=[ObservableLink(observable_key=url.key, basis=LinkBasis.SIGNALS, signal_keys=(trap.key,))],
+        )
+        store.append(finding)
+        return store, url, trap, finding
+
+    def _generic_intel(self, store: FactStore, url: Observable, fragment_id: str) -> None:
+        store.append(
+            ThreatIntel(
+                subject_key=url.key,
+                verdict=Verdict.MALICIOUS,
+                weight=6.0,
+                source=source("urlhaus"),
+                fragment_id=fragment_id,
+            )
+        )
+
+    def test_generic_intel_in_the_same_fragment_does_not_move_it(self) -> None:
+        """One worker fetching several feeds — the case no fragment filter could ever cover."""
+        store, url, _, finding = self._case()
+        self._generic_intel(store, url, "f1")
+
+        report = evaluate(store)
+        assert report.finding(finding.key).score == 4.0
+        assert report.observable(url.key).score == 6.0
+
+    def test_generic_intel_in_another_fragment_does_not_move_it(self) -> None:
+        store, url, _, finding = self._case("i1")
+        other = make_store("i2")
+        other_url = add_url(other, "i2")
+        self._generic_intel(other, other_url, "i2")
+
+        report = evaluate(store.union(other))
+        assert report.finding(finding.key).score == 4.0
+
+    def test_a_malicious_child_does_not_reach_a_pinned_finding(self) -> None:
+        store, url, _, finding = self._case()
+        ip = Observable(type="ipv4", value="203.0.113.7", source=source(), fragment_id="f1")
+        store.append(ip)
+        store.append(
+            ThreatIntel(subject_key=ip.key, verdict=Verdict.MALICIOUS, weight=8.0, source=source(), fragment_id="f1")
+        )
+        store.append(
+            Relation(
+                source_key=url.key,
+                target_key=ip.key,
+                kind=RelationKind.EXTRACTION,
+                source=source(),
+                fragment_id="f1",
+            )
+        )
+
+        report = evaluate(store)
+        assert report.finding(finding.key).score == 4.0
+        assert report.observable(url.key).score == 8.0
+
+    def test_it_follows_a_re_assertion_of_the_pinned_signal(self) -> None:
+        """Pinning resolves at evaluation, so a re-fetch moves the finding with its own source."""
+        store, url, _, finding = self._case()
+        store.append(
+            ThreatIntel(
+                subject_key=url.key,
+                verdict=Verdict.MALICIOUS,
+                weight=7.0,
+                source=source("proofpoint-trap"),
+                fragment_id="f1",
+            )
+        )
+
+        assert evaluate(store).finding(finding.key).score == 7.0
+
+    def test_a_refute_on_the_observable_still_caps_it(self) -> None:
+        """Pinning narrows the evidence, it does not launder an analyst's stance."""
+        store, url, _, finding = self._case()
+        store.append(
+            Decision(
+                target_key=url.key,
+                kind=DecisionKind.REFUTE,
+                justification="internal sandbox",
+                source=source("alice", SourceClass.ORG_ANALYST),
+                fragment_id="f1",
+            )
+        )
+
+        assert evaluate(store).finding(finding.key).score == DEFAULT_POLICY.refute_ceiling
+
+    def test_contributions_name_the_pinned_signal(self) -> None:
+        store, _, trap, finding = self._case()
+
+        contributions = evaluate(store).finding(finding.key).contributions
+        pin = next(c for c in contributions if c.label.startswith("pin"))
+        assert pin.source_key == trap.key
+        assert pin.label == "pin · proofpoint-trap · SUSPICIOUS"
+        assert pin.value == 4.0
+
+    def test_an_absent_pinned_signal_is_reported_not_raised(self) -> None:
+        """A fragment can carry the link before the signal it pins has merged in."""
+        store = make_store()
+        url = add_url(store, "f1")
+        finding = Finding(
+            rule_id="pp-trap-hit",
+            source=source("proofpoint-trap"),
+            fragment_id="f1",
+            observable_links=[
+                ObservableLink(observable_key=url.key, basis=LinkBasis.SIGNALS, signal_keys=("sig:absent:x",))
+            ],
+        )
+        store.append(finding)
+
+        result = evaluate(store).finding(finding.key)
+        unresolved = next(c for c in result.contributions if c.label == "pin · unresolved")
+        assert unresolved.retained is False
+        assert result.score == 0.0
+
+    def test_the_rule_floor_still_wins_when_it_is_stronger(self) -> None:
+        store, url, trap, _ = self._case()
+        strong = Finding(
+            rule_id="strong",
+            source=source("proofpoint-trap"),
+            fragment_id="f1",
+            verdict=Verdict.MALICIOUS,
+            weight=9.0,
+            observable_links=[ObservableLink(observable_key=url.key, basis=LinkBasis.SIGNALS, signal_keys=(trap.key,))],
+        )
+        store.append(strong)
+
+        assert evaluate(store).finding(strong.key).score == 9.0
 
 
 class TestFindingLevels:
@@ -97,10 +278,9 @@ class TestFindingLevels:
     def _linked_finding(self, store: FactStore, url: Observable, **kwargs) -> Finding:
         finding = Finding(
             rule_id="rule",
-            subject_key=url.key,
             source=source(),
             fragment_id="f1",
-            observable_links=[ObservableLink(observable_key=url.key, scope=Scope.ALL)],
+            observable_links=[ObservableLink(observable_key=url.key, basis=LinkBasis.OBSERVABLE)],
             **kwargs,
         )
         store.append(finding)
@@ -121,7 +301,6 @@ class TestFindingLevels:
         store = make_store()
         finding = Finding(
             rule_id="rule",
-            subject_key="obs:url:none",
             source=source(),
             fragment_id="f1",
             verdict=Verdict.INFO,
@@ -136,7 +315,6 @@ class TestFindingLevels:
         store = make_store()
         finding = Finding(
             rule_id="ceo_impersonation",
-            subject_key="obs:url:none",
             source=source(),
             fragment_id="f1",
             verdict=Verdict.MALICIOUS,
@@ -152,7 +330,6 @@ class TestFindingLevels:
         store = make_store()
         finding = Finding(
             rule_id="spf_pass",
-            subject_key="obs:url:none",
             source=source(),
             fragment_id="f1",
             verdict=Verdict.SAFE,
@@ -195,17 +372,16 @@ class TestDecisions:
         url = add_url(store, "f1")
         finding = Finding(
             rule_id="rule",
-            subject_key=url.key,
             source=source(),
             fragment_id="f1",
-            observable_links=[ObservableLink(observable_key=url.key, scope=Scope.ALL)],
+            observable_links=[ObservableLink(observable_key=url.key, basis=LinkBasis.OBSERVABLE)],
         )
         store.append(finding)
         store.append(
             Decision(
                 target_key=finding.key,
                 kind=DecisionKind.UPHOLD,
-                justification="confirmé par l'analyse mémoire",
+                justification="confirmed by memory analysis",
                 source=source("alice", SourceClass.ORG_ANALYST),
                 fragment_id="f1",
             )
@@ -219,7 +395,6 @@ class TestDecisions:
         store = make_store()
         finding = Finding(
             rule_id="rule",
-            subject_key="obs:url:none",
             source=source(),
             fragment_id="f1",
             verdict=Verdict.MALICIOUS,
@@ -229,7 +404,7 @@ class TestDecisions:
             Decision(
                 target_key=finding.key,
                 kind=DecisionKind.REFUTE,
-                justification="faux positif connu",
+                justification="known false positive",
                 source=source("alice", SourceClass.ORG_ANALYST),
                 fragment_id="f1",
             )
@@ -250,7 +425,7 @@ class TestDecisions:
             Decision(
                 target_key=url.key,
                 kind=DecisionKind.REFUTE,
-                justification="infrastructure d'authentification interne",
+                justification="internal authentication infrastructure",
                 source=source("rssi", SourceClass.ORG_POLICY),
                 fragment_id="f1",
             )
@@ -267,7 +442,7 @@ class TestDecisions:
             Decision(
                 target_key="tag:phishing",
                 kind=DecisionKind.UPHOLD,
-                justification="peu importe",
+                justification="does not matter",
                 source=source(),
                 fragment_id="f1",
             )
@@ -279,7 +454,7 @@ class TestDecisions:
                 decision = Decision(
                     target_key=target,
                     kind=kind,
-                    justification="motif",
+                    justification="reason",
                     source=source(),
                     fragment_id="f1",
                 )
@@ -310,10 +485,9 @@ class TestDecisions:
         )
         finding = Finding(
             rule_id="rule",
-            subject_key=url.key,
             source=source(),
             fragment_id="f1",
-            observable_links=[ObservableLink(observable_key=url.key, scope=Scope.ALL)],
+            observable_links=[ObservableLink(observable_key=url.key, basis=LinkBasis.OBSERVABLE)],
         )
         store.append(finding)
         store.append(
@@ -351,7 +525,7 @@ class TestVacating:
             Decision(
                 target_key=url.key,
                 kind=DecisionKind.REFUTE,
-                justification="infra interne",
+                justification="internal infra",
                 occurred_at=datetime(2026, 1, 15, tzinfo=timezone.utc),
                 source=source("rssi", SourceClass.ORG_POLICY),
                 fragment_id="f1",
@@ -367,7 +541,7 @@ class TestVacating:
             Decision(
                 target_key=url_key,
                 kind=DecisionKind.VACATED,
-                justification="le domaine n'est plus géré par la RSSI",
+                justification="the domain is no longer owned by the CISO",
                 occurred_at=datetime(2026, 6, 15, tzinfo=timezone.utc),
                 source=source("soc-lead", SourceClass.ORG_ANALYST),
                 fragment_id="f1",
@@ -386,7 +560,7 @@ class TestVacating:
             Decision(
                 target_key=url_key,
                 kind=DecisionKind.VACATED,
-                justification="plus dans le périmètre",
+                justification="out of scope now",
                 occurred_at=datetime(2026, 6, 15, tzinfo=timezone.utc),
                 source=source("soc-lead", SourceClass.ORG_ANALYST),
                 fragment_id="f1",
@@ -397,13 +571,12 @@ class TestVacating:
         vacated = next(c for c in contributions if c.source_key.startswith("dec:"))
         assert vacated.retained is False
         assert "stance withdrawn" in vacated.detail
-        assert "plus dans le périmètre" in vacated.detail
+        assert "out of scope now" in vacated.detail
 
     def test_a_vacated_finding_is_counted_again(self) -> None:
         store = make_store()
         finding = Finding(
             rule_id="rule",
-            subject_key="obs:url:none",
             source=source(),
             fragment_id="f1",
             verdict=Verdict.MALICIOUS,
@@ -417,7 +590,7 @@ class TestVacating:
                 Decision(
                     target_key=finding.key,
                     kind=kind,
-                    justification="motif",
+                    justification="reason",
                     occurred_at=when,
                     source=source("alice", SourceClass.ORG_ANALYST),
                     fragment_id="f1",
@@ -452,7 +625,7 @@ class TestContradictoryDecisions:
                 Decision(
                     target_key=url.key,
                     kind=kind,
-                    justification="motif",
+                    justification="reason",
                     occurred_at=self.JUNE if kind is fresher else self.JANUARY,
                     source=source("rssi", SourceClass.ORG_POLICY),
                     fragment_id="f1",
@@ -481,7 +654,6 @@ class TestContradictoryDecisions:
         store = make_store()
         finding = Finding(
             rule_id="rule",
-            subject_key="obs:url:none",
             source=source(),
             fragment_id="f1",
             verdict=Verdict.NOTABLE,
@@ -492,7 +664,7 @@ class TestContradictoryDecisions:
                 Decision(
                     target_key=finding.key,
                     kind=kind,
-                    justification="motif",
+                    justification="reason",
                     occurred_at=self.JUNE if kind is fresher else self.JANUARY,
                     source=source("alice", SourceClass.ORG_ANALYST),
                     fragment_id="f1",
@@ -519,7 +691,6 @@ class TestStatus:
         store = make_store()
         finding = Finding(
             rule_id="rule",
-            subject_key="obs:url:none",
             source=source(),
             fragment_id="f1",
             verdict=Verdict.MALICIOUS,
@@ -545,7 +716,6 @@ class TestConclusions:
     def _conclusion(store: FactStore, rule_id: str = "ai_review", **kwargs) -> Finding:
         finding = Finding(
             rule_id=rule_id,
-            subject_key="inv:f1",
             source=source("llm", SourceClass.INTERNAL_TOOL),
             fragment_id="f1",
             effect=Effect.FLOOR,
@@ -558,7 +728,6 @@ class TestConclusions:
     def _additive(store: FactStore, weight: float, rule_id: str = "base") -> Finding:
         finding = Finding(
             rule_id=rule_id,
-            subject_key="inv:f1",
             source=source(),
             fragment_id="f1",
             verdict=Verdict.SUSPICIOUS,
@@ -712,7 +881,7 @@ class TestConclusions:
         conclusion = self._conclusion(
             store,
             verdict=Verdict.SUSPICIOUS,
-            observable_links=[ObservableLink(observable_key=url.key, scope=Scope.ALL)],
+            observable_links=[ObservableLink(observable_key=url.key, basis=LinkBasis.OBSERVABLE)],
         )
 
         report = evaluate(store)
@@ -727,7 +896,7 @@ class TestConclusions:
             Decision(
                 target_key=conclusion.key,
                 kind=DecisionKind.REFUTE,
-                justification="l'analyse s'appuyait sur un artefact effacé depuis",
+                justification="the analysis relied on an artefact deleted since",
                 source=source("alice", SourceClass.ORG_ANALYST),
                 fragment_id="f1",
             )
@@ -750,7 +919,7 @@ class TestConclusions:
             Decision(
                 target_key=conclusion.key,
                 kind=DecisionKind.UPHOLD,
-                justification="revue par le RSSI",
+                justification="reviewed by the CISO",
                 source=source("alice", SourceClass.ORG_ANALYST),
                 fragment_id="f1",
             )
@@ -796,7 +965,6 @@ class TestCeilingConclusions:
     def _ceiling(store: FactStore, rule_id: str = "campaign", **kwargs) -> Finding:
         finding = Finding(
             rule_id=rule_id,
-            subject_key="inv:f1",
             source=source("psat", SourceClass.INTERNAL_TOOL),
             fragment_id="f1",
             effect=Effect.CEILING,
@@ -886,7 +1054,7 @@ class TestCeilingConclusions:
             Decision(
                 target_key=ceiling.key,
                 kind=DecisionKind.REFUTE,
-                justification="la campagne invoquée n'a jamais eu lieu",
+                justification="the campaign it invoked never took place",
                 source=source("alice", SourceClass.ORG_ANALYST),
                 fragment_id="f1",
             )
@@ -901,7 +1069,6 @@ class TestCeilingConclusions:
         with pytest.raises(ValueError, match="may only de-escalate"):
             Finding(
                 rule_id="campaign",
-                subject_key="inv:f1",
                 source=source(),
                 fragment_id="f1",
                 effect=Effect.CEILING,
@@ -912,7 +1079,6 @@ class TestCeilingConclusions:
         with pytest.raises(ValueError, match="never from a weight"):
             Finding(
                 rule_id="campaign",
-                subject_key="inv:f1",
                 source=source(),
                 fragment_id="f1",
                 effect=Effect.CEILING,
@@ -934,7 +1100,6 @@ class TestJudgmentInvariants:
         with pytest.raises(ValueError, match="greater than or equal to 0"):
             Finding(
                 rule_id="rule",
-                subject_key="obs:url:none",
                 source=source(),
                 fragment_id="f1",
                 verdict=Verdict.MALICIOUS,
@@ -945,7 +1110,6 @@ class TestJudgmentInvariants:
         investigation = Investigation()
         finding = Finding(
             rule_id="rule",
-            subject_key=investigation.root_key,
             source=source(),
             fragment_id=investigation.fragment_id,
             verdict=Verdict.MALICIOUS,
@@ -961,7 +1125,6 @@ class TestJudgmentInvariants:
         investigation = Investigation()
         finding = Finding(
             rule_id="rule",
-            subject_key=investigation.root_key,
             source=source(),
             fragment_id=investigation.fragment_id,
             verdict=Verdict.SUSPICIOUS,

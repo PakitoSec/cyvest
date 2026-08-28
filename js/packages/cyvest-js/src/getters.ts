@@ -23,12 +23,6 @@ import type {
 } from "./types";
 import { generateDecisionKey } from "./keys";
 
-/** Index used by the report to key an observable result by key *and* resolved scope. */
-export function observableIndex(observableKey: string, scope?: { scope?: string; fragment_id?: string | null }): string {
-  if (!scope || scope.scope === "ALL") return `${observableKey}@ALL`;
-  return `${observableKey}@fragment:${scope.fragment_id}`;
-}
-
 // --- facts
 
 export function getObservable(inv: Investigation, key: string): Observable | undefined {
@@ -155,12 +149,8 @@ export function getInvestigationResult(inv: Investigation): InvestigationResult 
   return inv.report.investigation;
 }
 
-export function getObservableResult(
-  inv: Investigation,
-  observableKey: string,
-  scope?: { scope?: string; fragment_id?: string | null },
-): ObservableResult | undefined {
-  return inv.report.observables?.[observableIndex(observableKey, scope)];
+export function getObservableResult(inv: Investigation, observableKey: string): ObservableResult | undefined {
+  return inv.report.observables?.[observableKey];
 }
 
 export function getFindingResult(inv: Investigation, findingKey: string): FindingResult | undefined {

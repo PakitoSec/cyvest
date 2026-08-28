@@ -127,11 +127,13 @@ class Judgment(BaseModel):
     defers to the policy, which assumes a magnitude for ``verdict`` so that stating a verdict
     alone is enough.
 
+    What the judgment is *about* is not here: a signal names an observable subject, a finding
+    names none and states its observables as links instead.
+
     ``weight`` is an unsigned magnitude: direction is the verdict's job alone. Allowing a
     negative one would let a fact read ``MALICIOUS`` while scoring ``SAFE``.
     """
 
-    subject_key: str = Field(..., min_length=1)
     verdict: Verdict = Field(default=Verdict.INFO)
     confidence: Annotated[float, Field(gt=0.0, le=1.0)] = Field(default=Confidence.HIGH.value)
     weight: Annotated[float, Field(ge=0.0)] | None = Field(default=None)

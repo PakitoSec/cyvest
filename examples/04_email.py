@@ -169,8 +169,14 @@ class EmailFrom(BaseRule):
         )
         cy.root().relate_to(obs, cy.REL.EXTRACTION)
 
-        # Create finding for header analysis
-        cy.finding("from", "test email vt 10", comment="> ok boys").link_observable(obs).tagged("emails")
+        # This rule reports what VT said plus the sender's infrastructure — not another feed's
+        # verdict on the same address, which `from-proofpoint` already carries.
+        (
+            cy.finding("from", "test email vt 10", comment="> ok boys")
+            .pin(obs.signal("VT"))
+            .link_observable(cy.observable(cy.OBS.DOMAIN, from_domain))
+            .tagged("emails")
+        )
 
         logger.info(f"Email header analysis complete: {obs.key}")
 
@@ -195,8 +201,12 @@ class EmailFromBIS(BaseRule):
         # Build observable chain with threat intel
         obs = cy.observable(cy.OBS.EMAIL, from_addr).with_ti("PROOFPOINT", 5, "> test")
 
-        # Create finding for header analysis
-        (cy.finding("from-proofpoint", "test email vt 10", comment="> ok boys").link_observable(obs).tagged("emails"))
+        # Pinned to the feed this rule queried: later intel on the address cannot move it.
+        (
+            cy.finding("from-proofpoint", "test email vt 10", comment="> ok boys")
+            .pin(obs.signal("PROOFPOINT"))
+            .tagged("emails")
+        )
 
         logger.info(f"Email header analysis complete: {obs.key}")
 
@@ -322,7 +332,7 @@ class BodiesDomainTask(BaseRule):
             # Create finding and link to tag
             chk = (
                 cy.finding(f"body-domain-{domain}", f"Domain analysis {domain}", comment=f"> score: {score}")
-                .link_observable(domain_obs, scope=cy.SCOPE.ALL)
+                .link_observable(domain_obs, basis=cy.BASIS.OBSERVABLE)
                 .tagged(tag)
             )
 

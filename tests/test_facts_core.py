@@ -40,10 +40,16 @@ class TestKeyTable:
         historical = ThreatIntel(subject_key=obs.key, source=SRC, fragment_id="f1", external_id="2024-05-01")
         assert default.key != historical.key
 
-    def test_finding_identity_includes_its_subject(self) -> None:
-        """v6 keyed on the name alone, which is why it needed origin_investigation_id."""
-        first = Finding(rule_id="r", subject_key="obs:url:a", source=SRC, fragment_id="f1")
-        second = Finding(rule_id="r", subject_key="obs:url:b", source=SRC, fragment_id="f1")
+    def test_finding_identity_is_its_rule(self) -> None:
+        """Like v6, but ``origin_investigation_id`` no longer joins in — merging is by rule alone."""
+        first = Finding(rule_id="r", source=SRC, fragment_id="f1")
+        second = Finding(rule_id="r", source=SRC, fragment_id="f2")
+        assert first.key == second.key == "fnd:r"
+
+    def test_a_finding_splits_on_its_external_id(self) -> None:
+        """How one rule fires once per observable now that no subject discriminates it."""
+        first = Finding(rule_id="r", external_id="obs:url:a", source=SRC, fragment_id="f1")
+        second = Finding(rule_id="r", external_id="obs:url:b", source=SRC, fragment_id="f1")
         assert first.key != second.key
 
     def test_relation_key_carries_direction(self) -> None:
@@ -109,8 +115,8 @@ class TestMergeLaws:
         left, right = store("a"), store("b")
         left.append(observable("a"))
         right.append(observable("b", value="5.6.7.8"))
-        left.append(Tag(name="phishing", finding_keys=("fnd:x:obs:url:a",), source=SRC, fragment_id="a"))
-        right.append(Tag(name="phishing", finding_keys=("fnd:y:obs:url:b",), source=SRC, fragment_id="b"))
+        left.append(Tag(name="phishing", finding_keys=("fnd:x",), source=SRC, fragment_id="a"))
+        right.append(Tag(name="phishing", finding_keys=("fnd:y",), source=SRC, fragment_id="b"))
         return left, right
 
     def test_idempotent(self) -> None:
@@ -169,7 +175,7 @@ class TestMergeLaws:
         left, right = self._stores()
         merged = left.union(right)
         tag = merged.tags[keys.generate_tag_key("phishing")]
-        assert set(tag.finding_keys) == {"fnd:x:obs:url:a", "fnd:y:obs:url:b"}
+        assert set(tag.finding_keys) == {"fnd:x", "fnd:y"}
 
     def test_observable_occurrences_merge_as_counters(self) -> None:
         left, right = store("a"), store("b")

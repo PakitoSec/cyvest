@@ -26,7 +26,7 @@ def _investigation(*, weight: float) -> Cyvest:
     cv = Cyvest(investigation_name="case")
     url = cv.observable_create("url", "https://evil.test")
     cv.finding_create("phishing-page", weight=weight)
-    cv.finding_link_observable("fnd:phishing-page:" + cv._investigation.root_key, url.key)
+    cv.finding_link_observable("fnd:phishing-page", url.key)
     return cv
 
 

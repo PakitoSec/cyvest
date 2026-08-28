@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from cyvest.enums import DecisionKind, Salience, Scope, SourceClass, Verdict
+from cyvest.enums import DecisionKind, LinkBasis, Salience, SourceClass, Verdict
 from cyvest.evaluation import evaluate
 from cyvest.evaluation.timeline import build_timeline
 from cyvest.facts import Decision, Finding, Observable, ObservableLink, SourceRef, ThreatIntel
@@ -36,11 +36,10 @@ def build() -> tuple[FactStore, Observable, Finding]:
     finding = Finding(
         rule_id="url_in_body",
         name="URL in body",
-        subject_key=url.key,
         source=SRC,
         fragment_id="f1",
         asserted_at=MARCH,
-        observable_links=[ObservableLink(observable_key=url.key, scope=Scope.ALL)],
+        observable_links=[ObservableLink(observable_key=url.key, basis=LinkBasis.OBSERVABLE)],
     )
     store.append(finding)
     return store, url, finding
@@ -59,7 +58,7 @@ class TestTimeline:
             Decision(
                 target_key=url.key,
                 kind=DecisionKind.REFUTE,
-                justification="CDN partenaire",
+                justification="Partner CDN",
                 occurred_at=JUNE,
                 asserted_at=JUNE,
                 source=ANALYST,
@@ -70,7 +69,7 @@ class TestTimeline:
         decisions = [entry for entry in entries if entry.kind == "decision"]
         assert len(decisions) == 1
         assert decisions[0].salience is Salience.KEY
-        assert "CDN partenaire" in decisions[0].title
+        assert "Partner CDN" in decisions[0].title
 
     def test_a_decision_is_titled_in_the_analyst_s_words(self) -> None:
         """
@@ -85,7 +84,7 @@ class TestTimeline:
             Decision(
                 target_key=url.key,
                 kind=DecisionKind.REFUTE,
-                justification="CDN partenaire",
+                justification="Partner CDN",
                 occurred_at=JUNE,
                 asserted_at=JUNE,
                 source=ANALYST,
@@ -96,7 +95,7 @@ class TestTimeline:
             Decision(
                 target_key=finding.key,
                 kind=DecisionKind.REFUTE,
-                justification="Faux positif connu",
+                justification="Known false positive",
                 occurred_at=JUNE,
                 asserted_at=JUNE,
                 source=ANALYST,
@@ -108,8 +107,8 @@ class TestTimeline:
             for entry in build_timeline(store, evaluate(store), min_salience=Salience.KEY)
             if entry.kind == "decision"
         }
-        assert titles[url.key] == "ALLOWLISTED · CDN partenaire"
-        assert titles[finding.key] == "DISMISSED · Faux positif connu"
+        assert titles[url.key] == "ALLOWLISTED · Partner CDN"
+        assert titles[finding.key] == "DISMISSED · Known false positive"
 
     def test_the_time_basis_switches_the_axis(self) -> None:
         store = FactStore(InvestigationHeader(investigation_id="inv", fragment_ids=("f1",)))

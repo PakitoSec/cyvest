@@ -18,7 +18,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from cyvest.enums import Salience, Status, Verdict
-from cyvest.evaluation.report import Report, ResolvedScope
+from cyvest.evaluation.report import Report
 from cyvest.facts.base import Fact
 from cyvest.facts.decision import Decision, decision_label
 from cyvest.facts.evidence import Evidence
@@ -57,7 +57,9 @@ def _describe(fact: Fact) -> tuple[str, str, str]:
     if isinstance(fact, ObservableSignal):
         return "signal", f"{fact.source.name} → {fact.verdict.value}", fact.subject_key
     if isinstance(fact, Finding):
-        return "finding", fact.name or fact.rule_id, fact.subject_key
+        # A finding names no subject; the first observable it links is the closest thing to one.
+        links = fact.observable_links
+        return "finding", fact.name or fact.rule_id, links[0].observable_key if links else fact.key
     if isinstance(fact, Decision):
         return "decision", f"{decision_label(fact)} · {fact.justification}".strip(" ·"), fact.target_key
     if isinstance(fact, Relation):
@@ -138,8 +140,6 @@ def _verdict_change_entries(
         replay.append(fact)
         report = evaluator(replay, policy)
         for result in report.observables.values():
-            if result.scope != ResolvedScope.all():
-                continue
             before = previous.get(result.key)
             if before is not None and before is not result.verdict:
                 entries.append(

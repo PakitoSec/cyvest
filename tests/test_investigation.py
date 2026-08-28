@@ -4,8 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from cyvest.enums import DecisionKind, ObservableType, RelationKind, Scope, SourceClass, Verdict, Weight
-from cyvest.evaluation import ResolvedScope
+from cyvest.enums import DecisionKind, LinkBasis, ObservableType, RelationKind, SourceClass, Verdict, Weight
 from cyvest.facts import Finding, Observable, SourceRef, Tag, ThreatIntel
 from cyvest.investigation import Investigation
 
@@ -28,10 +27,8 @@ def intel(inv: Investigation, obs: Observable, weight: float, source: SourceRef 
     )
 
 
-def finding(inv: Investigation, rule_id: str, obs: Observable, **kwargs) -> Finding:
-    return inv.add_finding(
-        Finding(rule_id=rule_id, subject_key=obs.key, source=FEED, fragment_id=inv.fragment_id, **kwargs)
-    )
+def finding(inv: Investigation, rule_id: str, **kwargs) -> Finding:
+    return inv.add_finding(Finding(rule_id=rule_id, source=FEED, fragment_id=inv.fragment_id, **kwargs))
 
 
 class TestRoot:
@@ -64,7 +61,7 @@ class TestReportCache:
     def test_the_cache_is_dropped_when_a_fact_lands(self) -> None:
         inv = Investigation()
         target = url(inv, "hxxp://a")
-        finding(inv, "r", target, observable_links=[{"observable_key": target.key, "scope": Scope.ALL}])
+        finding(inv, "r", observable_links=[{"observable_key": target.key, "basis": LinkBasis.OBSERVABLE}])
         assert inv.get_global_score() == 0.0
 
         intel(inv, target, 6.0)
@@ -76,7 +73,7 @@ class TestReportCache:
         inv = Investigation()
         target = url(inv, "hxxp://a")
         intel(inv, target, 6.0)
-        finding(inv, "r", target, observable_links=[{"observable_key": target.key, "scope": Scope.ALL}])
+        finding(inv, "r", observable_links=[{"observable_key": target.key, "basis": LinkBasis.OBSERVABLE}])
 
         baseline = inv.get_global_score()
         other = inv.reevaluate(policy=Policy(output_precision=0))
@@ -87,8 +84,7 @@ class TestReportCache:
 class TestFacts:
     def test_superseding_keeps_the_key_and_wins_on_freshness(self) -> None:
         inv = Investigation()
-        target = url(inv, "hxxp://a")
-        first = finding(inv, "r", target)
+        first = finding(inv, "r")
         updated = inv.supersede(first, comment="revu")
 
         assert updated.key == first.key
@@ -98,25 +94,101 @@ class TestFacts:
     def test_linking_an_observable_is_idempotent(self) -> None:
         inv = Investigation()
         target = url(inv, "hxxp://a")
-        created = finding(inv, "r", target)
+        created = finding(inv, "r")
         inv.link_finding_observable(created.key, target.key)
         inv.link_finding_observable(created.key, target.key)
         assert len(inv.get_finding(created.key).observable_links) == 1
 
-    def test_linking_the_same_observable_under_two_scopes_keeps_both(self) -> None:
+    def test_linking_the_same_observable_under_two_bases_keeps_both(self) -> None:
         inv = Investigation()
         target = url(inv, "hxxp://a")
-        created = finding(inv, "r", target)
-        inv.link_finding_observable(created.key, target.key, Scope.OWN_FRAGMENT)
-        inv.link_finding_observable(created.key, target.key, Scope.ALL)
+        created = finding(inv, "r")
+        inv.link_finding_observable(created.key, target.key, LinkBasis.NONE)
+        inv.link_finding_observable(created.key, target.key, LinkBasis.OBSERVABLE)
         assert len(inv.get_finding(created.key).observable_links) == 2
 
     def test_linking_an_unknown_key_fails_loudly(self) -> None:
         inv = Investigation()
-        target = url(inv, "hxxp://a")
-        created = finding(inv, "r", target)
+        created = finding(inv, "r")
         with pytest.raises(KeyError, match="Unknown observable"):
             inv.link_finding_observable(created.key, "obs:url:ghost")
+
+
+class TestPinning:
+    """``pin`` derives the observable from the signal, so the two can never disagree."""
+
+    @staticmethod
+    def _case():
+        inv = Investigation()
+        target = url(inv, "hxxp://a")
+        trap = intel(inv, target, 4.0, SourceRef(name="proofpoint-trap", source_class=SourceClass.VENDOR_FEED))
+        created = finding(inv, "r")
+        return inv, target, trap, created
+
+    def test_it_builds_the_same_link_as_the_long_form(self) -> None:
+        inv, target, trap, created = self._case()
+        inv.pin_finding_signals(created.key, trap.key)
+        pinned = inv.get_finding(created.key).observable_links[0]
+
+        other = Investigation()
+        other_target = url(other, "hxxp://a")
+        other_trap = intel(
+            other, other_target, 4.0, SourceRef(name="proofpoint-trap", source_class=SourceClass.VENDOR_FEED)
+        )
+        other_created = finding(other, "r")
+        other.link_finding_observable(other_created.key, other_target.key, LinkBasis.SIGNALS, [other_trap.key])
+
+        assert pinned == other.get_finding(other_created.key).observable_links[0]
+
+    def test_the_observable_is_derived_from_the_signal(self) -> None:
+        inv, target, trap, created = self._case()
+        inv.pin_finding_signals(created.key, trap.key)
+        link = inv.get_finding(created.key).observable_links[0]
+
+        assert link.observable_key == target.key
+        assert link.basis is LinkBasis.SIGNALS
+        assert link.signal_keys == (trap.key,)
+
+    def test_it_accepts_the_signal_itself_or_its_key(self) -> None:
+        inv, _, trap, created = self._case()
+        inv.pin_finding_signals(created.key, trap)
+        assert inv.get_finding(created.key).observable_links[0].signal_keys == (trap.key,)
+
+    def test_signals_about_different_observables_are_refused(self) -> None:
+        inv, _, trap, created = self._case()
+        elsewhere = url(inv, "hxxp://b")
+        other = intel(inv, elsewhere, 5.0)
+
+        with pytest.raises(ValueError, match="different observables"):
+            inv.pin_finding_signals(created.key, trap, other)
+
+    def test_pinning_nothing_is_refused(self) -> None:
+        inv, _, _, created = self._case()
+        with pytest.raises(ValueError, match="at least one signal"):
+            inv.pin_finding_signals(created.key)
+
+    def test_an_unknown_signal_fails_loudly(self) -> None:
+        inv, _, _, created = self._case()
+        with pytest.raises(KeyError, match="Unknown signal"):
+            inv.pin_finding_signals(created.key, "sig:ghost:obs:url:hxxp://a")
+
+    def test_a_signal_about_another_observable_is_refused_in_the_long_form(self) -> None:
+        inv, target, _, created = self._case()
+        elsewhere = url(inv, "hxxp://b")
+        other = intel(inv, elsewhere, 5.0)
+
+        with pytest.raises(ValueError, match="a pinned link may only name signals"):
+            inv.link_finding_observable(created.key, target.key, LinkBasis.SIGNALS, [other.key])
+
+    def test_naming_signals_without_the_signals_basis_is_refused(self) -> None:
+        inv, target, trap, created = self._case()
+        with pytest.raises(ValueError, match="only applies to the SIGNALS basis"):
+            inv.link_finding_observable(created.key, target.key, LinkBasis.OBSERVABLE, [trap.key])
+
+    def test_the_signals_basis_needs_at_least_one_signal(self) -> None:
+        inv, target, _, created = self._case()
+        with pytest.raises(ValueError, match="must name at least one"):
+            inv.link_finding_observable(created.key, target.key, LinkBasis.SIGNALS)
 
 
 class TestTags:
@@ -130,7 +202,7 @@ class TestTags:
         inv = Investigation()
         target = url(inv, "hxxp://a")
         intel(inv, target, 6.0)
-        leaf = finding(inv, "r", target, observable_links=[{"observable_key": target.key, "scope": Scope.ALL}])
+        leaf = finding(inv, "r", observable_links=[{"observable_key": target.key, "basis": LinkBasis.OBSERVABLE}])
 
         inv.add_tag(Tag(name="header:auth:dkim", source=FEED, fragment_id=inv.fragment_id))
         inv.add_finding_to_tag("tag:header:auth:dkim", leaf.key)
@@ -145,7 +217,7 @@ class TestDecisions:
         inv = Investigation()
         target = url(inv, "hxxp://a")
         intel(inv, target, 8.0)
-        inv.add_decision(target.key, DecisionKind.REFUTE, "CDN partenaire")
+        inv.add_decision(target.key, DecisionKind.REFUTE, "Partner CDN")
 
         result = inv.report.observable(target.key)
         assert result.verdict is Verdict.SAFE
@@ -154,8 +226,8 @@ class TestDecisions:
     def test_confirming_a_finding_forces_malicious(self) -> None:
         inv = Investigation()
         target = url(inv, "hxxp://a")
-        created = finding(inv, "r", target, observable_links=[{"observable_key": target.key, "scope": Scope.ALL}])
-        inv.add_decision(created.key, DecisionKind.UPHOLD, "confirmé par l'analyse mémoire")
+        created = finding(inv, "r", observable_links=[{"observable_key": target.key, "basis": LinkBasis.OBSERVABLE}])
+        inv.add_decision(created.key, DecisionKind.UPHOLD, "confirmed by memory analysis")
         assert inv.get_global_verdict() is Verdict.MALICIOUS
 
 
@@ -180,18 +252,36 @@ class TestMerge:
 
         target = url(left, "hxxp://a")
         intel(left, target, 2.0, SourceRef(name="proofpoint", source_class=SourceClass.VENDOR_FEED))
-        f1 = finding(left, "url_in_body", target, observable_links=[{"observable_key": target.key}])
+        f1 = finding(left, "url_in_body", observable_links=[{"observable_key": target.key}])
 
         target2 = url(right, "hxxp://a")
         intel(right, target2, 3.0, SourceRef(name="virustotal", source_class=SourceClass.VENDOR_FEED))
-        f2 = finding(right, "url_reputation", target2, observable_links=[{"observable_key": target2.key}])
+        f2 = finding(right, "url_reputation", observable_links=[{"observable_key": target2.key}])
+
+        left.merge_investigation(right)
+
+        # Both findings read the merged observable: the graph is shared, only pins narrow it.
+        assert left.report.finding(f1.key).score == 3.0
+        assert left.report.finding(f2.key).score == 3.0
+        assert left.report.observable(target.key).score == 3.0
+        assert left.get_global_score() == 6.0
+
+    def test_a_pinned_finding_survives_the_merge_unchanged(self) -> None:
+        left = Investigation(investigation_id="i1")
+        right = Investigation(investigation_id="i2")
+
+        target = url(left, "hxxp://a")
+        pinned_intel = intel(left, target, 2.0, SourceRef(name="proofpoint", source_class=SourceClass.VENDOR_FEED))
+        f1 = finding(left, "url_in_body")
+        left.pin_finding_signals(f1.key, pinned_intel.key)
+
+        target2 = url(right, "hxxp://a")
+        intel(right, target2, 3.0, SourceRef(name="virustotal", source_class=SourceClass.VENDOR_FEED))
 
         left.merge_investigation(right)
 
         assert left.report.finding(f1.key).score == 2.0
-        assert left.report.finding(f2.key).score == 3.0
         assert left.report.observable(target.key).score == 3.0
-        assert left.get_global_score() == 5.0
 
     def test_merging_twice_changes_nothing(self) -> None:
         left = Investigation(investigation_id="i1")
@@ -215,10 +305,9 @@ class TestExplain:
         created = finding(
             inv,
             "r",
-            target,
             verdict=Verdict.SAFE,
             weight=Weight.MEDIUM,
-            observable_links=[{"observable_key": target.key, "scope": Scope.ALL}],
+            observable_links=[{"observable_key": target.key, "basis": LinkBasis.OBSERVABLE}],
         )
 
         labels = {c.label: c for c in inv.explain(created.key)}
@@ -226,10 +315,12 @@ class TestExplain:
         assert floor.retained is False
         assert inv.report.finding(created.key).own_term_suppressed is True
 
-    def test_scope_resolution_is_visible_in_the_report(self) -> None:
+    def test_the_basis_is_visible_in_the_report(self) -> None:
         inv = Investigation(investigation_id="i1")
         target = url(inv, "hxxp://a")
         intel(inv, target, 4.0)
-        finding(inv, "r", target, observable_links=[{"observable_key": target.key, "scope": Scope.OWN_FRAGMENT}])
+        created = finding(inv, "r", observable_links=[{"observable_key": target.key}])
 
-        assert inv.report.observable(target.key, ResolvedScope.own("i1")).score == 4.0
+        link = next(c for c in inv.explain(created.key) if c.label.startswith("link"))
+        assert link.label == "link · observable"
+        assert inv.report.observable(target.key).score == 4.0

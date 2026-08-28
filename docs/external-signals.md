@@ -186,10 +186,10 @@ Three properties make this safe without coordination:
 - **a retry is free** — reconciling twice changes nothing;
 - **a partial failure still contributes** — `task()` reconciles even when the body raises.
 
-And because each worker has its own `fragment_id`, a finding it creates sees only its own
-fragment by default. When VirusTotal later raises the same URL, the ProofPoint worker's finding
-keeps its own value — you can still tell who said what. See
-[scope](scoring-model.md#scope-why-a-finding-can-hold-its-value).
+And because each worker has its own `fragment_id`, every fact stays attributable to the feed that
+asserted it. When a rule must report the verdict *it* fetched rather than whatever the observable
+accumulates next, it pins itself to that signal. See
+[basis](scoring-model.md#basis-what-a-link-scores-on).
 
 ---
 

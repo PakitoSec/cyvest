@@ -141,14 +141,21 @@ url.allowlisted, finding.dismissed, finding.suppressed_by_decision
 A decision bounds a result rather than adding a term, and stays a fact — dated, attributed,
 mergeable. `justification` is required.
 
-## Scope
+## What a link scores on
 
 ```python
-cv.finding("rule", "…").link_observable(url, scope=cv.SCOPE.ALL)
+cv.finding("rule", "…").link_observable(url)                        # the observable, as it stands
+
+trap = cv.observable_add_threat_intel(url, "proofpoint-trap", verdict=cv.VERDICT.SUSPICIOUS, weight=4.0)
+cv.finding("pp-trap-hit", "…").pin(trap)                             # only that feed
+
+cv.finding("seen", "…").link_observable(url, cv.BASIS.NONE)         # documentary, scores nothing
 ```
 
-Each finding-to-observable link carries a scope, `OWN_FRAGMENT` by default, so a finding holds its
-own value even when the observable rises in another fragment.
+Each finding-to-observable link carries a **basis**: `OBSERVABLE` by default, `SIGNALS` when the
+link names the intel it scores on, `NONE` when the edge is there for the graph alone. `pin` is how
+a rule reports the verdict **it** fetched — nothing else landing on that observable, not another
+feed nor an extracted child, can move it.
 → [Scoring Model](docs/scoring-model.md)
 
 ## Ingesting external signals
@@ -304,6 +311,7 @@ The Python side always re-derives the report from the facts on load, so a stale 
 | `05_graph_dataset.py` | a dataset for the graph visualisation |
 | `06_compare_investigations.py` | diffing and tolerance rules |
 | `07_conclusion.py` | conclusions and analyst calls |
+| `08_pinned_finding.py` | pinning a finding to the intel it fetched |
 
 ## JavaScript packages
 

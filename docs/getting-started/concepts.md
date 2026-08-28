@@ -92,16 +92,20 @@ finding = cv.finding_create("url_analysis", "Analyze URLs in email", weight=8.5)
 cv.finding_link_observable(finding.key, url.key)
 ```
 
-Identity is `(rule_id, subject_key)`. The same rule on two observables gives two findings; the
-same rule on the same observable gives one, across any number of investigations — which is why v7
-has no `origin_investigation_id`.
+Identity is the `rule_id` alone. Reusing it gives one finding, across any number of
+investigations — which is why v7 has no `origin_investigation_id`. A finding names no subject:
+what it is *about* is the observables it links, which are also what it scores on.
 
-A finding with no explicit `subject` is anchored to the **root observable**, whose key is identical
-in every investigation, so a conclusion about the case survives a merge.
+A rule that fires once per observable states that with an `external_id`:
 
-Each link carries a **scope** (`OWN_FRAGMENT` by default), which is what lets a finding hold its
-value while the observable it points at keeps evolving. See
-[scope](../scoring-model.md#scope-why-a-finding-can-hold-its-value).
+```python
+cv.finding_create("url_analysis", external_id=url.key).link_observable(url)
+```
+
+Each link carries a **basis** (`OBSERVABLE` by default). A finding that fetched its own threat
+intel can pin itself to it with `pin`, and then nothing else landing on that observable moves it;
+a link with basis `NONE` is kept for the graph but scores nothing. See
+[basis](../scoring-model.md#basis-what-a-link-scores-on).
 
 Two axes govern how a finding takes part in the total: `status` says **whether** it does, `effect`
 says **how**. `ADDITIVE` — the default — makes it a term of the sum.
@@ -183,7 +187,7 @@ only the findings that are actually **counted**.
 Every fact has a deterministic key, which is what makes merging work without coordination:
 
 - **Observable**: `obs:{type}:{normalized_value}`, or `obs:{type}:{subtype}:{namespace}:{value}`
-- **Finding**: `fnd:{rule_id}:{subject_key}`
+- **Finding**: `fnd:{rule_id}`, or `fnd:{rule_id}:{external_id}`
 - **Signal**: `sig:{source}:{observable_key}`
 - **Relation**: `rel:{kind}:{source_key}>{target_key}`
 - **Evidence**: `evd:{source}:{external_id}`, or `evd:sha256:{digest}` for inline content
@@ -202,8 +206,9 @@ represents an address, while `USER/email` represents a user *account*. Executabl
 `FILE/path` and can be related to a `PROCESS/pid`.
 
 !!! warning "Keys are semantic, so facts merge silently"
-    Reusing a `rule_id` on the same subject updates that finding rather than adding one. This is
-    usually what you want — it is what makes merging idempotent — but it surprises people once.
+    Reusing a `rule_id` updates that finding rather than adding one. This is usually what you
+    want — it is what makes merging idempotent — but it surprises people once. A rule that fires
+    once per observable must say so with `external_id`.
 
 ---
 
@@ -305,8 +310,8 @@ outranking assertion time, so a slow worker cannot overwrite fresher data with s
     v6 resolved conflicts with `max`, so scores only ever rose. In v7, if a feed reclassifies a URL
     as clean, the clean verdict wins. That is the point, but it means a re-run can lower a score.
 
-Fragments also give **scope** its meaning: each source of facts has its own `fragment_id`, and a
-finding's links look, by default, only at what its own fragment established.
+Fragments keep the log **attributable**: each source of facts has its own `fragment_id`, carried
+by every fact it appends, so the report can still say who established what after a merge.
 
 ---
 

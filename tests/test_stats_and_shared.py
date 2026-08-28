@@ -19,7 +19,7 @@ def seeded_case() -> Cyvest:
     ip = cv.observable(cv.OBS.IPV4, "10.0.0.5", internal=True)
     cv.observable_add_threat_intel(url, "virustotal", verdict=cv.VERDICT.MALICIOUS, weight=6.0)
     cv.observable_add_relation(ip, url, cv.REL.EXTRACTION)
-    cv.finding("url_in_body", subject=url).link_observable(url, cv.SCOPE.ALL)
+    cv.finding("url_in_body").link_observable(url, cv.BASIS.OBSERVABLE)
     cv.tag_create("phishing")
     cv.evidence_create("enrichment", title="whois", content={"registrar": "x"})
     return cv
@@ -47,7 +47,7 @@ class TestStatistics:
         cv = seeded_case()
         before = stats_of(cv).get_applied_finding_count()
 
-        next(iter(cv.finding_get_all().values())).dismiss("faux positif")
+        next(iter(cv.finding_get_all().values())).dismiss("false positive")
         after = stats_of(cv).get_applied_finding_count()
 
         assert before == 1
@@ -59,7 +59,7 @@ class TestStatistics:
         url = cv.observable_get(cv.OBS.URL, "hxxp://bad.example")
         assert stats_of(cv).get_allowlisted_observable_count() == 0
 
-        cv.decision_create(url, cv.DECISION.REFUTE, "infra interne")
+        cv.decision_create(url, cv.DECISION.REFUTE, "internal infra")
         assert stats_of(cv).get_allowlisted_observable_count() == 1
 
     def test_confidence_bands_summarize_findings(self) -> None:
@@ -84,14 +84,15 @@ class TestSharedContext:
         with context.task(fragment_id="i1") as worker:
             url = worker.observable(worker.OBS.URL, "hxxp://bad.example/x")
             worker.observable_add_threat_intel(url, "proofpoint", verdict=worker.VERDICT.MALICIOUS, weight=2.0)
-            worker.finding("url_in_body", subject=url).link_observable(url)
+            worker.finding("url_in_body").link_observable(url)
 
         with context.task(fragment_id="i2") as worker:
             url = worker.observable(worker.OBS.URL, "hxxp://bad.example/x")
             worker.observable_add_threat_intel(url, "virustotal", verdict=worker.VERDICT.MALICIOUS, weight=3.0)
-            worker.finding("url_reputation", subject=url).link_observable(url)
+            worker.finding("url_reputation").link_observable(url)
 
-        assert context.get_global_score() == 5.0
+        # Reconciled facts are shared, so both findings read the same observable.
+        assert context.get_global_score() == 6.0
         assert context.get_global_verdict() is Verdict.MALICIOUS
 
     def test_reconciling_twice_is_harmless(self) -> None:
@@ -140,7 +141,7 @@ class TestSharedContext:
         with context.task() as worker:
             url = worker.observable(worker.OBS.URL, "hxxp://bad.example")
             worker.observable_add_threat_intel(url, "virustotal", verdict=worker.VERDICT.MALICIOUS, weight=6.0)
-            worker.finding("r", subject=url).link_observable(url, worker.SCOPE.ALL)
+            worker.finding("r").link_observable(url, worker.BASIS.OBSERVABLE)
 
         facade = context.as_cyvest()
         assert facade.get_global_score() == 6.0

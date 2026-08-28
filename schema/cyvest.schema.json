@@ -302,13 +302,8 @@
     },
     "Finding": {
       "additionalProperties": false,
-      "description": "A rule outcome. Identity is ``(rule_id, subject_key)``.\n\n``subject_key`` may be an observable *or* the investigation itself — unlike a signal, which\nalways targets an observable.",
+      "description": "A rule outcome. Identity is ``rule_id`` alone, plus ``external_id`` when one is given.\n\nA finding names no subject: what it is about is its ``observable_links``, which are also what\nit scores on. Use ``external_id`` when the same rule must yield several findings — typically\nonce per observable, ``external_id=url.key``.",
       "properties": {
-        "subject_key": {
-          "minLength": 1,
-          "title": "Subject Key",
-          "type": "string"
-        },
         "verdict": {
           "$ref": "#/$defs/Verdict",
           "default": "INFO"
@@ -440,7 +435,6 @@
         }
       },
       "required": [
-        "subject_key",
         "key",
         "seq",
         "asserted_at",
@@ -650,6 +644,16 @@
       "title": "Label",
       "type": "object"
     },
+    "LinkBasis": {
+      "description": "What a Finding→Observable link scores on.\n\nOne question, three answers, none of which depends on how the run was threaded:\n\n- ``OBSERVABLE`` — the observable as it stands, whoever contributed to it;\n- ``SIGNALS`` — the signals the link names, and nothing else, which is how a finding that\n  fetched its own threat intel holds that value while the observable keeps accumulating;\n- ``NONE`` — nothing: the edge is kept for the graph and the narrative, but it is inert.\n\nv7.0 briefly carried a fourth, ``FRAGMENT``, gating the observable on the fragment that wrote\neach fact. It was dropped before release: it damped a merged total but never a local one, so\nthe same rules scored differently depending on whether enrichment ran in its own worker.\n``SIGNALS`` states that intent directly, and ``NONE`` covers the inert link it was standing in\nfor when migrating v6 documents.",
+      "enum": [
+        "OBSERVABLE",
+        "SIGNALS",
+        "NONE"
+      ],
+      "title": "LinkBasis",
+      "type": "string"
+    },
     "Observable": {
       "additionalProperties": false,
       "description": "A cyber observable. Identity is ``(type, subtype, namespace, value)``, nothing else.",
@@ -836,16 +840,24 @@
       "type": "object"
     },
     "ObservableLink": {
-      "description": "A link from a finding to one of its observables, with the scope it is evaluated in.\n\nScope is **per link**, exactly like v6's ``propagation_mode``: a finding may mix scopes, and\nmay even link the same observable twice under two scopes. Deduplication is on the tuple.",
+      "description": "A link from a finding to one of its observables, with the basis it is evaluated on.\n\nBasis is **per link**, exactly like v6's ``propagation_mode``: a finding may mix bases, and\nmay even link the same observable twice under two of them. Deduplication is on the triple\n``(observable_key, basis, signal_keys)``.\n\n``signal_keys`` is sorted and deduplicated so that two links naming the same signals in a\ndifferent order are the same link, and merging stays idempotent.",
       "properties": {
         "observable_key": {
           "minLength": 1,
           "title": "Observable Key",
           "type": "string"
         },
-        "scope": {
-          "$ref": "#/$defs/Scope",
-          "default": "OWN_FRAGMENT"
+        "basis": {
+          "$ref": "#/$defs/LinkBasis",
+          "default": "OBSERVABLE"
+        },
+        "signal_keys": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Signal Keys",
+          "type": "array"
         }
       },
       "required": [
@@ -855,7 +867,7 @@
       "type": "object"
     },
     "ObservableResult": {
-      "description": "An observable's verdict within one resolved scope.",
+      "description": "An observable's verdict. One per observable: the graph holds every fact anyone contributed.",
       "properties": {
         "key": {
           "title": "Key",
@@ -899,9 +911,6 @@
           "additionalProperties": true,
           "title": "Raw",
           "type": "object"
-        },
-        "scope": {
-          "$ref": "#/$defs/ResolvedScope"
         }
       },
       "required": [
@@ -1069,38 +1078,6 @@
       "title": "Report",
       "type": "object"
     },
-    "ResolvedScope": {
-      "description": "A link scope with ``OWN_FRAGMENT`` already resolved to the fragment that carries the link.\n\n``OWN_FRAGMENT`` is not *one* scope: it denotes a different set of facts for every fragment.\nTwo findings from different fragments pointing at the same observable need two distinct\nresults, so results are indexed by the resolved scope — never by the raw label.\n\nA model rather than a tuple so it crosses the JSON boundary as a named object: the report is\nthe contract a front-end reads, and positional data makes for a poor contract.",
-      "properties": {
-        "scope": {
-          "$ref": "#/$defs/Scope",
-          "default": "ALL"
-        },
-        "fragment_id": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Fragment Id"
-        }
-      },
-      "title": "ResolvedScope",
-      "type": "object"
-    },
-    "Scope": {
-      "description": "How far a Finding→Observable link looks when evaluating its observable.\n\nReplaces v6's ``PropagationMode`` one-for-one. ``OWN_FRAGMENT`` resolves to *the fragment of\nthe finding that carries the link*, so it denotes a different scope for each fragment — the\nreport indexes observable results by the resolved scope, never by this label.",
-      "enum": [
-        "OWN_FRAGMENT",
-        "ALL"
-      ],
-      "title": "Scope",
-      "type": "string"
-    },
     "SourceClass": {
       "description": "Family a source belongs to, used by the policy to weigh its reliability.",
       "enum": [
@@ -1238,11 +1215,6 @@
       "additionalProperties": false,
       "description": "A verdict from a threat-intelligence source.\n\nIdentity is ``(source, subject_key)``, so a source re-asserting the same observable updates\nin place instead of piling up duplicates. Pass ``external_id`` to keep history on purpose.",
       "properties": {
-        "subject_key": {
-          "minLength": 1,
-          "title": "Subject Key",
-          "type": "string"
-        },
         "verdict": {
           "$ref": "#/$defs/Verdict",
           "default": "INFO"
@@ -1323,6 +1295,11 @@
           "title": "Evidence Keys",
           "type": "array"
         },
+        "subject_key": {
+          "minLength": 1,
+          "title": "Subject Key",
+          "type": "string"
+        },
         "kind": {
           "const": "threat_intel",
           "default": "threat_intel",
@@ -1374,12 +1351,12 @@
         }
       },
       "required": [
-        "subject_key",
         "key",
         "seq",
         "asserted_at",
         "source",
-        "fragment_id"
+        "fragment_id",
+        "subject_key"
       ],
       "title": "ThreatIntel",
       "type": "object"

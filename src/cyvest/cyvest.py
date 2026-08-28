@@ -7,6 +7,7 @@ scoring lives here — scores come from the report, which is recomputed rather t
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
@@ -19,19 +20,20 @@ from cyvest.enums import (
     Confidence,
     DecisionKind,
     Effect,
+    LinkBasis,
     ObservableSubtype,
     ObservableType,
     RelationKind,
-    Scope,
+    Salience,
     SourceClass,
     Status,
     Verdict,
     Weight,
 )
-from cyvest.evaluation import Report, ResolvedScope
+from cyvest.evaluation import Report
 from cyvest.evaluation.engines import available_aliases, available_engines
 from cyvest.evaluation.projection import verdict_from_score
-from cyvest.evaluation.timeline import TimelineEntry
+from cyvest.evaluation.timeline import TimeBasis, TimelineEntry
 from cyvest.facts import (
     Evidence,
     Finding,
@@ -39,6 +41,7 @@ from cyvest.facts import (
     Observable,
     ObservableAlias,
     ObservableIdentity,
+    ObservableSignal,
     SourceRef,
     Tag,
     ThreatIntel,
@@ -78,7 +81,7 @@ class Cyvest:
     OBS: Final[type[ObservableType]] = ObservableType
     SUB: Final[type[ObservableSubtype]] = ObservableSubtype
     REL: Final[type[RelationKind]] = RelationKind
-    SCOPE: Final[type[Scope]] = Scope
+    BASIS: Final[type[LinkBasis]] = LinkBasis
     VERDICT: Final[type[Verdict]] = Verdict
     WEIGHT: Final[type[Weight]] = Weight
     CONF: Final[type[Confidence]] = Confidence
@@ -500,7 +503,6 @@ class Cyvest:
         verdict: Verdict | str | None = None,
         weight: float | None = None,
         confidence: float = Confidence.HIGH.value,
-        subject: ObservableProxy | Observable | str | None = None,
         status: Status = Status.EVALUATED,
         effect: Effect | str = Effect.ADDITIVE,
         labels: tuple[Label, ...] = (),
@@ -510,9 +512,12 @@ class Cyvest:
         """
         Create a finding.
 
-        Identity is ``(rule_id, subject)``: the same rule on two observables yields two findings,
-        and the same rule on the same observable merges — which is why v6 needed
-        ``origin_investigation_id`` and v7 does not.
+        Identity is ``rule_id``: reusing it updates that finding rather than adding one, across
+        any number of investigations — which is why v6 needed ``origin_investigation_id`` and v7
+        does not. A rule that fires once per observable must say so with
+        ``external_id=observable.key``.
+
+        What the finding is about is stated by linking observables, not by a subject field.
 
         Stating a ``verdict`` or a ``weight`` alone is enough; each implies the other.
         """
@@ -524,7 +529,6 @@ class Cyvest:
             verdict=resolved_verdict,
             weight=resolved_weight,
             confidence=confidence,
-            subject_key=self._key_of(subject) if subject is not None else self._investigation.root_key,
             status=status,
             effect=Effect(effect) if isinstance(effect, str) else effect,
             labels=labels,
@@ -544,7 +548,6 @@ class Cyvest:
         *,
         verdict: Verdict | str,
         confidence: float = Confidence.HIGH.value,
-        subject: ObservableProxy | Observable | str | None = None,
         labels: tuple[Label, ...] = (),
         extra: dict[str, Any] | None = None,
         external_id: str | None = None,
@@ -570,7 +573,6 @@ class Cyvest:
             comment,
             verdict=resolved,
             confidence=confidence,
-            subject=subject,
             effect=Effect.FLOOR if resolved.polarity > 0 else Effect.CEILING,
             labels=labels,
             extra=extra or {},
@@ -588,9 +590,20 @@ class Cyvest:
         self,
         finding_key: str,
         observable_key: str,
-        scope: Scope | str = Scope.OWN_FRAGMENT,
+        basis: LinkBasis | str = LinkBasis.OBSERVABLE,
+        signal_keys: Sequence[str] = (),
     ) -> FindingProxy:
-        self._investigation.link_finding_observable(finding_key, observable_key, scope)
+        self._investigation.link_finding_observable(finding_key, observable_key, basis, signal_keys)
+        return FindingProxy(self._investigation, finding_key)
+
+    def finding_pin_signals(
+        self,
+        finding_key: str,
+        *signals: ThreatIntelProxy | ObservableSignal | str,
+    ) -> FindingProxy:
+        """Score the finding on the signals it fetched; the observable is derived from them."""
+        resolved = [s.key if isinstance(s, (ThreatIntelProxy, ObservableSignal)) else s for s in signals]
+        self._investigation.pin_finding_signals(finding_key, *resolved)
         return FindingProxy(self._investigation, finding_key)
 
     def finding_link_evidence(self, finding_key: str, evidence_key: str) -> FindingProxy:
@@ -717,14 +730,30 @@ class Cyvest:
     def explain(self, key: str) -> tuple:
         return self._investigation.explain(key)
 
-    def timeline(self, **kwargs: Any) -> list[TimelineEntry]:
-        return self._investigation.timeline(**kwargs)
+    def timeline(
+        self,
+        *,
+        time: TimeBasis = "occurred",
+        since: datetime | None = None,
+        until: datetime | None = None,
+        entity_key: str | None = None,
+        min_salience: Salience = Salience.NOTABLE,
+        track_verdict_changes: bool = False,
+    ) -> list[TimelineEntry]:
+        return self._investigation.timeline(
+            time=time,
+            since=since,
+            until=until,
+            entity_key=entity_key,
+            min_salience=min_salience,
+            track_verdict_changes=track_verdict_changes,
+        )
 
     def reevaluate(self, *, policy: Policy | None = None, engine: str | None = None) -> Report:
         return self._investigation.reevaluate(policy=policy, engine=engine)
 
-    def observable_result(self, observable_key: str, scope: ResolvedScope | None = None):
-        return self._investigation.report.observable(observable_key, scope)
+    def observable_result(self, observable_key: str):
+        return self._investigation.report.observable(observable_key)
 
     def statistics(self) -> StatisticsSchema:
         """Counts describing the shape of the investigation, computed on demand from the report."""
@@ -767,15 +796,39 @@ class Cyvest:
         save_investigation_json(self._investigation, filepath)
         return str(filepath)
 
-    def io_to_markdown(self, **kwargs: Any) -> str:
+    def io_to_markdown(
+        self,
+        *,
+        include_tags: bool = True,
+        include_observables: bool = True,
+        show_silent: bool = False,
+    ) -> str:
         from cyvest.io.serialization import generate_markdown_report
 
-        return generate_markdown_report(self._investigation, **kwargs)
+        return generate_markdown_report(
+            self._investigation,
+            include_tags=include_tags,
+            include_observables=include_observables,
+            show_silent=show_silent,
+        )
 
-    def io_save_markdown(self, filepath: str | Path, **kwargs: Any) -> str:
+    def io_save_markdown(
+        self,
+        filepath: str | Path,
+        *,
+        include_tags: bool = True,
+        include_observables: bool = True,
+        show_silent: bool = False,
+    ) -> str:
         from cyvest.io.serialization import save_investigation_markdown
 
-        return save_investigation_markdown(self._investigation, filepath, **kwargs)
+        return save_investigation_markdown(
+            self._investigation,
+            filepath,
+            include_tags=include_tags,
+            include_observables=include_observables,
+            show_silent=show_silent,
+        )
 
     @classmethod
     def io_load_dict(cls, data: dict[str, Any], *, migrate: bool = False) -> Cyvest:
@@ -798,10 +851,23 @@ class Cyvest:
 
     # ------------------------------------------------------------------ display
 
-    def display_summary(self, **kwargs: Any) -> None:
+    def display_summary(
+        self,
+        *,
+        show_graph: bool = False,
+        show_observables: bool = False,
+        show_silent: bool = False,
+    ) -> None:
         from cyvest.io.render import build_summary, print_renderable
 
-        print_renderable(build_summary(self._investigation, **kwargs))
+        print_renderable(
+            build_summary(
+                self._investigation,
+                show_graph=show_graph,
+                show_observables=show_observables,
+                show_silent=show_silent,
+            )
+        )
 
     def display_statistics(self) -> None:
         from cyvest.io.render import build_statistics, print_renderable
@@ -813,10 +879,29 @@ class Cyvest:
 
         print_renderable(build_explanation(self._investigation, key))
 
-    def display_timeline(self, **kwargs: Any) -> None:
+    def display_timeline(
+        self,
+        *,
+        time: TimeBasis = "occurred",
+        since: datetime | None = None,
+        until: datetime | None = None,
+        entity_key: str | None = None,
+        min_salience: Salience = Salience.NOTABLE,
+        track_verdict_changes: bool = False,
+    ) -> None:
         from cyvest.io.render import build_timeline, print_renderable
 
-        print_renderable(build_timeline(self._investigation, **kwargs))
+        print_renderable(
+            build_timeline(
+                self._investigation,
+                time=time,
+                since=since,
+                until=until,
+                entity_key=entity_key,
+                min_salience=min_salience,
+                track_verdict_changes=track_verdict_changes,
+            )
+        )
 
     def display_diff(
         self,

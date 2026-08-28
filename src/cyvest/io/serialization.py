@@ -22,7 +22,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from cyvest.enums import DecisionKind, RelationKind, Scope, SourceClass, Status, Verdict
+from cyvest.enums import DecisionKind, LinkBasis, RelationKind, SourceClass, Status, Verdict
 from cyvest.evaluation.projection import verdict_from_score
 from cyvest.facts import (
     Decision,
@@ -94,13 +94,24 @@ def save_investigation_json(investigation: Investigation, filepath: str | Path) 
 # --------------------------------------------------------------------------- markdown
 
 
-def generate_markdown_report(investigation: Investigation, *, include_tags: bool = True) -> str:
+def generate_markdown_report(
+    investigation: Investigation,
+    *,
+    include_tags: bool = True,
+    include_observables: bool = True,
+    show_silent: bool = False,
+) -> str:
     """
     A human-readable report.
 
     Every figure comes from the report, and each one travels with the engine that produced it —
     comparing scores across engines is meaningless, so the id is never dropped.
+
+    Rules that concluded nothing are left out unless ``show_silent`` asks for them, and the
+    observable table can be dropped entirely: a report handed to a model is mostly noise budget.
     """
+    from cyvest.io.render import is_silent_finding
+
     report = investigation.report
     header = investigation.store.header
     lines: list[str] = [
@@ -127,21 +138,24 @@ def generate_markdown_report(investigation: Investigation, *, include_tags: bool
         result = report.finding(key)
         if result is None:
             continue
+        if not show_silent and is_silent_finding(investigation, report, key):
+            continue
         score = "—" if result.score is None else f"{result.score:.2f}"
         lines.append(
             f"| {finding.name or finding.rule_id} | {score} | {result.verdict.value} | {result.status.value} |"
         )
     lines.append("")
 
-    lines += ["## Observables", "", "| Type | Value | Score | Verdict |", "|---|---|---|---|"]
-    for key, observable in sorted(investigation.get_all_observables().items()):
-        if key == header.root_key:
-            continue
-        result = report.observable(key)
-        score = "—" if result is None or result.score is None else f"{result.score:.2f}"
-        verdict = result.verdict.value if result else "INFO"
-        lines.append(f"| {observable.obs_type} | `{observable.value}` | {score} | {verdict} |")
-    lines.append("")
+    if include_observables:
+        lines += ["## Observables", "", "| Type | Value | Score | Verdict |", "|---|---|---|---|"]
+        for key, observable in sorted(investigation.get_all_observables().items()):
+            if key == header.root_key:
+                continue
+            result = report.observable(key)
+            score = "—" if result is None or result.score is None else f"{result.score:.2f}"
+            verdict = result.verdict.value if result else "INFO"
+            lines.append(f"| {observable.obs_type} | `{observable.value}` | {score} | {verdict} |")
+        lines.append("")
 
     if include_tags and investigation.get_all_tags():
         lines += ["## Tags", "", "| Tag | Aggregated score |", "|---|---|"]
@@ -152,8 +166,21 @@ def generate_markdown_report(investigation: Investigation, *, include_tags: bool
     return "\n".join(lines)
 
 
-def save_investigation_markdown(investigation: Investigation, filepath: str | Path, **kwargs: Any) -> str:
-    Path(filepath).write_text(generate_markdown_report(investigation, **kwargs).rstrip("\n") + "\n", encoding="utf-8")
+def save_investigation_markdown(
+    investigation: Investigation,
+    filepath: str | Path,
+    *,
+    include_tags: bool = True,
+    include_observables: bool = True,
+    show_silent: bool = False,
+) -> str:
+    report = generate_markdown_report(
+        investigation,
+        include_tags=include_tags,
+        include_observables=include_observables,
+        show_silent=show_silent,
+    )
+    Path(filepath).write_text(report.rstrip("\n") + "\n", encoding="utf-8")
     return str(filepath)
 
 
@@ -440,31 +467,33 @@ def _migrate_v6_to_v7(data: dict[str, Any]) -> dict[str, Any]:
         )
         evidences[evidence.key] = evidence
 
-    # v6 keyed a finding on its name alone; v7 keys it on `(rule_id, subject_key)`. A tag still
-    # points at the old key, so it needs the same translation the observables get.
+    # v6 keyed a finding on its name, v7 on its `rule_id` — the same string, so the shape is
+    # preserved. A tag still points at the old key, so it needs the same translation the
+    # observables get.
     finding_key_map: dict[str, str] = {}
     for key, payload in (data.get("findings") or {}).items():
+        # ⚠ v6 gated a LOCAL_ONLY link on ``origin_investigation_id == investigation_id``, so an
+        # imported one was simply inert. v7 states that as ``LinkBasis.NONE``, decided here rather
+        # than at evaluation: reading it as a live link would silently raise the score of every
+        # merged investigation.
+        origin = str(payload.get("origin_investigation_id") or fragment_id)
+        native = origin == fragment_id
         links = tuple(
             ObservableLink(
                 observable_key=_translated(key_map, link["observable_key"]),
-                scope=Scope.ALL if str(link.get("propagation_mode", "")).upper() == "GLOBAL" else Scope.OWN_FRAGMENT,
+                basis=LinkBasis.OBSERVABLE
+                if str(link.get("propagation_mode", "")).upper() == "GLOBAL" or native
+                else LinkBasis.NONE,
             )
             for link in payload.get("observable_links") or []
         )
         judgment = _judgment_from_v6(payload)
         # A v6 finding stuck at NONE never applied; keep it visible but out of the arithmetic.
         status = Status.NOT_APPLICABLE if str(payload.get("level", "")).upper() == "NONE" else Status.EVALUATED
-        # ⚠ The origin *is* the fragment. v6 gated a LOCAL_ONLY link on
-        # ``origin_investigation_id == investigation_id``; v7 expresses the same gate as
-        # ``Scope.OWN_FRAGMENT`` resolved against the finding's own fragment. Collapsing every
-        # finding onto the document-level fragment would make imported LOCAL_ONLY links start
-        # propagating, which silently raises the score of any merged investigation.
-        origin = str(payload.get("origin_investigation_id") or fragment_id)
         finding = Finding(
             rule_id=payload.get("finding_name", "unknown"),
             name=payload.get("description", ""),
             comment=payload.get("comment", ""),
-            subject_key=links[0].observable_key if links else (root_key or fragment_id),
             observable_links=links,
             status=status,
             extra=payload.get("extra") or {},

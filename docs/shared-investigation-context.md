@@ -59,29 +59,35 @@ shared = SharedInvestigationContext.from_investigation(cv._investigation)
 
 ---
 
-## Fragments and scope
+## Fragments and attribution
 
-Each worker gets its own **fragment id**, and that is not an implementation detail: it is what
-gives `Scope.OWN_FRAGMENT` its meaning.
+Each worker gets its own **fragment id**, and every fact it appends carries it. That is what keeps
+the log attributable after reconciliation: the report can still say who established what, and the
+per-fragment occurrence counters merge without inflating a tally.
+
+What a fragment does **not** do is filter scoring. Reconciled facts are shared, so a finding
+linking an observable reads everything anyone contributed to it:
 
 ```python
 with shared.task(fragment_id="virustotal-worker") as cv:
     url = cv.observable(cv.OBS.URL, "https://evil.test").with_ti("virustotal", 3.0)
     finding = cv.finding("url_reputation")
-    cv.finding_link_observable(finding.key, url.key)   # sees only this fragment
+    cv.finding_link_observable(finding.key, url.key)   # reads the merged observable
 ```
 
-A finding created in a fragment sees, by default, only what that fragment established. So when a
-second worker raises the same URL to 7, the first worker's finding **keeps its own value** — which
-is exactly the behaviour you want when two feeds disagree and you need to know who said what.
-
-Opt into the merged view per link:
+When a rule must score on the intel **it** fetched, and on nothing else, it says so — regardless
+of which worker ran it:
 
 ```python
-cv.finding_link_observable(finding.key, url.key, scope=cv.SCOPE.ALL)
+with shared.task(fragment_id="proofpoint-worker") as cv:
+    url = cv.observable(cv.OBS.URL, "https://evil.test")
+    trap = cv.observable_add_threat_intel(url, "proofpoint-trap", verdict=cv.VERDICT.SUSPICIOUS, weight=4.0)
+    cv.observable_add_threat_intel(url, "urlhaus", verdict=cv.VERDICT.MALICIOUS, weight=6.0)
+
+    cv.finding("pp-trap-hit").pin(trap)   # stays at 4.0
 ```
 
-See [scope](scoring-model.md#scope-why-a-finding-can-hold-its-value).
+See [basis](scoring-model.md#basis-what-a-link-scores-on).
 
 ---
 
@@ -104,7 +110,7 @@ without asking anybody:
 ```python
 shared.observable_get("obs:domain:malicious.com")
 shared.observables_list_by_type(Cyvest.OBS.URL)
-shared.finding_get("fnd:url_reputation:obs:url:https://evil.test")
+shared.finding_get("fnd:url_reputation")
 shared.evidence_get("evd:sha256:…")
 ```
 

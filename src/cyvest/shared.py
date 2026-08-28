@@ -88,8 +88,8 @@ class SharedInvestigationContext:
         """
         Hand out a worker-local investigation sharing this context's root.
 
-        The fragment id is what makes ``Scope.OWN_FRAGMENT`` meaningful later: a finding created
-        here will only ever see this fragment's facts unless it asks otherwise.
+        The fragment id is what keeps a worker's facts attributable after reconciliation: every
+        fact it appends carries it, so the report can still say who established what.
 
         Usable directly or as a context manager, in which case exiting reconciles the fragment.
         """

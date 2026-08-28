@@ -27,8 +27,9 @@ what turns `Report.confidence` from informative into determining. The engine reg
 
 ### Intra-fragment freeze (`watermark`) and fact versioning
 
-Superseded facts kept alongside the current ones. The reference scenario is covered today by
-`ObservableLink.scope` alone, which is why this waits.
+Superseded facts kept alongside the current ones. Pinning a finding to named signals
+(`LinkBasis.SIGNALS`) already covers the reference scenario — holding a finding at the intel it
+fetched — without replaying history, which is why this waits.
 
 Structural constraint, non-negotiable: fact collections stay maps `{key: object}`. History goes
 into a **sibling** `facts.history`, because turning a map into `{key: [objects]}` would break every

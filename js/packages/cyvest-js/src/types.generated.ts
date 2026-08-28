@@ -85,13 +85,23 @@ export type Status = "NOT_APPLICABLE" | "PENDING" | "EVALUATED";
  */
 export type Effect = "ADDITIVE" | "FLOOR" | "CEILING";
 /**
- * How far a Finding→Observable link looks when evaluating its observable.
+ * What a Finding→Observable link scores on.
  *
- * Replaces v6's ``PropagationMode`` one-for-one. ``OWN_FRAGMENT`` resolves to *the fragment of
- * the finding that carries the link*, so it denotes a different scope for each fragment — the
- * report indexes observable results by the resolved scope, never by this label.
+ * One question, three answers, none of which depends on how the run was threaded:
+ *
+ * - ``OBSERVABLE`` — the observable as it stands, whoever contributed to it;
+ * - ``SIGNALS`` — the signals the link names, and nothing else, which is how a finding that
+ *   fetched its own threat intel holds that value while the observable keeps accumulating;
+ * - ``NONE`` — nothing: the edge is kept for the graph and the narrative, but it is inert.
+ *
+ * v7.0 briefly carried a fourth, ``FRAGMENT``, gating the observable on the fragment that wrote
+ * each fact. It was dropped before release: it damped a merged total but never a local one, so
+ * the same rules scored differently depending on whether enrichment ran in its own worker.
+ * ``SIGNALS`` states that intent directly, and ``NONE`` covers the inert link it was standing in
+ * for when migrating v6 documents.
  */
-export type Scope = "OWN_FRAGMENT" | "ALL";
+export type LinkBasis = "OBSERVABLE" | "SIGNALS" | "NONE";
+export type SignalKeys = string[];
 export type ObservableLinks = ObservableLink[];
 export type Labels1 = Label[];
 export type OccurredAt5 = string | null;
@@ -123,7 +133,6 @@ export type Score1 = number | null;
 export type Contributions1 = Contribution[];
 export type Score2 = number | null;
 export type Contributions2 = Contribution[];
-export type FragmentId = string | null;
 
 /**
  * A complete serialized investigation.
@@ -250,7 +259,6 @@ export interface Signals {
  * in place instead of piling up duplicates. Pass ``external_id`` to keep history on purpose.
  */
 export interface ThreatIntel {
-  subject_key: string;
   verdict?: Verdict;
   confidence?: number;
   weight?: Weight;
@@ -262,6 +270,7 @@ export interface ThreatIntel {
   fragment_id: string;
   external_id?: ExternalId2;
   evidence_keys?: EvidenceKeys2;
+  subject_key: string;
   kind?: "threat_intel";
   observed_at?: ObservedAt1;
   labels?: Labels;
@@ -309,13 +318,13 @@ export interface Findings {
   [k: string]: Finding;
 }
 /**
- * A rule outcome. Identity is ``(rule_id, subject_key)``.
+ * A rule outcome. Identity is ``rule_id`` alone, plus ``external_id`` when one is given.
  *
- * ``subject_key`` may be an observable *or* the investigation itself — unlike a signal, which
- * always targets an observable.
+ * A finding names no subject: what it is about is its ``observable_links``, which are also what
+ * it scores on. Use ``external_id`` when the same rule must yield several findings — typically
+ * once per observable, ``external_id=url.key``.
  */
 export interface Finding {
-  subject_key: string;
   verdict?: Verdict;
   confidence?: number;
   weight?: Weight1;
@@ -338,14 +347,19 @@ export interface Finding {
   extra?: Extra1;
 }
 /**
- * A link from a finding to one of its observables, with the scope it is evaluated in.
+ * A link from a finding to one of its observables, with the basis it is evaluated on.
  *
- * Scope is **per link**, exactly like v6's ``propagation_mode``: a finding may mix scopes, and
- * may even link the same observable twice under two scopes. Deduplication is on the tuple.
+ * Basis is **per link**, exactly like v6's ``propagation_mode``: a finding may mix bases, and
+ * may even link the same observable twice under two of them. Deduplication is on the triple
+ * ``(observable_key, basis, signal_keys)``.
+ *
+ * ``signal_keys`` is sorted and deduplicated so that two links naming the same signals in a
+ * different order are the same link, and merging stays idempotent.
  */
 export interface ObservableLink {
   observable_key: string;
-  scope?: Scope;
+  basis?: LinkBasis;
+  signal_keys?: SignalKeys;
   [k: string]: unknown;
 }
 export interface Extra1 {
@@ -477,7 +491,7 @@ export interface Observables1 {
   [k: string]: ObservableResult;
 }
 /**
- * An observable's verdict within one resolved scope.
+ * An observable's verdict. One per observable: the graph holds every fact anyone contributed.
  */
 export interface ObservableResult {
   key: string;
@@ -487,24 +501,8 @@ export interface ObservableResult {
   contributions?: Contributions2;
   suppressed_by_decision?: boolean;
   raw?: Raw2;
-  scope?: ResolvedScope;
   [k: string]: unknown;
 }
 export interface Raw2 {
-  [k: string]: unknown;
-}
-/**
- * A link scope with ``OWN_FRAGMENT`` already resolved to the fragment that carries the link.
- *
- * ``OWN_FRAGMENT`` is not *one* scope: it denotes a different set of facts for every fragment.
- * Two findings from different fragments pointing at the same observable need two distinct
- * results, so results are indexed by the resolved scope — never by the raw label.
- *
- * A model rather than a tuple so it crosses the JSON boundary as a named object: the report is
- * the contract a front-end reads, and positional data makes for a poor contract.
- */
-export interface ResolvedScope {
-  scope?: Scope;
-  fragment_id?: FragmentId;
   [k: string]: unknown;
 }

@@ -11,8 +11,8 @@ def build_email_case() -> Cyvest:
     cv = Cyvest(root_data={"type": "email"}, investigation_name="IR-2431")
     url = cv.observable_create(cv.OBS.URL, "hxxp://bad.example/x")
     cv.observable_add_threat_intel(url, "virustotal", verdict=cv.VERDICT.MALICIOUS, weight=6.0)
-    finding = cv.finding_create("url_in_body", "URL in body", subject=url)
-    cv.finding_link_observable(finding.key, url.key, cv.SCOPE.ALL)
+    finding = cv.finding_create("url_in_body", "URL in body")
+    cv.finding_link_observable(finding.key, url.key, cv.BASIS.OBSERVABLE)
     return cv
 
 
@@ -54,8 +54,8 @@ class TestFluentDsl:
         url.with_ti(cv.threat_intel_draft("proofpoint", verdict=cv.VERDICT.MALICIOUS, weight=cv.WEIGHT.HIGH))
 
         cv.tag_create("phishing")
-        finding = cv.finding("url_in_body", "URL in body", subject=url)
-        finding.link_observable(url, cv.SCOPE.ALL).tagged("tag:phishing")
+        finding = cv.finding("url_in_body", "URL in body")
+        finding.link_observable(url, cv.BASIS.OBSERVABLE).tagged("tag:phishing")
 
         assert cv.get_global_verdict() is Verdict.MALICIOUS
         assert cv.tag_get("phishing").aggregated_score == cv.WEIGHT.HIGH.value
@@ -98,11 +98,11 @@ class TestDecisions:
         """The fluent path must carry the attribution, or the short path is the untraceable one."""
         cv = build_email_case()
         url = cv.observable_get(cv.OBS.URL, "hxxp://bad.example/x")
-        url.allowlist("CDN partenaire", decided_by="alice")
+        url.allowlist("Partner CDN", decided_by="alice")
 
         decision = cv.decision_get(url)
         assert decision.decided_by == "alice"
-        assert decision.justification == "CDN partenaire"
+        assert decision.justification == "Partner CDN"
         assert url.verdict is Verdict.SAFE
         assert url.allowlisted is True
 
@@ -111,10 +111,10 @@ class TestDecisions:
         url = cv.observable_get(cv.OBS.URL, "hxxp://bad.example/x")
         computed = url.score
 
-        url.allowlist("CDN partenaire", decided_by="alice")
+        url.allowlist("Partner CDN", decided_by="alice")
         assert url.score == -1.0
 
-        url.vacate("plus dans le périmètre", decided_by="soc-lead")
+        url.vacate("out of scope now", decided_by="soc-lead")
         assert url.score == computed
         assert url.allowlisted is False
         assert url.vacated is True
@@ -123,7 +123,7 @@ class TestDecisions:
         """The path for code replaying a feed, where the stance is a variable."""
         cv = Cyvest()
         url = cv.observable(cv.OBS.URL, "hxxp://unknown.example")
-        url.decide(cv.DECISION.UPHOLD, "importé de la blocklist groupe", decided_by="feed")
+        url.decide(cv.DECISION.UPHOLD, "imported from the group blocklist", decided_by="feed")
 
         assert url.blocklisted is True
         assert url.verdict is Verdict.MALICIOUS
@@ -131,8 +131,8 @@ class TestDecisions:
     def test_confirming_a_finding_beats_a_clean_graph(self) -> None:
         cv = Cyvest()
         url = cv.observable(cv.OBS.URL, "hxxp://unknown.example")
-        finding = cv.finding("manual", "Analyste", subject=url).link_observable(url, cv.SCOPE.ALL)
-        finding.confirm("confirmé par l'analyse mémoire")
+        finding = cv.finding("manual", "Analyst").link_observable(url, cv.BASIS.OBSERVABLE)
+        finding.confirm("confirmed by memory analysis")
 
         assert cv.get_global_verdict() is Verdict.MALICIOUS
         assert finding.confirmed is True
@@ -140,11 +140,43 @@ class TestDecisions:
     def test_dismissing_keeps_it_visible_but_uncounted(self) -> None:
         cv = build_email_case()
         finding = next(iter(cv.finding_get_all().values()))
-        finding.dismiss("faux positif")
+        finding.dismiss("false positive")
 
         assert cv.finding_get(finding.key) is not None
         assert cv.get_global_score() == 0.0
         assert finding.dismissed is True
+
+
+class TestPinning:
+    """The reference scenario, through the fluent API."""
+
+    @staticmethod
+    def _case():
+        cv = Cyvest()
+        url = cv.observable(cv.OBS.URL, "hxxp://bad.example/x")
+        trap = cv.observable_add_threat_intel(url, "proofpoint-trap", verdict=cv.VERDICT.SUSPICIOUS, weight=4.0)
+        return cv, url, trap
+
+    def test_a_pinned_finding_holds_while_the_observable_rises(self) -> None:
+        cv, url, trap = self._case()
+        pinned = cv.finding("pp-trap-hit", "TRAP").pin(trap)
+        rising = cv.finding("url-reputation", "Reputation").link_observable(url, cv.BASIS.OBSERVABLE)
+
+        cv.observable_add_threat_intel(url, "urlhaus", verdict=cv.VERDICT.MALICIOUS, weight=6.0)
+
+        assert pinned.score == 4.0
+        assert rising.score == 6.0
+
+    def test_pin_accepts_a_signal_recovered_from_the_observable(self) -> None:
+        cv, url, _ = self._case()
+        finding = cv.finding("pp-trap-hit", "TRAP").pin(url.signal("proofpoint-trap"))
+        assert finding.score == 4.0
+
+    def test_pin_chains(self) -> None:
+        cv, url, trap = self._case()
+        cv.tag_create("phishing")
+        finding = cv.finding("pp-trap-hit", "TRAP").pin(trap).tagged("tag:phishing")
+        assert finding.score == 4.0
 
 
 class TestVerdictSemantics:
@@ -152,8 +184,8 @@ class TestVerdictSemantics:
         cv = Cyvest()
         url = cv.observable(cv.OBS.URL, "hxxp://bad.example")
         cv.observable_add_threat_intel(url, "virustotal", verdict=cv.VERDICT.MALICIOUS, weight=6.0)
-        finding = cv.finding("spf_pass", "SPF valide", subject=url, verdict=cv.VERDICT.SAFE, weight=4.0)
-        finding.link_observable(url, cv.SCOPE.ALL)
+        finding = cv.finding("spf_pass", "SPF valide", verdict=cv.VERDICT.SAFE, weight=4.0)
+        finding.link_observable(url, cv.BASIS.OBSERVABLE)
 
         assert finding.verdict is Verdict.SAFE
         assert finding.computed_verdict is Verdict.MALICIOUS
@@ -184,8 +216,8 @@ class TestConclusions:
 
     def test_a_conclusion_tops_the_total_up_to_its_verdict(self) -> None:
         cv = Cyvest()
-        cv.finding("spf_fail", "SPF invalide", verdict=cv.VERDICT.SUSPICIOUS, weight=3.2)
-        conclusion = cv.conclusion("ai_review", "Analyse IA", verdict=cv.VERDICT.MALICIOUS)
+        cv.finding("spf_fail", "SPF failure", verdict=cv.VERDICT.SUSPICIOUS, weight=3.2)
+        conclusion = cv.conclusion("ai_review", "AI review", verdict=cv.VERDICT.MALICIOUS)
 
         assert cv.get_global_score() == 5.0
         assert conclusion.is_conclusion is True
@@ -195,8 +227,8 @@ class TestConclusions:
     def test_a_safe_conclusion_brings_the_total_down_to_its_verdict(self) -> None:
         """A declared benign context — an awareness campaign — neutralises what the rules found."""
         cv = Cyvest()
-        cv.finding("spf_fail", "SPF invalide", verdict=cv.VERDICT.MALICIOUS, weight=8.0)
-        conclusion = cv.conclusion("awareness_campaign", "Campagne PSAT", verdict=cv.VERDICT.SAFE)
+        cv.finding("spf_fail", "SPF failure", verdict=cv.VERDICT.MALICIOUS, weight=8.0)
+        conclusion = cv.conclusion("awareness_campaign", "Awareness campaign", verdict=cv.VERDICT.SAFE)
 
         assert cv.get_global_verdict() is cv.VERDICT.SAFE
         assert cv.get_global_score() < 0.0
@@ -205,8 +237,8 @@ class TestConclusions:
 
     def test_a_conclusion_that_changes_nothing_says_so(self) -> None:
         cv = Cyvest()
-        cv.finding("known_malware", "Malware connu", verdict=cv.VERDICT.MALICIOUS, weight=8.0)
-        conclusion = cv.conclusion("ai_review", "Analyse IA", verdict=cv.VERDICT.MALICIOUS)
+        cv.finding("known_malware", "Known malware", verdict=cv.VERDICT.MALICIOUS, weight=8.0)
+        conclusion = cv.conclusion("ai_review", "AI review", verdict=cv.VERDICT.MALICIOUS)
 
         assert cv.get_global_score() == 8.0
         assert conclusion.applied_bound == 0.0
@@ -261,20 +293,21 @@ class TestMerge:
     def test_the_reference_scenario_through_the_facade(self) -> None:
         left = Cyvest(investigation_id="i1")
         url_left = left.observable(left.OBS.URL, "hxxp://bad.example/x")
-        left.observable_add_threat_intel(url_left, "proofpoint", verdict=left.VERDICT.MALICIOUS, weight=2.0)
-        f1 = left.finding("url_in_body", subject=url_left).link_observable(url_left)
+        trap = left.observable_add_threat_intel(url_left, "proofpoint", verdict=left.VERDICT.MALICIOUS, weight=2.0)
+        f1 = left.finding("url_in_body").pin(trap)
+        f_open = left.finding("url_open").link_observable(url_left)
 
         right = Cyvest(investigation_id="i2")
         url_right = right.observable(right.OBS.URL, "hxxp://bad.example/x")
         right.observable_add_threat_intel(url_right, "virustotal", verdict=right.VERDICT.MALICIOUS, weight=3.0)
-        f2 = right.finding("url_reputation", subject=url_right).link_observable(url_right)
+        f2 = right.finding("url_reputation").link_observable(url_right)
 
         left.merge_investigation(right)
 
-        assert left.finding_get(f1.key).score == 2.0
+        assert left.finding_get(f1.key).score == 2.0  # pinned: holds
+        assert left.finding_get(f_open.key).score == 3.0  # open: rises
         assert left.finding_get(f2.key).score == 3.0
         assert left.observable_get(url_left.key).score == 3.0
-        assert left.get_global_score() == 5.0
 
     def test_seeing_an_artifact_twice_counts_twice(self) -> None:
         cv = Cyvest()

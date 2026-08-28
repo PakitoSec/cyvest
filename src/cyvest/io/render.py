@@ -19,8 +19,9 @@ from rich.table import Table
 from rich.text import Text
 from rich.tree import Tree
 
-from cyvest.enums import DecisionKind, Verdict
+from cyvest.enums import DecisionKind, Salience, Verdict
 from cyvest.evaluation.report import CONCLUSION_BOUND_LABELS, Contribution, Report
+from cyvest.evaluation.timeline import TimeBasis
 from cyvest.facts.decision import decision_label
 from cyvest.stats import InvestigationStats
 
@@ -71,10 +72,10 @@ def _age(moment: datetime) -> str:
     """Display-only: how long ago something was decided. Never touches a score."""
     months = (datetime.now(timezone.utc) - moment).days // 30
     if months >= 24:
-        return f"il y a {months // 12} ans"
+        return f"{months // 12} years ago"
     if months >= 1:
-        return f"il y a {months} mois"
-    return "récemment"
+        return f"{months} months ago"
+    return "recently"
 
 
 def _decision_badges(investigation: Investigation, key: str) -> Text:
@@ -89,7 +90,7 @@ def _decision_badges(investigation: Investigation, key: str) -> Text:
     )
     when = decision.occurred_at or decision.asserted_at
     badge.append(f" {decision.source.name} · {_age(when)}", style="dim")
-    badge.append(f" « {decision.justification} »", style="dim italic")
+    badge.append(f" \u201c{decision.justification}\u201d", style="dim italic")
     return badge
 
 
@@ -169,19 +170,19 @@ def _finding_notes(investigation: Investigation, report: Report, key: str) -> Te
     result = report.finding(key)
     notes = _decision_badges(investigation, key)
     if result is not None and result.own_term_suppressed:
-        notes.append(" · contredit par un observable", style="dim italic")
+        notes.append(" · outweighed by an observable", style="dim italic")
     if finding is not None and finding.effect.concludes:
         applied = _applied_bound(report, key)
         notes.append(
-            f" · conclusion {applied:+.2f} sur le total" if applied else " · conclusion, verdict déjà atteint",
+            f" · conclusion {applied:+.2f} on the total" if applied else " · conclusion, verdict already reached",
             style="dim italic",
         )
     if result is not None and not result.counted:
-        notes.append(f" · hors calcul ({result.status.value})", style="dim italic")
+        notes.append(f" · not counted ({result.status.value})", style="dim italic")
     return notes
 
 
-def _is_silent(investigation: Investigation, report: Report, key: str) -> bool:
+def is_silent_finding(investigation: Investigation, report: Report, key: str) -> bool:
     """
     A rule that ran and concluded nothing — v6 called this level ``NONE``.
 
@@ -213,7 +214,7 @@ def _add_findings(
         if result is None:
             continue
         counted += 1 if result.counted else 0
-        if not show_silent and _is_silent(investigation, report, key):
+        if not show_silent and is_silent_finding(investigation, report, key):
             silent += 1
             continue
         by_verdict.setdefault(result.verdict, []).append((finding.name or finding.rule_id, key))
@@ -372,14 +373,31 @@ def build_explanation(investigation: Investigation, key: str) -> Table:
     return table
 
 
-def build_timeline(investigation: Investigation, **kwargs: object) -> Table:
+def build_timeline(
+    investigation: Investigation,
+    *,
+    time: TimeBasis = "occurred",
+    since: datetime | None = None,
+    until: datetime | None = None,
+    entity_key: str | None = None,
+    min_salience: Salience = Salience.NOTABLE,
+    track_verdict_changes: bool = False,
+) -> Table:
     table = Table(title="Timeline", expand=True, title_justify="left")
     table.add_column("When")
     table.add_column("Kind")
     table.add_column("Title", overflow="fold")
     table.add_column("Salience")
 
-    for entry in investigation.timeline(**kwargs):
+    entries = investigation.timeline(
+        time=time,
+        since=since,
+        until=until,
+        entity_key=entity_key,
+        min_salience=min_salience,
+        track_verdict_changes=track_verdict_changes,
+    )
+    for entry in entries:
         table.add_row(
             entry.when.strftime("%Y-%m-%d %H:%M"),
             entry.kind,

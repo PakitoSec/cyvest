@@ -171,17 +171,32 @@ class DecisionKind(str, Enum):
         return self is not DecisionKind.VACATED
 
 
-class Scope(str, Enum):
+class LinkBasis(str, Enum):
     """
-    How far a Finding→Observable link looks when evaluating its observable.
+    What a Finding→Observable link scores on.
 
-    Replaces v6's ``PropagationMode`` one-for-one. ``OWN_FRAGMENT`` resolves to *the fragment of
-    the finding that carries the link*, so it denotes a different scope for each fragment — the
-    report indexes observable results by the resolved scope, never by this label.
+    One question, three answers, none of which depends on how the run was threaded:
+
+    - ``OBSERVABLE`` — the observable as it stands, whoever contributed to it;
+    - ``SIGNALS`` — the signals the link names, and nothing else, which is how a finding that
+      fetched its own threat intel holds that value while the observable keeps accumulating;
+    - ``NONE`` — nothing: the edge is kept for the graph and the narrative, but it is inert.
+
+    v7.0 briefly carried a fourth, ``FRAGMENT``, gating the observable on the fragment that wrote
+    each fact. It was dropped before release: it damped a merged total but never a local one, so
+    the same rules scored differently depending on whether enrichment ran in its own worker.
+    ``SIGNALS`` states that intent directly, and ``NONE`` covers the inert link it was standing in
+    for when migrating v6 documents.
     """
 
-    OWN_FRAGMENT = "OWN_FRAGMENT"
-    ALL = "ALL"
+    OBSERVABLE = "OBSERVABLE"
+    SIGNALS = "SIGNALS"
+    NONE = "NONE"
+
+    @property
+    def scores(self) -> bool:
+        """Whether the link contributes a term at all."""
+        return self is not LinkBasis.NONE
 
 
 class Aggregation(str, Enum):
@@ -292,11 +307,11 @@ __all__ = [
     "Confidence",
     "DecisionKind",
     "Effect",
+    "LinkBasis",
     "ObservableSubtype",
     "ObservableType",
     "RelationKind",
     "Salience",
-    "Scope",
     "SourceClass",
     "Status",
     "Verdict",

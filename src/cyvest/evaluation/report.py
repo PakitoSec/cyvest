@@ -18,36 +18,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from cyvest.enums import Effect, Scope, Status, Verdict
-
-
-class ResolvedScope(BaseModel):
-    """
-    A link scope with ``OWN_FRAGMENT`` already resolved to the fragment that carries the link.
-
-    ``OWN_FRAGMENT`` is not *one* scope: it denotes a different set of facts for every fragment.
-    Two findings from different fragments pointing at the same observable need two distinct
-    results, so results are indexed by the resolved scope — never by the raw label.
-
-    A model rather than a tuple so it crosses the JSON boundary as a named object: the report is
-    the contract a front-end reads, and positional data makes for a poor contract.
-    """
-
-    model_config = ConfigDict(frozen=True)
-
-    scope: Scope = Field(default=Scope.ALL)
-    fragment_id: str | None = Field(default=None)
-
-    @classmethod
-    def all(cls) -> ResolvedScope:
-        return cls(scope=Scope.ALL)
-
-    @classmethod
-    def own(cls, fragment_id: str) -> ResolvedScope:
-        return cls(scope=Scope.OWN_FRAGMENT, fragment_id=fragment_id)
-
-    def __str__(self) -> str:
-        return "ALL" if self.scope is Scope.ALL else f"fragment:{self.fragment_id}"
+from cyvest.enums import Effect, Status, Verdict
 
 
 def round_half_up(value: float, precision: int) -> float:
@@ -88,9 +59,7 @@ class _ResultBase(BaseModel):
 
 
 class ObservableResult(_ResultBase):
-    """An observable's verdict within one resolved scope."""
-
-    scope: ResolvedScope = Field(default_factory=ResolvedScope.all)
+    """An observable's verdict. One per observable: the graph holds every fact anyone contributed."""
 
 
 class FindingResult(_ResultBase):
@@ -134,19 +103,13 @@ class Report(BaseModel):
     policy_version: str = Field(...)
     investigation: InvestigationResult = Field(...)
     findings: dict[str, FindingResult] = Field(default_factory=dict)
-    # Keyed by ``observable_index`` rather than a tuple, so the map survives the JSON boundary.
     observables: dict[str, ObservableResult] = Field(default_factory=dict)
 
-    def observable(self, key: str, scope: ResolvedScope | None = None) -> ObservableResult | None:
-        return self.observables.get(observable_index(key, scope or ResolvedScope.all()))
+    def observable(self, key: str) -> ObservableResult | None:
+        return self.observables.get(key)
 
     def finding(self, key: str) -> FindingResult | None:
         return self.findings.get(key)
-
-
-def observable_index(observable_key: str, scope: ResolvedScope) -> str:
-    """Index an observable result by key *and* resolved scope — the same observable may hold several."""
-    return f"{observable_key}@{scope}"
 
 
 __all__ = [
@@ -156,7 +119,5 @@ __all__ = [
     "InvestigationResult",
     "ObservableResult",
     "Report",
-    "ResolvedScope",
-    "observable_index",
     "round_half_up",
 ]

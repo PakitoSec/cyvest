@@ -4,7 +4,7 @@
     "investigation_id": "cyvest-email-example",
     "name": "Email Investigation",
     "root_key": "obs:artifact:__cyvest_root__",
-    "opened_at": "2026-08-27T12:09:58.148843Z",
+    "opened_at": "2026-08-28T15:51:05.894531Z",
     "policy_version": "default-v1",
     "engine_id": "basic-v1",
     "fragment_ids": [
@@ -25,8 +25,8 @@
     "observables": {
       "obs:artifact:__cyvest_root__": {
         "key": "obs:artifact:__cyvest_root__",
-        "seq": "01M11J0ZMAA2B1CC4WT5FB34FF",
-        "asserted_at": "2026-08-27T12:09:58.154220Z",
+        "seq": "01M14H2KDD3JQNEJB71TFJ95C6",
+        "asserted_at": "2026-08-28T15:51:05.901870Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -90,8 +90,8 @@
       },
       "obs:email:noreply@dmalicious.com": {
         "key": "obs:email:noreply@dmalicious.com",
-        "seq": "01M11J0ZM6SYZAWRR45WFA6SX8",
-        "asserted_at": "2026-08-27T12:09:58.150376Z",
+        "seq": "01M14H2KD8VCKM15JPPD51Q6GR",
+        "asserted_at": "2026-08-28T15:51:05.896505Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -115,8 +115,8 @@
       },
       "obs:domain:dmalicious.com": {
         "key": "obs:domain:dmalicious.com",
-        "seq": "01M11J0ZM5FGGWPM87N5T6GV3N",
-        "asserted_at": "2026-08-27T12:09:58.149994Z",
+        "seq": "01M14H2KD8K3GHNN08DACZ9CEE",
+        "asserted_at": "2026-08-28T15:51:05.896050Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -134,13 +134,13 @@
         "extra": {},
         "aliases": [],
         "occurrences": {
-          "fragment-emailfrom": 1
+          "fragment-emailfrom": 2
         }
       },
       "obs:ipv4:8.1.2.3": {
         "key": "obs:ipv4:8.1.2.3",
-        "seq": "01M11J0ZM6MXAPZJEJDYBDVP52",
-        "asserted_at": "2026-08-27T12:09:58.150043Z",
+        "seq": "01M14H2KD7ZVW9S9F3YNFZQ216",
+        "asserted_at": "2026-08-28T15:51:05.895840Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -163,8 +163,8 @@
       },
       "obs:email:user@company.com": {
         "key": "obs:email:user@company.com",
-        "seq": "01M11J0ZM6J6HHZJ8PSMRS2BVE",
-        "asserted_at": "2026-08-27T12:09:58.150662Z",
+        "seq": "01M14H2KD8KZ2JRFHJ4TTB2E5G",
+        "asserted_at": "2026-08-28T15:51:05.896828Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -187,8 +187,8 @@
       },
       "obs:file:body/html": {
         "key": "obs:file:body/html",
-        "seq": "01M11J0ZM8GBMNFK96C7X8CMNR",
-        "asserted_at": "2026-08-27T12:09:58.152104Z",
+        "seq": "01M14H2KDBN1EGBEVQB18JAAJX",
+        "asserted_at": "2026-08-28T15:51:05.899562Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -212,8 +212,8 @@
       },
       "obs:url:https://virus.com/payload.exe": {
         "key": "obs:url:https://virus.com/payload.exe",
-        "seq": "01M11J0ZM6TN73AVZEQQERJAWJ",
-        "asserted_at": "2026-08-27T12:09:58.150973Z",
+        "seq": "01M14H2KD9974S3PK1MT1T88JT",
+        "asserted_at": "2026-08-28T15:51:05.897593Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -236,8 +236,8 @@
       },
       "obs:domain:virus.com": {
         "key": "obs:domain:virus.com",
-        "seq": "01M11J0ZM8S1YDGXBWTDD92WJ5",
-        "asserted_at": "2026-08-27T12:09:58.152186Z",
+        "seq": "01M14H2KDBQGDD75AEWY61FSXY",
+        "asserted_at": "2026-08-28T15:51:05.899650Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -261,8 +261,8 @@
       },
       "obs:url:https://virus.com/about": {
         "key": "obs:url:https://virus.com/about",
-        "seq": "01M11J0ZM7TWWJ7Y7V8QZ9Z54N",
-        "asserted_at": "2026-08-27T12:09:58.151305Z",
+        "seq": "01M14H2KD9VK1BWSWA85M03VD7",
+        "asserted_at": "2026-08-28T15:51:05.897951Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -285,8 +285,8 @@
       },
       "obs:url:https://domain.com/ok/toto": {
         "key": "obs:url:https://domain.com/ok/toto",
-        "seq": "01M11J0ZM7HTB60DDQNN2G1T63",
-        "asserted_at": "2026-08-27T12:09:58.151594Z",
+        "seq": "01M14H2KDA57PNSFKMMF64BQ9E",
+        "asserted_at": "2026-08-28T15:51:05.898243Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -309,8 +309,8 @@
       },
       "obs:domain:domain.com": {
         "key": "obs:domain:domain.com",
-        "seq": "01M11J0ZM88JY5AG3TM5ZC322X",
-        "asserted_at": "2026-08-27T12:09:58.152410Z",
+        "seq": "01M14H2KDCQYTQ8NZ6D9ZT9D63",
+        "asserted_at": "2026-08-28T15:51:05.900226Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -334,8 +334,8 @@
       },
       "obs:file:invoice.pdf": {
         "key": "obs:file:invoice.pdf",
-        "seq": "01M11J0ZM9YE1031HN5PZH3DDM",
-        "asserted_at": "2026-08-27T12:09:58.153084Z",
+        "seq": "01M14H2KDDHZTP57T8TQYBCFFS",
+        "asserted_at": "2026-08-28T15:51:05.901098Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -358,8 +358,8 @@
       },
       "obs:hash:md5:d41d8cd98f00b204e9800998ecf8427e": {
         "key": "obs:hash:md5:d41d8cd98f00b204e9800998ecf8427e",
-        "seq": "01M11J0ZM9ZDZQRYMABXAYR6DW",
-        "asserted_at": "2026-08-27T12:09:58.153118Z",
+        "seq": "01M14H2KDD0X5KGHG0F81S7XRM",
+        "asserted_at": "2026-08-28T15:51:05.901152Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -384,8 +384,8 @@
     "relations": {
       "rel:pivot:obs:domain:dmalicious.com>obs:ipv4:8.1.2.3": {
         "key": "rel:pivot:obs:domain:dmalicious.com>obs:ipv4:8.1.2.3",
-        "seq": "01M11J0ZM67HBWJMJ9W74R5E1Q",
-        "asserted_at": "2026-08-27T12:09:58.150071Z",
+        "seq": "01M14H2KD735NE956360GP00NY",
+        "asserted_at": "2026-08-28T15:51:05.895881Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -403,8 +403,8 @@
       },
       "rel:extraction:obs:email:noreply@dmalicious.com>obs:domain:dmalicious.com": {
         "key": "rel:extraction:obs:email:noreply@dmalicious.com>obs:domain:dmalicious.com",
-        "seq": "01M11J0ZM6P95EMGHVYW7HT5GP",
-        "asserted_at": "2026-08-27T12:09:58.150086Z",
+        "seq": "01M14H2KD73WN3P5FCEG1B19Y0",
+        "asserted_at": "2026-08-28T15:51:05.895903Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -422,8 +422,8 @@
       },
       "rel:extraction:obs:artifact:__cyvest_root__>obs:email:noreply@dmalicious.com": {
         "key": "rel:extraction:obs:artifact:__cyvest_root__>obs:email:noreply@dmalicious.com",
-        "seq": "01M11J0ZM6XH3Y4XY13DDKBFSW",
-        "asserted_at": "2026-08-27T12:09:58.150102Z",
+        "seq": "01M14H2KD71MG1CVPHCGMJJXM6",
+        "asserted_at": "2026-08-28T15:51:05.895918Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -441,8 +441,8 @@
       },
       "rel:extraction:obs:artifact:__cyvest_root__>obs:email:user@company.com": {
         "key": "rel:extraction:obs:artifact:__cyvest_root__>obs:email:user@company.com",
-        "seq": "01M11J0ZM6PRDP9PGF1JRHJZ9C",
-        "asserted_at": "2026-08-27T12:09:58.150676Z",
+        "seq": "01M14H2KD8F7HDRGH81NEDF5C4",
+        "asserted_at": "2026-08-28T15:51:05.896843Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -460,8 +460,8 @@
       },
       "rel:extraction:obs:artifact:__cyvest_root__>obs:file:body/html": {
         "key": "rel:extraction:obs:artifact:__cyvest_root__>obs:file:body/html",
-        "seq": "01M11J0ZM89JG2JKYJ02768Y1Q",
-        "asserted_at": "2026-08-27T12:09:58.152121Z",
+        "seq": "01M14H2KDBY4DEC3Z4B2V3FHYB",
+        "asserted_at": "2026-08-28T15:51:05.899580Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -479,8 +479,8 @@
       },
       "rel:extraction:obs:file:body/html>obs:url:https://virus.com/payload.exe": {
         "key": "rel:extraction:obs:file:body/html>obs:url:https://virus.com/payload.exe",
-        "seq": "01M11J0ZM68NFGDHAV6QFHM3T6",
-        "asserted_at": "2026-08-27T12:09:58.150999Z",
+        "seq": "01M14H2KD90CAP675F0HKPRPC0",
+        "asserted_at": "2026-08-28T15:51:05.897628Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -498,8 +498,8 @@
       },
       "rel:pivot:obs:domain:virus.com>obs:url:https://virus.com/payload.exe": {
         "key": "rel:pivot:obs:domain:virus.com>obs:url:https://virus.com/payload.exe",
-        "seq": "01M11J0ZM7QQHJFQRD9WWE75JS",
-        "asserted_at": "2026-08-27T12:09:58.151040Z",
+        "seq": "01M14H2KD905HEEH1V23G95H4R",
+        "asserted_at": "2026-08-28T15:51:05.897678Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -517,8 +517,8 @@
       },
       "rel:extraction:obs:file:body/html>obs:url:https://virus.com/about": {
         "key": "rel:extraction:obs:file:body/html>obs:url:https://virus.com/about",
-        "seq": "01M11J0ZM739CD9JF9Q1KSXJ04",
-        "asserted_at": "2026-08-27T12:09:58.151343Z",
+        "seq": "01M14H2KD9841FBXKBC2YKDHJW",
+        "asserted_at": "2026-08-28T15:51:05.897988Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -536,8 +536,8 @@
       },
       "rel:pivot:obs:domain:virus.com>obs:url:https://virus.com/about": {
         "key": "rel:pivot:obs:domain:virus.com>obs:url:https://virus.com/about",
-        "seq": "01M11J0ZM7VW2TXQG31340V1EJ",
-        "asserted_at": "2026-08-27T12:09:58.151393Z",
+        "seq": "01M14H2KDAC3MDXGS0C93YA0CV",
+        "asserted_at": "2026-08-28T15:51:05.898045Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -555,8 +555,8 @@
       },
       "rel:extraction:obs:file:body/html>obs:url:https://domain.com/ok/toto": {
         "key": "rel:extraction:obs:file:body/html>obs:url:https://domain.com/ok/toto",
-        "seq": "01M11J0ZM7P25GM0DARHHGE3K1",
-        "asserted_at": "2026-08-27T12:09:58.151623Z",
+        "seq": "01M14H2KDAXQ3W2BCM0P46THSR",
+        "asserted_at": "2026-08-28T15:51:05.898273Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -574,8 +574,8 @@
       },
       "rel:pivot:obs:domain:domain.com>obs:url:https://domain.com/ok/toto": {
         "key": "rel:pivot:obs:domain:domain.com>obs:url:https://domain.com/ok/toto",
-        "seq": "01M11J0ZM7DFASPY08QK00JF6Y",
-        "asserted_at": "2026-08-27T12:09:58.151670Z",
+        "seq": "01M14H2KDAHPWKRWZQ9D4GXV31",
+        "asserted_at": "2026-08-28T15:51:05.898360Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -593,8 +593,8 @@
       },
       "rel:extraction:obs:file:body/html>obs:domain:virus.com": {
         "key": "rel:extraction:obs:file:body/html>obs:domain:virus.com",
-        "seq": "01M11J0ZM8F1X4Y41B3GB34993",
-        "asserted_at": "2026-08-27T12:09:58.152215Z",
+        "seq": "01M14H2KDB6W4KRNHSF73GHTBJ",
+        "asserted_at": "2026-08-28T15:51:05.899686Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -612,8 +612,8 @@
       },
       "rel:extraction:obs:file:body/html>obs:domain:domain.com": {
         "key": "rel:extraction:obs:file:body/html>obs:domain:domain.com",
-        "seq": "01M11J0ZM8BTCTQ15XTGH92JJ0",
-        "asserted_at": "2026-08-27T12:09:58.152442Z",
+        "seq": "01M14H2KDC4V642Z89QYXCEA5C",
+        "asserted_at": "2026-08-28T15:51:05.900275Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -631,8 +631,8 @@
       },
       "rel:extraction:obs:artifact:__cyvest_root__>obs:file:invoice.pdf": {
         "key": "rel:extraction:obs:artifact:__cyvest_root__>obs:file:invoice.pdf",
-        "seq": "01M11J0ZM96ZZ67VSQZJQA6CE2",
-        "asserted_at": "2026-08-27T12:09:58.153143Z",
+        "seq": "01M14H2KDDPZ1EMK6MGPQH9WVW",
+        "asserted_at": "2026-08-28T15:51:05.901190Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -650,8 +650,8 @@
       },
       "rel:extraction:obs:file:invoice.pdf>obs:hash:md5:d41d8cd98f00b204e9800998ecf8427e": {
         "key": "rel:extraction:obs:file:invoice.pdf>obs:hash:md5:d41d8cd98f00b204e9800998ecf8427e",
-        "seq": "01M11J0ZM9P4KCP690TN0MC9XN",
-        "asserted_at": "2026-08-27T12:09:58.153153Z",
+        "seq": "01M14H2KDDZFQXC54PTMDQWFY9",
+        "asserted_at": "2026-08-28T15:51:05.901204Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -670,13 +670,12 @@
     },
     "signals": {
       "sig:vt:obs:email:noreply@dmalicious.com": {
-        "subject_key": "obs:email:noreply@dmalicious.com",
         "verdict": "INFO",
         "confidence": 1.0,
         "weight": 0.0,
         "key": "sig:vt:obs:email:noreply@dmalicious.com",
-        "seq": "01M11J0ZM5B8DV0FGB9PWC339W",
-        "asserted_at": "2026-08-27T12:09:58.149937Z",
+        "seq": "01M14H2KD72TA3CD4NS22SGAVX",
+        "asserted_at": "2026-08-28T15:51:05.895722Z",
         "occurred_at": null,
         "source": {
           "name": "VT",
@@ -685,6 +684,7 @@
         "fragment_id": "fragment-emailfrom",
         "external_id": null,
         "evidence_keys": [],
+        "subject_key": "obs:email:noreply@dmalicious.com",
         "kind": "threat_intel",
         "observed_at": null,
         "labels": [],
@@ -694,13 +694,12 @@
         "comment": "> test"
       },
       "sig:vt:obs:domain:dmalicious.com": {
-        "subject_key": "obs:domain:dmalicious.com",
         "verdict": "NOTABLE",
         "confidence": 1.0,
         "weight": 1.0,
         "key": "sig:vt:obs:domain:dmalicious.com",
-        "seq": "01M11J0ZM6HRPG0QKA3V88FWKY",
-        "asserted_at": "2026-08-27T12:09:58.150010Z",
+        "seq": "01M14H2KD7BBG2BNPWJSNDRB01",
+        "asserted_at": "2026-08-28T15:51:05.895799Z",
         "occurred_at": null,
         "source": {
           "name": "VT",
@@ -709,6 +708,7 @@
         "fragment_id": "fragment-emailfrom",
         "external_id": null,
         "evidence_keys": [],
+        "subject_key": "obs:domain:dmalicious.com",
         "kind": "threat_intel",
         "observed_at": null,
         "labels": [],
@@ -718,13 +718,12 @@
         "comment": ""
       },
       "sig:abuseipdb:obs:ipv4:8.1.2.3": {
-        "subject_key": "obs:ipv4:8.1.2.3",
         "verdict": "NOTABLE",
         "confidence": 1.0,
         "weight": 2.0,
         "key": "sig:abuseipdb:obs:ipv4:8.1.2.3",
-        "seq": "01M11J0ZM66GW599D11E5EJRVV",
-        "asserted_at": "2026-08-27T12:09:58.150055Z",
+        "seq": "01M14H2KD7DR8KAJKA0RE7SGN4",
+        "asserted_at": "2026-08-28T15:51:05.895858Z",
         "occurred_at": null,
         "source": {
           "name": "ABUSEIPDB",
@@ -733,6 +732,7 @@
         "fragment_id": "fragment-emailfrom",
         "external_id": null,
         "evidence_keys": [],
+        "subject_key": "obs:ipv4:8.1.2.3",
         "kind": "threat_intel",
         "observed_at": null,
         "labels": [],
@@ -742,13 +742,12 @@
         "comment": ""
       },
       "sig:proofpoint:obs:email:noreply@dmalicious.com": {
-        "subject_key": "obs:email:noreply@dmalicious.com",
         "verdict": "MALICIOUS",
         "confidence": 1.0,
         "weight": 5.0,
         "key": "sig:proofpoint:obs:email:noreply@dmalicious.com",
-        "seq": "01M11J0ZM6HDKVNCQTS1XCR4HN",
-        "asserted_at": "2026-08-27T12:09:58.150390Z",
+        "seq": "01M14H2KD8DQC3GTW56AKY8P4Y",
+        "asserted_at": "2026-08-28T15:51:05.896524Z",
         "occurred_at": null,
         "source": {
           "name": "PROOFPOINT",
@@ -757,6 +756,7 @@
         "fragment_id": "fragment-emailfrombis",
         "external_id": null,
         "evidence_keys": [],
+        "subject_key": "obs:email:noreply@dmalicious.com",
         "kind": "threat_intel",
         "observed_at": null,
         "labels": [],
@@ -766,13 +766,12 @@
         "comment": "> test"
       },
       "sig:vt:obs:url:https://virus.com/payload.exe": {
-        "subject_key": "obs:url:https://virus.com/payload.exe",
         "verdict": "MALICIOUS",
         "confidence": 1.0,
         "weight": 5.0,
         "key": "sig:vt:obs:url:https://virus.com/payload.exe",
-        "seq": "01M11J0ZM69BG8T36EN1JTNR8W",
-        "asserted_at": "2026-08-27T12:09:58.150988Z",
+        "seq": "01M14H2KD9Q6NCASQ9TJZYNEFB",
+        "asserted_at": "2026-08-28T15:51:05.897612Z",
         "occurred_at": null,
         "source": {
           "name": "VT",
@@ -781,6 +780,7 @@
         "fragment_id": "fragment-bodiesurltask",
         "external_id": null,
         "evidence_keys": [],
+        "subject_key": "obs:url:https://virus.com/payload.exe",
         "kind": "threat_intel",
         "observed_at": null,
         "labels": [],
@@ -790,13 +790,12 @@
         "comment": ""
       },
       "sig:vt:obs:url:https://virus.com/about": {
-        "subject_key": "obs:url:https://virus.com/about",
         "verdict": "SUSPICIOUS",
         "confidence": 1.0,
         "weight": 3.0,
         "key": "sig:vt:obs:url:https://virus.com/about",
-        "seq": "01M11J0ZM7DVXRQZC4FEYCCSBD",
-        "asserted_at": "2026-08-27T12:09:58.151327Z",
+        "seq": "01M14H2KD9NJQS9JDCP106K4HJ",
+        "asserted_at": "2026-08-28T15:51:05.897971Z",
         "occurred_at": null,
         "source": {
           "name": "VT",
@@ -805,6 +804,7 @@
         "fragment_id": "fragment-bodiesurltask",
         "external_id": null,
         "evidence_keys": [],
+        "subject_key": "obs:url:https://virus.com/about",
         "kind": "threat_intel",
         "observed_at": null,
         "labels": [],
@@ -814,13 +814,12 @@
         "comment": ""
       },
       "sig:vt:obs:url:https://domain.com/ok/toto": {
-        "subject_key": "obs:url:https://domain.com/ok/toto",
         "verdict": "SAFE",
         "confidence": 1.0,
         "weight": 1.0,
         "key": "sig:vt:obs:url:https://domain.com/ok/toto",
-        "seq": "01M11J0ZM7G7Y1E4KS80NQSPF6",
-        "asserted_at": "2026-08-27T12:09:58.151610Z",
+        "seq": "01M14H2KDAKFZ3556C3P3SN2CG",
+        "asserted_at": "2026-08-28T15:51:05.898261Z",
         "occurred_at": null,
         "source": {
           "name": "VT",
@@ -829,6 +828,7 @@
         "fragment_id": "fragment-bodiesurltask",
         "external_id": null,
         "evidence_keys": [],
+        "subject_key": "obs:url:https://domain.com/ok/toto",
         "kind": "threat_intel",
         "observed_at": null,
         "labels": [],
@@ -838,13 +838,12 @@
         "comment": ""
       },
       "sig:vt:obs:domain:virus.com": {
-        "subject_key": "obs:domain:virus.com",
         "verdict": "SUSPICIOUS",
         "confidence": 1.0,
         "weight": 3.0,
         "key": "sig:vt:obs:domain:virus.com",
-        "seq": "01M11J0ZM8T23F5NX6B2KR5YWZ",
-        "asserted_at": "2026-08-27T12:09:58.152201Z",
+        "seq": "01M14H2KDBXGQNZVKBQXFTABNR",
+        "asserted_at": "2026-08-28T15:51:05.899671Z",
         "occurred_at": null,
         "source": {
           "name": "VT",
@@ -853,6 +852,7 @@
         "fragment_id": "fragment-bodiesdomaintask",
         "external_id": null,
         "evidence_keys": [],
+        "subject_key": "obs:domain:virus.com",
         "kind": "threat_intel",
         "observed_at": null,
         "labels": [],
@@ -862,13 +862,12 @@
         "comment": ""
       },
       "sig:vt:obs:domain:domain.com": {
-        "subject_key": "obs:domain:domain.com",
         "verdict": "INFO",
         "confidence": 1.0,
         "weight": 0.0,
         "key": "sig:vt:obs:domain:domain.com",
-        "seq": "01M11J0ZM8KBPZPCFS5YPM1J2W",
-        "asserted_at": "2026-08-27T12:09:58.152428Z",
+        "seq": "01M14H2KDC8MGACCQK971H4QM8",
+        "asserted_at": "2026-08-28T15:51:05.900253Z",
         "occurred_at": null,
         "source": {
           "name": "VT",
@@ -877,6 +876,7 @@
         "fragment_id": "fragment-bodiesdomaintask",
         "external_id": null,
         "evidence_keys": [],
+        "subject_key": "obs:domain:domain.com",
         "kind": "threat_intel",
         "observed_at": null,
         "labels": [],
@@ -886,13 +886,12 @@
         "comment": ""
       },
       "sig:vt:obs:hash:md5:d41d8cd98f00b204e9800998ecf8427e": {
-        "subject_key": "obs:hash:md5:d41d8cd98f00b204e9800998ecf8427e",
         "verdict": "MALICIOUS",
         "confidence": 1.0,
         "weight": 10.0,
         "key": "sig:vt:obs:hash:md5:d41d8cd98f00b204e9800998ecf8427e",
-        "seq": "01M11J0ZM9GK2CWZ7VVG5KJK7W",
-        "asserted_at": "2026-08-27T12:09:58.153130Z",
+        "seq": "01M14H2KDDJ85EXS507FR6HGJM",
+        "asserted_at": "2026-08-28T15:51:05.901170Z",
         "occurred_at": null,
         "source": {
           "name": "VT",
@@ -901,6 +900,7 @@
         "fragment_id": "fragment-attachmenttask",
         "external_id": null,
         "evidence_keys": [],
+        "subject_key": "obs:hash:md5:d41d8cd98f00b204e9800998ecf8427e",
         "kind": "threat_intel",
         "observed_at": null,
         "labels": [],
@@ -910,13 +910,12 @@
         "comment": "MD5 hash analysis"
       },
       "sig:malwarebazaar:obs:file:invoice.pdf": {
-        "subject_key": "obs:file:invoice.pdf",
         "verdict": "MALICIOUS",
         "confidence": 1.0,
         "weight": 10.0,
         "key": "sig:malwarebazaar:obs:file:invoice.pdf",
-        "seq": "01M11J0ZM9Q2WXYM1PJMQTR8YV",
-        "asserted_at": "2026-08-27T12:09:58.153164Z",
+        "seq": "01M14H2KDD7P70TG4NE2ZCMPST",
+        "asserted_at": "2026-08-28T15:51:05.901218Z",
         "occurred_at": null,
         "source": {
           "name": "MALWAREBAZAAR",
@@ -925,6 +924,7 @@
         "fragment_id": "fragment-attachmenttask",
         "external_id": null,
         "evidence_keys": [],
+        "subject_key": "obs:file:invoice.pdf",
         "kind": "threat_intel",
         "observed_at": null,
         "labels": [],
@@ -937,8 +937,8 @@
     "evidences": {
       "evd:sha256:6266e5073358f0b41fc4b2843bc312bd2a557ca5bc40b015202129ccad59e517": {
         "key": "evd:sha256:6266e5073358f0b41fc4b2843bc312bd2a557ca5bc40b015202129ccad59e517",
-        "seq": "01M11J0ZM6S8ZR5JY5NXR2GHW0",
-        "asserted_at": "2026-08-27T12:09:58.150620Z",
+        "seq": "01M14H2KD8J9WBP0GM486WR5P0",
+        "asserted_at": "2026-08-28T15:51:05.896785Z",
         "occurred_at": null,
         "source": {
           "name": "splunk",
@@ -959,14 +959,13 @@
       }
     },
     "findings": {
-      "fnd:from:obs:artifact:__cyvest_root__": {
-        "subject_key": "obs:artifact:__cyvest_root__",
+      "fnd:from": {
         "verdict": "INFO",
         "confidence": 1.0,
         "weight": null,
-        "key": "fnd:from:obs:artifact:__cyvest_root__",
-        "seq": "01M11J0ZM69RA23Q5200MFH3SG",
-        "asserted_at": "2026-08-27T12:09:58.150141Z",
+        "key": "fnd:from",
+        "seq": "01M14H2KD859155C361HSV6AVX",
+        "asserted_at": "2026-08-28T15:51:05.896083Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -984,20 +983,27 @@
         "observable_links": [
           {
             "observable_key": "obs:email:noreply@dmalicious.com",
-            "scope": "OWN_FRAGMENT"
+            "basis": "SIGNALS",
+            "signal_keys": [
+              "sig:vt:obs:email:noreply@dmalicious.com"
+            ]
+          },
+          {
+            "observable_key": "obs:domain:dmalicious.com",
+            "basis": "OBSERVABLE",
+            "signal_keys": []
           }
         ],
         "labels": [],
         "extra": {}
       },
-      "fnd:from-proofpoint:obs:artifact:__cyvest_root__": {
-        "subject_key": "obs:artifact:__cyvest_root__",
+      "fnd:from-proofpoint": {
         "verdict": "INFO",
         "confidence": 1.0,
         "weight": null,
-        "key": "fnd:from-proofpoint:obs:artifact:__cyvest_root__",
-        "seq": "01M11J0ZM6HJBBFBJ1CKBFJ0HX",
-        "asserted_at": "2026-08-27T12:09:58.150419Z",
+        "key": "fnd:from-proofpoint",
+        "seq": "01M14H2KD8HDNE9X6FJTNTRDTV",
+        "asserted_at": "2026-08-28T15:51:05.896566Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -1015,20 +1021,22 @@
         "observable_links": [
           {
             "observable_key": "obs:email:noreply@dmalicious.com",
-            "scope": "OWN_FRAGMENT"
+            "basis": "SIGNALS",
+            "signal_keys": [
+              "sig:proofpoint:obs:email:noreply@dmalicious.com"
+            ]
           }
         ],
         "labels": [],
         "extra": {}
       },
-      "fnd:receiver:obs:artifact:__cyvest_root__": {
-        "subject_key": "obs:artifact:__cyvest_root__",
+      "fnd:receiver": {
         "verdict": "NOTABLE",
         "confidence": 1.0,
         "weight": 0.1,
-        "key": "fnd:receiver:obs:artifact:__cyvest_root__",
-        "seq": "01M11J0ZM69H9TSRQ8PGF2JEXM",
-        "asserted_at": "2026-08-27T12:09:58.150721Z",
+        "key": "fnd:receiver",
+        "seq": "01M14H2KD8RKYA09BX308SVFGW",
+        "asserted_at": "2026-08-28T15:51:05.896892Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -1046,20 +1054,20 @@
         "observable_links": [
           {
             "observable_key": "obs:email:user@company.com",
-            "scope": "OWN_FRAGMENT"
+            "basis": "OBSERVABLE",
+            "signal_keys": []
           }
         ],
         "labels": [],
         "extra": {}
       },
-      "fnd:body-url-https://virus.com/payload.exe:obs:artifact:__cyvest_root__": {
-        "subject_key": "obs:artifact:__cyvest_root__",
+      "fnd:body-url-https://virus.com/payload.exe": {
         "verdict": "INFO",
         "confidence": 1.0,
         "weight": null,
-        "key": "fnd:body-url-https://virus.com/payload.exe:obs:artifact:__cyvest_root__",
-        "seq": "01M11J0ZM7AY8J9RAEYAT0RVZ1",
-        "asserted_at": "2026-08-27T12:09:58.151065Z",
+        "key": "fnd:body-url-https://virus.com/payload.exe",
+        "seq": "01M14H2KD9MNGJ2AN9KCWRGQHG",
+        "asserted_at": "2026-08-28T15:51:05.897705Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -1077,20 +1085,20 @@
         "observable_links": [
           {
             "observable_key": "obs:url:https://virus.com/payload.exe",
-            "scope": "OWN_FRAGMENT"
+            "basis": "OBSERVABLE",
+            "signal_keys": []
           }
         ],
         "labels": [],
         "extra": {}
       },
-      "fnd:body-url-https://virus.com/about:obs:artifact:__cyvest_root__": {
-        "subject_key": "obs:artifact:__cyvest_root__",
+      "fnd:body-url-https://virus.com/about": {
         "verdict": "INFO",
         "confidence": 1.0,
         "weight": null,
-        "key": "fnd:body-url-https://virus.com/about:obs:artifact:__cyvest_root__",
-        "seq": "01M11J0ZM7B1J0RD3MNQJ2GHCV",
-        "asserted_at": "2026-08-27T12:09:58.151417Z",
+        "key": "fnd:body-url-https://virus.com/about",
+        "seq": "01M14H2KDAKGF6HE30DK47SB37",
+        "asserted_at": "2026-08-28T15:51:05.898071Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -1108,20 +1116,20 @@
         "observable_links": [
           {
             "observable_key": "obs:url:https://virus.com/about",
-            "scope": "OWN_FRAGMENT"
+            "basis": "OBSERVABLE",
+            "signal_keys": []
           }
         ],
         "labels": [],
         "extra": {}
       },
-      "fnd:body-url-https://domain.com/ok/toto:obs:artifact:__cyvest_root__": {
-        "subject_key": "obs:artifact:__cyvest_root__",
+      "fnd:body-url-https://domain.com/ok/toto": {
         "verdict": "INFO",
         "confidence": 1.0,
         "weight": null,
-        "key": "fnd:body-url-https://domain.com/ok/toto:obs:artifact:__cyvest_root__",
-        "seq": "01M11J0ZM7KAVHWH7TY7XGP4VA",
-        "asserted_at": "2026-08-27T12:09:58.151692Z",
+        "key": "fnd:body-url-https://domain.com/ok/toto",
+        "seq": "01M14H2KDAYC7M30BQNY4X6VV2",
+        "asserted_at": "2026-08-28T15:51:05.898383Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -1139,20 +1147,20 @@
         "observable_links": [
           {
             "observable_key": "obs:url:https://domain.com/ok/toto",
-            "scope": "OWN_FRAGMENT"
+            "basis": "OBSERVABLE",
+            "signal_keys": []
           }
         ],
         "labels": [],
         "extra": {}
       },
-      "fnd:body-domain-virus.com:obs:artifact:__cyvest_root__": {
-        "subject_key": "obs:artifact:__cyvest_root__",
+      "fnd:body-domain-virus.com": {
         "verdict": "INFO",
         "confidence": 1.0,
         "weight": null,
-        "key": "fnd:body-domain-virus.com:obs:artifact:__cyvest_root__",
-        "seq": "01M11J0ZM8M939E7AHRQ7AAHCG",
-        "asserted_at": "2026-08-27T12:09:58.152242Z",
+        "key": "fnd:body-domain-virus.com",
+        "seq": "01M14H2KDB5GDGQRTYQJA37690",
+        "asserted_at": "2026-08-28T15:51:05.899722Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -1170,20 +1178,20 @@
         "observable_links": [
           {
             "observable_key": "obs:domain:virus.com",
-            "scope": "ALL"
+            "basis": "OBSERVABLE",
+            "signal_keys": []
           }
         ],
         "labels": [],
         "extra": {}
       },
-      "fnd:body-domain-domain.com:obs:artifact:__cyvest_root__": {
-        "subject_key": "obs:artifact:__cyvest_root__",
+      "fnd:body-domain-domain.com": {
         "verdict": "INFO",
         "confidence": 1.0,
         "weight": null,
-        "key": "fnd:body-domain-domain.com:obs:artifact:__cyvest_root__",
-        "seq": "01M11J0ZM80GAH9WX6R86WV97H",
-        "asserted_at": "2026-08-27T12:09:58.152469Z",
+        "key": "fnd:body-domain-domain.com",
+        "seq": "01M14H2KDC7FDXT4WCXNFVTC9G",
+        "asserted_at": "2026-08-28T15:51:05.900311Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -1201,20 +1209,20 @@
         "observable_links": [
           {
             "observable_key": "obs:domain:domain.com",
-            "scope": "ALL"
+            "basis": "OBSERVABLE",
+            "signal_keys": []
           }
         ],
         "labels": [],
         "extra": {}
       },
-      "fnd:attachment-invoice.pdf:obs:artifact:__cyvest_root__": {
-        "subject_key": "obs:artifact:__cyvest_root__",
+      "fnd:attachment-invoice.pdf": {
         "verdict": "INFO",
         "confidence": 1.0,
         "weight": null,
-        "key": "fnd:attachment-invoice.pdf:obs:artifact:__cyvest_root__",
-        "seq": "01M11J0ZM9TTV91NM6TW14GH9F",
-        "asserted_at": "2026-08-27T12:09:58.153187Z",
+        "key": "fnd:attachment-invoice.pdf",
+        "seq": "01M14H2KDDEAZ88S2SXKWXZGYW",
+        "asserted_at": "2026-08-28T15:51:05.901254Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -1232,20 +1240,20 @@
         "observable_links": [
           {
             "observable_key": "obs:file:invoice.pdf",
-            "scope": "OWN_FRAGMENT"
+            "basis": "OBSERVABLE",
+            "signal_keys": []
           }
         ],
         "labels": [],
         "extra": {}
       },
-      "fnd:email_risk_aggregated:obs:artifact:__cyvest_root__": {
-        "subject_key": "obs:artifact:__cyvest_root__",
+      "fnd:email_risk_aggregated": {
         "verdict": "MALICIOUS",
         "confidence": 1.0,
         "weight": 6.0,
-        "key": "fnd:email_risk_aggregated:obs:artifact:__cyvest_root__",
-        "seq": "01M11J0ZMAYMXANXMWGWAD53WG",
-        "asserted_at": "2026-08-27T12:09:58.154077Z",
+        "key": "fnd:email_risk_aggregated",
+        "seq": "01M14H2KDDF0YJ3EA3051TS0B5",
+        "asserted_at": "2026-08-28T15:51:05.901707Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -1264,14 +1272,13 @@
         "labels": [],
         "extra": {}
       },
-      "fnd:ai:obs:artifact:__cyvest_root__": {
-        "subject_key": "obs:artifact:__cyvest_root__",
+      "fnd:ai": {
         "verdict": "MALICIOUS",
         "confidence": 1.0,
         "weight": null,
-        "key": "fnd:ai:obs:artifact:__cyvest_root__",
-        "seq": "01M11J0ZMABZWN96P0HTWGJH86",
-        "asserted_at": "2026-08-27T12:09:58.154240Z",
+        "key": "fnd:ai",
+        "seq": "01M14H2KDD0X6PFATRTKQVEB7S",
+        "asserted_at": "2026-08-28T15:51:05.901895Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -1297,8 +1304,8 @@
   "tags": {
     "tag:emails": {
       "key": "tag:emails",
-      "seq": "01M11J0ZM6NTZHH6YGSCWJHQ93",
-      "asserted_at": "2026-08-27T12:09:58.150751Z",
+      "seq": "01M14H2KD96SXNM3S3QR2AXPMG",
+      "asserted_at": "2026-08-28T15:51:05.897192Z",
       "occurred_at": null,
       "source": {
         "name": "cyvest",
@@ -1310,15 +1317,15 @@
       "name": "emails",
       "description": "",
       "finding_keys": [
-        "fnd:from:obs:artifact:__cyvest_root__",
-        "fnd:from-proofpoint:obs:artifact:__cyvest_root__",
-        "fnd:receiver:obs:artifact:__cyvest_root__"
+        "fnd:from",
+        "fnd:from-proofpoint",
+        "fnd:receiver"
       ]
     },
     "tag:bodies": {
       "key": "tag:bodies",
-      "seq": "01M11J0ZM8X70W56QE1G1WQ3NM",
-      "asserted_at": "2026-08-27T12:09:58.152056Z",
+      "seq": "01M14H2KDBV2RW12XNC6C54T3Z",
+      "asserted_at": "2026-08-28T15:51:05.899504Z",
       "occurred_at": null,
       "source": {
         "name": "cyvest",
@@ -1333,8 +1340,8 @@
     },
     "tag:bodies:urls": {
       "key": "tag:bodies:urls",
-      "seq": "01M11J0ZM7E7JGJ20ZMB6DDZ01",
-      "asserted_at": "2026-08-27T12:09:58.151709Z",
+      "seq": "01M14H2KDAVHGM4BWFH06HFE5W",
+      "asserted_at": "2026-08-28T15:51:05.898529Z",
       "occurred_at": null,
       "source": {
         "name": "cyvest",
@@ -1346,15 +1353,15 @@
       "name": "bodies:urls",
       "description": "Bodies URLs Analysis",
       "finding_keys": [
-        "fnd:body-url-https://virus.com/payload.exe:obs:artifact:__cyvest_root__",
-        "fnd:body-url-https://virus.com/about:obs:artifact:__cyvest_root__",
-        "fnd:body-url-https://domain.com/ok/toto:obs:artifact:__cyvest_root__"
+        "fnd:body-url-https://virus.com/payload.exe",
+        "fnd:body-url-https://virus.com/about",
+        "fnd:body-url-https://domain.com/ok/toto"
       ]
     },
     "tag:bodies:domains": {
       "key": "tag:bodies:domains",
-      "seq": "01M11J0ZM8485FZAN1GT64757R",
-      "asserted_at": "2026-08-27T12:09:58.152489Z",
+      "seq": "01M14H2KDCZB7N9CPZE1W8RQGR",
+      "asserted_at": "2026-08-28T15:51:05.900340Z",
       "occurred_at": null,
       "source": {
         "name": "cyvest",
@@ -1366,14 +1373,14 @@
       "name": "bodies:domains",
       "description": "Bodies Domains Analysis",
       "finding_keys": [
-        "fnd:body-domain-virus.com:obs:artifact:__cyvest_root__",
-        "fnd:body-domain-domain.com:obs:artifact:__cyvest_root__"
+        "fnd:body-domain-virus.com",
+        "fnd:body-domain-domain.com"
       ]
     },
     "tag:attachments": {
       "key": "tag:attachments",
-      "seq": "01M11J0ZM9EPR1Z09VTN37DMPJ",
-      "asserted_at": "2026-08-27T12:09:58.153204Z",
+      "seq": "01M14H2KDDQJQWV363YE19G740",
+      "asserted_at": "2026-08-28T15:51:05.901284Z",
       "occurred_at": null,
       "source": {
         "name": "cyvest",
@@ -1385,13 +1392,13 @@
       "name": "attachments",
       "description": "Email Attachments Analysis",
       "finding_keys": [
-        "fnd:attachment-invoice.pdf:obs:artifact:__cyvest_root__"
+        "fnd:attachment-invoice.pdf"
       ]
     },
     "tag:risk_assessment": {
       "key": "tag:risk_assessment",
-      "seq": "01M11J0ZMAKQMR01TSS749B1AY",
-      "asserted_at": "2026-08-27T12:09:58.154263Z",
+      "seq": "01M14H2KDD50M2MDPHQTETWQ8V",
+      "asserted_at": "2026-08-28T15:51:05.901923Z",
       "occurred_at": null,
       "source": {
         "name": "cyvest",
@@ -1403,13 +1410,13 @@
       "name": "risk_assessment",
       "description": "",
       "finding_keys": [
-        "fnd:email_risk_aggregated:obs:artifact:__cyvest_root__"
+        "fnd:email_risk_aggregated"
       ]
     },
     "tag:risk_assessment:ai": {
       "key": "tag:risk_assessment:ai",
-      "seq": "01M11J0ZMAZ98C4HW0FCRR8Z3A",
-      "asserted_at": "2026-08-27T12:09:58.154273Z",
+      "seq": "01M14H2KDDGKGTS6K7HAPSASGQ",
+      "asserted_at": "2026-08-28T15:51:05.901936Z",
       "occurred_at": null,
       "source": {
         "name": "cyvest",
@@ -1421,7 +1428,7 @@
       "name": "risk_assessment:ai",
       "description": "AI Analysis Tag",
       "finding_keys": [
-        "fnd:ai:obs:artifact:__cyvest_root__"
+        "fnd:ai"
       ]
     }
   },
@@ -1435,77 +1442,77 @@
       "score": 35.1,
       "contributions": [
         {
-          "source_key": "fnd:from:obs:artifact:__cyvest_root__",
+          "source_key": "fnd:from",
           "label": "finding",
           "value": 2.0,
           "retained": true,
           "detail": ""
         },
         {
-          "source_key": "fnd:from-proofpoint:obs:artifact:__cyvest_root__",
+          "source_key": "fnd:from-proofpoint",
           "label": "finding",
           "value": 5.0,
           "retained": true,
           "detail": ""
         },
         {
-          "source_key": "fnd:receiver:obs:artifact:__cyvest_root__",
+          "source_key": "fnd:receiver",
           "label": "finding",
           "value": 0.1,
           "retained": true,
           "detail": ""
         },
         {
-          "source_key": "fnd:body-url-https://virus.com/payload.exe:obs:artifact:__cyvest_root__",
+          "source_key": "fnd:body-url-https://virus.com/payload.exe",
           "label": "finding",
           "value": 5.0,
           "retained": true,
           "detail": ""
         },
         {
-          "source_key": "fnd:body-url-https://virus.com/about:obs:artifact:__cyvest_root__",
+          "source_key": "fnd:body-url-https://virus.com/about",
           "label": "finding",
           "value": 3.0,
           "retained": true,
           "detail": ""
         },
         {
-          "source_key": "fnd:body-url-https://domain.com/ok/toto:obs:artifact:__cyvest_root__",
+          "source_key": "fnd:body-url-https://domain.com/ok/toto",
           "label": "finding",
           "value": -1.0,
           "retained": true,
           "detail": ""
         },
         {
-          "source_key": "fnd:body-domain-virus.com:obs:artifact:__cyvest_root__",
+          "source_key": "fnd:body-domain-virus.com",
           "label": "finding",
           "value": 5.0,
           "retained": true,
           "detail": ""
         },
         {
-          "source_key": "fnd:body-domain-domain.com:obs:artifact:__cyvest_root__",
+          "source_key": "fnd:body-domain-domain.com",
           "label": "finding",
           "value": 0.0,
           "retained": true,
           "detail": ""
         },
         {
-          "source_key": "fnd:attachment-invoice.pdf:obs:artifact:__cyvest_root__",
+          "source_key": "fnd:attachment-invoice.pdf",
           "label": "finding",
           "value": 10.0,
           "retained": true,
           "detail": ""
         },
         {
-          "source_key": "fnd:email_risk_aggregated:obs:artifact:__cyvest_root__",
+          "source_key": "fnd:email_risk_aggregated",
           "label": "finding",
           "value": 6.0,
           "retained": true,
           "detail": ""
         },
         {
-          "source_key": "fnd:ai:obs:artifact:__cyvest_root__",
+          "source_key": "fnd:ai",
           "label": "conclusion floor · MALICIOUS",
           "value": 0.0,
           "retained": false,
@@ -1516,15 +1523,22 @@
       "raw": {}
     },
     "findings": {
-      "fnd:from:obs:artifact:__cyvest_root__": {
-        "key": "fnd:from:obs:artifact:__cyvest_root__",
+      "fnd:from": {
+        "key": "fnd:from",
         "verdict": "NOTABLE",
         "confidence": 1.0,
         "score": 2.0,
         "contributions": [
           {
-            "source_key": "obs:email:noreply@dmalicious.com",
-            "label": "link · fragment:fragment-emailfrom",
+            "source_key": "sig:vt:obs:email:noreply@dmalicious.com",
+            "label": "pin · VT · INFO",
+            "value": 0.0,
+            "retained": true,
+            "detail": ""
+          },
+          {
+            "source_key": "obs:domain:dmalicious.com",
+            "label": "link · observable",
             "value": 2.0,
             "retained": true,
             "detail": ""
@@ -1537,15 +1551,15 @@
         "own_term_suppressed": false,
         "counted": true
       },
-      "fnd:from-proofpoint:obs:artifact:__cyvest_root__": {
-        "key": "fnd:from-proofpoint:obs:artifact:__cyvest_root__",
+      "fnd:from-proofpoint": {
+        "key": "fnd:from-proofpoint",
         "verdict": "MALICIOUS",
         "confidence": 1.0,
         "score": 5.0,
         "contributions": [
           {
-            "source_key": "obs:email:noreply@dmalicious.com",
-            "label": "link · fragment:fragment-emailfrombis",
+            "source_key": "sig:proofpoint:obs:email:noreply@dmalicious.com",
+            "label": "pin · PROOFPOINT · MALICIOUS",
             "value": 5.0,
             "retained": true,
             "detail": ""
@@ -1558,14 +1572,14 @@
         "own_term_suppressed": false,
         "counted": true
       },
-      "fnd:receiver:obs:artifact:__cyvest_root__": {
-        "key": "fnd:receiver:obs:artifact:__cyvest_root__",
+      "fnd:receiver": {
+        "key": "fnd:receiver",
         "verdict": "NOTABLE",
         "confidence": 1.0,
         "score": 0.1,
         "contributions": [
           {
-            "source_key": "fnd:receiver:obs:artifact:__cyvest_root__",
+            "source_key": "fnd:receiver",
             "label": "rule floor · NOTABLE",
             "value": 0.1,
             "retained": true,
@@ -1573,7 +1587,7 @@
           },
           {
             "source_key": "obs:email:user@company.com",
-            "label": "link · fragment:fragment-emailreciever",
+            "label": "link · observable",
             "value": 0.0,
             "retained": true,
             "detail": ""
@@ -1586,15 +1600,15 @@
         "own_term_suppressed": false,
         "counted": true
       },
-      "fnd:body-url-https://virus.com/payload.exe:obs:artifact:__cyvest_root__": {
-        "key": "fnd:body-url-https://virus.com/payload.exe:obs:artifact:__cyvest_root__",
+      "fnd:body-url-https://virus.com/payload.exe": {
+        "key": "fnd:body-url-https://virus.com/payload.exe",
         "verdict": "MALICIOUS",
         "confidence": 1.0,
         "score": 5.0,
         "contributions": [
           {
             "source_key": "obs:url:https://virus.com/payload.exe",
-            "label": "link · fragment:fragment-bodiesurltask",
+            "label": "link · observable",
             "value": 5.0,
             "retained": true,
             "detail": ""
@@ -1607,15 +1621,15 @@
         "own_term_suppressed": false,
         "counted": true
       },
-      "fnd:body-url-https://virus.com/about:obs:artifact:__cyvest_root__": {
-        "key": "fnd:body-url-https://virus.com/about:obs:artifact:__cyvest_root__",
+      "fnd:body-url-https://virus.com/about": {
+        "key": "fnd:body-url-https://virus.com/about",
         "verdict": "SUSPICIOUS",
         "confidence": 1.0,
         "score": 3.0,
         "contributions": [
           {
             "source_key": "obs:url:https://virus.com/about",
-            "label": "link · fragment:fragment-bodiesurltask",
+            "label": "link · observable",
             "value": 3.0,
             "retained": true,
             "detail": ""
@@ -1628,15 +1642,15 @@
         "own_term_suppressed": false,
         "counted": true
       },
-      "fnd:body-url-https://domain.com/ok/toto:obs:artifact:__cyvest_root__": {
-        "key": "fnd:body-url-https://domain.com/ok/toto:obs:artifact:__cyvest_root__",
+      "fnd:body-url-https://domain.com/ok/toto": {
+        "key": "fnd:body-url-https://domain.com/ok/toto",
         "verdict": "SAFE",
         "confidence": 1.0,
         "score": -1.0,
         "contributions": [
           {
             "source_key": "obs:url:https://domain.com/ok/toto",
-            "label": "link · fragment:fragment-bodiesurltask",
+            "label": "link · observable",
             "value": -1.0,
             "retained": true,
             "detail": ""
@@ -1649,15 +1663,15 @@
         "own_term_suppressed": false,
         "counted": true
       },
-      "fnd:body-domain-virus.com:obs:artifact:__cyvest_root__": {
-        "key": "fnd:body-domain-virus.com:obs:artifact:__cyvest_root__",
+      "fnd:body-domain-virus.com": {
+        "key": "fnd:body-domain-virus.com",
         "verdict": "MALICIOUS",
         "confidence": 1.0,
         "score": 5.0,
         "contributions": [
           {
             "source_key": "obs:domain:virus.com",
-            "label": "link · ALL",
+            "label": "link · observable",
             "value": 5.0,
             "retained": true,
             "detail": ""
@@ -1670,15 +1684,15 @@
         "own_term_suppressed": false,
         "counted": true
       },
-      "fnd:body-domain-domain.com:obs:artifact:__cyvest_root__": {
-        "key": "fnd:body-domain-domain.com:obs:artifact:__cyvest_root__",
+      "fnd:body-domain-domain.com": {
+        "key": "fnd:body-domain-domain.com",
         "verdict": "INFO",
         "confidence": 1.0,
         "score": 0.0,
         "contributions": [
           {
             "source_key": "obs:domain:domain.com",
-            "label": "link · ALL",
+            "label": "link · observable",
             "value": 0.0,
             "retained": true,
             "detail": ""
@@ -1691,15 +1705,15 @@
         "own_term_suppressed": false,
         "counted": true
       },
-      "fnd:attachment-invoice.pdf:obs:artifact:__cyvest_root__": {
-        "key": "fnd:attachment-invoice.pdf:obs:artifact:__cyvest_root__",
+      "fnd:attachment-invoice.pdf": {
+        "key": "fnd:attachment-invoice.pdf",
         "verdict": "MALICIOUS",
         "confidence": 1.0,
         "score": 10.0,
         "contributions": [
           {
             "source_key": "obs:file:invoice.pdf",
-            "label": "link · fragment:fragment-attachmenttask",
+            "label": "link · observable",
             "value": 10.0,
             "retained": true,
             "detail": ""
@@ -1712,14 +1726,14 @@
         "own_term_suppressed": false,
         "counted": true
       },
-      "fnd:email_risk_aggregated:obs:artifact:__cyvest_root__": {
-        "key": "fnd:email_risk_aggregated:obs:artifact:__cyvest_root__",
+      "fnd:email_risk_aggregated": {
+        "key": "fnd:email_risk_aggregated",
         "verdict": "MALICIOUS",
         "confidence": 1.0,
         "score": 6.0,
         "contributions": [
           {
-            "source_key": "fnd:email_risk_aggregated:obs:artifact:__cyvest_root__",
+            "source_key": "fnd:email_risk_aggregated",
             "label": "rule floor · MALICIOUS",
             "value": 6.0,
             "retained": true,
@@ -1733,14 +1747,14 @@
         "own_term_suppressed": false,
         "counted": true
       },
-      "fnd:ai:obs:artifact:__cyvest_root__": {
-        "key": "fnd:ai:obs:artifact:__cyvest_root__",
+      "fnd:ai": {
+        "key": "fnd:ai",
         "verdict": "MALICIOUS",
         "confidence": 1.0,
         "score": null,
         "contributions": [
           {
-            "source_key": "fnd:ai:obs:artifact:__cyvest_root__",
+            "source_key": "fnd:ai",
             "label": "conclusion · MALICIOUS",
             "value": 0.0,
             "retained": true,
@@ -1756,7 +1770,7 @@
       }
     },
     "observables": {
-      "obs:ipv4:8.1.2.3@fragment:fragment-emailfrom": {
+      "obs:ipv4:8.1.2.3": {
         "key": "obs:ipv4:8.1.2.3",
         "verdict": "NOTABLE",
         "confidence": 1.0,
@@ -1771,13 +1785,9 @@
           }
         ],
         "suppressed_by_decision": false,
-        "raw": {},
-        "scope": {
-          "scope": "OWN_FRAGMENT",
-          "fragment_id": "fragment-emailfrom"
-        }
+        "raw": {}
       },
-      "obs:domain:dmalicious.com@fragment:fragment-emailfrom": {
+      "obs:domain:dmalicious.com": {
         "key": "obs:domain:dmalicious.com",
         "verdict": "NOTABLE",
         "confidence": 1.0,
@@ -1799,75 +1809,18 @@
           }
         ],
         "suppressed_by_decision": false,
-        "raw": {},
-        "scope": {
-          "scope": "OWN_FRAGMENT",
-          "fragment_id": "fragment-emailfrom"
-        }
+        "raw": {}
       },
-      "obs:email:noreply@dmalicious.com@fragment:fragment-emailfrom": {
-        "key": "obs:email:noreply@dmalicious.com",
-        "verdict": "NOTABLE",
-        "confidence": 1.0,
-        "score": 2.0,
-        "contributions": [
-          {
-            "source_key": "sig:vt:obs:email:noreply@dmalicious.com",
-            "label": "VT · INFO",
-            "value": 0.0,
-            "retained": true,
-            "detail": ""
-          },
-          {
-            "source_key": "rel:extraction:obs:email:noreply@dmalicious.com>obs:domain:dmalicious.com",
-            "label": "extraction → obs:domain:dmalicious.com",
-            "value": 2.0,
-            "retained": true,
-            "detail": ""
-          }
-        ],
-        "suppressed_by_decision": false,
-        "raw": {},
-        "scope": {
-          "scope": "OWN_FRAGMENT",
-          "fragment_id": "fragment-emailfrom"
-        }
-      },
-      "obs:email:noreply@dmalicious.com@fragment:fragment-emailfrombis": {
-        "key": "obs:email:noreply@dmalicious.com",
-        "verdict": "MALICIOUS",
-        "confidence": 1.0,
-        "score": 5.0,
-        "contributions": [
-          {
-            "source_key": "sig:proofpoint:obs:email:noreply@dmalicious.com",
-            "label": "PROOFPOINT · MALICIOUS",
-            "value": 5.0,
-            "retained": true,
-            "detail": ""
-          }
-        ],
-        "suppressed_by_decision": false,
-        "raw": {},
-        "scope": {
-          "scope": "OWN_FRAGMENT",
-          "fragment_id": "fragment-emailfrombis"
-        }
-      },
-      "obs:email:user@company.com@fragment:fragment-emailreciever": {
+      "obs:email:user@company.com": {
         "key": "obs:email:user@company.com",
         "verdict": "INFO",
         "confidence": 1.0,
         "score": 0.0,
         "contributions": [],
         "suppressed_by_decision": false,
-        "raw": {},
-        "scope": {
-          "scope": "OWN_FRAGMENT",
-          "fragment_id": "fragment-emailreciever"
-        }
+        "raw": {}
       },
-      "obs:url:https://virus.com/payload.exe@fragment:fragment-bodiesurltask": {
+      "obs:url:https://virus.com/payload.exe": {
         "key": "obs:url:https://virus.com/payload.exe",
         "verdict": "MALICIOUS",
         "confidence": 1.0,
@@ -1882,13 +1835,9 @@
           }
         ],
         "suppressed_by_decision": false,
-        "raw": {},
-        "scope": {
-          "scope": "OWN_FRAGMENT",
-          "fragment_id": "fragment-bodiesurltask"
-        }
+        "raw": {}
       },
-      "obs:url:https://virus.com/about@fragment:fragment-bodiesurltask": {
+      "obs:url:https://virus.com/about": {
         "key": "obs:url:https://virus.com/about",
         "verdict": "SUSPICIOUS",
         "confidence": 1.0,
@@ -1903,13 +1852,9 @@
           }
         ],
         "suppressed_by_decision": false,
-        "raw": {},
-        "scope": {
-          "scope": "OWN_FRAGMENT",
-          "fragment_id": "fragment-bodiesurltask"
-        }
+        "raw": {}
       },
-      "obs:url:https://domain.com/ok/toto@fragment:fragment-bodiesurltask": {
+      "obs:url:https://domain.com/ok/toto": {
         "key": "obs:url:https://domain.com/ok/toto",
         "verdict": "SAFE",
         "confidence": 1.0,
@@ -1924,55 +1869,9 @@
           }
         ],
         "suppressed_by_decision": false,
-        "raw": {},
-        "scope": {
-          "scope": "OWN_FRAGMENT",
-          "fragment_id": "fragment-bodiesurltask"
-        }
+        "raw": {}
       },
-      "obs:url:https://virus.com/payload.exe@ALL": {
-        "key": "obs:url:https://virus.com/payload.exe",
-        "verdict": "MALICIOUS",
-        "confidence": 1.0,
-        "score": 5.0,
-        "contributions": [
-          {
-            "source_key": "sig:vt:obs:url:https://virus.com/payload.exe",
-            "label": "VT · MALICIOUS",
-            "value": 5.0,
-            "retained": true,
-            "detail": ""
-          }
-        ],
-        "suppressed_by_decision": false,
-        "raw": {},
-        "scope": {
-          "scope": "ALL",
-          "fragment_id": null
-        }
-      },
-      "obs:url:https://virus.com/about@ALL": {
-        "key": "obs:url:https://virus.com/about",
-        "verdict": "SUSPICIOUS",
-        "confidence": 1.0,
-        "score": 3.0,
-        "contributions": [
-          {
-            "source_key": "sig:vt:obs:url:https://virus.com/about",
-            "label": "VT · SUSPICIOUS",
-            "value": 3.0,
-            "retained": true,
-            "detail": ""
-          }
-        ],
-        "suppressed_by_decision": false,
-        "raw": {},
-        "scope": {
-          "scope": "ALL",
-          "fragment_id": null
-        }
-      },
-      "obs:domain:virus.com@ALL": {
+      "obs:domain:virus.com": {
         "key": "obs:domain:virus.com",
         "verdict": "MALICIOUS",
         "confidence": 1.0,
@@ -2001,34 +1900,9 @@
           }
         ],
         "suppressed_by_decision": false,
-        "raw": {},
-        "scope": {
-          "scope": "ALL",
-          "fragment_id": null
-        }
+        "raw": {}
       },
-      "obs:url:https://domain.com/ok/toto@ALL": {
-        "key": "obs:url:https://domain.com/ok/toto",
-        "verdict": "SAFE",
-        "confidence": 1.0,
-        "score": -1.0,
-        "contributions": [
-          {
-            "source_key": "sig:vt:obs:url:https://domain.com/ok/toto",
-            "label": "VT · SAFE",
-            "value": -1.0,
-            "retained": true,
-            "detail": ""
-          }
-        ],
-        "suppressed_by_decision": false,
-        "raw": {},
-        "scope": {
-          "scope": "ALL",
-          "fragment_id": null
-        }
-      },
-      "obs:domain:domain.com@ALL": {
+      "obs:domain:domain.com": {
         "key": "obs:domain:domain.com",
         "verdict": "INFO",
         "confidence": 1.0,
@@ -2050,13 +1924,9 @@
           }
         ],
         "suppressed_by_decision": false,
-        "raw": {},
-        "scope": {
-          "scope": "ALL",
-          "fragment_id": null
-        }
+        "raw": {}
       },
-      "obs:hash:md5:d41d8cd98f00b204e9800998ecf8427e@fragment:fragment-attachmenttask": {
+      "obs:hash:md5:d41d8cd98f00b204e9800998ecf8427e": {
         "key": "obs:hash:md5:d41d8cd98f00b204e9800998ecf8427e",
         "verdict": "MALICIOUS",
         "confidence": 1.0,
@@ -2071,13 +1941,9 @@
           }
         ],
         "suppressed_by_decision": false,
-        "raw": {},
-        "scope": {
-          "scope": "OWN_FRAGMENT",
-          "fragment_id": "fragment-attachmenttask"
-        }
+        "raw": {}
       },
-      "obs:file:invoice.pdf@fragment:fragment-attachmenttask": {
+      "obs:file:invoice.pdf": {
         "key": "obs:file:invoice.pdf",
         "verdict": "MALICIOUS",
         "confidence": 1.0,
@@ -2099,75 +1965,9 @@
           }
         ],
         "suppressed_by_decision": false,
-        "raw": {},
-        "scope": {
-          "scope": "OWN_FRAGMENT",
-          "fragment_id": "fragment-attachmenttask"
-        }
+        "raw": {}
       },
-      "obs:email:user@company.com@ALL": {
-        "key": "obs:email:user@company.com",
-        "verdict": "INFO",
-        "confidence": 1.0,
-        "score": 0.0,
-        "contributions": [],
-        "suppressed_by_decision": false,
-        "raw": {},
-        "scope": {
-          "scope": "ALL",
-          "fragment_id": null
-        }
-      },
-      "obs:ipv4:8.1.2.3@ALL": {
-        "key": "obs:ipv4:8.1.2.3",
-        "verdict": "NOTABLE",
-        "confidence": 1.0,
-        "score": 2.0,
-        "contributions": [
-          {
-            "source_key": "sig:abuseipdb:obs:ipv4:8.1.2.3",
-            "label": "ABUSEIPDB · NOTABLE",
-            "value": 2.0,
-            "retained": true,
-            "detail": ""
-          }
-        ],
-        "suppressed_by_decision": false,
-        "raw": {},
-        "scope": {
-          "scope": "ALL",
-          "fragment_id": null
-        }
-      },
-      "obs:domain:dmalicious.com@ALL": {
-        "key": "obs:domain:dmalicious.com",
-        "verdict": "NOTABLE",
-        "confidence": 1.0,
-        "score": 2.0,
-        "contributions": [
-          {
-            "source_key": "sig:vt:obs:domain:dmalicious.com",
-            "label": "VT · NOTABLE",
-            "value": 1.0,
-            "retained": true,
-            "detail": ""
-          },
-          {
-            "source_key": "rel:pivot:obs:domain:dmalicious.com>obs:ipv4:8.1.2.3",
-            "label": "pivot → obs:ipv4:8.1.2.3",
-            "value": 2.0,
-            "retained": true,
-            "detail": ""
-          }
-        ],
-        "suppressed_by_decision": false,
-        "raw": {},
-        "scope": {
-          "scope": "ALL",
-          "fragment_id": null
-        }
-      },
-      "obs:email:noreply@dmalicious.com@ALL": {
+      "obs:email:noreply@dmalicious.com": {
         "key": "obs:email:noreply@dmalicious.com",
         "verdict": "MALICIOUS",
         "confidence": 1.0,
@@ -2196,13 +1996,9 @@
           }
         ],
         "suppressed_by_decision": false,
-        "raw": {},
-        "scope": {
-          "scope": "ALL",
-          "fragment_id": null
-        }
+        "raw": {}
       },
-      "obs:file:body/html@ALL": {
+      "obs:file:body/html": {
         "key": "obs:file:body/html",
         "verdict": "MALICIOUS",
         "confidence": 1.0,
@@ -2230,93 +2026,40 @@
             "detail": ""
           },
           {
-            "source_key": "rel:extraction:obs:file:body/html>obs:domain:domain.com",
-            "label": "extraction → obs:domain:domain.com",
-            "value": 0.0,
-            "retained": true,
-            "detail": ""
-          },
-          {
             "source_key": "rel:extraction:obs:file:body/html>obs:domain:virus.com",
             "label": "extraction → obs:domain:virus.com",
             "value": 5.0,
             "retained": true,
             "detail": ""
-          }
-        ],
-        "suppressed_by_decision": false,
-        "raw": {},
-        "scope": {
-          "scope": "ALL",
-          "fragment_id": null
-        }
-      },
-      "obs:hash:md5:d41d8cd98f00b204e9800998ecf8427e@ALL": {
-        "key": "obs:hash:md5:d41d8cd98f00b204e9800998ecf8427e",
-        "verdict": "MALICIOUS",
-        "confidence": 1.0,
-        "score": 10.0,
-        "contributions": [
-          {
-            "source_key": "sig:vt:obs:hash:md5:d41d8cd98f00b204e9800998ecf8427e",
-            "label": "VT · MALICIOUS",
-            "value": 10.0,
-            "retained": true,
-            "detail": ""
-          }
-        ],
-        "suppressed_by_decision": false,
-        "raw": {},
-        "scope": {
-          "scope": "ALL",
-          "fragment_id": null
-        }
-      },
-      "obs:file:invoice.pdf@ALL": {
-        "key": "obs:file:invoice.pdf",
-        "verdict": "MALICIOUS",
-        "confidence": 1.0,
-        "score": 10.0,
-        "contributions": [
-          {
-            "source_key": "sig:malwarebazaar:obs:file:invoice.pdf",
-            "label": "MALWAREBAZAAR · MALICIOUS",
-            "value": 10.0,
-            "retained": true,
-            "detail": ""
           },
           {
-            "source_key": "rel:extraction:obs:file:invoice.pdf>obs:hash:md5:d41d8cd98f00b204e9800998ecf8427e",
-            "label": "extraction → obs:hash:md5:d41d8cd98f00b204e9800998ecf8427e",
-            "value": 10.0,
+            "source_key": "rel:extraction:obs:file:body/html>obs:domain:domain.com",
+            "label": "extraction → obs:domain:domain.com",
+            "value": 0.0,
             "retained": true,
             "detail": ""
           }
         ],
         "suppressed_by_decision": false,
-        "raw": {},
-        "scope": {
-          "scope": "ALL",
-          "fragment_id": null
-        }
+        "raw": {}
       },
-      "obs:artifact:__cyvest_root__@ALL": {
+      "obs:artifact:__cyvest_root__": {
         "key": "obs:artifact:__cyvest_root__",
         "verdict": "MALICIOUS",
         "confidence": 1.0,
         "score": 10.0,
         "contributions": [
           {
-            "source_key": "rel:extraction:obs:artifact:__cyvest_root__>obs:email:user@company.com",
-            "label": "extraction → obs:email:user@company.com",
-            "value": 0.0,
+            "source_key": "rel:extraction:obs:artifact:__cyvest_root__>obs:email:noreply@dmalicious.com",
+            "label": "extraction → obs:email:noreply@dmalicious.com",
+            "value": 5.0,
             "retained": true,
             "detail": ""
           },
           {
-            "source_key": "rel:extraction:obs:artifact:__cyvest_root__>obs:email:noreply@dmalicious.com",
-            "label": "extraction → obs:email:noreply@dmalicious.com",
-            "value": 5.0,
+            "source_key": "rel:extraction:obs:artifact:__cyvest_root__>obs:email:user@company.com",
+            "label": "extraction → obs:email:user@company.com",
+            "value": 0.0,
             "retained": true,
             "detail": ""
           },
@@ -2336,11 +2079,7 @@
           }
         ],
         "suppressed_by_decision": false,
-        "raw": {},
-        "scope": {
-          "scope": "ALL",
-          "fragment_id": null
-        }
+        "raw": {}
       }
     }
   }

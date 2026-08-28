@@ -11,11 +11,11 @@ reintroduce the confusion v7 exists to remove.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
-from cyvest.enums import DecisionKind, Effect, RelationKind, Scope, SourceClass, Status, Verdict
-from cyvest.evaluation import ResolvedScope
+from cyvest.enums import DecisionKind, Effect, LinkBasis, RelationKind, SourceClass, Status, Verdict
 from cyvest.evaluation.projection import verdict_from_score
 from cyvest.evaluation.report import CONCLUSION_BOUND_LABELS, Contribution, FindingResult, ObservableResult
 from cyvest.facts import (
@@ -26,6 +26,7 @@ from cyvest.facts import (
     Label,
     Observable,
     ObservableAlias,
+    ObservableSignal,
     SourceRef,
     Tag,
     ThreatIntel,
@@ -97,10 +98,6 @@ class _JudgedProxy(_ReadOnlyProxy[_T]):
     @property
     def weight(self) -> float | None:
         return self._resolve().weight
-
-    @property
-    def subject_key(self) -> str:
-        return self._resolve().subject_key
 
 
 class _DecidableProxy(_ReadOnlyProxy[_T]):
@@ -228,8 +225,8 @@ class ObservableProxy(_DecidableProxy[Observable]):
     def occurrence_count(self) -> int:
         return self._resolve().occurrence_count
 
-    def result(self, scope: ResolvedScope | None = None) -> ObservableResult | None:
-        return self._investigation.report.observable(self._key, scope)
+    def result(self) -> ObservableResult | None:
+        return self._investigation.report.observable(self._key)
 
     @property
     def score(self) -> float:
@@ -453,10 +450,22 @@ class FindingProxy(_DecidableProxy[Finding], _JudgedProxy[Finding]):
     def link_observable(
         self,
         observable: ObservableProxy | Observable | str,
-        scope: Scope | str = Scope.OWN_FRAGMENT,
+        basis: LinkBasis | str = LinkBasis.OBSERVABLE,
+        signal_keys: Sequence[str] = (),
     ) -> FindingProxy:
         key = observable.key if isinstance(observable, (ObservableProxy, Observable)) else observable
-        self._investigation.link_finding_observable(self._key, key, scope)
+        self._investigation.link_finding_observable(self._key, key, basis, signal_keys)
+        return self
+
+    def pin(self, *signals: ThreatIntelProxy | ObservableSignal | str) -> FindingProxy:
+        """
+        Score this finding on the signals it fetched, and on nothing else.
+
+        The observable is derived from the signals, so it is never restated. Later intel on that
+        observable — and anything its children pick up — leaves this finding where it stands.
+        """
+        resolved = [s.key if isinstance(s, (ThreatIntelProxy, ObservableSignal)) else s for s in signals]
+        self._investigation.pin_finding_signals(self._key, *resolved)
         return self
 
     def link_evidence(self, evidence: EvidenceProxy | Evidence | str) -> FindingProxy:
@@ -599,6 +608,10 @@ class ThreatIntelProxy(_JudgedProxy[ThreatIntel]):
     @property
     def source(self) -> str:
         return self._resolve().source.name
+
+    @property
+    def subject_key(self) -> str:
+        return self._resolve().subject_key
 
     @property
     def source_class(self):  # noqa: ANN201

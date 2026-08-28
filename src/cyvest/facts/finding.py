@@ -16,7 +16,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from cyvest import keys
-from cyvest.enums import Effect, Scope, Status, Verdict
+from cyvest.enums import Effect, LinkBasis, Status, Verdict
 from cyvest.facts.base import Fact, Judgment, Label
 
 _VERDICTS_WITHOUT_FLOOR = (Verdict.SAFE, Verdict.INFO)
@@ -27,27 +27,55 @@ CONCLUSION_TAKES_NO_WEIGHT = (
     "weight; drop the weight or make the finding ADDITIVE"
 )
 
+SIGNALS_BASIS_TAKES_KEYS = (
+    "a SIGNALS link scores on the signals it names, so it must name at least one; pass "
+    "signal_keys, or pick the OBSERVABLE basis to score on the observable itself"
+)
+
+OBSERVABLE_BASIS_TAKES_NO_KEYS = (
+    "signal_keys only applies to the SIGNALS basis; an OBSERVABLE link scores on the observable "
+    "as a whole and a NONE link scores nothing, so naming signals would be silently ignored"
+)
+
 
 class ObservableLink(BaseModel):
     """
-    A link from a finding to one of its observables, with the scope it is evaluated in.
+    A link from a finding to one of its observables, with the basis it is evaluated on.
 
-    Scope is **per link**, exactly like v6's ``propagation_mode``: a finding may mix scopes, and
-    may even link the same observable twice under two scopes. Deduplication is on the tuple.
+    Basis is **per link**, exactly like v6's ``propagation_mode``: a finding may mix bases, and
+    may even link the same observable twice under two of them. Deduplication is on the triple
+    ``(observable_key, basis, signal_keys)``.
+
+    ``signal_keys`` is sorted and deduplicated so that two links naming the same signals in a
+    different order are the same link, and merging stays idempotent.
     """
 
     model_config = ConfigDict(frozen=True)
 
     observable_key: str = Field(..., min_length=1)
-    scope: Scope = Field(default=Scope.OWN_FRAGMENT)
+    basis: LinkBasis = Field(default=LinkBasis.OBSERVABLE)
+    signal_keys: tuple[str, ...] = Field(default=())
+
+    @model_validator(mode="after")
+    def _check_basis(self) -> ObservableLink:
+        if self.basis is LinkBasis.SIGNALS:
+            if not self.signal_keys:
+                raise ValueError(SIGNALS_BASIS_TAKES_KEYS)
+            normalized = tuple(sorted(set(self.signal_keys)))
+            if normalized != self.signal_keys:
+                object.__setattr__(self, "signal_keys", normalized)
+        elif self.signal_keys:
+            raise ValueError(OBSERVABLE_BASIS_TAKES_NO_KEYS)
+        return self
 
 
 class Finding(Fact, Judgment):
     """
-    A rule outcome. Identity is ``(rule_id, subject_key)``.
+    A rule outcome. Identity is ``rule_id`` alone, plus ``external_id`` when one is given.
 
-    ``subject_key`` may be an observable *or* the investigation itself — unlike a signal, which
-    always targets an observable.
+    A finding names no subject: what it is about is its ``observable_links``, which are also what
+    it scores on. Use ``external_id`` when the same rule must yield several findings — typically
+    once per observable, ``external_id=url.key``.
     """
 
     rule_id: str = Field(..., min_length=1)
@@ -67,16 +95,15 @@ class Finding(Fact, Judgment):
             return values
         values["key"] = keys.generate_finding_key(
             str(values.get("rule_id", "")),
-            str(values.get("subject_key", "")),
             external_id=values.get("external_id"),
         )
         return values
 
     @model_validator(mode="after")
     def _dedupe_links(self) -> Finding:
-        seen: dict[tuple[str, Scope], ObservableLink] = {}
+        seen: dict[tuple[str, LinkBasis, tuple[str, ...]], ObservableLink] = {}
         for link in self.observable_links:
-            seen.setdefault((link.observable_key, link.scope), link)
+            seen.setdefault((link.observable_key, link.basis, link.signal_keys), link)
         if len(seen) != len(self.observable_links):
             object.__setattr__(self, "observable_links", tuple(seen.values()))
         return self

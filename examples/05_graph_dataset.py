@@ -97,7 +97,7 @@ def main(output: Path | None = None) -> None:
         cv.observable(cv.OBS.URL, "https://accounts.google.com/security")
         .with_ti("Internal Whitelist", weight=-2.0, comment="Known safe link")
         .allowlist(
-            "Domaine d'authentification Google, validé par la RSSI",
+            "Google authentication domain, approved by the CISO",
             decided_by="rssi",
         )
     )

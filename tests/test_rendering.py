@@ -133,6 +133,32 @@ class TestSummaryLayout:
         assert "url https://bad.example/x" in titles
 
 
+class TestMarkdownTrimming:
+    """A report handed to a model is mostly noise budget, so it can be trimmed."""
+
+    @staticmethod
+    def _case() -> Cyvest:
+        cv = Cyvest(investigation_name="IR-1")
+        cv.finding("quiet", "quiet rule")
+        cv.finding("loud", "loud rule").with_weight(5.0)
+        cv.observable(ObservableType.DOMAIN, "bad.example")
+        return cv
+
+    def test_a_silent_finding_is_left_out_by_default(self) -> None:
+        markdown = generate_markdown_report(self._case()._investigation)
+        assert "loud rule" in markdown
+        assert "quiet rule" not in markdown
+
+    def test_show_silent_brings_it_back(self) -> None:
+        assert "quiet rule" in generate_markdown_report(self._case()._investigation, show_silent=True)
+
+    def test_the_observable_table_can_be_dropped(self) -> None:
+        markdown = generate_markdown_report(self._case()._investigation, include_observables=False)
+        assert "## Observables" not in markdown
+        assert "bad.example" not in markdown
+        assert "loud rule" in markdown
+
+
 class TestEmptyInvestigation:
     """A renderer that raises on an empty investigation fails exactly when nothing was found."""
 

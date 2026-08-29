@@ -184,7 +184,8 @@ Three properties make this safe without coordination:
 
 - **order does not matter** — merging is commutative and associative;
 - **a retry is free** — reconciling twice changes nothing;
-- **a partial failure still contributes** — `task()` reconciles even when the body raises.
+- **a partial failure still contributes** — `task()` reconciles even when the body raises, unless
+  you pass `reconcile_on_error=False`.
 
 And because each worker has its own `fragment_id`, every fact stays attributable to the feed that
 asserted it. When a rule must report the verdict *it* fetched rather than whatever the observable

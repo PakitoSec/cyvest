@@ -3,8 +3,12 @@
 from __future__ import annotations
 
 import asyncio
+import threading
+
+import pytest
 
 from cyvest import Cyvest, Verdict
+from cyvest.investigation import FrozenInvestigationError
 from cyvest.shared import SharedInvestigationContext
 from cyvest.stats import InvestigationStats
 
@@ -92,8 +96,9 @@ class TestSharedContext:
             worker.finding("url_reputation").link_observable(url)
 
         # Reconciled facts are shared, so both findings read the same observable.
-        assert context.get_global_score() == 6.0
-        assert context.get_global_verdict() is Verdict.MALICIOUS
+        snapshot = context.snapshot()
+        assert snapshot.get_global_score() == 6.0
+        assert snapshot.get_global_verdict() is Verdict.MALICIOUS
 
     def test_reconciling_twice_is_harmless(self) -> None:
         context = SharedInvestigationContext()
@@ -101,10 +106,10 @@ class TestSharedContext:
         worker.observable(worker.OBS.URL, "hxxp://bad.example")
 
         context.reconcile(worker)
-        first = len(context.store.observables)
+        first = len(context.snapshot().observable_get_all())
         context.reconcile(worker)
 
-        assert len(context.store.observables) == first
+        assert len(context.snapshot().observable_get_all()) == first
 
     def test_reconcile_order_does_not_matter(self) -> None:
         def build(fragment_id: str, value: str) -> Cyvest:
@@ -123,18 +128,25 @@ class TestSharedContext:
         backward.reconcile(right)
         backward.reconcile(left)
 
-        assert sorted(forward.store.observables) == sorted(backward.store.observables)
+        assert sorted(forward.snapshot().observable_get_all()) == sorted(backward.snapshot().observable_get_all())
 
     def test_a_failing_task_still_contributes_what_it_gathered(self) -> None:
         context = SharedInvestigationContext()
-        try:
+        with pytest.raises(RuntimeError):
             with context.task(fragment_id="i1") as worker:
                 worker.observable(worker.OBS.URL, "hxxp://partial")
                 raise RuntimeError("analysis blew up")
-        except RuntimeError:
-            pass
 
-        assert any("partial" in obs.value for obs in context.store.observables.values())
+        assert any("partial" in obs.value for obs in context.snapshot().observable_get_all().values())
+
+    def test_a_failing_task_can_be_told_to_contribute_nothing(self) -> None:
+        context = SharedInvestigationContext()
+        with pytest.raises(RuntimeError):
+            with context.task(fragment_id="i1", reconcile_on_error=False) as worker:
+                worker.observable(worker.OBS.URL, "hxxp://partial")
+                raise RuntimeError("analysis blew up")
+
+        assert not any("partial" in obs.value for obs in context.snapshot().observable_get_all().values())
 
     def test_the_reconciled_whole_reads_through_the_ordinary_facade(self) -> None:
         context = SharedInvestigationContext()
@@ -143,17 +155,71 @@ class TestSharedContext:
             worker.observable_add_threat_intel(url, "virustotal", verdict=worker.VERDICT.MALICIOUS, weight=6.0)
             worker.finding("r").link_observable(url, worker.BASIS.OBSERVABLE)
 
-        facade = context.as_cyvest()
-        assert facade.get_global_score() == 6.0
+        assert context.snapshot().get_global_score() == 6.0
 
-    def test_async_reads_do_not_need_a_global_lock(self) -> None:
+    def test_a_snapshot_holds_still_while_workers_keep_arriving(self) -> None:
+        """The point of a snapshot: several reads of one task cannot straddle two states."""
         context = SharedInvestigationContext()
-        with context.task() as worker:
-            worker.finding("r", verdict=worker.VERDICT.MALICIOUS)
+        with context.task(fragment_id="first") as worker:
+            worker.observable(worker.OBS.URL, "hxxp://first")
 
-        async def read() -> tuple:
-            return await asyncio.gather(context.aget_global_score(), context.aget_global_verdict())
+        snapshot = context.snapshot()
+        before = len(snapshot.observable_get_all())
 
-        score, verdict = asyncio.run(read())
-        assert verdict is Verdict.MALICIOUS
-        assert score > 0
+        with context.task(fragment_id="second") as worker:
+            worker.observable(worker.OBS.URL, "hxxp://second")
+
+        assert len(snapshot.observable_get_all()) == before
+        assert len(context.snapshot().observable_get_all()) == before + 1
+
+    def test_a_snapshot_refuses_to_be_written_to(self) -> None:
+        context = SharedInvestigationContext()
+        snapshot = context.snapshot()
+
+        with pytest.raises(FrozenInvestigationError):
+            snapshot.observable(snapshot.OBS.URL, "hxxp://nowhere")
+
+    def test_concurrent_reconciles_never_tear_a_read(self) -> None:
+        context = SharedInvestigationContext()
+        stop = threading.Event()
+        seen: list[int] = []
+        failures: list[BaseException] = []
+
+        def reader() -> None:
+            try:
+                while not stop.is_set():
+                    snapshot = context.snapshot()
+                    observables = snapshot.observable_get_all()
+                    # The report must describe the very facts just listed, not a later store.
+                    assert all(snapshot.observable_result(key) is not None for key in observables)
+                    seen.append(len(observables))
+            except BaseException as error:  # noqa: BLE001 - reported on the main thread
+                failures.append(error)
+
+        watcher = threading.Thread(target=reader)
+        watcher.start()
+        try:
+            for index in range(40):
+                with context.task(fragment_id=f"w{index}") as worker:
+                    worker.observable(worker.OBS.URL, f"hxxp://host{index}")
+        finally:
+            stop.set()
+            watcher.join()
+
+        assert not failures
+        assert seen == sorted(seen)  # a snapshot never goes backwards
+        assert len(context.snapshot().observable_get_all()) == 41  # the root plus 40 workers
+
+    def test_async_tasks_reconcile_off_the_event_loop(self) -> None:
+        context = SharedInvestigationContext()
+
+        async def worker(index: int) -> None:
+            async with context.atask(fragment_id=f"w{index}") as cv:
+                cv.observable(cv.OBS.URL, f"hxxp://host{index}")
+
+        async def run() -> Cyvest:
+            await asyncio.gather(*(worker(index) for index in range(5)))
+            return await context.asnapshot()
+
+        snapshot = asyncio.run(run())
+        assert len(snapshot.observable_get_all()) == 6  # the root plus five workers

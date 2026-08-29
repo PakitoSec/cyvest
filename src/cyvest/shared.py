@@ -3,29 +3,26 @@ Shared investigation context: several workers, one store.
 
 v6 guarded a mutable model with a global lock and deep-copied everything on every read, because
 concurrent mutation of shared objects had to be prevented. None of that is needed once facts are
-immutable and merging is a union: a worker builds its own fragment, and reconciling is
-``store.union()`` — idempotent, commutative and associative, so the order of arrivals is
-irrelevant and a double reconcile is harmless.
+immutable and merging is a union: a worker builds its own fragment, and reconciling folds it in —
+idempotent, commutative and associative, so the order of arrivals is irrelevant and a double
+reconcile is harmless.
 
-The lock that remains protects one dict insertion, not an object graph.
+Reads go through :meth:`SharedInvestigationContext.snapshot`, a frozen view of the union. That is
+the whole read API: what it hands out is the ordinary ``Cyvest`` facade.
 """
 
 from __future__ import annotations
 
 import asyncio
 import threading
-from collections.abc import Iterator
-from contextlib import contextmanager
+from collections.abc import AsyncIterator, Iterator
+from contextlib import asynccontextmanager, contextmanager
 from typing import Any, Literal
 
 from logurich import get_logger
 
-from cyvest import keys
 from cyvest.cyvest import Cyvest
-from cyvest.enums import ObservableType, Verdict
-from cyvest.evaluation import Report, evaluate
-from cyvest.facts import Evidence, Finding, Observable
-from cyvest.facts.store import FactStore, InvestigationHeader
+from cyvest.enums import ObservableType
 from cyvest.investigation import Investigation
 from cyvest.policy import DEFAULT_POLICY, Policy
 from cyvest.ulid import generate_ulid
@@ -37,8 +34,8 @@ class SharedInvestigationContext:
     """
     A store several tasks contribute to.
 
-    Each ``create_cyvest`` hands out its own fragment id; reconciling folds that fragment back in.
-    Reads see the current union without taking a global lock on the object graph.
+    Each worker gets its own fragment id; reconciling folds that fragment back in. Reading is
+    taking a snapshot, which every read of a given task then shares.
     """
 
     def __init__(
@@ -62,18 +59,17 @@ class SharedInvestigationContext:
             investigation_name=investigation_name,
             investigation_id=investigation_id,
         )
-        self._append_lock = threading.Lock()
+        self._lock = threading.Lock()
+        self._snapshot: Cyvest | None = None
 
     @classmethod
     def from_investigation(cls, investigation: Investigation) -> SharedInvestigationContext:
         """Wrap an existing investigation so workers can contribute fragments to it."""
-        context = cls.__new__(cls)
-        context.policy = investigation.policy
         root = investigation.get_root()
-        context._root_data = root.extra
-        context._root_type = root.obs_type
+        context = cls(root.extra, root_type=root.obs_type, policy=investigation.policy)
+        # The investigation __init__ just built is a placeholder; one initialisation path is worth
+        # one throwaway root.
         context._main = investigation
-        context._append_lock = threading.Lock()
         return context
 
     # ------------------------------------------------------------------ fragments
@@ -82,7 +78,6 @@ class SharedInvestigationContext:
         self,
         *,
         fragment_id: str | None = None,
-        investigation_id: str | None = None,
         investigation_name: str | None = None,
     ) -> Cyvest:
         """
@@ -98,23 +93,43 @@ class SharedInvestigationContext:
             root_type=self._root_type,
             policy=self.policy,
             engine=self._main.store.header.engine_id,
-            investigation_id=fragment_id or investigation_id or generate_ulid(),
+            investigation_id=fragment_id or generate_ulid(),
             investigation_name=investigation_name,
         )
         worker._shared_context = self
         return worker
 
-    async def acreate_cyvest(self, *, fragment_id: str | None = None) -> Cyvest:
-        return await asyncio.to_thread(self.create_cyvest, fragment_id=fragment_id)
-
     @contextmanager
-    def task(self, *, fragment_id: str | None = None) -> Iterator[Cyvest]:
-        """Scope a worker and reconcile it on exit, including when the body raises."""
+    def task(self, *, fragment_id: str | None = None, reconcile_on_error: bool = True) -> Iterator[Cyvest]:
+        """
+        Scope a worker and reconcile it on exit.
+
+        A worker that raises still contributes what it managed to establish, which is usually what
+        an analyst wants. Pass ``reconcile_on_error=False`` when a half-finished fragment is worse
+        than no fragment at all.
+        """
         worker = self.create_cyvest(fragment_id=fragment_id)
         try:
             yield worker
-        finally:
+        except BaseException:
+            if reconcile_on_error:
+                self.reconcile(worker)
+            raise
+        else:
             self.reconcile(worker)
+
+    @asynccontextmanager
+    async def atask(self, *, fragment_id: str | None = None, reconcile_on_error: bool = True) -> AsyncIterator[Cyvest]:
+        """Async twin of :meth:`task`; reconciling runs off the event loop."""
+        worker = self.create_cyvest(fragment_id=fragment_id)
+        try:
+            yield worker
+        except BaseException:
+            if reconcile_on_error:
+                await self.areconcile(worker)
+            raise
+        else:
+            await self.areconcile(worker)
 
     # ------------------------------------------------------------------ reconcile
 
@@ -123,77 +138,49 @@ class SharedInvestigationContext:
         return source._investigation if isinstance(source, Cyvest) else source
 
     def reconcile(self, source: Cyvest | Investigation) -> None:
-        """Fold a worker's fragment into the shared store. Safe to call twice."""
+        """
+        Fold a worker's fragment into the shared store. Safe to call twice.
+
+        Folding in place costs the size of the fragment; ``union`` would rebuild the whole store on
+        every arrival, which is quadratic over a run. Same merge law either way.
+        """
         incoming = self._investigation_of(source)
-        with self._append_lock:
-            self._main.store = self._main.store.union(incoming.store)
+        with self._lock:
+            store = self._main.store
+            store.header = store.header.with_fragments(incoming.store.header.fragment_ids)
+            store.extend(incoming.store.all_facts())
             self._main.invalidate()
+            self._snapshot = None
 
     async def areconcile(self, source: Cyvest | Investigation) -> None:
         await asyncio.to_thread(self.reconcile, source)
 
     # ------------------------------------------------------------------ reads
 
-    @property
-    def store(self) -> FactStore:
-        return self._main.store
+    def snapshot(self) -> Cyvest:
+        """
+        A frozen view of the union at this instant.
 
-    @property
-    def header(self) -> InvestigationHeader:
-        return self._main.store.header
+        Every read through it sees one state. A task that consults a finding, then an observable,
+        then the report would otherwise be handed three different versions of the store, and score
+        something that never existed. Writing to a snapshot raises instead of being discarded.
 
-    @property
-    def report(self) -> Report:
-        return self._main.report
+        The copy is paid once per reconciliation, and only if somebody reads.
+        """
+        with self._lock:
+            if self._snapshot is None:
+                frozen, self._main.store = self._main.store, self._main.store.copy()
+                self._snapshot = Cyvest._wrap(Investigation.from_store(frozen, policy=self.policy, frozen=True))
+            return self._snapshot
 
-    def evaluate(self, *, policy: Policy | None = None, engine: str | None = None) -> Report:
-        return evaluate(self._main.store, policy or self.policy, engine or self.header.engine_id)
-
-    def get_global_score(self) -> float:
-        return self._main.get_global_score()
-
-    async def aget_global_score(self) -> float:
-        return await asyncio.to_thread(self.get_global_score)
-
-    def get_global_verdict(self) -> Verdict:
-        return self._main.get_global_verdict()
-
-    async def aget_global_verdict(self) -> Verdict:
-        return await asyncio.to_thread(self.get_global_verdict)
-
-    def observable_get(self, *args: Any, **kwargs: Any) -> Observable | None:
-        """Accepts a key, or the identity components — same call as on the facade it hands out."""
-        return self._main.get_observable(keys.resolve_observable_key(*args, **kwargs))
-
-    async def observable_aget(self, *args: Any, **kwargs: Any) -> Observable | None:
-        return await asyncio.to_thread(self.observable_get, *args, **kwargs)
-
-    def observables_list_by_type(self, obs_type: ObservableType | str) -> list[Observable]:
-        wanted = obs_type.value if isinstance(obs_type, ObservableType) else str(obs_type).lower()
-        return [
-            observable
-            for observable in self._main.get_all_observables().values()
-            if (observable.obs_type.value if hasattr(observable.obs_type, "value") else observable.obs_type) == wanted
-        ]
-
-    def finding_get(self, key: str) -> Finding | None:
-        return self._main.get_finding(key)
-
-    async def finding_aget(self, key: str) -> Finding | None:
-        return await asyncio.to_thread(self.finding_get, key)
-
-    def evidence_get(self, key: str) -> Evidence | None:
-        return self._main.get_evidence(key)
-
-    async def evidence_aget(self, key: str) -> Evidence | None:
-        return await asyncio.to_thread(self.evidence_get, key)
+    async def asnapshot(self) -> Cyvest:
+        return await asyncio.to_thread(self.snapshot)
 
     def finalize_relationships(self) -> None:
-        self._main.finalize_relationships()
-
-    def as_cyvest(self) -> Cyvest:
-        """Expose the reconciled whole through the ordinary facade."""
-        return Cyvest._wrap(self._main)
+        """Attach orphaned components to the root."""
+        with self._lock:
+            self._main.finalize_relationships()
+            self._snapshot = None
 
 
 __all__ = ["SharedInvestigationContext"]

@@ -65,7 +65,7 @@ pytest --cov=cyvest --cov-report=term-missing --cov-report=html
 
 - Prefer pytest-style fixtures and descriptive test names (`test_score_propagates_to_parent`).
 - Separate behaviour tests (fluent helpers, CLI) from data-model regression tests.
-- When touching concurrency/shared context, add a stress case under `tests/test_shared_context.py` or a new module.
+- When touching concurrency/shared context, add a stress case under `tests/test_stats_and_shared.py` or a new module.
 - Keep coverage above 90% for touched modules; justify unavoidable gaps in the PR.
 
 Example skeleton:

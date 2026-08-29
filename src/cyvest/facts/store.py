@@ -183,6 +183,28 @@ class FactStore:
         merged.extend(other.all_facts())
         return merged
 
+    def copy(self) -> FactStore:
+        """
+        A store holding the same facts, with containers of its own.
+
+        Facts are immutable, so only the registries and indexes need duplicating. That is what
+        lets a snapshot detach from a live store without paying for a deep copy.
+        """
+        clone = FactStore(self.header)
+        clone.observables = dict(self.observables)
+        clone.relations = dict(self.relations)
+        clone.signals = dict(self.signals)
+        clone.evidences = dict(self.evidences)
+        clone.findings = dict(self.findings)
+        clone.decisions = dict(self.decisions)
+        clone.tags = dict(self.tags)
+        clone._children = defaultdict(set, {key: set(value) for key, value in self._children.items()})
+        clone._parents = defaultdict(set, {key: set(value) for key, value in self._parents.items()})
+        clone._signals_by_subject = defaultdict(
+            set, {key: set(value) for key, value in self._signals_by_subject.items()}
+        )
+        return clone
+
     def all_facts(self) -> Iterator[Fact]:
         yield from self.observables.values()
         yield from self.relations.values()

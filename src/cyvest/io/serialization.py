@@ -234,14 +234,7 @@ def load_investigation_dict(data: dict[str, Any], *, migrate: bool = False) -> I
 
     document = InvestigationSchema.model_validate(data)
 
-    investigation = Investigation.__new__(Investigation)
-    investigation.policy = _policy_for(document.policy_version)
-    investigation.investigation_id = document.header.investigation_id
-    investigation.fragment_id = document.header.investigation_id
-    investigation.started_at = document.header.opened_at
-    investigation.store = FactStore(document.header)
-    investigation._report = None
-
+    store = FactStore(document.header)
     for collection in (
         document.facts.observables,
         document.facts.relations,
@@ -251,9 +244,9 @@ def load_investigation_dict(data: dict[str, Any], *, migrate: bool = False) -> I
         document.decisions,
         document.tags,
     ):
-        investigation.store.extend(collection.values())
+        store.extend(collection.values())
 
-    return investigation
+    return Investigation.from_store(store, policy=_policy_for(document.policy_version))
 
 
 def _policy_for(policy_version: str) -> Any:

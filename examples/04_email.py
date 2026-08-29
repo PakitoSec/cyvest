@@ -47,7 +47,7 @@ class BaseRule(ABC):
     def _run(self, shared_context: SharedInvestigationContext) -> None:
         self.shared_context = shared_context
         with shared_context.create_cyvest(
-            investigation_id=self._get_investigation_id(),
+            fragment_id=self._get_investigation_id(),
             investigation_name=self._get_investigation_name(),
         ) as cy:
             self.run(cy)
@@ -120,7 +120,9 @@ class RuleExecutor:
                     future.result()
                     logger.info(f"Task {task.__class__.__name__} completed and reconciled")
                 except Exception as e:
+                    # Swallowing here would drop the fragment from the generated report in silence.
                     logger.error(f"Task {task.__class__.__name__} failed: {e}")
+                    raise
 
         # Return final merged investigation as Cyvest
         return main_cy
@@ -420,23 +422,22 @@ class AggregatedRiskTask(BaseRule):
 
         logger.info("Starting aggregated risk assessment")
 
-        # Access findings from other tasks using parameter-based API
-        from_finding = self.shared_context.finding_get("from")
-        receiver_finding = self.shared_context.finding_get("receiver")
+        # One snapshot for every read below: facts and scores then describe the same state.
+        snapshot = self.shared_context.snapshot()
 
-        # Access observables from other tasks using parameter-based API
-        sender_email = self.shared_context.observable_get(Cyvest.OBS.EMAIL, "noreply@domainmalicious.com")
-        malicious_domain = self.shared_context.observable_get(Cyvest.OBS.DOMAIN, "domainmalicious.com")
+        from_finding = snapshot.finding_get("fnd:from")
+        receiver_finding = snapshot.finding_get("fnd:receiver")
 
-        url_observables = self.shared_context.observables_list_by_type(Cyvest.OBS.URL)
-        attachment_observables = self.shared_context.observables_list_by_type(Cyvest.OBS.FILE)
+        sender_email = snapshot.observable_get(Cyvest.OBS.EMAIL, "noreply@domainmalicious.com")
+        malicious_domain = snapshot.observable_get(Cyvest.OBS.DOMAIN, "domainmalicious.com")
 
-        # Scores live in the report, never on the facts, so read them there.
-        report = self.shared_context.report
+        observables = snapshot.observable_get_all().values()
+        url_observables = [obs for obs in observables if obs.obs_type is Cyvest.OBS.URL]
+        attachment_observables = [obs for obs in observables if obs.obs_type is Cyvest.OBS.FILE]
 
         def score_of(observable) -> Decimal:
-            result = report.observable(observable.key)
-            return Decimal(str(result.score)) if result is not None else Decimal("0")
+            """Scores live in the report, never on the facts; the proxy reads them there."""
+            return Decimal(str(observable.score))
 
         # Calculate composite risk score
         risk_score = Decimal("0")

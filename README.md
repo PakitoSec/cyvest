@@ -211,11 +211,13 @@ def worker(shared):
     with shared.task() as cv:
         cv.observable(cv.OBS.EMAIL, "sender@example.com")
 
-print(shared.get_global_score(), shared.get_global_verdict())
+snapshot = shared.snapshot()                     # a frozen Cyvest over the union
+print(snapshot.get_global_score(), snapshot.get_global_verdict())
 ```
 
 Reconciling is a union of facts, so arrival order does not matter and reconciling twice is
-harmless. → [Shared Investigation Context](docs/shared-investigation-context.md)
+harmless. Reads go through a snapshot, so several reads of one task cannot straddle two states.
+→ [Shared Investigation Context](docs/shared-investigation-context.md)
 
 ## Comparing investigations
 

@@ -50,6 +50,10 @@ ROOT_SENTINEL = "__cyvest_root__"
 DEFAULT_SOURCE = SourceRef(name="cyvest", source_class=SourceClass.INTERNAL_TOOL)
 
 
+class FrozenInvestigationError(RuntimeError):
+    """Raised when a snapshot is written to; the fact would be discarded on the next read."""
+
+
 class Investigation:
     """Owns the facts, the parameters and the cached report — nothing else."""
 
@@ -93,7 +97,27 @@ class Investigation:
             )
         )
         self.store.append(root)
+        self.frozen = False
         self._report: Report | None = None
+
+    @classmethod
+    def from_store(cls, store: FactStore, *, policy: Policy | None = None, frozen: bool = False) -> Investigation:
+        """
+        Rebuild an investigation around facts that already exist.
+
+        ``__init__`` mints a root observable and a fresh header, which is wrong for anything
+        rehydrated — a loaded file, a wrapped fragment, a snapshot. The header already carries the
+        identity, so it is read back rather than invented.
+        """
+        investigation = cls.__new__(cls)
+        investigation.policy = policy or DEFAULT_POLICY
+        investigation.investigation_id = store.header.investigation_id
+        investigation.fragment_id = store.header.investigation_id
+        investigation.started_at = store.header.opened_at
+        investigation.store = store
+        investigation.frozen = frozen
+        investigation._report = None
+        return investigation
 
     # ---------------------------------------------------------------- report
 
@@ -179,6 +203,11 @@ class Investigation:
     # ---------------------------------------------------------------- facts
 
     def append(self, fact: Fact) -> Fact:
+        if self.frozen:
+            raise FrozenInvestigationError(
+                "This investigation is a snapshot and cannot be written to. "
+                "Contribute through a worker obtained from the shared context instead."
+            )
         stored = self.store.append(fact)
         self.invalidate()
         return stored
@@ -516,4 +545,4 @@ class Investigation:
         return self.report.observable(observable_key)
 
 
-__all__ = ["ROOT_SENTINEL", "Investigation"]
+__all__ = ["ROOT_SENTINEL", "FrozenInvestigationError", "Investigation"]

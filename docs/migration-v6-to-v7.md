@@ -299,6 +299,35 @@ cv.finding("pp-trap-hit").pin(trap)
     of topology — it depended on which investigation had produced the finding. If a finding must
     hold its own value, pin it; that is explicit and survives any refactoring of your workers.
 
+### The shared context lost its read API
+
+`SharedInvestigationContext` kept the same shape — `create_cyvest`, `task`, `reconcile` — but it no
+longer mirrors the facade. Every read now goes through `snapshot()`, which returns an ordinary
+frozen `Cyvest`:
+
+| v6 | v7 |
+|---|---|
+| `shared.observable_get(...)` | `shared.snapshot().observable_get(...)` |
+| `shared.finding_get("name")` | `shared.snapshot().finding_get("fnd:name")` |
+| `shared.evidence_get(key)` | `shared.snapshot().evidence_get(key)` |
+| `shared.observables_list_by_type(t)` | filter `shared.snapshot().observable_get_all()` |
+| `shared.get_global_score()` → `Decimal` | `shared.snapshot().get_global_score()` → `float` |
+| `shared.get_global_level()` | `shared.snapshot().get_global_verdict()` |
+| `shared.is_whitelisted()` | gone — see §6, and note the warning about reading it mid-run |
+| `shared.enrichment_get(name)` | gone with `Enrichment`; see [external signals](external-signals.md) |
+| `shared.io_to_markdown()`, `io_save_markdown()`, `io_save_json()` | the same names, on the snapshot |
+| `shared.io_to_invest()` | `shared.snapshot().io_to_dict()` |
+| `shared.acreate_cyvest(...)` | `shared.atask(...)` |
+| every `a…` read twin | reads on a snapshot are dictionary lookups; keep them synchronous |
+
+Taking the snapshot **once** is the point, not a formality. A rule that read an observable, then a
+finding, then the report was being handed three different states of the store, and could score a
+combination that never existed. A snapshot holds still; writing to one raises
+`FrozenInvestigationError` instead of discarding the fact.
+
+Reconciliation is commutative, but production is not: a worker that branches on a shared read
+depends on who finished first. Collect in parallel, derive in one pass.
+
 ---
 
 ## 8. Serialization

@@ -22,7 +22,7 @@ idempotent, commutative and associative. So:
 - reconciling the same worker **twice is harmless**;
 - a read needs no lock on the object graph, because nothing mutates in place.
 
-The one lock that remains protects a single dict swap.
+The one lock that remains guards a fold and a snapshot swap.
 
 ---
 
@@ -39,7 +39,13 @@ def worker(shared: SharedInvestigationContext) -> None:
 ```
 
 `task()` hands out a worker-local `Cyvest` and reconciles it on exit — **including when the body
-raises**, so a failing worker still contributes what it managed to establish.
+raises**, so a failing worker still contributes what it managed to establish. When a half-finished
+fragment is worse than none, say so:
+
+```python
+with shared.task(fragment_id="virustotal", reconcile_on_error=False) as cv:
+    ...
+```
 
 You can also build the context directly:
 
@@ -93,65 +99,96 @@ See [basis](scoring-model.md#basis-what-a-link-scores-on).
 
 ## Reading across tasks
 
-A worker can consult what other workers have already established:
+A worker can consult what other workers have already established. Reads go through a **snapshot**:
+a frozen view of the union, exposed as the ordinary `Cyvest` facade.
 
 ```python
 def bodies_url(shared: SharedInvestigationContext) -> None:
     with shared.task() as cv:
-        domain = shared.observable_get("obs:domain:malicious.com")
+        domain = shared.snapshot().observable_get("obs:domain:malicious.com")
         if domain is not None:
             url = cv.observable(cv.OBS.URL, "https://malicious.com/login")
             cv.observable_add_relation(url.key, domain.key, cv.REL.PIVOT)
 ```
 
-Reads take keys, not `(type, value)` pairs — keys are deterministic, so a worker can compute one
-without asking anybody:
+Take it once and reuse it. A rule that consults a finding, then an observable, then the report
+would otherwise be handed three different states, and score something that never existed:
 
 ```python
-shared.observable_get("obs:domain:malicious.com")
-shared.observables_list_by_type(Cyvest.OBS.URL)
-shared.finding_get("fnd:url_reputation")
-shared.evidence_get("evd:sha256:…")
+snapshot = shared.snapshot()
+
+urls = [o for o in snapshot.observable_get_all().values() if o.obs_type is Cyvest.OBS.URL]
+worst = max((o.score for o in urls), default=0.0)   # the score describes the very facts listed
 ```
+
+A snapshot is read-only: writing to it raises `FrozenInvestigationError` rather than dropping the
+fact silently. Contributions go through the worker, results come from the snapshot.
+
+Reads take keys, not `(type, value)` pairs — keys are deterministic, so a worker can compute one
+without asking anybody. The identity components work too, exactly as on any `Cyvest`:
+
+```python
+snapshot.observable_get("obs:domain:malicious.com")
+snapshot.observable_get(Cyvest.OBS.DOMAIN, "malicious.com")
+snapshot.finding_get("fnd:url_reputation")
+snapshot.evidence_get("evd:sha256:…")
+```
+
+---
+
+## Order matters again the moment you read
+
+Reconciliation is commutative. **Production is not.** As soon as a worker branches on a shared
+read — the `if domain is not None` above — its output depends on who happened to finish first. The
+union is still deterministic; the facts fed into it are not.
+
+So prefer two phases:
+
+1. **collect** — workers run independently, never reading the shared state, and the result does not
+   depend on scheduling;
+2. **derive** — one pass over the union takes a single snapshot and writes what needs the whole
+   picture.
+
+Cross-task reads during phase 1 are supported, and sometimes the pragmatic answer. Just know that
+they are what trades determinism for latency, not the merge.
 
 ---
 
 ## Asyncio
 
-Every read has an `a…` twin that runs the critical section in a worker thread, so the event loop
-is never blocked:
+`atask` scopes a worker and reconciles it off the event loop; `asnapshot` does the same for the
+read side. Reads *on* a snapshot are plain dictionary lookups and stay synchronous.
 
 ```python
-cv = await shared.acreate_cyvest(fragment_id="worker-1")
-...
-await shared.areconcile(cv)
+async with shared.atask(fragment_id="worker-1") as cv:
+    cv.observable(cv.OBS.URL, "https://evil.test")
 
-score = await shared.aget_global_score()
-verdict = await shared.aget_global_verdict()
-observable = await shared.observable_aget("obs:url:https://evil.test")
+snapshot = await shared.asnapshot()
+score = snapshot.get_global_score()
+verdict = snapshot.get_global_verdict()
+observable = snapshot.observable_get("obs:url:https://evil.test")
 ```
 
 ---
 
 ## Results
 
-The shared context exposes the reconciled whole:
+A snapshot is the reconciled whole, through the facade you already know:
 
 ```python
-shared.report                 # the derived report
-shared.get_global_score()
-shared.get_global_verdict()
-shared.evaluate(engine="basic-v1")   # re-derive without touching facts
+cv = shared.snapshot()
 
-shared.finalize_relationships()      # attach orphaned components to the root
-```
-
-When you want the ordinary facade over the merged result:
-
-```python
-cv = shared.as_cyvest()
+cv.get_global_score()
+cv.get_global_verdict()
+cv.reevaluate(engine="basic-v1")   # re-derive without touching facts
 cv.display_summary(show_graph=True)
 cv.io_save_json("investigation.json")
+```
+
+One call left on the context itself, because it writes:
+
+```python
+shared.finalize_relationships()   # attach orphaned components to the root
 ```
 
 ---
@@ -161,14 +198,9 @@ cv.io_save_json("investigation.json")
 | Method | Purpose |
 |---|---|
 | `create_cyvest(*, fragment_id=…)` | a worker-local `Cyvest`; usable as a context manager |
-| `acreate_cyvest(*, fragment_id=…)` | async equivalent |
-| `task(*, fragment_id=…)` | scoped worker, reconciled on exit even on error |
+| `task(*, fragment_id=…, reconcile_on_error=True)` | scoped worker, reconciled on exit |
+| `atask(*, fragment_id=…, reconcile_on_error=True)` | async equivalent |
 | `reconcile(source)` / `areconcile(source)` | fold a fragment in; safe to call twice |
-| `store`, `header`, `report` | the reconciled state |
-| `evaluate(*, policy=…, engine=…)` | re-derive a report |
-| `get_global_score()` / `get_global_verdict()` | headline results (`a…` variants available) |
-| `observable_get(key)`, `observables_list_by_type(type)` | reads (`a…` variants available) |
-| `finding_get(key)`, `evidence_get(key)` | reads (`a…` variants available) |
+| `snapshot()` / `asnapshot()` | a frozen `Cyvest` over the union — the whole read API |
 | `finalize_relationships()` | connect orphans to the root |
-| `as_cyvest()` | the ordinary facade over the whole |
 | `from_investigation(investigation)` | wrap an existing investigation |

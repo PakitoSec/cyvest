@@ -566,7 +566,7 @@ def main(workers, stats, output):
     # reconciled. Run it in parallel and its own weight legitimately varies.
     logger.info("Investigation complete - displaying summary - score should be 35.1")
 
-    cy.display_summary()
+    cy.display_summary(show_observables=True)
     if stats:
         cy.display_statistics()
 

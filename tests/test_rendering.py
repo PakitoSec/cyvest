@@ -14,8 +14,16 @@ import pytest
 from rich.console import Console
 
 from cyvest import Cyvest
-from cyvest.enums import ObservableSubtype, ObservableType, Salience
-from cyvest.io.render import build_graph, build_statistics, build_summary, build_timeline
+from cyvest.compare import ExpectedResult, compare_investigations
+from cyvest.enums import Effect, ObservableSubtype, ObservableType, Salience, Verdict
+from cyvest.io.render import (
+    build_diff,
+    build_explanation,
+    build_graph,
+    build_statistics,
+    build_summary,
+    build_timeline,
+)
 from cyvest.io.serialization import generate_markdown_report
 
 
@@ -23,6 +31,12 @@ def render(renderable: object) -> str:
     console = Console(file=io.StringIO(), width=200, no_color=True)
     console.print(renderable)
     return console.file.getvalue()
+
+
+def styles_of(renderable: object, text: str) -> set[str]:
+    """Styles applied to every segment whose text is exactly ``text`` (colour is not in the string)."""
+    console = Console(file=io.StringIO(), width=200)
+    return {str(segment.style) for segment in console.render(renderable) if segment.text.strip() == text}
 
 
 def case() -> Cyvest:
@@ -127,6 +141,38 @@ class TestSummaryLayout:
         assert "ObservableType." not in output
         assert "domain" in output
 
+    def test_the_graph_hangs_below_the_summary_by_default(self) -> None:
+        """The table gives the score, the graph gives what produced it; v6 printed both."""
+        output = render(build_summary(case()._investigation))
+
+        assert "bad.example" in output
+        assert "extraction \u2192" in output
+        assert "bad.example" not in render(build_summary(case()._investigation, show_graph=False))
+
+    def test_the_graph_names_the_findings_that_fired_on_a_node(self) -> None:
+        cv = case()
+        cv.finding("url_analysis").link_observable(cv.observable(cv.OBS.URL, "https://bad.example/x"))
+
+        assert "[fnd:url_analysis]" in render(build_graph(cv._investigation))
+
+    def test_a_node_does_not_inherit_the_dim_of_its_relation(self) -> None:
+        """Rich propagates the base style of a ``Text`` to everything appended to it."""
+        styles = styles_of(build_graph(case()._investigation), "domain bad.example")
+
+        assert styles
+        assert not any("dim" in style for style in styles)
+
+    def test_a_score_carries_the_colour_of_its_band(self) -> None:
+        """A number read against the wrong band is worse than no number at all."""
+        cv = Cyvest(investigation_name="IR-1")
+        cv.finding_create("bad", "bad rule", weight=8.0)
+        cv.finding_create("benign", "benign rule", weight=-1.0)
+
+        summary = build_summary(cv._investigation)
+
+        assert styles_of(summary, "8.00") == {"red"}
+        assert styles_of(summary, "-1.00") == {"bright_green"}
+
     def test_the_markdown_export_shows_the_type_not_the_repr(self) -> None:
         markdown = generate_markdown_report(case()._investigation)
         assert "ObservableType." not in markdown
@@ -161,6 +207,71 @@ class TestMarkdownTrimming:
         assert "## Observables" not in markdown
         assert "bad.example" not in markdown
         assert "loud rule" in markdown
+
+
+class TestDiffEffectColumn:
+    """The effect is only worth the width when it is what differs."""
+
+    @staticmethod
+    def _additive() -> Cyvest:
+        cv = Cyvest(investigation_name="case")
+        cv.finding_create("analyst-call", verdict=Verdict.SUSPICIOUS, weight=4.0)
+        return cv
+
+    def test_the_diff_nests_observables_and_signals_under_the_finding(self) -> None:
+        """A score says something moved; only the tree says what moved it."""
+        cv = Cyvest(investigation_name="case")
+        url = cv.observable(cv.OBS.URL, "https://bad.example/x", internal=False)
+        url.with_ti("virustotal", weight=8.0)
+        cv.finding_create("url_analysis", weight=3.0).link_observable(url)
+
+        table = render(build_diff(compare_investigations(cv, Cyvest(investigation_name="case"))))
+        assert "\u2514\u2500\u2500 https://bad.example/x" in table
+        assert "    \u2514\u2500\u2500 virustotal" in table
+        assert "+ 1 added | - 0 removed | \u2717 0 mismatch" in table
+
+    def test_a_score_rule_alone_does_not_mention_the_effect(self) -> None:
+        rules = [ExpectedResult(rule_id="analyst-call", score="> 10")]
+        table = render(build_diff(compare_investigations(self._additive(), result_expected=rules)))
+        assert "additive" not in table
+
+    def test_a_conclusion_read_as_a_term_says_so(self) -> None:
+        expected = Cyvest(investigation_name="case")
+        expected.conclusion("analyst-call", verdict=Verdict.MALICIOUS)
+        table = render(build_diff(compare_investigations(self._additive(), expected)))
+        assert "floor" in table
+        assert "additive" in table
+
+    def test_a_pinned_effect_that_is_met_stays_quiet(self) -> None:
+        rules = [ExpectedResult(rule_id="analyst-call", effect=Effect.ADDITIVE, score="> 10")]
+        table = render(build_diff(compare_investigations(self._additive(), result_expected=rules)))
+        assert "additive" not in table
+
+
+class TestExplanation:
+    def test_the_explanation_names_the_source_of_each_contribution(self) -> None:
+        table = render(build_explanation(case()._investigation, "obs:url:https://bad.example/x"))
+        assert "virustotal" in table
+
+
+class TestPrinterRouting:
+    """A caller-supplied printer keeps every renderer on one stream; a console would interleave."""
+
+    @pytest.mark.parametrize(
+        "call",
+        [
+            lambda cv, printer: cv.display_summary(printer=printer),
+            lambda cv, printer: cv.display_statistics(printer=printer),
+            lambda cv, printer: cv.display_timeline(printer=printer),
+            lambda cv, printer: cv.display_explanation("fnd:url_analysis", printer=printer),
+            lambda cv, printer: cv.display_diff(printer=printer),
+        ],
+    )
+    def test_the_renderable_goes_to_the_printer_not_the_console(self, call, capsys) -> None:
+        captured: list[object] = []
+        call(case(), captured.append)
+        assert len(captured) == 1
+        assert capsys.readouterr().out == ""
 
 
 class TestEmptyInvestigation:

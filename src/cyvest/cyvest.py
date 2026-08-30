@@ -7,7 +7,7 @@ scoring lives here — scores come from the report, which is recomputed rather t
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
@@ -850,30 +850,32 @@ class Cyvest:
     def display_summary(
         self,
         *,
-        show_graph: bool = False,
+        show_graph: bool = True,
         show_observables: bool = False,
         show_rule_ids: bool = True,
+        printer: Callable[[object], None] | None = None,
     ) -> None:
-        from cyvest.io.render import build_summary, print_renderable
+        from cyvest.io.render import build_summary, emit
 
-        print_renderable(
+        emit(
             build_summary(
                 self._investigation,
                 show_graph=show_graph,
                 show_observables=show_observables,
                 show_rule_ids=show_rule_ids,
-            )
+            ),
+            printer,
         )
 
-    def display_statistics(self) -> None:
-        from cyvest.io.render import build_statistics, print_renderable
+    def display_statistics(self, *, printer: Callable[[object], None] | None = None) -> None:
+        from cyvest.io.render import build_statistics, emit
 
-        print_renderable(build_statistics(self._investigation))
+        emit(build_statistics(self._investigation), printer)
 
-    def display_explanation(self, key: str) -> None:
-        from cyvest.io.render import build_explanation, print_renderable
+    def display_explanation(self, key: str, *, printer: Callable[[object], None] | None = None) -> None:
+        from cyvest.io.render import build_explanation, emit
 
-        print_renderable(build_explanation(self._investigation, key))
+        emit(build_explanation(self._investigation, key), printer)
 
     def display_timeline(
         self,
@@ -884,10 +886,11 @@ class Cyvest:
         entity_key: str | None = None,
         min_salience: Salience = Salience.NOTABLE,
         track_verdict_changes: bool = False,
+        printer: Callable[[object], None] | None = None,
     ) -> None:
-        from cyvest.io.render import build_timeline, print_renderable
+        from cyvest.io.render import build_timeline, emit
 
-        print_renderable(
+        emit(
             build_timeline(
                 self._investigation,
                 time=time,
@@ -896,7 +899,8 @@ class Cyvest:
                 entity_key=entity_key,
                 min_salience=min_salience,
                 track_verdict_changes=track_verdict_changes,
-            )
+            ),
+            printer,
         )
 
     def display_diff(
@@ -904,13 +908,13 @@ class Cyvest:
         expected: Cyvest | None = None,
         result_expected: list[Any] | None = None,
         *,
+        printer: Callable[[object], None] | None = None,
         title: str = "Investigation diff",
     ) -> None:
         from cyvest.compare import compare_investigations
-        from cyvest.io.render import build_diff, print_renderable
+        from cyvest.io.render import display_diff as render_diff
 
-        diffs = compare_investigations(self, expected, result_expected)
-        print_renderable(build_diff(diffs, title=title))
+        render_diff(compare_investigations(self, expected, result_expected), printer, title=title)
 
     # ------------------------------------------------------------------ sugar
 

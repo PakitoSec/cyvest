@@ -171,6 +171,14 @@ cv.io_save_json("investigation.json")
 cv.io_save_markdown("report.md")
 ```
 
+Each `display_*` prints on a `rich.Console` unless you hand it a `printer` — a callable taking one
+renderable. Use it to send everything through your logger, otherwise console output (stdout) and
+log output (stderr) interleave and the tables land before their own headers:
+
+```python
+cv.display_summary(printer=lambda renderable: logger.rich("INFO", renderable, width=150))
+```
+
 From the shell:
 
 ```bash

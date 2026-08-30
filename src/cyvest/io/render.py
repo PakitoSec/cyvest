@@ -8,6 +8,7 @@ score, whereas letting the evaluator consult the clock would make an archived re
 
 from __future__ import annotations
 
+from collections import Counter
 from collections.abc import Callable, Sequence
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
@@ -19,7 +20,8 @@ from rich.table import Table
 from rich.text import Text
 from rich.tree import Tree
 
-from cyvest.enums import DecisionKind, Salience, Verdict
+from cyvest.enums import DecisionKind, Effect, Salience, Verdict
+from cyvest.evaluation.projection import verdict_from_score
 from cyvest.evaluation.report import CONCLUSION_BOUND_LABELS, Contribution, Report
 from cyvest.evaluation.timeline import TimeBasis
 from cyvest.facts.decision import decision_label
@@ -52,6 +54,9 @@ _DECISION_STYLES: dict[DecisionKind, str] = {
     DecisionKind.VACATED: "bold dim",
 }
 
+#: Keyed by ``DiffStatus`` value, so the renderer stays free of a compare-time import.
+_STATUS_STYLES: dict[str, str] = {"+": "green", "-": "red", "\u2717": "yellow"}
+
 
 def verdict_text(verdict: Verdict) -> Text:
     return Text(verdict.value, style=VERDICT_STYLES.get(verdict, "white"))
@@ -59,6 +64,15 @@ def verdict_text(verdict: Verdict) -> Text:
 
 def _score(value: float | None) -> str:
     return "—" if value is None else f"{value:.2f}"
+
+
+def _score_text(value: float | None, *, bold: bool = False) -> Text:
+    """A score carries its own band: reading a number against the wrong colour is the whole risk."""
+    prefix = "bold " if bold else ""
+    if value is None:
+        return Text("—", style=f"{prefix}dim")
+    style = VERDICT_STYLES.get(verdict_from_score(value), "white")
+    return Text(f"{value:.2f}", style=f"{prefix}{style}")
 
 
 def _applied_bound(report: Report, finding_key: str) -> float:
@@ -97,7 +111,7 @@ def _decision_badges(investigation: Investigation, key: str) -> Text:
 def build_summary(
     investigation: Investigation,
     *,
-    show_graph: bool = False,
+    show_graph: bool = True,
     show_observables: bool = False,
     show_rule_ids: bool = True,
 ) -> Group:
@@ -117,7 +131,7 @@ def build_summary(
 
     title = Text(header.name or header.investigation_id, style="bold")
     title.append("  ")
-    title.append(_score(report.investigation.score), style="bold")
+    title.append_text(_score_text(report.investigation.score, bold=True))
     title.append("  ")
     title.append(verdict_text(report.investigation.verdict))
     # The engine id always travels with the score: comparing scores across engines is meaningless.
@@ -140,7 +154,7 @@ def build_summary(
     table.add_section()
     table.add_row(
         Text("GLOBAL SCORE", style="bold"),
-        Text(_score(report.investigation.score), style="bold"),
+        _score_text(report.investigation.score, bold=True),
         verdict_text(report.investigation.verdict),
     )
 
@@ -215,7 +229,7 @@ def _add_findings(
             result = report.finding(key)
             label = Text(name)
             label.append_text(_finding_notes(investigation, report, key))
-            table.add_row(_row(label), _score(result.score), verdict_text(result.verdict))
+            table.add_row(_row(label), _score_text(result.score), verdict_text(result.verdict))
     return displayed, counted
 
 
@@ -228,7 +242,7 @@ def _add_tags(table: Table, investigation: Investigation) -> None:
         score = investigation.get_tag_aggregated_score(tag.name)
         table.add_row(
             _row(Text(tag.name)),
-            _score(score),
+            _score_text(score),
             verdict_text(investigation.get_tag_aggregated_verdict(tag.name)),
         )
 
@@ -255,12 +269,11 @@ def _add_observables(table: Table, investigation: Investigation, report: Report)
     _section(table, f"OBSERVABLES: {len(observables)} observables")
     for key, observable in sorted(observables.items(), key=lambda item: (str(item[1].obs_type), item[1].value)):
         result = report.observable(key)
-        label = Text(f"{observable.obs_type} ", style="dim")
-        label.append(observable.value)
+        label = Text(f"{observable.obs_type} {observable.value}")
         label.append_text(_decision_badges(investigation, key))
         table.add_row(
             _row(label),
-            _score(result.score if result else None),
+            _score_text(result.score if result else None),
             verdict_text(result.verdict if result else Verdict.INFO),
         )
 
@@ -285,16 +298,30 @@ def build_graph(investigation: Investigation) -> Tree:
     """Walk down from the root; ``source_key`` is the parent, so no direction to interpret."""
     header = investigation.store.header
     report = investigation.report
-    tree = Tree(Text("investigation", style="bold"))
+
+    # A node is read to find out which rule fired on it, so the findings travel with it.
+    linked_findings: dict[str, list[str]] = {}
+    for key, finding in investigation.get_all_findings().items():
+        for link in finding.observable_links:
+            linked_findings.setdefault(link.observable_key, []).append(key)
 
     def label(key: str) -> Text:
         observable = investigation.get_observable(key)
         result = report.observable(key)
-        text = Text(f"{observable.obs_type} ", style="dim") if observable else Text()
-        text.append(observable.value if observable else key)
+        text = Text()
+        findings = linked_findings.get(key)
+        if findings:
+            text.append(f"[{', '.join(sorted(findings))}] ", style="cyan")
+        if observable is not None:
+            text.append(f"{observable.obs_type} {observable.value}")
+        else:
+            text.append(key)
         if result is not None:
-            text.append(f"  {_score(result.score)} ", style="dim")
-            text.append(verdict_text(result.verdict))
+            text.append("  ")
+            text.append_text(_score_text(result.score))
+            text.append(" ")
+            text.append_text(verdict_text(result.verdict))
+        text.append_text(_decision_badges(investigation, key))
         return text
 
     def walk(key: str, node: Tree, seen: set[str]) -> None:
@@ -302,12 +329,17 @@ def build_graph(investigation: Investigation) -> Tree:
             if relation.target_key in seen:
                 continue
             seen.add(relation.target_key)
-            child = node.add(label(relation.target_key))
-            child.label.append(f"  ({relation.kind.value})", style="dim italic")
-            walk(relation.target_key, child, seen)
+            # Base style of a Text bleeds onto everything appended to it: keep it unset.
+            child_label = Text()
+            child_label.append(f"{relation.kind.value} \u2192 ", style="dim")
+            child_label.append_text(label(relation.target_key))
+            walk(relation.target_key, node.add(child_label), seen)
 
-    if header.root_key:
-        walk(header.root_key, tree, {header.root_key})
+    root_key = header.root_key
+    if not root_key:
+        return Tree(Text("investigation", style="bold"))
+    tree = Tree(label(root_key))
+    walk(root_key, tree, {root_key})
     return tree
 
 
@@ -388,47 +420,94 @@ def build_timeline(
 
 
 def build_diff(diffs: Sequence[DiffItem], *, title: str = "Investigation diff") -> Table:
-    """Render a comparison as a table. An empty diff still produces a table, saying so."""
-    table = Table(title=title, show_lines=False)
-    table.add_column("", width=2)
-    table.add_column("Finding")
-    table.add_column("Expected")
-    table.add_column("Actual")
-    table.add_column("Observables")
+    """
+    Render a comparison as a tree: each finding, then what it links, then what asserted it.
+
+    A bare score tells you *that* something moved; the observables and signals beneath it tell
+    you *why*, which is the only thing a diff is read for. They are listed whether they moved or
+    not — a branch that held still is what locates the one that did.
+
+    An empty diff still produces a table, saying so.
+    """
+    counts = Counter(item.status.value for item in diffs)
+    mismatched = counts["\u2717"]
+    table = Table(
+        title=title,
+        caption=(
+            f"[green]+ {counts['+']}[/green] added | "
+            f"[red]- {counts['-']}[/red] removed | "
+            f"[yellow]\u2717 {mismatched}[/yellow] mismatch"
+        ),
+    )
+    table.add_column("Key")
+    table.add_column("Expected", justify="center")
+    table.add_column("Actual", justify="center")
+    table.add_column("Status", justify="center", width=8)
 
     if not diffs:
-        table.add_row("", Text("no difference", style="green"), "", "", "")
+        table.add_row(Text("no difference", style="green"), "", "", "")
         return table
 
-    for item in diffs:
-        style = {"+": "green", "-": "red", "\u2717": "yellow"}[item.status.value]
-        expected = item.expected_score_rule or _score_verdict(item.expected_score, item.expected_verdict)
-        if item.expected_score_rule and item.expected_verdict:
-            expected = f"{item.expected_score_rule} / {item.expected_verdict.value}"
+    for index, item in enumerate(diffs):
+        if index:
+            table.add_section()
+        expected = _verdict_score(item.expected_verdict, item.expected_score, item.expected_score_rule)
+        actual = _verdict_score(item.actual_verdict, item.actual_score)
+        # Only worth the width when an effect was expected *and* is what differs.
+        expected_effect = item.expected_effect_rule or item.expected_effect
+        if expected_effect is not None and expected_effect is not item.actual_effect:
+            _append_effect(expected, expected_effect)
+            _append_effect(actual, item.actual_effect)
         table.add_row(
-            Text(item.status.value, style=style),
-            item.rule_id or item.key,
+            Text(item.rule_id or item.key),
             expected,
-            _score_verdict(item.actual_score, item.actual_verdict),
-            "\n".join(
-                f"{diff.value or diff.observable_key}: "
-                f"{_score_verdict(diff.expected_score, diff.expected_verdict)} \u2192 "
-                f"{_score_verdict(diff.actual_score, diff.actual_verdict)}"
-                for diff in item.observable_diffs
-            ),
+            actual,
+            Text(item.status.value, style=_STATUS_STYLES.get(item.status.value, "white")),
         )
+        _add_observable_rows(table, item)
     return table
 
 
-def _score_verdict(score: float | None, verdict: Verdict | None) -> str:
-    if score is None and verdict is None:
-        return "\u2014"
-    parts = []
-    if score is not None:
-        parts.append(f"{score:g}")
+def _add_observable_rows(table: Table, item: DiffItem) -> None:
+    elbow, tee, pipe = "\u2514\u2500\u2500 ", "\u251c\u2500\u2500 ", "\u2502   "
+    for obs_index, observable in enumerate(item.observable_diffs):
+        last_obs = obs_index == len(item.observable_diffs) - 1
+        label = Text(elbow if last_obs else tee)
+        label.append(observable.value or observable.observable_key, style="cyan")
+        table.add_row(
+            label,
+            _verdict_score(observable.expected_verdict, observable.expected_score),
+            _verdict_score(observable.actual_verdict, observable.actual_score),
+            "",
+        )
+        for signal_index, signal in enumerate(observable.signal_diffs):
+            last_signal = signal_index == len(observable.signal_diffs) - 1
+            source = Text(("    " if last_obs else pipe) + (elbow if last_signal else tee))
+            source.append(signal.source, style="magenta")
+            table.add_row(
+                source,
+                _verdict_score(signal.expected_verdict, signal.expected_score),
+                _verdict_score(signal.actual_verdict, signal.actual_score),
+                "",
+            )
+
+
+def _verdict_score(verdict: Verdict | None, score: float | None, score_rule: str | None = None) -> Text:
+    """Verdict then magnitude, the way a band is read: what it means before how much."""
+    text = Text()
     if verdict is not None:
-        parts.append(verdict.value)
-    return " / ".join(parts)
+        text.append(verdict.value, style=VERDICT_STYLES.get(verdict, "white"))
+    tail = score_rule or (None if score is None else f"{score:.2f}")
+    if tail:
+        if len(text):
+            text.append(" ")
+        text.append(tail)
+    return text if len(text) else Text("-", style="dim")
+
+
+def _append_effect(text: Text, effect: Effect | None) -> None:
+    if effect is not None:
+        text.append(f" \u00b7 {effect.value.lower()}", style="dim")
 
 
 def display_diff(
@@ -438,11 +517,12 @@ def display_diff(
     title: str = "Investigation diff",
 ) -> None:
     """Print a diff, either to a console or through a caller-supplied printer (a logger, typically)."""
-    table = build_diff(diffs, title=title)
-    if printer is not None:
-        printer(table)
-    else:
-        print_renderable(table)
+    emit(build_diff(diffs, title=title), printer)
+
+
+def emit(renderable: object, printer: Callable[[object], None] | None = None) -> None:
+    """Hand a renderable to a caller-supplied printer, or print it on a console."""
+    (printer or print_renderable)(renderable)
 
 
 def print_renderable(renderable: object, console: Console | None = None) -> None:
@@ -458,6 +538,7 @@ __all__ = [
     "build_summary",
     "build_timeline",
     "display_diff",
+    "emit",
     "print_renderable",
     "verdict_text",
 ]

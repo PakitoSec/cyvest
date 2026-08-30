@@ -82,6 +82,7 @@ A rule targets a finding either by `rule_id` or by full `key`; one of the two is
 | `key` | match the finding by exact key |
 | `verdict` | the conclusion expected |
 | `score` | a band, as a rule string |
+| `effect` | how the finding enters the total |
 | `ignore` | statuses to tolerate, e.g. `{DiffStatus.REMOVED}` |
 
 `ignore` is how you say "this finding may or may not fire, and that is fine":
@@ -89,6 +90,23 @@ A rule targets a finding either by `rule_id` or by full `key`; one of the two is
 ```python
 ExpectedResult(rule_id="optional-enrichment", score="> 0", ignore={DiffStatus.REMOVED})
 ```
+
+### Pinning the effect
+
+A conclusion bounds the total instead of adding a term to it, so it carries no score. A rule that
+states only a verdict therefore vouches for it silently becoming a term of the sum — the one
+change that turns a rule capping the case into a rule inflating it. Say so explicitly:
+
+```python
+from cyvest import Effect
+
+ExpectedResult(rule_id="analyst-call", verdict=Verdict.MALICIOUS, effect=Effect.FLOOR)
+```
+
+`conclusion()` derives the direction from the verdict, so on a finding it created the two travel
+together. `finding_create` does not: it takes `effect` and `verdict` independently, and a
+`SUSPICIOUS` conclusion may be either a floor or a ceiling. Pinning `effect` is the only way to
+state which — and the only way to tell a conclusion from an `ADDITIVE` finding.
 
 ---
 
@@ -129,6 +147,29 @@ display_diff(diffs, lambda renderable: logger.rich("INFO", renderable, width=150
 ```
 
 An empty diff still renders a table, saying so — silence is ambiguous.
+
+Each row is a tree: the finding, the observables it links, and the signals that asserted them,
+with the expected and actual band side by side at every level. Branches are listed whether they
+moved or not — a score tells you *that* something changed, the tree tells you *what* changed it.
+
+```text
+│ domain-reputation         │   NOTABLE 0.50    │    NOTABLE 1.00    │   ✗    │
+│ └── example.com           │     INFO 0.00     │    NOTABLE 0.50    │        │
+│     ├── MISP Warning List │     INFO 0.00     │     INFO 0.00      │        │
+│     └── VirusTotal        │     INFO 0.00     │    NOTABLE 0.50    │        │
+```
+
+!!! warning "Pass a `printer` when you also log"
+    Without one, the table goes to a `rich.Console` on **stdout** while your logger writes to
+    **stderr**. The two streams are not synchronised, so tables surface before their own
+    headers. Every `display_*` method takes a `printer` for exactly this reason:
+
+    ```python
+    def to_logger(renderable: object) -> None:
+        logger.rich("INFO", renderable, width=150)
+
+    actual.display_diff(expected, printer=to_logger)
+    ```
 
 From the shell:
 

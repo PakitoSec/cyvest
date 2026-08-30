@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from cyvest.enums import Verdict
+from cyvest.enums import Effect, Verdict
 
 if TYPE_CHECKING:
     from cyvest.cyvest import Cyvest
@@ -49,6 +49,10 @@ class ExpectedResult(BaseModel):
 
     ``verdict`` pins the conclusion; ``score`` expresses a band (``">= 0.01"``, ``"< 3"``), which
     is what makes a test survive a policy tweak that shifts magnitudes without changing meaning.
+
+    ``effect`` pins *how* the finding enters the total. A conclusion carries no score, so a rule
+    that only stated a verdict would tolerate it silently becoming a term of the sum — the one
+    change that turns a rule capping the case into a rule inflating it.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -57,6 +61,7 @@ class ExpectedResult(BaseModel):
     key: str | None = None
     verdict: Verdict | None = None
     score: str | None = None
+    effect: Effect | None = None
     ignore: set[DiffStatus] | None = None
 
     @model_validator(mode="after")
@@ -67,6 +72,18 @@ class ExpectedResult(BaseModel):
 
     def matches(self, key: str, rule_id: str) -> bool:
         return self.key == key if self.key else self.rule_id == rule_id
+
+
+class SignalDiff(BaseModel):
+    """How one signal on a linked observable differs between the two runs."""
+
+    model_config = ConfigDict(frozen=True)
+
+    source: str
+    expected_score: float | None = None
+    expected_verdict: Verdict | None = None
+    actual_score: float | None = None
+    actual_verdict: Verdict | None = None
 
 
 class ObservableDiff(BaseModel):
@@ -80,6 +97,7 @@ class ObservableDiff(BaseModel):
     expected_verdict: Verdict | None = None
     actual_score: float | None = None
     actual_verdict: Verdict | None = None
+    signal_diffs: tuple[SignalDiff, ...] = Field(default=())
 
 
 class DiffItem(BaseModel):
@@ -93,8 +111,11 @@ class DiffItem(BaseModel):
     expected_verdict: Verdict | None = None
     expected_score: float | None = None
     expected_score_rule: str | None = None
+    expected_effect: Effect | None = None
+    expected_effect_rule: Effect | None = None
     actual_verdict: Verdict | None = None
     actual_score: float | None = None
+    actual_effect: Effect | None = None
     observable_diffs: tuple[ObservableDiff, ...] = Field(default=())
 
 
@@ -110,27 +131,62 @@ def evaluate_score_rule(actual_score: float, rule: str) -> bool:
     return _OPERATORS[operator](actual_score, threshold)
 
 
+def _signal_view(cv: Cyvest, observable_key: str) -> dict[str, tuple[float | None, Verdict]]:
+    """Per-source score and verdict of every signal on an observable, keyed by source name."""
+    result = cv.get_report().observable(observable_key)
+    values = {contribution.source_key: contribution.value for contribution in result.contributions} if result else {}
+    return {
+        signal.source.name: (values.get(signal.key), signal.verdict)
+        for signal in cv._investigation.store.signals_for(observable_key)
+    }
+
+
+def _signal_diffs(actual: Cyvest, expected: Cyvest, observable_key: str) -> tuple[SignalDiff, ...]:
+    actual_signals = _signal_view(actual, observable_key)
+    expected_signals = _signal_view(expected, observable_key)
+    return tuple(
+        SignalDiff(
+            source=source,
+            expected_score=expected_signals.get(source, (None, None))[0],
+            expected_verdict=expected_signals.get(source, (None, None))[1],
+            actual_score=actual_signals.get(source, (None, None))[0],
+            actual_verdict=actual_signals.get(source, (None, None))[1],
+        )
+        for source in sorted({*actual_signals, *expected_signals})
+    )
+
+
 def _observable_diffs(actual: Cyvest, expected: Cyvest, finding_key: str) -> tuple[ObservableDiff, ...]:
-    finding = actual._investigation.get_finding(finding_key)
-    if finding is None:
-        return ()
+    """
+    Every observable the finding links, on either side, whether it moved or not.
+
+    The tree under a finding is context: it is read to understand *why* the score moved, so an
+    observable that held still is as informative as one that did not.
+    """
+    linked: list[str] = []
+    for side in (actual, expected):
+        finding = side._investigation.get_finding(finding_key)
+        if finding is not None:
+            linked.extend(link.observable_key for link in finding.observable_links)
+
     diffs: list[ObservableDiff] = []
-    for link in finding.observable_links:
-        actual_result = actual.get_report().observable(link.observable_key)
-        expected_result = expected.get_report().observable(link.observable_key)
+    for observable_key in dict.fromkeys(linked):
+        actual_result = actual.get_report().observable(observable_key)
+        expected_result = expected.get_report().observable(observable_key)
         if actual_result is None and expected_result is None:
             continue
-        if actual_result and expected_result and actual_result.score == expected_result.score:
-            continue
-        observable = actual._investigation.get_observable(link.observable_key)
+        observable = actual._investigation.get_observable(observable_key) or expected._investigation.get_observable(
+            observable_key
+        )
         diffs.append(
             ObservableDiff(
-                observable_key=link.observable_key,
+                observable_key=observable_key,
                 value=observable.value if observable else "",
                 expected_score=expected_result.score if expected_result else None,
                 expected_verdict=expected_result.verdict if expected_result else None,
                 actual_score=actual_result.score if actual_result else None,
                 actual_verdict=actual_result.verdict if actual_result else None,
+                signal_diffs=_signal_diffs(actual, expected, observable_key),
             )
         )
     return tuple(diffs)
@@ -188,11 +244,12 @@ def _rule_tolerates(rule: ExpectedResult | None, result: FindingResult | None) -
     A rule that states nothing tolerates nothing: ``ignore`` is the way to wave a difference
     through, and a bare target would otherwise silence every mismatch on it.
     """
-    if rule is None or result is None or (rule.score is None and rule.verdict is None):
+    if rule is None or result is None or (rule.score is None and rule.verdict is None and rule.effect is None):
         return False
     score_ok = rule.score is None or (result.score is not None and evaluate_score_rule(result.score, rule.score))
     verdict_ok = rule.verdict is None or result.verdict is rule.verdict
-    return score_ok and verdict_ok
+    effect_ok = rule.effect is None or result.effect is rule.effect
+    return score_ok and verdict_ok and effect_ok
 
 
 def _diff_against_investigation(
@@ -226,6 +283,7 @@ def _diff_against_investigation(
                     rule_id=actual_findings[key].rule_id,
                     actual_score=actual_result.score if actual_result else None,
                     actual_verdict=actual_result.verdict if actual_result else None,
+                    observable_diffs=_observable_diffs(actual, expected, key),
                 )
             )
         elif in_expected and not in_actual:
@@ -240,12 +298,17 @@ def _diff_against_investigation(
                     expected_score=expected_result.score if expected_result else None,
                     expected_verdict=expected_result.verdict if expected_result else None,
                     expected_score_rule=rule.score if rule else None,
+                    observable_diffs=_observable_diffs(actual, expected, key),
                 )
             )
         elif (
             actual_result
             and expected_result
-            and (actual_result.score != expected_result.score or actual_result.verdict is not expected_result.verdict)
+            and (
+                actual_result.score != expected_result.score
+                or actual_result.verdict is not expected_result.verdict
+                or actual_result.effect is not expected_result.effect
+            )
         ):
             settled.add(key)
             if _ignores(rule, DiffStatus.MISMATCH) or _rule_tolerates(rule, actual_result):
@@ -258,8 +321,11 @@ def _diff_against_investigation(
                     expected_score=expected_result.score,
                     expected_verdict=expected_result.verdict,
                     expected_score_rule=rule.score if rule else None,
+                    expected_effect=expected_result.effect,
+                    expected_effect_rule=rule.effect if rule else None,
                     actual_score=actual_result.score,
                     actual_verdict=actual_result.verdict,
+                    actual_effect=actual_result.effect,
                     observable_diffs=_observable_diffs(actual, expected, key),
                 )
             )
@@ -311,6 +377,7 @@ def _check_rule(actual: Cyvest, rule: ExpectedResult) -> list[DiffItem]:
                 rule_id=rule.rule_id or "",
                 expected_verdict=rule.verdict,
                 expected_score_rule=rule.score,
+                expected_effect_rule=rule.effect,
             )
         ]
 
@@ -321,7 +388,8 @@ def _check_rule(actual: Cyvest, rule: ExpectedResult) -> list[DiffItem]:
             continue
         score_ok = rule.score is None or (result.score is not None and evaluate_score_rule(result.score, rule.score))
         verdict_ok = rule.verdict is None or result.verdict is rule.verdict
-        if score_ok and verdict_ok:
+        effect_ok = rule.effect is None or result.effect is rule.effect
+        if score_ok and verdict_ok and effect_ok:
             continue
         if rule.ignore and DiffStatus.MISMATCH in rule.ignore:
             continue
@@ -332,8 +400,10 @@ def _check_rule(actual: Cyvest, rule: ExpectedResult) -> list[DiffItem]:
                 rule_id=findings[key].rule_id,
                 expected_verdict=rule.verdict,
                 expected_score_rule=rule.score,
+                expected_effect_rule=rule.effect,
                 actual_score=result.score,
                 actual_verdict=result.verdict,
+                actual_effect=result.effect,
             )
         )
     return diffs
@@ -345,6 +415,7 @@ __all__ = [
     "EngineMismatchError",
     "ExpectedResult",
     "ObservableDiff",
+    "SignalDiff",
     "compare_investigations",
     "evaluate_score_rule",
     "parse_score_rule",

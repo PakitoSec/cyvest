@@ -11,6 +11,7 @@ from cyvest.compare import (
     EngineMismatchError,
     ExpectedResult,
     ObservableDiff,
+    SignalDiff,
     compare_investigations,
 )
 from cyvest.cyvest import Cyvest
@@ -82,6 +83,7 @@ __all__ = [
     "EngineMismatchError",
     "ExpectedResult",
     "ObservableDiff",
+    "SignalDiff",
     "compare_investigations",
     "Decision",
     "DecisionKind",

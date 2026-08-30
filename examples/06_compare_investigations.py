@@ -7,7 +7,7 @@ Shows differences in findings, observables, and threat intelligence between inve
 
 from logurich import get_logger, init_logger
 
-from cyvest import Cyvest, ExpectedResult, Verdict, compare_investigations
+from cyvest import Cyvest, Effect, ExpectedResult, Verdict, compare_investigations
 from cyvest.io.render import display_diff
 
 logger = get_logger(__name__)
@@ -49,6 +49,9 @@ def create_expected_investigation() -> Cyvest:
         weight=1.11,
         verdict=Verdict.NOTABLE,
     )
+
+    # A conclusion: it bounds the total instead of adding a term to it.
+    cv.conclusion("analyst-call", "Analyst conclusion", verdict=Verdict.MALICIOUS)
 
     return cv
 
@@ -104,6 +107,14 @@ def create_actual_investigation() -> Cyvest:
     )
     new_finding.link_observable(malicious_domain)
 
+    # Same rule, same verdict, but it now adds a term to the total instead of capping it.
+    cv.finding_create(
+        "analyst-call",
+        "Analyst conclusion",
+        weight=7.0,
+        verdict=Verdict.MALICIOUS,
+    )
+
     return cv
 
 
@@ -111,6 +122,11 @@ def main() -> None:
     """Run the comparison example."""
     logger.info("[bold magenta]Cyvest Investigation Comparison Example[/bold magenta]")
     logger.info("")
+
+    # Everything goes through the logger: mixing it with a bare console would interleave two
+    # streams and print the tables out of order.
+    def to_logger(renderable: object) -> None:
+        logger.rich("INFO", renderable, width=150)
 
     # Create investigations
     expected = create_expected_investigation()
@@ -121,7 +137,7 @@ def main() -> None:
     logger.info("")
 
     diffs = compare_investigations(actual, expected)
-    display_diff(diffs, lambda r: logger.rich("INFO", r, width=150), title="Diff: Without Tolerance Rules")
+    display_diff(diffs, to_logger, title="Diff: Without Tolerance Rules")
 
     logger.info("")
     logger.info(f"Total differences found: {len(diffs)}")
@@ -142,7 +158,7 @@ def main() -> None:
     diffs_with_rules = compare_investigations(actual, expected, result_expected=tolerance_rules)
     display_diff(
         diffs_with_rules,
-        lambda r: logger.rich("INFO", r, width=150),
+        to_logger,
         title="Diff: With Tolerance Rules",
     )
 
@@ -150,11 +166,32 @@ def main() -> None:
     logger.info(f"Total differences found (with tolerance): {len(diffs_with_rules)}")
     logger.info("")
 
-    # Using the Cyvest convenience methods
-    logger.info("[bold cyan]3. Using Cyvest convenience methods:[/bold cyan]")
+    # A conclusion carries no score, so a rule stating only a verdict vouches for it silently
+    # becoming a term of the sum. `effect` is what pins that.
+    logger.info("[bold cyan]3. Pinning how a finding enters the total:[/bold cyan]")
     logger.info("")
 
-    actual.display_diff(expected=expected, title="Diff: Using Cyvest.display_diff()")
+    verdict_only = ExpectedResult(rule_id="analyst-call", verdict=Verdict.MALICIOUS)
+    with_effect = ExpectedResult(rule_id="analyst-call", verdict=Verdict.MALICIOUS, effect=Effect.FLOOR)
+
+    for label, rule in (("verdict alone", verdict_only), ("verdict + effect=FLOOR", with_effect)):
+        reported = compare_investigations(actual, expected, result_expected=[*tolerance_rules, rule])
+        on_analyst_call = [diff for diff in reported if diff.rule_id == "analyst-call"]
+        logger.info(f"{label}: {len(on_analyst_call)} difference(s) reported on analyst-call")
+
+    display_diff(
+        compare_investigations(actual, expected, result_expected=[*tolerance_rules, with_effect]),
+        to_logger,
+        title="Diff: Pinning effect=FLOOR",
+    )
+
+    logger.info("")
+
+    # Using the Cyvest convenience methods
+    logger.info("[bold cyan]4. Using Cyvest convenience methods:[/bold cyan]")
+    logger.info("")
+
+    actual.display_diff(expected=expected, printer=to_logger, title="Diff: Using Cyvest.display_diff()")
 
     logger.info("")
     logger.info("[green]Example complete![/green]")

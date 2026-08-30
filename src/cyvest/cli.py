@@ -17,7 +17,6 @@ import click
 from logurich import get_logger
 from logurich.opt_click import click_logger_params
 from pydantic import ValidationError
-from rich.console import Console
 
 from cyvest import __version__
 from cyvest.compare import EngineMismatchError, ExpectedResult, compare_investigations
@@ -36,8 +35,12 @@ from cyvest.policy import DEFAULT_POLICY
 from cyvest.schema import get_investigation_schema, get_signal_schema
 
 CONTEXT_SETTINGS = {"help_option_names": ["-h", "--help"]}
-console = Console()
 logger = get_logger(__name__)
+
+
+def _to_logger(renderable: object) -> None:
+    """Everything on one stream: a bare console would print tables before their own headers."""
+    logger.rich("INFO", renderable, width=150)
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -152,10 +155,10 @@ def cli() -> None:
 def show(input: Path, stats: bool, graph: bool, rule_ids: bool, engine: str | None) -> None:
     """Display an investigation from a JSON file."""
     cv = _open(input, engine)
-    cv.display_summary(show_graph=graph, show_rule_ids=rule_ids)
+    cv.display_summary(show_graph=graph, show_rule_ids=rule_ids, printer=_to_logger)
     if stats:
         logger.info("")
-        cv.display_statistics()
+        cv.display_statistics(printer=_to_logger)
 
 
 @cli.command()
@@ -174,7 +177,7 @@ def stats(input: Path, detailed: bool, engine: str | None) -> None:
 
     if detailed:
         logger.info("")
-        cv.display_statistics()
+        cv.display_statistics(printer=_to_logger)
         return
 
     statistics = cv.statistics()
@@ -195,7 +198,7 @@ def explain_cmd(input: Path, key: str, engine: str | None) -> None:
     """
     cv = _open(input, engine)
     try:
-        cv.display_explanation(key)
+        cv.display_explanation(key, printer=_to_logger)
     except KeyError as exc:
         raise click.ClickException(f"Unknown key: {key}") from exc
 
@@ -220,7 +223,7 @@ def timeline_cmd(input: Path, time_basis: str, key_only: bool, engine: str | Non
     kwargs: dict[str, Any] = {"time": time_basis}
     if key_only:
         kwargs["min_salience"] = Salience.KEY
-    cv.display_timeline(**kwargs)
+    cv.display_timeline(**kwargs, printer=_to_logger)
 
 
 @cli.command(name="engines")
@@ -428,7 +431,7 @@ def diff(actual: Path, expected: Path, rules: Path | None, title: str, engine: s
         logger.info("[green]\u2713 No differences found[/green]")
         return
 
-    display_diff(diffs, lambda renderable: logger.rich("INFO", renderable, width=150), title=title)
+    display_diff(diffs, _to_logger, title=title)
 
 
 # =============================================================================

@@ -19,7 +19,7 @@ from cyvest.compare import (
     evaluate_score_rule,
     parse_score_rule,
 )
-from cyvest.enums import Verdict
+from cyvest.enums import Effect, Verdict
 
 
 def _investigation(*, weight: float) -> Cyvest:
@@ -106,6 +106,23 @@ class TestInvestigationDiff:
         diff = diffs[0].observable_diffs[0]
         assert diff.value == "https://evil.test"
         assert diff.actual_score > (diff.expected_score or 0.0)
+
+    def test_each_observable_carries_the_signals_that_asserted_it(self) -> None:
+        """A moved observable is only readable next to the source that moved it."""
+        actual, expected = _investigation(weight=1.0), _investigation(weight=1.0)
+        actual.observable_get("obs:url:https://evil.test").with_ti("VirusTotal", 6.0)
+        diffs = compare_investigations(actual, expected)
+        signals = diffs[0].observable_diffs[0].signal_diffs
+        assert [signal.source for signal in signals] == ["VirusTotal"]
+        assert signals[0].expected_verdict is None
+        assert signals[0].actual_verdict is Verdict.MALICIOUS
+
+    def test_an_added_finding_still_carries_its_tree(self) -> None:
+        """A finding that only exists on one side is exactly the one whose inputs need showing."""
+        actual, expected = _investigation(weight=1.0), Cyvest(investigation_name="case")
+        diffs = compare_investigations(actual, expected)
+        assert [d.status for d in diffs] == [DiffStatus.ADDED]
+        assert [o.value for o in diffs[0].observable_diffs] == ["https://evil.test"]
 
 
 class TestToleranceRules:
@@ -213,6 +230,63 @@ class TestToleranceRules:
         diffs = [d for d in compare_investigations(actual, expected, rules) if d.rule_id == rule_id]
         assert len(diffs) == 1, diffs
         assert diffs[0].status is status
+
+
+class TestEffectRules:
+    """
+    A conclusion carries no score, so a rule stating only a verdict would vouch for it silently
+    becoming a term of the sum — the one change that turns a rule capping the case into a rule
+    inflating it.
+    """
+
+    @staticmethod
+    def _concluding() -> Cyvest:
+        cv = Cyvest(investigation_name="case")
+        cv.conclusion("analyst-call", "analyst call", verdict=Verdict.MALICIOUS)
+        return cv
+
+    @staticmethod
+    def _additive() -> Cyvest:
+        cv = Cyvest(investigation_name="case")
+        cv.finding_create("analyst-call", weight=5.0)
+        return cv
+
+    def test_a_conclusion_turning_into_a_term_is_reported(self) -> None:
+        diffs = compare_investigations(self._additive(), self._concluding())
+        assert [d.status for d in diffs] == [DiffStatus.MISMATCH]
+        assert diffs[0].expected_effect is Effect.FLOOR
+        assert diffs[0].actual_effect is Effect.ADDITIVE
+
+    def test_a_verdict_rule_alone_would_have_waved_it_through(self) -> None:
+        rules = [ExpectedResult(rule_id="analyst-call", verdict=Verdict.MALICIOUS)]
+        assert compare_investigations(self._additive(), self._concluding(), rules) == []
+
+    def test_stating_the_effect_catches_it(self) -> None:
+        rules = [ExpectedResult(rule_id="analyst-call", verdict=Verdict.MALICIOUS, effect=Effect.FLOOR)]
+        diffs = compare_investigations(self._additive(), self._concluding(), rules)
+        assert [d.status for d in diffs] == [DiffStatus.MISMATCH]
+
+    def test_a_matching_effect_still_tolerates(self) -> None:
+        rules = [ExpectedResult(rule_id="analyst-call", effect=Effect.FLOOR)]
+        assert compare_investigations(self._concluding(), self._concluding(), rules) == []
+
+    def test_the_effect_stands_alone_as_an_assertion(self) -> None:
+        rules = [ExpectedResult(rule_id="analyst-call", effect=Effect.CEILING)]
+        diffs = compare_investigations(self._concluding(), result_expected=rules)
+        assert [d.status for d in diffs] == [DiffStatus.MISMATCH]
+        assert diffs[0].actual_effect is Effect.FLOOR
+
+    def test_a_floor_turning_into_a_ceiling_is_reported(self) -> None:
+        """Same verdict, no score on either side: the effect is the only thing left to compare."""
+
+        def case(effect: Effect) -> Cyvest:
+            cv = Cyvest(investigation_name="case")
+            cv.finding_create("analyst-call", verdict=Verdict.SUSPICIOUS, effect=effect)
+            return cv
+
+        diffs = compare_investigations(case(Effect.CEILING), case(Effect.FLOOR))
+        assert [d.status for d in diffs] == [DiffStatus.MISMATCH]
+        assert (diffs[0].expected_effect, diffs[0].actual_effect) == (Effect.FLOOR, Effect.CEILING)
 
 
 class TestEngineMismatch:

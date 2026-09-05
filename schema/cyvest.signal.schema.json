@@ -54,22 +54,21 @@
   },
   "$id": "https://cyvest.io/schema/signal-7.json",
   "additionalProperties": false,
-  "description": "One judgment about one observable, as produced by an external system.\n\n``verdict`` and ``weight`` are the two halves of a magnitude and either one is enough: a\nsource that only knows \"this is bad\" states the verdict, a source that returns a number\nstates the weight, and the missing half is completed from the score bands.",
+  "description": "A complete external judgment, validated without inference or policy defaults.\n\nThe producer must state the version, kind, verdict, non-negative weight and confidence.\nUse ``Cyvest.io_dump_signal`` to complete a partial judgment before sending it. ``payload``\nis opaque: provider-specific validation belongs to the connector, not to Cyvest.",
   "properties": {
     "schema_version": {
-      "default": "7.1.0",
       "pattern": "^7\\.\\d+\\.\\d+$",
       "title": "Schema Version",
       "type": "string"
     },
     "kind": {
       "const": "threat_intel",
-      "default": "threat_intel",
       "title": "Kind",
       "type": "string"
     },
     "source": {
       "minLength": 1,
+      "pattern": "\\S",
       "title": "Source",
       "type": "string"
     },
@@ -78,30 +77,14 @@
       "default": "vendor_feed"
     },
     "verdict": {
-      "anyOf": [
-        {
-          "$ref": "#/$defs/Verdict"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "default": null
+      "$ref": "#/$defs/Verdict"
     },
     "weight": {
-      "anyOf": [
-        {
-          "type": "number"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "default": null,
-      "title": "Weight"
+      "minimum": 0.0,
+      "title": "Weight",
+      "type": "number"
     },
     "confidence": {
-      "default": 1.0,
       "exclusiveMinimum": 0.0,
       "maximum": 1.0,
       "title": "Confidence",
@@ -152,7 +135,12 @@
     }
   },
   "required": [
-    "source"
+    "schema_version",
+    "kind",
+    "source",
+    "verdict",
+    "weight",
+    "confidence"
   ],
   "title": "SignalEnvelope",
   "type": "object"

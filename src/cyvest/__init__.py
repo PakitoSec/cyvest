@@ -94,7 +94,7 @@ from cyvest.relations import (
 from cyvest.resolvers import ObservableResolution, ObservableResolver, identity_is_complete, infer_observable_identity
 from cyvest.schema.signal import SIGNAL_SCHEMA_VERSION, SignalEnvelope
 
-__version__ = "7.1.0"
+__version__ = "7.2.0"
 
 __all__ = [
     "DEFAULT_POLICY",

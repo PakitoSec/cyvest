@@ -138,7 +138,7 @@ class TestTaxonomyBoundaries:
     def test_external_envelope_preserves_metadata_and_signal_judgment(self) -> None:
         entry = Cyvest.taxonomy(name="engine", value="clean", verdict=Verdict.SAFE)
         wire = Cyvest.io_dump_signal("vendor", verdict=Verdict.MALICIOUS, weight=6.0, taxonomies=(entry,))
-        assert wire["schema_version"] == "7.1.0"
+        assert wire["schema_version"] == "7.2.0"
         assert wire["taxonomies"] == [entry.model_dump(mode="json")]
         jsonschema = pytest.importorskip("jsonschema")
         schema = json.loads(Path("schema/cyvest.signal.schema.json").read_text())
@@ -187,7 +187,17 @@ class TestTaxonomyBoundaries:
         assert migrated["schema_version"] == "7.1.0"
         assert migrated["facts"]["signals"][signal.key]["taxonomies"] == [expected[0].model_dump(mode="json")]
         assert migrate_to_current(migrated) == migrated
-        draft = Cyvest.io_load_signal({"schema_version": "7.0.0", "source": "old", "taxonomies": ["legacy:whole:text"]})
+        draft = Cyvest.io_load_signal(
+            {
+                "schema_version": "7.0.0",
+                "kind": "threat_intel",
+                "source": "old",
+                "verdict": "INFO",
+                "weight": 0.0,
+                "confidence": 1.0,
+                "taxonomies": ["legacy:whole:text"],
+            }
+        )
         obs = cv.observable("url", "https://old.example")
         obs.with_ti(draft)
         assert obs.signal("old").taxonomies == expected

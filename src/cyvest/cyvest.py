@@ -63,7 +63,7 @@ from cyvest.proxies import (
     ThreatIntelProxy,
 )
 from cyvest.resolvers import ObservableResolution, ObservableResolver, ObservableResolverResult
-from cyvest.schema.signal import SignalEnvelope
+from cyvest.schema.signal import SignalEnvelope, _SignalInput
 from cyvest.stats import InvestigationStats, StatisticsSchema
 
 if TYPE_CHECKING:
@@ -1038,19 +1038,14 @@ class Cyvest:
         """
         Validate an external system's response against the published signal contract.
 
-        Strict on purpose: a malformed payload raises here rather than becoming a signal that
-        quietly scores zero. The returned draft is what ``ObservableProxy.with_ti`` consumes, so
-        the caller decides which observable the judgment lands on.
+        Version, kind, verdict, weight and confidence must be explicit: no judgment is completed
+        or rewritten on ingestion. The returned draft is what ``ObservableProxy.with_ti`` consumes,
+        so the caller decides which observable the judgment lands on.
 
         Re-ingesting the same response is a no-op — identity is ``(source, observable)`` and the
         raw body sits in ``payload``, outside any key. Pass ``external_id`` to keep history.
         """
-        envelope = SignalEnvelope.model_validate(payload)
-        draft = envelope.as_draft()
-        draft["verdict"], draft["weight"] = Cyvest._judgment(envelope.verdict, envelope.weight)
-        if draft["weight"] is None:
-            draft.pop("weight")
-        return draft
+        return SignalEnvelope.model_validate(payload).as_draft()
 
     @staticmethod
     def io_dump_signal(
@@ -1074,10 +1069,10 @@ class Cyvest:
         fall back on, so the missing half is completed from ``policy``: pass your own calibration
         when the default bands are not yours.
         """
-        envelope = SignalEnvelope(source=source, verdict=verdict, weight=weight, confidence=confidence, **kwargs)
-        judged, magnitude = Cyvest._judgment(envelope.verdict, envelope.weight)
+        producer = _SignalInput(source=source, verdict=verdict, weight=weight, confidence=confidence, **kwargs)
+        judged, magnitude = Cyvest._judgment(producer.verdict, producer.weight)
         resolved = (policy or DEFAULT_POLICY).resolve_weight(verdict=judged, weight=magnitude)
-        completed = envelope.model_copy(update={"verdict": judged, "weight": resolved})
+        completed = SignalEnvelope.model_validate({**producer.model_dump(), "verdict": judged, "weight": resolved})
         return completed.model_dump(mode="json", exclude_none=True)
 
 

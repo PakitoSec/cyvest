@@ -15,14 +15,14 @@ a quota counter, a correlation id — cannot turn one signal into two.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from cyvest.enums import SourceClass, Verdict
 from cyvest.facts.taxonomy import Taxonomies
 
-SIGNAL_SCHEMA_VERSION = "7.1.0"
+SIGNAL_SCHEMA_VERSION = "7.2.0"
 SIGNAL_SCHEMA_ID = "https://cyvest.io/schema/signal-7.json"
 
 # Same rule as the investigation document: the published shape guards the major only, because
@@ -30,31 +30,28 @@ SIGNAL_SCHEMA_ID = "https://cyvest.io/schema/signal-7.json"
 # one. The minor window — read older, never newer — is enforced by the validator below.
 SIGNAL_SCHEMA_VERSION_PATTERN = rf"^{SIGNAL_SCHEMA_VERSION.split('.')[0]}\.\d+\.\d+$"
 
+# JSON numbers only: accept integers and floats, never bools or numeric strings.
+_FiniteNumber = Annotated[float, Field(strict=True, allow_inf_nan=False)]
+
 
 def _minor(version: str) -> int:
     return int(version.split(".")[1])
 
 
-class SignalEnvelope(BaseModel):
-    """
-    One judgment about one observable, as produced by an external system.
+class _SignalInput(BaseModel):
+    """Producer-only input for ``io_dump_signal``; never an external transport contract."""
 
-    ``verdict`` and ``weight`` are the two halves of a magnitude and either one is enough: a
-    source that only knows "this is bad" states the verdict, a source that returns a number
-    states the weight, and the missing half is completed from the score bands.
-    """
-
-    model_config = ConfigDict(extra="forbid", json_schema_extra={"$id": SIGNAL_SCHEMA_ID})
+    model_config = ConfigDict(extra="forbid")
 
     schema_version: str = Field(default=SIGNAL_SCHEMA_VERSION, pattern=SIGNAL_SCHEMA_VERSION_PATTERN)
     kind: Literal["threat_intel"] = Field(default="threat_intel")
 
-    source: str = Field(..., min_length=1)
+    source: str = Field(..., strict=True, min_length=1, pattern=r"\S")
     source_class: SourceClass = Field(default=SourceClass.VENDOR_FEED)
 
     verdict: Verdict | None = Field(default=None)
-    weight: float | None = Field(default=None)
-    confidence: float = Field(default=1.0, gt=0.0, le=1.0)
+    weight: _FiniteNumber | None = Field(default=None)
+    confidence: _FiniteNumber = Field(default=1.0, gt=0.0, le=1.0)
 
     observed_at: datetime | None = Field(default=None)
     # Set it to keep successive scans apart; leave it out and re-ingesting is a no-op.
@@ -70,6 +67,24 @@ class SignalEnvelope(BaseModel):
         if _minor(value) > _minor(SIGNAL_SCHEMA_VERSION):
             raise ValueError(f"Signal schema {value} is newer than this library ({SIGNAL_SCHEMA_VERSION})")
         return value
+
+
+class SignalEnvelope(_SignalInput):
+    """
+    A complete external judgment, validated without inference or policy defaults.
+
+    The producer must state the version, kind, verdict, non-negative weight and confidence.
+    Use ``Cyvest.io_dump_signal`` to complete a partial judgment before sending it. ``payload``
+    is opaque: provider-specific validation belongs to the connector, not to Cyvest.
+    """
+
+    model_config = ConfigDict(json_schema_extra={"$id": SIGNAL_SCHEMA_ID})
+
+    schema_version: str = Field(..., pattern=SIGNAL_SCHEMA_VERSION_PATTERN)
+    kind: Literal["threat_intel"]
+    verdict: Verdict
+    weight: _FiniteNumber = Field(..., ge=0.0)
+    confidence: _FiniteNumber = Field(..., gt=0.0, le=1.0)
 
     def as_draft(self) -> dict[str, Any]:
         """The keyword form ``ObservableProxy.with_ti`` consumes, once a subject is known."""

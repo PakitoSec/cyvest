@@ -1,6 +1,6 @@
 {
   "name": "@cyvest/cyvest-js",
-  "version": "7.1.0",
+  "version": "7.2.0",
   "description": "Typed reader for Cyvest investigation documents: schema validation, fact accessors, and graph helpers.",
   "keywords": [
     "cybersecurity",

@@ -4,7 +4,7 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   resolve: {
     alias: {
-      "@cyvest/cyvest-js": resolve(__dirname, "../cyvest-js/src/index.ts"),
+      "@cyvest/cyvest-js": resolve(import.meta.dirname, "../cyvest-js/src/index.ts"),
     },
   },
   test: {

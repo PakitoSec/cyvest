@@ -26,9 +26,16 @@ from tests.test_serialization import V6_DOCUMENT
 
 
 @pytest.fixture(autouse=True)
-def _capture_cli_logs(caplog: pytest.LogCaptureFixture):
-    caplog.set_level(logging.INFO, logger="cyvest.cli")
-    return caplog
+def _capture_cli_logs(caplog: pytest.LogCaptureFixture) -> Iterator[pytest.LogCaptureFixture]:
+    cli_logger = logging.getLogger("cyvest.cli")
+    caplog.set_level(logging.INFO, logger=cli_logger.name)
+    # logurich >= 1.0.1 clears root handlers when the CLI initializes logging, including
+    # pytest's capture handler. Capture on the producer instead, before the logging queue.
+    cli_logger.addHandler(caplog.handler)
+    try:
+        yield caplog
+    finally:
+        cli_logger.removeHandler(caplog.handler)
 
 
 @pytest.fixture(scope="session")
@@ -136,6 +143,16 @@ class TestInspection:
 
 
 class TestEngines:
+    def test_log_capture_survives_repeated_cli_initialization(
+        self, runner: CliRunner, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """Each invoke initializes and shuts down logurich; capture must survive both runs."""
+        for _ in range(2):
+            caplog.clear()
+            result = runner.invoke(cli, ["engines"])
+            assert result.exit_code == 0, result.output
+            assert "basic → basic-v1" in caplog.text
+
     def test_engines_lists_the_registry_and_its_aliases(
         self, runner: CliRunner, caplog: pytest.LogCaptureFixture
     ) -> None:

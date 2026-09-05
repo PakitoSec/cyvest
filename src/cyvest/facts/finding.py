@@ -16,7 +16,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from cyvest import keys
-from cyvest.enums import Effect, LinkBasis, Status, Verdict
+from cyvest.enums import Effect, LinkBasis, Status, Tactic, Verdict
 from cyvest.facts.base import Fact, Judgment, Label
 
 _VERDICTS_WITHOUT_FLOOR = (Verdict.SAFE, Verdict.INFO)
@@ -76,6 +76,10 @@ class Finding(Fact, Judgment):
     A finding names no subject: what it is about is its ``observable_links``, which are also what
     it scores on. Use ``external_id`` when the same rule must yield several findings — typically
     once per observable, ``external_id=url.key``.
+
+    A finding that describes an activity is **dated** through the envelope's ``occurred_at`` —
+    when the activity happened, as opposed to when the rule fired — and may name the ATT&CK
+    ``tactic`` it demonstrates. Both are what the timeline reads; neither enters the score.
     """
 
     rule_id: str = Field(..., min_length=1)
@@ -86,6 +90,7 @@ class Finding(Fact, Judgment):
     effect: Effect = Field(default=Effect.ADDITIVE)
     observable_links: tuple[ObservableLink, ...] = Field(default=())
     labels: tuple[Label, ...] = Field(default=())
+    tactic: Tactic | None = Field(default=None)
     extra: dict[str, Any] = Field(default_factory=dict)
 
     @model_validator(mode="before")

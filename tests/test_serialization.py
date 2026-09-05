@@ -45,9 +45,8 @@ class TestRoundTrip:
     def test_facts_stay_maps_keyed_by_their_semantic_key(self) -> None:
         """7.2 will add ``facts.history``; turning these maps into lists would break every document."""
         facts = investigation_to_dict(build_case()._investigation)["facts"]
-        for name in ("observables", "relations", "signals", "evidences", "findings"):
-            assert isinstance(facts[name], dict)
-        assert facts["events"] == {}
+        assert set(facts) == {"observables", "relations", "signals", "evidences", "findings"}
+        assert all(isinstance(collection, dict) for collection in facts.values())
 
     def test_signals_carry_their_discriminator(self) -> None:
         signals = investigation_to_dict(build_case()._investigation)["facts"]["signals"]

@@ -44,6 +44,18 @@ def _hash_dict(data: dict[str, Any]) -> str:
     return hashlib.sha256(content.encode()).hexdigest()[:16]
 
 
+def slugify(value: str, *, fallback: str = "") -> str:
+    """
+    Lower-case kebab-case identifier from free text: ``"URL In Body!"`` → ``"url-in-body"``.
+
+    For a ``rule_id`` or a tag derived from a label a model or a human wrote. Returns ``fallback``
+    when nothing survives.
+    """
+    normalized = "".join(ch.lower() if ch.isalnum() else "-" for ch in value)
+    collapsed = "-".join(part for part in normalized.split("-") if part)
+    return collapsed or fallback
+
+
 def normalize_observable_value(obs_type: str, value: str, subtype: str | None = None) -> str:
     """Normalize an observable value for identity without changing its display value."""
     normalized_type = _normalize_value(obs_type)

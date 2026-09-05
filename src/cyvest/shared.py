@@ -21,7 +21,8 @@ from typing import Any, Literal
 
 from logurich import get_logger
 
-from cyvest.cyvest import Cyvest
+from cyvest.autolink import AutoLink
+from cyvest.cyvest import Cyvest, InvestigationSpec
 from cyvest.enums import ObservableType
 from cyvest.investigation import Investigation
 from cyvest.policy import DEFAULT_POLICY, Policy
@@ -47,10 +48,9 @@ class SharedInvestigationContext:
         engine: str | None = None,
         investigation_name: str | None = None,
         investigation_id: str | None = None,
+        auto_link: AutoLink | None = None,
     ) -> None:
         self.policy = policy or DEFAULT_POLICY
-        self._root_data = root_data
-        self._root_type = root_type
         self._main = Investigation(
             root_data,
             root_type=root_type,
@@ -59,14 +59,32 @@ class SharedInvestigationContext:
             investigation_name=investigation_name,
             investigation_id=investigation_id,
         )
+        # Every worker is built from this spec, so the derived edges are the same whichever task
+        # first saw an observable, and a worker shares the main's root, policy and engine.
+        self.spec = InvestigationSpec(
+            root_data,
+            root_type=root_type,
+            policy=self.policy,
+            engine=self._main.store.header.engine_id,
+            auto_link=auto_link,
+        )
         self._lock = threading.Lock()
         self._snapshot: Cyvest | None = None
+
+    @property
+    def auto_link(self) -> AutoLink | None:
+        return self.spec.auto_link
 
     @classmethod
     def from_investigation(cls, investigation: Investigation) -> SharedInvestigationContext:
         """Wrap an existing investigation so workers can contribute fragments to it."""
         root = investigation.get_root()
-        context = cls(root.extra, root_type=root.obs_type, policy=investigation.policy)
+        context = cls(
+            root.extra,
+            root_type=root.obs_type,
+            policy=investigation.policy,
+            engine=investigation.store.header.engine_id,
+        )
         # The investigation __init__ just built is a placeholder; one initialisation path is worth
         # one throwaway root.
         context._main = investigation
@@ -88,14 +106,7 @@ class SharedInvestigationContext:
 
         Usable directly or as a context manager, in which case exiting reconciles the fragment.
         """
-        worker = Cyvest(
-            self._root_data,
-            root_type=self._root_type,
-            policy=self.policy,
-            engine=self._main.store.header.engine_id,
-            investigation_id=fragment_id or generate_ulid(),
-            investigation_name=investigation_name,
-        )
+        worker = self.spec.new(investigation_id=fragment_id or generate_ulid(), investigation_name=investigation_name)
         worker._shared_context = self
         return worker
 
@@ -147,8 +158,10 @@ class SharedInvestigationContext:
         incoming = self._investigation_of(source)
         with self._lock:
             store = self._main.store
-            store.header = store.header.with_fragments(incoming.store.header.fragment_ids)
+            # The same header law as ``union`` — the fold in place is only an optimisation of it.
+            store.header = store.header.merge(incoming.store.header)
             store.extend(incoming.store.all_facts())
+            self._main.investigation_id = store.header.investigation_id
             self._main.invalidate()
             self._snapshot = None
 

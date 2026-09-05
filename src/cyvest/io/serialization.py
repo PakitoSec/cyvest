@@ -91,90 +91,62 @@ def save_investigation_json(investigation: Investigation, filepath: str | Path) 
     )
 
 
-# --------------------------------------------------------------------------- markdown
+# --------------------------------------------------------------------------- merge
+
+_FACT_COLLECTIONS = ("observables", "relations", "signals", "evidences", "findings")
+_TOP_LEVEL_COLLECTIONS = ("decisions", "tags")
 
 
-def generate_markdown_report(
-    investigation: Investigation,
-    *,
-    include_tags: bool = True,
-    include_observables: bool = True,
-) -> str:
+def _fact_items(document: dict[str, Any]) -> dict[str, Any]:
+    """Every fact of a document keyed by its semantic key, whatever collection it sits in."""
+    items: dict[str, Any] = {}
+    facts = document.get("facts") or {}
+    for name in _FACT_COLLECTIONS:
+        items.update(facts.get(name) or {})
+    for name in _TOP_LEVEL_COLLECTIONS:
+        items.update(document.get(name) or {})
+    return items
+
+
+def _subsumes(bigger: dict[str, Any], smaller: dict[str, Any]) -> bool:
     """
-    A human-readable report.
+    ``bigger`` already contains every fact of ``smaller``, unchanged, under the same identity.
 
-    Every figure comes from the report, and each one travels with the engine that produced it —
-    comparing scores across engines is meaningless, so the id is never dropped.
-
-    The observable table can be dropped entirely: a report handed to a model is mostly noise
-    budget.
+    Facts are compared whole rather than by ``seq``: an observable keeps its ``seq`` through a
+    merge while its per-fragment counters grow, so equal sequence numbers do not mean equal facts.
     """
-    report = investigation.report
-    header = investigation.store.header
-    lines: list[str] = [
-        f"# {header.name or header.investigation_id}",
-        "",
-        f"- **Score**: {report.investigation.score:.2f} ({report.investigation.verdict.value})",
-        f"- **Engine**: `{report.engine_id}` · policy `{report.policy_version}`",
-        f"- **Opened**: {header.opened_at.isoformat()}",
-        "",
-    ]
-
-    decisions = investigation.get_all_decisions()
-    if decisions:
-        lines += ["## Decisions", "", "| Target | Kind | By | Justification |", "|---|---|---|---|"]
-        for decision in decisions.values():
-            lines.append(
-                f"| `{decision.target_key}` | {decision.kind.value} | {decision.source.name} "
-                f"| {decision.justification or ''} |"
-            )
-        lines.append("")
-
-    lines += ["## Findings", "", "| Rule | Score | Verdict | Status |", "|---|---|---|---|"]
-    for key, finding in sorted(investigation.get_all_findings().items()):
-        result = report.finding(key)
-        if result is None:
-            continue
-        score = "—" if result.score is None else f"{result.score:.2f}"
-        lines.append(
-            f"| {finding.name or finding.rule_id} | {score} | {result.verdict.value} | {result.status.value} |"
-        )
-    lines.append("")
-
-    if include_observables:
-        lines += ["## Observables", "", "| Type | Value | Score | Verdict |", "|---|---|---|---|"]
-        for key, observable in sorted(investigation.get_all_observables().items()):
-            if key == header.root_key:
-                continue
-            result = report.observable(key)
-            score = "—" if result is None or result.score is None else f"{result.score:.2f}"
-            verdict = result.verdict.value if result else "INFO"
-            lines.append(f"| {observable.obs_type} | `{observable.value}` | {score} | {verdict} |")
-        lines.append("")
-
-    if include_tags and investigation.get_all_tags():
-        lines += ["## Tags", "", "| Tag | Aggregated score |", "|---|---|"]
-        for tag in sorted(investigation.get_all_tags().values(), key=lambda t: t.name):
-            lines.append(f"| {tag.name} | {investigation.get_tag_aggregated_score(tag.name):.2f} |")
-        lines.append("")
-
-    return "\n".join(lines)
+    big_header = bigger.get("header") or {}
+    small_header = smaller.get("header") or {}
+    if big_header.get("investigation_id") != small_header.get("investigation_id"):
+        return False
+    if not set(small_header.get("fragment_ids") or ()) <= set(big_header.get("fragment_ids") or ()):
+        return False
+    big_items = _fact_items(bigger)
+    return all(big_items.get(key) == fact for key, fact in _fact_items(smaller).items())
 
 
-def save_investigation_markdown(
-    investigation: Investigation,
-    filepath: str | Path,
-    *,
-    include_tags: bool = True,
-    include_observables: bool = True,
-) -> str:
-    report = generate_markdown_report(
-        investigation,
-        include_tags=include_tags,
-        include_observables=include_observables,
-    )
-    Path(filepath).write_text(report.rstrip("\n") + "\n", encoding="utf-8")
-    return str(filepath)
+def merge_documents(current: dict[str, Any] | None, incoming: dict[str, Any] | None) -> dict[str, Any] | None:
+    """
+    The union of two serialized documents — the reducer an agent framework folds its state with.
+
+    Same law as ``FactStore.union``, so the same properties; no facade has to be alive at the
+    merge site. Either side may be missing. Two fast paths keep the common case cheap: identical
+    documents come back as is, and a document that contains everything the other does wins on a
+    dict comparison — which is what every step of a sequential run produces, since each write
+    starts from the previous state. Only genuinely divergent documents pay for a model load.
+    """
+    if not current:
+        return incoming or None
+    if not incoming:
+        return current
+    if current is incoming or current == incoming:
+        return current
+    if _subsumes(incoming, current):
+        return incoming
+    if _subsumes(current, incoming):
+        return current
+    first, second = load_investigation_dict(current), load_investigation_dict(incoming)
+    return investigation_to_dict(Investigation.from_store(first.store.union(second.store), policy=first.policy))
 
 
 # --------------------------------------------------------------------------- load
@@ -678,6 +650,7 @@ __all__ = [
     "investigation_to_dict",
     "load_investigation_dict",
     "load_investigation_json",
+    "merge_documents",
     "migrate_to_current",
     "save_investigation_json",
     "serialize_investigation",

@@ -19,9 +19,10 @@ from logurich.opt_click import click_logger_params
 from pydantic import ValidationError
 
 from cyvest import __version__
-from cyvest.compare import EngineMismatchError, ExpectedResult, compare_investigations
+from cyvest.compare import ExpectedResult, compare_investigations
 from cyvest.cyvest import Cyvest
 from cyvest.enums import ObservableType
+from cyvest.errors import EngineMismatchError, RootMismatchError
 from cyvest.extract import (
     ExtractedObservable,
     extract_all,
@@ -281,7 +282,13 @@ def merge(inputs: tuple[Path, ...], output: Path, stats: bool, engine: str | Non
 
     for input_path in inputs[1:]:
         logger.info(f"  Merging: {input_path}")
-        merged.merge_investigation(_open(input_path, engine))
+        try:
+            report = merged.merge_investigation(_open(input_path, engine))
+        except EngineMismatchError as exc:
+            raise click.ClickException(f"{exc} Pass --engine to re-evaluate every input with the same one.") from exc
+        except RootMismatchError as exc:
+            raise click.ClickException(str(exc)) from exc
+        logger.info(f"    +{len(report.added)} added, {len(report.superseded)} superseded, {len(report.kept)} kept")
 
     logger.info("[green]\u2713 Merge complete[/green]\n")
 

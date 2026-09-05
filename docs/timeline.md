@@ -36,7 +36,45 @@ Reading the `asserted` axis is how you answer *"what did we know, and when did w
 including the uncomfortable case where a signal about Monday's event only arrived on Friday.
 
 When a fact has no `occurred_at`, the `occurred` axis falls back to `asserted_at`: an unknown
-event time is better approximated by the moment it was recorded than dropped.
+event time is better approximated by the moment it was recorded than dropped. The entry says so —
+`entry.dated` is `False` — so a consumer building an incident chronology rather than an
+investigation log can keep the dated facts only.
+
+---
+
+## Dating facts
+
+`occurred_at` is not a field you fill on the timeline; it is a field of the fact, under the name
+each family gives it:
+
+| Fact | Field | Meaning |
+|---|---|---|
+| finding | `occurred_at` | when the activity the finding describes happened |
+| evidence | `captured_at` | when the material was captured |
+| signal, relation | `observed_at` | when the source observed it |
+| decision | `occurred_at` | when the analyst decided |
+
+```python
+from datetime import datetime, timezone
+
+cv.finding(
+    "link-clicked",
+    "`jdoe` opened the landing page from the mail",
+    verdict="NOTABLE",
+    tactic="initial-access",
+    occurred_at=datetime(2026, 8, 7, 10, 2, tzinfo=timezone.utc),
+)
+```
+
+A finding that describes an activity may also name the ATT&CK **tactic** it demonstrates
+(`cyvest.Tactic`, fourteen Enterprise tactics in kebab-case: `initial-access`, `execution`,
+`lateral-movement`…). The timeline entry carries it; the score ignores it. A neutral, factual event
+of the incident — a login, a download that turned out legitimate — is a dated finding with verdict
+`INFO`: it shows in the chronology and weighs nothing.
+
+Through `cyvest_record`, a model dates any of those five operations with `occurred_at` (ISO 8601
+UTC) and names a finding's `tactic`. An update that omits them keeps the previous values: a
+re-assertion that said nothing about *when* does not erase a date it never disputed.
 
 ---
 
@@ -48,7 +86,7 @@ read from the report:
 | Salience | Earned by |
 |---|---|
 | `KEY` | any **decision** — a human act is always worth showing; a **finding** or a **signal** whose weight reaches `policy.salience_threshold` |
-| `NOTABLE` | a fact that moved the number without reaching the threshold; the **first** signal on an observable, which is when it entered the picture |
+| `NOTABLE` | a fact that moved the number without reaching the threshold; the **first** signal on an observable, which is when it entered the picture; a **dated** finding whatever its weight — a chronology claim is what the timeline exists to show |
 | `BACKGROUND` | everything else |
 
 Filter to the spine of the investigation:
@@ -98,7 +136,7 @@ filter above, which is why observables and relations rarely show up unaided:
 | Kind | Title |
 |---|---|
 | `signal` | `VirusTotal → MALICIOUS` |
-| `finding` | the finding's name, or its rule id |
+| `finding` | the finding's name, or its rule id — with its `tactic` when it states one |
 | `decision` | `ALLOWLISTED · Corporate sandbox` |
 | `relation` | `extraction → obs:url:…` |
 | `evidence` | the evidence title, or its type |
@@ -106,4 +144,4 @@ filter above, which is why observables and relations rarely show up unaided:
 | `verdict_change` | `NOTABLE → MALICIOUS` (opt-in) |
 
 Each entry carries `subject_key` and `refs`, so a timeline row can be followed back into the graph
-or into `explain`.
+or into `explain`, plus `dated` and `tactic` as described above.

@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 import pytest
 
-from cyvest.enums import DecisionKind, LinkBasis, ObservableType, RelationKind, SourceClass, Verdict, Weight
+from cyvest.enums import DecisionKind, LinkBasis, ObservableType, RelationKind, SourceClass, Tactic, Verdict, Weight
 from cyvest.facts import Finding, Observable, SourceRef, Tag, ThreatIntel
 from cyvest.investigation import Investigation
 
@@ -112,6 +114,26 @@ class TestFacts:
         created = finding(inv, "r")
         with pytest.raises(KeyError, match="Unknown observable"):
             inv.link_finding_observable(created.key, "obs:url:ghost")
+
+    def test_an_undated_update_does_not_erase_the_date_or_the_tactic(self) -> None:
+        """
+        A re-assertion without ``occurred_at`` ranks at its own ``asserted_at``, later than any past
+        ``occurred_at``, so it would win the merge and silently lose the date. The facade keeps it.
+        """
+        when = datetime(2026, 8, 7, 10, tzinfo=timezone.utc)
+        inv = Investigation()
+        finding(inv, "r", occurred_at=when, tactic=Tactic.EXECUTION)
+        updated = finding(inv, "r", comment="revisited", verdict=Verdict.SUSPICIOUS)
+        assert updated.comment == "revisited" and updated.verdict is Verdict.SUSPICIOUS
+        assert updated.occurred_at == when and updated.tactic is Tactic.EXECUTION
+        assert len(inv.get_all_findings()) == 1
+
+    def test_a_dated_update_replaces_the_date_and_the_tactic(self) -> None:
+        inv = Investigation()
+        finding(inv, "r", occurred_at=datetime(2026, 8, 7, tzinfo=timezone.utc), tactic=Tactic.EXECUTION)
+        later = datetime(2026, 8, 8, tzinfo=timezone.utc)
+        updated = finding(inv, "r", occurred_at=later, tactic=Tactic.PERSISTENCE)
+        assert updated.occurred_at == later and updated.tactic is Tactic.PERSISTENCE
 
 
 class TestPinning:

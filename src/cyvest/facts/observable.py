@@ -42,6 +42,11 @@ _NAMESPACE_REQUIRED = {
 }
 
 
+#: Public names of the identity rules, for code that infers an identity before building the fact.
+NAMESPACE_REQUIRED = frozenset(_NAMESPACE_REQUIRED)
+SUBTYPE_REQUIRED = frozenset(_SUBTYPE_REQUIRED | {ObservableType.FILE.value})
+
+
 class _ObservableIdentityBase(BaseModel):
     """The quadruplet that identifies an observable."""
 

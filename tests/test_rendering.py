@@ -16,6 +16,8 @@ from rich.console import Console
 from cyvest import Cyvest
 from cyvest.compare import ExpectedResult, compare_investigations
 from cyvest.enums import Effect, ObservableSubtype, ObservableType, Salience, Verdict
+from cyvest.io import render as render_module
+from cyvest.io.markdown import generate_markdown_report
 from cyvest.io.render import (
     build_diff,
     build_explanation,
@@ -24,7 +26,6 @@ from cyvest.io.render import (
     build_summary,
     build_timeline,
 )
-from cyvest.io.serialization import generate_markdown_report
 
 
 def render(renderable: object) -> str:
@@ -272,6 +273,22 @@ class TestPrinterRouting:
         call(case(), captured.append)
         assert len(captured) == 1
         assert capsys.readouterr().out == ""
+
+    def test_the_active_logurich_logger_is_used_implicitly(self, monkeypatch) -> None:
+        captured: list[tuple[str, object, int]] = []
+
+        class Logger:
+            def rich(self, level: str, renderable: object, *, width: int) -> None:
+                captured.append((level, renderable, width))
+
+        monkeypatch.setattr(render_module, "_logurich_logger", Logger())
+        monkeypatch.setattr(render_module, "_logurich_is_configured", lambda: True)
+
+        case().display_summary()
+
+        assert len(captured) == 1
+        assert captured[0][0] == "INFO"
+        assert captured[0][2] == 150
 
 
 class TestEmptyInvestigation:

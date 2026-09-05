@@ -20,6 +20,13 @@ from rich.table import Table
 from rich.text import Text
 from rich.tree import Tree
 
+try:
+    from logurich import get_log_levels, get_logger
+except ImportError:  # pragma: no cover - logurich is a required dependency of cyvest
+    _logurich_logger = None
+else:
+    _logurich_logger = get_logger(__name__)
+
 from cyvest.enums import DecisionKind, Effect, Salience, Verdict
 from cyvest.evaluation.projection import verdict_from_score
 from cyvest.evaluation.report import CONCLUSION_BOUND_LABELS, Contribution, Report
@@ -399,6 +406,7 @@ def build_timeline(
     table.add_column("When")
     table.add_column("Kind")
     table.add_column("Title", overflow="fold")
+    table.add_column("Tactic")
     table.add_column("Salience")
 
     entries = investigation.timeline(
@@ -410,10 +418,14 @@ def build_timeline(
         track_verdict_changes=track_verdict_changes,
     )
     for entry in entries:
+        # On the occurred axis an undated fact sits at its assertion time: say so rather than pass it off.
+        when = entry.when.strftime("%Y-%m-%d %H:%M")
+        when_text = Text(when) if entry.dated or time == "asserted" else Text(f"{when} (asserted)", style="dim")
         table.add_row(
-            entry.when.strftime("%Y-%m-%d %H:%M"),
+            when_text,
             entry.kind,
             entry.title,
+            entry.tactic.value if entry.tactic is not None else "",
             Text(entry.salience.value, style="bold" if entry.salience.value == "key" else "dim"),
         )
     return table
@@ -521,8 +533,22 @@ def display_diff(
 
 
 def emit(renderable: object, printer: Callable[[object], None] | None = None) -> None:
-    """Hand a renderable to a caller-supplied printer, or print it on a console."""
-    (printer or print_renderable)(renderable)
+    """Print through the active logurich logger, an explicit printer, or a console."""
+    if printer is not None:
+        printer(renderable)
+    elif _logurich_logger is not None and _logurich_is_configured():
+        _logurich_logger.rich("INFO", renderable, width=150)
+    else:
+        print_renderable(renderable)
+
+
+def _logurich_is_configured() -> bool:
+    """Use logurich only after the application has explicitly initialized it."""
+    try:
+        get_log_levels()
+    except RuntimeError:
+        return False
+    return True
 
 
 def print_renderable(renderable: object, console: Console | None = None) -> None:

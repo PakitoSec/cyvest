@@ -326,8 +326,7 @@
         "labels": [],
         "extra": {}
       }
-    },
-    "events": {}
+    }
   },
   "decisions": {
     "dec:obs:domain:cdn.partner.example": {

@@ -51,8 +51,16 @@ class Verdict(str, Enum):
             return 0
         return 1
 
+    @property
+    def rank(self) -> int:
+        """Position on the scale, ``SAFE`` first: what to sort or take the max on."""
+        return _VERDICT_RANK[self]
+
     def __str__(self) -> str:
         return self.value
+
+
+_VERDICT_RANK = {member: index for index, member in enumerate(Verdict)}
 
 
 class Confidence(float, Enum):
@@ -221,6 +229,62 @@ class Salience(str, Enum):
 _SALIENCE_ORDER = {"background": 0, "notable": 1, "key": 2}
 
 
+class Tactic(str, Enum):
+    """
+    A MITRE ATT&CK Enterprise tactic — the phase of the kill chain a finding demonstrates.
+
+    Kebab-case values, in kill-chain order. A tactic is a classification the timeline displays,
+    never a term the engine scores: whether the activity is malicious is the verdict's job.
+    """
+
+    RECONNAISSANCE = "reconnaissance"
+    RESOURCE_DEVELOPMENT = "resource-development"
+    INITIAL_ACCESS = "initial-access"
+    EXECUTION = "execution"
+    PERSISTENCE = "persistence"
+    PRIVILEGE_ESCALATION = "privilege-escalation"
+    DEFENSE_EVASION = "defense-evasion"
+    CREDENTIAL_ACCESS = "credential-access"
+    DISCOVERY = "discovery"
+    LATERAL_MOVEMENT = "lateral-movement"
+    COLLECTION = "collection"
+    COMMAND_AND_CONTROL = "command-and-control"
+    EXFILTRATION = "exfiltration"
+    IMPACT = "impact"
+
+    def __str__(self) -> str:
+        return self.value
+
+    @property
+    def attack_id(self) -> str:
+        """The ``TAxxxx`` identifier ATT&CK gives this tactic."""
+        return _TACTIC_ATTACK_IDS[self]
+
+    @classmethod
+    def from_attack_id(cls, attack_id: str) -> Tactic | None:
+        """The tactic behind a ``TAxxxx`` identifier, or ``None`` when it names no Enterprise tactic."""
+        return _TACTICS_BY_ATTACK_ID.get(attack_id.strip().upper())
+
+
+_TACTIC_ATTACK_IDS: dict[Tactic, str] = {
+    Tactic.RECONNAISSANCE: "TA0043",
+    Tactic.RESOURCE_DEVELOPMENT: "TA0042",
+    Tactic.INITIAL_ACCESS: "TA0001",
+    Tactic.EXECUTION: "TA0002",
+    Tactic.PERSISTENCE: "TA0003",
+    Tactic.PRIVILEGE_ESCALATION: "TA0004",
+    Tactic.DEFENSE_EVASION: "TA0005",
+    Tactic.CREDENTIAL_ACCESS: "TA0006",
+    Tactic.DISCOVERY: "TA0007",
+    Tactic.LATERAL_MOVEMENT: "TA0008",
+    Tactic.COLLECTION: "TA0009",
+    Tactic.COMMAND_AND_CONTROL: "TA0011",
+    Tactic.EXFILTRATION: "TA0010",
+    Tactic.IMPACT: "TA0040",
+}
+_TACTICS_BY_ATTACK_ID: dict[str, Tactic] = {attack_id: tactic for tactic, attack_id in _TACTIC_ATTACK_IDS.items()}
+
+
 class RelationKind(str, Enum):
     """
     The analyst pivot that produced the target from the source.
@@ -314,6 +378,7 @@ __all__ = [
     "Salience",
     "SourceClass",
     "Status",
+    "Tactic",
     "Verdict",
     "Weight",
 ]

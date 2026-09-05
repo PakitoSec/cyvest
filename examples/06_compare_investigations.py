@@ -123,11 +123,6 @@ def main() -> None:
     logger.info("[bold magenta]Cyvest Investigation Comparison Example[/bold magenta]")
     logger.info("")
 
-    # Everything goes through the logger: mixing it with a bare console would interleave two
-    # streams and print the tables out of order.
-    def to_logger(renderable: object) -> None:
-        logger.rich("INFO", renderable, width=150)
-
     # Create investigations
     expected = create_expected_investigation()
     actual = create_actual_investigation()
@@ -137,7 +132,7 @@ def main() -> None:
     logger.info("")
 
     diffs = compare_investigations(actual, expected)
-    display_diff(diffs, to_logger, title="Diff: Without Tolerance Rules")
+    display_diff(diffs, title="Diff: Without Tolerance Rules")
 
     logger.info("")
     logger.info(f"Total differences found: {len(diffs)}")
@@ -156,11 +151,7 @@ def main() -> None:
     ]
 
     diffs_with_rules = compare_investigations(actual, expected, result_expected=tolerance_rules)
-    display_diff(
-        diffs_with_rules,
-        to_logger,
-        title="Diff: With Tolerance Rules",
-    )
+    display_diff(diffs_with_rules, title="Diff: With Tolerance Rules")
 
     logger.info("")
     logger.info(f"Total differences found (with tolerance): {len(diffs_with_rules)}")
@@ -181,7 +172,6 @@ def main() -> None:
 
     display_diff(
         compare_investigations(actual, expected, result_expected=[*tolerance_rules, with_effect]),
-        to_logger,
         title="Diff: Pinning effect=FLOOR",
     )
 
@@ -191,7 +181,7 @@ def main() -> None:
     logger.info("[bold cyan]4. Using Cyvest convenience methods:[/bold cyan]")
     logger.info("")
 
-    actual.display_diff(expected=expected, printer=to_logger, title="Diff: Using Cyvest.display_diff()")
+    actual.display_diff(expected=expected, title="Diff: Using Cyvest.display_diff()")
 
     logger.info("")
     logger.info("[green]Example complete![/green]")

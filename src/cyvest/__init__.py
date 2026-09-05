@@ -5,16 +5,16 @@ v7 rests on three layers: immutable **facts**, a declarative **policy**, and a p
 **evaluation** that recomputes a report instead of storing scores on the facts.
 """
 
+from cyvest.autolink import AutoLink
 from cyvest.compare import (
     DiffItem,
     DiffStatus,
-    EngineMismatchError,
     ExpectedResult,
     ObservableDiff,
     SignalDiff,
     compare_investigations,
 )
-from cyvest.cyvest import Cyvest
+from cyvest.cyvest import Cyvest, InvestigationSpec
 from cyvest.enums import (
     Aggregation,
     Confidence,
@@ -27,9 +27,11 @@ from cyvest.enums import (
     Salience,
     SourceClass,
     Status,
+    Tactic,
     Verdict,
     Weight,
 )
+from cyvest.errors import EngineMismatchError, PolicyMismatchError, RootMismatchError
 from cyvest.evaluation import (
     Contribution,
     FindingResult,
@@ -56,6 +58,18 @@ from cyvest.facts import (
     Tag,
     ThreatIntel,
 )
+from cyvest.facts.store import MergeReport
+from cyvest.io.markdown import render_llm_summary
+from cyvest.io.serialization import merge_documents
+from cyvest.operations import (
+    AppliedOp,
+    BatchResult,
+    Operation,
+    OpError,
+    RecordBatch,
+    aapply_operations,
+    apply_operations,
+)
 from cyvest.policy import DEFAULT_POLICY, Policy
 from cyvest.proxies import (
     DecisionProxy,
@@ -65,7 +79,18 @@ from cyvest.proxies import (
     TagProxy,
     ThreatIntelProxy,
 )
-from cyvest.resolvers import ObservableResolution, ObservableResolver
+from cyvest.relations import (
+    RelationApplyResult,
+    RelationContext,
+    RelationIssue,
+    RelationPlan,
+    RelationPlanPreview,
+    RelationProposal,
+    apply_relation_plan,
+    relation_context,
+    validate_relation_plan,
+)
+from cyvest.resolvers import ObservableResolution, ObservableResolver, identity_is_complete, infer_observable_identity
 from cyvest.schema.signal import SIGNAL_SCHEMA_VERSION, SignalEnvelope
 
 __version__ = "7.0.0"
@@ -73,11 +98,36 @@ __version__ = "7.0.0"
 __all__ = [
     "DEFAULT_POLICY",
     "Aggregation",
+    "AppliedOp",
+    "AutoLink",
+    "BatchResult",
+    "OpError",
+    "Operation",
+    "RecordBatch",
+    "RelationApplyResult",
+    "RelationContext",
+    "RelationIssue",
+    "RelationPlan",
+    "RelationPlanPreview",
+    "RelationProposal",
+    "aapply_operations",
+    "apply_operations",
+    "apply_relation_plan",
+    "MergeReport",
+    "PolicyMismatchError",
+    "RootMismatchError",
+    "identity_is_complete",
+    "infer_observable_identity",
+    "merge_documents",
+    "relation_context",
+    "render_llm_summary",
+    "validate_relation_plan",
     "Confidence",
     "Contribution",
     "SIGNAL_SCHEMA_VERSION",
     "SignalEnvelope",
     "Cyvest",
+    "InvestigationSpec",
     "DiffItem",
     "DiffStatus",
     "EngineMismatchError",
@@ -117,6 +167,7 @@ __all__ = [
     "SourceClass",
     "SourceRef",
     "Status",
+    "Tactic",
     "Tag",
     "TagProxy",
     "ThreatIntel",

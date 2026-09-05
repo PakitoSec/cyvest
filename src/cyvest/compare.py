@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from cyvest.enums import Effect, Verdict
+from cyvest.errors import EngineMismatchError
 
 if TYPE_CHECKING:
     from cyvest.cyvest import Cyvest
@@ -31,10 +32,6 @@ _OPERATORS = {
     "==": lambda a, b: a == b,
     "!=": lambda a, b: a != b,
 }
-
-
-class EngineMismatchError(RuntimeError):
-    """Raised when two investigations were scored by different engines."""
 
 
 class DiffStatus(str, Enum):

@@ -7,8 +7,9 @@ scoring lives here — scores come from the report, which is recomputed rather t
 
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from copy import deepcopy
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Final, Literal, overload
@@ -16,6 +17,7 @@ from typing import TYPE_CHECKING, Any, Final, Literal, overload
 from logurich import get_logger
 
 from cyvest import keys
+from cyvest.autolink import AutoLink, apply_structural_links
 from cyvest.enums import (
     Confidence,
     DecisionKind,
@@ -27,6 +29,7 @@ from cyvest.enums import (
     Salience,
     SourceClass,
     Status,
+    Tactic,
     Verdict,
     Weight,
 )
@@ -42,10 +45,12 @@ from cyvest.facts import (
     ObservableAlias,
     ObservableIdentity,
     ObservableSignal,
+    Relation,
     SourceRef,
     Tag,
     ThreatIntel,
 )
+from cyvest.facts.store import MergeReport
 from cyvest.investigation import DEFAULT_SOURCE, Investigation
 from cyvest.policy import DEFAULT_POLICY, Policy
 from cyvest.proxies import (
@@ -89,6 +94,7 @@ class Cyvest:
     STATUS: Final[type[Status]] = Status
     EFFECT: Final[type[Effect]] = Effect
     SRC: Final[type[SourceClass]] = SourceClass
+    TACTIC: Final[type[Tactic]] = Tactic
 
     def __init__(
         self,
@@ -99,6 +105,7 @@ class Cyvest:
         engine: str | None = None,
         investigation_name: str | None = None,
         investigation_id: str | None = None,
+        auto_link: AutoLink | None = None,
     ) -> None:
         self._investigation = Investigation(
             root_data,
@@ -109,6 +116,16 @@ class Cyvest:
             investigation_id=investigation_id,
         )
         self._observable_resolvers: list[ObservableResolver] = []
+        self._auto_link = auto_link
+
+    @property
+    def auto_link(self) -> AutoLink | None:
+        """The automatic linking rules this facade applies on creation, if any."""
+        return self._auto_link
+
+    @auto_link.setter
+    def auto_link(self, value: AutoLink | None) -> None:
+        self._auto_link = value
 
     # ------------------------------------------------------------------ engines
 
@@ -320,7 +337,12 @@ class Cyvest:
             fragment_id=fragment,
         )
         stored = self._investigation.add_observable(observable)
-        return ObservableProxy(self._investigation, stored.key)
+        proxy = ObservableProxy(self._investigation, stored.key)
+        # Only on first sight: the derived facts have deterministic keys, so re-running would be a
+        # no-op anyway, and skipping it keeps a repeated observable from paying for the parse.
+        if existing is None and self._auto_link is not None and self._auto_link.structural:
+            apply_structural_links(self, proxy, self._auto_link)
+        return proxy
 
     # ------------------------------------------------------------------ observables
 
@@ -333,12 +355,19 @@ class Cyvest:
         internal: bool = False,
         comment: str = "",
         extra: dict[str, Any] | None = None,
+        resolve: bool = True,
     ) -> ObservableProxy:
-        """Create an observable, or return the existing one — identity is the quadruplet."""
+        """
+        Create an observable, or return the existing one — identity is the quadruplet.
+
+        ``resolve=False`` takes the identity as given, without consulting the registered
+        resolvers: for a value already canonical — a domain derived from a URL, an identity another
+        system settled — where a resolver could only add a lookup, or fail because it is async.
+        """
         alias = ObservableAlias(type=obs_type, subtype=subtype, namespace=namespace, value=value)
         return self._create_from_identity(
             alias=alias,
-            resolved=self._resolve_identity_sync(alias),
+            resolved=self._resolve_identity_sync(alias) if resolve else None,
             internal=internal,
             comment=comment,
             extra=extra,
@@ -353,12 +382,13 @@ class Cyvest:
         internal: bool = False,
         comment: str = "",
         extra: dict[str, Any] | None = None,
+        resolve: bool = True,
     ) -> ObservableProxy:
         """Async variant, for resolvers that need to call out."""
         alias = ObservableAlias(type=obs_type, subtype=subtype, namespace=namespace, value=value)
         return self._create_from_identity(
             alias=alias,
-            resolved=await self._resolve_identity_async(alias),
+            resolved=await self._resolve_identity_async(alias) if resolve else None,
             internal=internal,
             comment=comment,
             extra=extra,
@@ -395,8 +425,14 @@ class Cyvest:
         confidence: float = 1.0,
         comment: str = "",
         observed_at: datetime | None = None,
+        asserted_by: SourceRef | None = None,
     ) -> ObservableProxy:
-        """``source`` is the parent, ``target`` the child; the kind implies the direction."""
+        """
+        ``source`` is the parent, ``target`` the child; the kind implies the direction.
+
+        ``asserted_by`` records who drew the edge when it was not the caller itself — an
+        auto-link rule, an agent's validated plan.
+        """
         source_key = self._key_of(source)
         self._investigation.add_relation(
             source_key,
@@ -405,8 +441,13 @@ class Cyvest:
             confidence=confidence,
             comment=comment,
             observed_at=observed_at,
+            asserted_by=asserted_by,
         )
         return ObservableProxy(self._investigation, source_key)
+
+    def relation_get_all(self) -> dict[str, Relation]:
+        """Every relation, keyed. Relations are facts without a proxy: they carry nothing to compute."""
+        return self._investigation.get_all_relations()
 
     def observable_add_threat_intel(
         self,
@@ -506,6 +547,8 @@ class Cyvest:
         status: Status = Status.EVALUATED,
         effect: Effect | str = Effect.ADDITIVE,
         labels: tuple[Label, ...] = (),
+        tactic: Tactic | str | None = None,
+        occurred_at: datetime | None = None,
         extra: dict[str, Any] | None = None,
         external_id: str | None = None,
     ) -> FindingProxy:
@@ -520,6 +563,11 @@ class Cyvest:
         What the finding is about is stated by linking observables, not by a subject field.
 
         Stating a ``verdict`` or a ``weight`` alone is enough; each implies the other.
+
+        ``occurred_at`` dates the activity the finding describes — the time the source reports,
+        not the time the rule fired — and ``tactic`` names the ATT&CK tactic it demonstrates. The
+        timeline reads both; the score reads neither. An update that omits them keeps the
+        previous values.
         """
         resolved_verdict, resolved_weight = self._judgment(verdict, weight)
         finding = Finding(
@@ -532,6 +580,8 @@ class Cyvest:
             status=status,
             effect=Effect(effect) if isinstance(effect, str) else effect,
             labels=labels,
+            tactic=Tactic(tactic) if isinstance(tactic, str) else tactic,
+            occurred_at=occurred_at,
             extra=extra or {},
             external_id=external_id,
             source=DEFAULT_SOURCE,
@@ -761,8 +811,14 @@ class Cyvest:
 
     # ------------------------------------------------------------------ graph & merge
 
-    def merge_investigation(self, other: Cyvest) -> None:
-        self._investigation.merge_investigation(other._investigation)
+    def merge_investigation(
+        self,
+        other: Cyvest,
+        *,
+        on_engine_mismatch: Literal["raise", "reevaluate"] = "raise",
+    ) -> MergeReport:
+        """Fold ``other`` in; see :meth:`Investigation.merge_investigation` for the law and the report."""
+        return self._investigation.merge_investigation(other._investigation, on_engine_mismatch=on_engine_mismatch)
 
     def finalize_relationships(self) -> None:
         self._investigation.finalize_relationships()
@@ -802,7 +858,7 @@ class Cyvest:
         include_tags: bool = True,
         include_observables: bool = True,
     ) -> str:
-        from cyvest.io.serialization import generate_markdown_report
+        from cyvest.io.markdown import generate_markdown_report
 
         return generate_markdown_report(
             self._investigation,
@@ -817,7 +873,7 @@ class Cyvest:
         include_tags: bool = True,
         include_observables: bool = True,
     ) -> str:
-        from cyvest.io.serialization import save_investigation_markdown
+        from cyvest.io.markdown import save_investigation_markdown
 
         return save_investigation_markdown(
             self._investigation,
@@ -827,22 +883,41 @@ class Cyvest:
         )
 
     @classmethod
-    def io_load_dict(cls, data: dict[str, Any], *, migrate: bool = False) -> Cyvest:
+    def io_load_dict(
+        cls,
+        data: dict[str, Any],
+        *,
+        migrate: bool = False,
+        auto_link: AutoLink | None = None,
+    ) -> Cyvest:
+        """
+        Rebuild a facade from a serialized document.
+
+        Resolvers are not part of the document and come back empty: register them again on the
+        result. ``auto_link`` is likewise a facade setting, not a fact, so it is passed here.
+        """
         from cyvest.io.serialization import load_investigation_dict
 
-        return cls._wrap(load_investigation_dict(data, migrate=migrate))
+        return cls._wrap(load_investigation_dict(data, migrate=migrate), auto_link=auto_link)
 
     @classmethod
-    def io_load_json(cls, filepath: str | Path, *, migrate: bool = False) -> Cyvest:
+    def io_load_json(
+        cls,
+        filepath: str | Path,
+        *,
+        migrate: bool = False,
+        auto_link: AutoLink | None = None,
+    ) -> Cyvest:
         from cyvest.io.serialization import load_investigation_json
 
-        return cls._wrap(load_investigation_json(filepath, migrate=migrate))
+        return cls._wrap(load_investigation_json(filepath, migrate=migrate), auto_link=auto_link)
 
     @classmethod
-    def _wrap(cls, investigation: Investigation) -> Cyvest:
+    def _wrap(cls, investigation: Investigation, *, auto_link: AutoLink | None = None) -> Cyvest:
         facade = cls.__new__(cls)
         facade._investigation = investigation
         facade._observable_resolvers = []
+        facade._auto_link = auto_link
         return facade
 
     # ------------------------------------------------------------------ display
@@ -1001,4 +1076,51 @@ class Cyvest:
         return completed.model_dump(mode="json", exclude_none=True)
 
 
-__all__ = ["Cyvest"]
+@dataclass(frozen=True)
+class InvestigationSpec:
+    """
+    How to build a facade, and how to build it *again*.
+
+    Everything a serialized document does not carry: the root, the policy and engine, the naming,
+    the auto-link rules, and ``configure`` — code such as identity resolvers, run on every facade
+    this spec hands out, new or loaded. One object serves the shared context handing out workers
+    and an agent framework rebuilding the investigation from its state; they used to describe the
+    same thing twice.
+    """
+
+    root_data: Any = None
+    root_type: ObservableType | str = ObservableType.FILE
+    policy: Policy | None = None
+    engine: str | None = None
+    investigation_name: str | None = None
+    investigation_id: str | None = None
+    auto_link: AutoLink | None = None
+    configure: Callable[[Cyvest], None] | None = None
+
+    def new(self, *, investigation_id: str | None = None, investigation_name: str | None = None) -> Cyvest:
+        """A fresh investigation; the id and name may be overridden per call, for workers."""
+        cv = Cyvest(
+            self.root_data,
+            root_type=self.root_type,  # type: ignore[arg-type]
+            policy=self.policy,
+            engine=self.engine,
+            investigation_name=investigation_name if investigation_name is not None else self.investigation_name,
+            investigation_id=investigation_id if investigation_id is not None else self.investigation_id,
+            auto_link=self.auto_link,
+        )
+        return self._configured(cv)
+
+    def load(self, data: Mapping[str, Any], *, migrate: bool = False) -> Cyvest:
+        """The facade over a serialized document, with this spec's settings and resolvers back on it."""
+        return self._configured(Cyvest.io_load_dict(dict(data), migrate=migrate, auto_link=self.auto_link))
+
+    def wrap(self, investigation: Investigation) -> Cyvest:
+        return self._configured(Cyvest._wrap(investigation, auto_link=self.auto_link))
+
+    def _configured(self, cv: Cyvest) -> Cyvest:
+        if self.configure is not None:
+            self.configure(cv)
+        return cv
+
+
+__all__ = ["Cyvest", "InvestigationSpec"]

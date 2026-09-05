@@ -19,6 +19,7 @@ from typing import Any, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from cyvest.errors import EngineMismatchError, PolicyMismatchError, RootMismatchError
 from cyvest.facts.base import Fact, utc_now
 from cyvest.facts.decision import Decision
 from cyvest.facts.evidence import Evidence
@@ -62,9 +63,76 @@ class InvestigationHeader(BaseModel):
     engine_id: str = Field(default="basic-v1")
     fragment_ids: tuple[str, ...] = Field(default=())
 
+    @property
+    def sort_key(self) -> tuple[datetime, str]:
+        """The canonical order of two headers: the one opened first comes first, the id breaks ties."""
+        return (self.opened_at, self.investigation_id)
+
     def with_fragments(self, fragment_ids: Iterable[str]) -> InvestigationHeader:
-        merged = dict.fromkeys((*self.fragment_ids, *fragment_ids))
+        merged = sorted(dict.fromkeys((*self.fragment_ids, *fragment_ids)))
         return self.model_copy(update={"fragment_ids": tuple(merged)})
+
+    def merge(self, other: InvestigationHeader) -> InvestigationHeader:
+        """
+        The header of the union of two stores — the one law, symmetric and deterministic.
+
+        Facts have always merged by a total order; the header used to come from whichever side
+        was ``self``, which made a merge commutative on its facts and not on its name. Now both
+        headers are put in canonical order first (:attr:`sort_key`), so ``a.merge(b)`` and
+        ``b.merge(a)`` are the same header: the identity and the name of the investigation opened
+        first, the earliest opening time, the sorted union of the fragments.
+
+        Three fields must agree, and refuse rather than pick a side: facts collected under two
+        engines or two policies are not on one scale, and two roots are two cases. Re-evaluating
+        under one engine is a decision the caller states — see
+        :meth:`Investigation.merge_investigation`.
+        """
+        if self.engine_id != other.engine_id:
+            raise EngineMismatchError(
+                f"Cannot merge a {self.engine_id} investigation with a {other.engine_id} one; "
+                "scores from different engines are not on the same scale. "
+                "Re-evaluate both under one engine first."
+            )
+        if self.policy_version != other.policy_version:
+            raise PolicyMismatchError(
+                f"Cannot merge a {self.policy_version} investigation with a {other.policy_version} one; "
+                "the two were scored under different policies."
+            )
+        if self.root_key and other.root_key and self.root_key != other.root_key:
+            raise RootMismatchError(
+                f"Cannot merge investigations anchored on different roots ({self.root_key} vs {other.root_key})."
+            )
+        first, second = sorted((self, other), key=lambda header: header.sort_key)
+        return InvestigationHeader(
+            investigation_id=first.investigation_id,
+            name=first.name or second.name,
+            root_key=first.root_key or second.root_key,
+            opened_at=first.opened_at,
+            policy_version=first.policy_version,
+            engine_id=first.engine_id,
+            fragment_ids=first.with_fragments(second.fragment_ids).fragment_ids,
+        )
+
+
+class MergeReport(BaseModel):
+    """
+    What a merge did to the receiving store, key by key.
+
+    ``added`` are facts the receiver did not have; ``superseded`` are facts it had and that the
+    incoming, fresher assertion replaced; ``kept`` are facts it had and kept, the incoming one
+    being older or identical. ``fragments`` lists the fragments joined by the merge.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    added: tuple[str, ...] = Field(default=())
+    superseded: tuple[str, ...] = Field(default=())
+    kept: tuple[str, ...] = Field(default=())
+    fragments: tuple[str, ...] = Field(default=())
+
+    @property
+    def changed(self) -> bool:
+        return bool(self.added or self.superseded)
 
 
 def _merge_counters(left: dict[str, int], right: dict[str, int]) -> dict[str, int]:
@@ -175,13 +243,45 @@ class FactStore:
         """
         Merge another store into a new one.
 
-        Idempotent, commutative and associative: ``union`` is a fold of ``resolve_conflict`` over
-        a key-indexed registry, and that resolver is itself a deterministic total order.
+        Idempotent, commutative and associative — header included: ``union`` is a fold of
+        ``resolve_conflict`` over a key-indexed registry, that resolver is a deterministic total
+        order, and the two sides are put in canonical order (:attr:`InvestigationHeader.sort_key`)
+        before folding, so the order the arguments came in cannot leak into the result.
+
+        Raises the mismatch errors of :meth:`InvestigationHeader.merge` when the two stores were
+        scored on different scales or anchor on different roots.
         """
-        merged = FactStore(self.header.with_fragments(other.header.fragment_ids))
-        merged.extend(self.all_facts())
-        merged.extend(other.all_facts())
+        header = self.header.merge(other.header)
+        # Two branches of one investigation share a header, so the tie is broken on the stores'
+        # own content; the fold order then never depends on which side was ``self``.
+        first, second = sorted((self, other), key=lambda store: (store.header.sort_key, sorted(store.keys())))
+        merged = FactStore(header)
+        merged.extend(first.all_facts())
+        merged.extend(second.all_facts())
         return merged
+
+    def report_merge(self, incoming: FactStore, merged: FactStore) -> MergeReport:
+        """Describe ``merged`` from this store's point of view: what ``incoming`` added, replaced or lost."""
+        added: list[str] = []
+        superseded: list[str] = []
+        kept: list[str] = []
+        roots = {self.header.root_key, incoming.header.root_key}
+        for fact in incoming.all_facts():
+            # The root is an anchor every side re-mints; it would be "superseded" by every merge.
+            if fact.key in roots:
+                continue
+            before = self.get(fact.key)
+            if before is None:
+                added.append(fact.key)
+                continue
+            after = merged.get(fact.key)
+            (kept if after is None or after.seq == before.seq else superseded).append(fact.key)
+        return MergeReport(
+            added=tuple(sorted(added)),
+            superseded=tuple(sorted(superseded)),
+            kept=tuple(sorted(kept)),
+            fragments=tuple(sorted(set(incoming.header.fragment_ids) - set(self.header.fragment_ids))),
+        )
 
     def copy(self) -> FactStore:
         """
@@ -204,6 +304,9 @@ class FactStore:
             set, {key: set(value) for key, value in self._signals_by_subject.items()}
         )
         return clone
+
+    def keys(self) -> Iterator[str]:
+        yield from (fact.key for fact in self.all_facts())
 
     def all_facts(self) -> Iterator[Fact]:
         yield from self.observables.values()
@@ -264,4 +367,4 @@ class FactStore:
         )
 
 
-__all__ = ["FactStore", "InvestigationHeader", "resolve_conflict"]
+__all__ = ["FactStore", "InvestigationHeader", "MergeReport", "resolve_conflict"]

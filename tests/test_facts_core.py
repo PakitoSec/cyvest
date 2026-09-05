@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from cyvest import keys
-from cyvest.enums import DecisionKind, RelationKind, SourceClass, Verdict
+from cyvest.enums import DecisionKind, RelationKind, SourceClass, Tactic, Verdict
 from cyvest.facts import Decision, Finding, Observable, Relation, SourceRef, Tag, ThreatIntel
 from cyvest.facts.store import FactStore, InvestigationHeader
 from cyvest.ulid import decode_ulid_timestamp, generate_ulid
@@ -84,6 +84,22 @@ class TestKeyTable:
         assert quiet.key == noisy.key
 
 
+class TestTactic:
+    def test_a_finding_states_a_tactic_from_the_enum_only(self) -> None:
+        dated = Finding(rule_id="r", tactic="initial-access", source=SRC, fragment_id="f1")
+        assert dated.tactic is Tactic.INITIAL_ACCESS
+        with pytest.raises(ValueError):
+            Finding(rule_id="r", tactic="TA0001", source=SRC, fragment_id="f1")
+
+    def test_attack_ids_round_trip_and_cover_the_fourteen_tactics(self) -> None:
+        assert len(Tactic) == 14
+        assert Tactic.INITIAL_ACCESS.attack_id == "TA0001" and Tactic.IMPACT.attack_id == "TA0040"
+        for tactic in Tactic:
+            assert Tactic.from_attack_id(tactic.attack_id) is tactic
+        assert Tactic.from_attack_id(" ta0011 ") is Tactic.COMMAND_AND_CONTROL
+        assert Tactic.from_attack_id("TA9999") is None
+
+
 class TestEnvelope:
     def test_seq_is_generated_from_asserted_at(self) -> None:
         moment = datetime(2026, 3, 1, 12, 0, tzinfo=timezone.utc)
@@ -97,6 +113,23 @@ class TestEnvelope:
         stale_seq = generate_ulid(timestamp_ms=int((moment - timedelta(days=30)).timestamp() * 1000))
         with pytest.raises(ValueError, match="disagrees with asserted_at"):
             Observable(type="ipv4", value="1.2.3.4", source=SRC, fragment_id="f1", asserted_at=moment, seq=stale_seq)
+
+
+class TestSeq:
+    def test_ulids_minted_in_the_same_millisecond_keep_their_order(self) -> None:
+        """The merge law breaks ties on ``seq``; random bits inside one millisecond would make it a coin toss."""
+        stamp = int(datetime(2026, 8, 7, tzinfo=timezone.utc).timestamp() * 1000)
+        minted = [generate_ulid(timestamp_ms=stamp) for _ in range(200)]
+        assert minted == sorted(minted) and len(set(minted)) == 200
+
+    def test_two_re_assertions_inside_one_millisecond_settle_on_the_later_one(self) -> None:
+        moment = datetime(2026, 8, 7, tzinfo=timezone.utc)
+        first = Finding(rule_id="r", comment="first", asserted_at=moment, source=SRC, fragment_id="f1")
+        second = Finding(rule_id="r", comment="second", asserted_at=moment, source=SRC, fragment_id="f1")
+        registry = store()
+        registry.append(first)
+        registry.append(second)
+        assert registry.findings[first.key].comment == "second"
 
 
 class TestMergeLaws:

@@ -158,6 +158,23 @@ def generate_markdown_report(
             lines.append(f"| {_type_name(observable)} | `{observable.value}` | {score} | {verdict} |")
         lines.append("")
 
+        taxonomy_rows = []
+        for key, signal in sorted(investigation.get_all_threat_intels().items()):
+            for entry in signal.taxonomies:
+                cells = (key, entry.name, entry.value, entry.verdict.value)
+                taxonomy_rows.append(
+                    "| " + " | ".join(cell.replace("|", "\\|").replace("\n", "<br>") for cell in cells) + " |"
+                )
+        if taxonomy_rows:
+            lines += [
+                "## Taxonomies (descriptive only)",
+                "",
+                "| Signal | Name | Value | Verdict |",
+                "|---|---|---|---|",
+                *taxonomy_rows,
+                "",
+            ]
+
     if include_tags and investigation.get_all_tags():
         lines += ["## Tags", "", "| Tag | Aggregated score |", "|---|---|"]
         for tag in sorted(investigation.get_all_tags().values(), key=lambda t: t.name):

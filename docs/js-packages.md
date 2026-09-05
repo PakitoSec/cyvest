@@ -9,6 +9,12 @@ recomputes a score. `parseCyvest` reads any document of the same major up to its
 `7.1` SDK accepts a `7.0` document, a `7.0` SDK refuses a `7.1` one rather than dropping the
 fields it does not know, and a 6.x document is pointed at `cyvest migrate`.
 
+In 7.1, `ThreatIntel.taxonomies` contains `Taxonomy` objects (`name`, `value`, `verdict`), not
+strings. `parseCyvest` normalizes legacy text entries without modifying the input or its report.
+Their text becomes the name, their value is empty and their verdict is `INFO`; these entries
+are descriptive only. `isCyvest` is a strict type guard and returns false for unnormalized
+text entries: use the result of `parseCyvest` when loading older documents.
+
 ## Packages
 
 - **@cyvest/cyvest-js** — Generated types, schema validation, graph builders, tag hierarchy utilities (including aggregated score and verdict), and helper functions for Cyvest investigation JSON. Ships ESM/CJS builds and `.d.ts` files.

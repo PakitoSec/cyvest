@@ -70,8 +70,8 @@ pnpm add @cyvest/cyvest-js          # typed reader for the JSON documents
 pnpm add @cyvest/cyvest-vis         # React graph components
 ```
 
-Their version tracks the Python one: `@cyvest/cyvest-js@7.0.0` reads the documents written by
-`cyvest==7.0.0`. See [JS packages](../js-packages.md).
+Their version tracks the Python one: `@cyvest/cyvest-js@7.1.0` reads the documents written by
+`cyvest==7.1.0`, as well as 7.0 documents. See [JS packages](../js-packages.md).
 
 ---
 

@@ -15,7 +15,7 @@ import addFormats from "ajv-formats";
 import schema from "../../../../schema/cyvest.schema.json" with { type: "json" };
 import type { Investigation } from "./types";
 
-export const SCHEMA_VERSION = "7.0.0";
+export const SCHEMA_VERSION = "7.1.0";
 
 const SEMVER = /^\d+\.\d+\.\d+$/;
 
@@ -64,19 +64,44 @@ export function assertReadableVersion(version: string): void {
   }
 }
 
-export function parseCyvest(json: unknown): Investigation {
-  assertReadableVersion(detectSchemaVersion(json));
-  const validate = getValidator();
-  if (!validate(json)) {
-    throw new Error(`Invalid Cyvest payload: ${ajv.errorsText(validate.errors || [])}`);
-  }
-  return json as Investigation;
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+/** Normalize 7.0 free-text taxonomies once at the input boundary, without mutating the caller. */
+function normalizeTaxonomies(json: unknown): unknown {
+  if (!isRecord(json) || !isRecord(json.facts) || !isRecord(json.facts.signals)) return json;
+  const signals = Object.fromEntries(
+    Object.entries(json.facts.signals).map(([key, signal]) => [
+      key,
+      isRecord(signal) && Array.isArray(signal.taxonomies)
+        ? {
+            ...signal,
+            taxonomies: signal.taxonomies.map((entry: unknown) =>
+              typeof entry === "string" ? { name: entry, value: "", verdict: "INFO" } : entry,
+            ),
+          }
+        : signal,
+    ]),
+  );
+  return { ...json, facts: { ...json.facts, signals } };
+}
+
+export function parseCyvest(json: unknown): Investigation {
+  assertReadableVersion(detectSchemaVersion(json));
+  const normalized = normalizeTaxonomies(json);
+  const validate = getValidator();
+  if (!validate(normalized)) {
+    throw new Error(`Invalid Cyvest payload: ${ajv.errorsText(validate.errors || [])}`);
+  }
+  return normalized as Investigation;
+}
+
+/** A type guard cannot normalize its argument: legacy strings need parseCyvest first. */
 export function isCyvest(json: unknown): json is Investigation {
   try {
-    parseCyvest(json);
-    return true;
+    assertReadableVersion(detectSchemaVersion(json));
+    return !!getValidator()(json);
   } catch {
     return false;
   }

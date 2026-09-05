@@ -36,6 +36,7 @@ from cyvest.facts import (
     Relation,
     SourceRef,
     Tag,
+    Taxonomy,
     ThreatIntel,
     utc_now,
 )
@@ -321,6 +322,33 @@ class Investigation:
 
     def get_all_threat_intels(self) -> dict[str, ThreatIntel]:
         return {key: signal for key, signal in self.store.signals.items() if isinstance(signal, ThreatIntel)}
+
+    def add_threat_intel_taxonomy(self, key: str, taxonomy: Taxonomy | str) -> ThreatIntel:
+        """Upsert descriptive metadata by name, preserving the signal's judgment."""
+        signal = self.get_threat_intel(key)
+        if signal is None:
+            raise KeyError(f"Unknown threat intel: {key}")
+        entry = Taxonomy.model_validate(taxonomy)
+        entries = list(signal.taxonomies)
+        for index, existing in enumerate(entries):
+            if existing.name == entry.name:
+                if existing == entry:
+                    return signal
+                entries[index] = entry
+                break
+        else:
+            entries.append(entry)
+        return self.supersede(signal, taxonomies=tuple(entries))  # type: ignore[return-value]
+
+    def remove_threat_intel_taxonomy(self, key: str, name: str) -> ThreatIntel:
+        """Remove a descriptive entry by name; absent names are a no-op."""
+        signal = self.get_threat_intel(key)
+        if signal is None:
+            raise KeyError(f"Unknown threat intel: {key}")
+        entries = tuple(entry for entry in signal.taxonomies if entry.name != name)
+        if entries == signal.taxonomies:
+            return signal
+        return self.supersede(signal, taxonomies=entries)  # type: ignore[return-value]
 
     # --- evidence
 

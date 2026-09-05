@@ -66,7 +66,7 @@ class TestContract:
     def test_an_envelope_from_a_newer_minor_is_refused(self) -> None:
         """Accepting it would silently drop the fields that minor added."""
         with pytest.raises(ValidationError, match="newer than this library"):
-            Cyvest.io_load_signal(_response(schema_version="7.1.0"))
+            Cyvest.io_load_signal(_response(schema_version="7.2.0"))
 
     def test_an_envelope_from_another_major_is_refused(self) -> None:
         with pytest.raises(ValidationError):
@@ -167,9 +167,9 @@ class TestEmission:
         payload = Cyvest.io_dump_signal("vt", weight=6.0, observed_at=datetime(2026, 3, 1, 9, 12, tzinfo=timezone.utc))
         assert payload["observed_at"].startswith("2026-03-01T09:12:00")
 
-    def test_taxonomies_are_emitted_as_a_list(self) -> None:
+    def test_legacy_text_taxonomies_are_emitted_as_structured_entries(self) -> None:
         payload = Cyvest.io_dump_signal("vt", weight=6.0, taxonomies=("malware-type:trojan",))
-        assert payload["taxonomies"] == ["malware-type:trojan"]
+        assert payload["taxonomies"] == [{"name": "malware-type:trojan", "value": "", "verdict": "INFO"}]
 
     def test_an_absent_field_is_left_out_rather_than_sent_as_null(self) -> None:
         payload = Cyvest.io_dump_signal("vt", weight=6.0)

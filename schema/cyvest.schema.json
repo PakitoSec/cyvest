@@ -1238,6 +1238,31 @@
       "title": "Tag",
       "type": "object"
     },
+    "Taxonomy": {
+      "additionalProperties": false,
+      "description": "A named value with a display verdict. No weight, confidence or scoring effect.",
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "value": {
+          "title": "Value",
+          "type": "string"
+        },
+        "verdict": {
+          "$ref": "#/$defs/Verdict",
+          "default": "INFO",
+          "description": "Descriptive only; never affects scoring"
+        }
+      },
+      "required": [
+        "name",
+        "value"
+      ],
+      "title": "Taxonomy",
+      "type": "object"
+    },
     "ThreatIntel": {
       "additionalProperties": false,
       "description": "A verdict from a threat-intelligence source.\n\nIdentity is ``(source, subject_key)``, so a source re-asserting the same observable updates\nin place instead of piling up duplicates. Pass ``external_id`` to keep history on purpose.",
@@ -1366,7 +1391,7 @@
         "taxonomies": {
           "default": [],
           "items": {
-            "type": "string"
+            "$ref": "#/$defs/Taxonomy"
           },
           "title": "Taxonomies",
           "type": "array"
@@ -1406,7 +1431,7 @@
   "description": "A complete serialized investigation.",
   "properties": {
     "schema_version": {
-      "default": "7.0.0",
+      "default": "7.1.0",
       "pattern": "^7\\.\\d+\\.\\d+$",
       "title": "Schema Version",
       "type": "string"

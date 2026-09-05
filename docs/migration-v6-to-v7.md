@@ -45,6 +45,7 @@ read-only and never reimplement a scoring rule — but the report is an output, 
 | v6 | v7 | Note |
 |---|---|---|
 | `Level` | `Verdict` | Same five useful values; see §3 |
+| `Taxonomy(level, name, value)` | `Taxonomy(verdict, name, value)` | Restored in 7.1; descriptive only, never scored |
 | `Enrichment` | `Evidence` | Never scored in v6 either; the name now says so |
 | `Relationship` (embedded in the observable) | `Relation` (standalone fact) | §5 |
 | `score` (on facts) | `weight` | A magnitude *asserted*, not derived |
@@ -162,6 +163,11 @@ cv.observable_add_relation(email.key, url.key, cv.REL.EXTRACTION)
 
 The migration maps `bidirectional` to `related-to`, which loses propagation on those edges. That
 is intentional: an edge that pointed both ways had no defensible propagation semantics.
+
+v6 also accepted **any string** as a relationship type (`redirects-to`, `resolves-to`…). Those
+become `related-to` as well — v6 never defined what such an edge propagated, so v7 must not
+guess — and the original type is kept on the relation's `comment` when the edge had none, so a
+reader can still tell a redirect hop from a plain association.
 
 ---
 
@@ -334,7 +340,7 @@ depends on who finished first. Collect in parallel, derive in one pass.
 
 ```json
 {
-  "schema_version": "7.0.0",
+  "schema_version": "7.1.0",
   "header": { "investigation_id": "...", "root_key": "obs:file:__cyvest_root__", "...": "..." },
   "policy_version": "default-v1",
   "engine_id": "basic-v1",
@@ -352,6 +358,10 @@ depends on who finished first. Collect in parallel, derive in one pass.
   breaking the schema.
 - Findings carry an optional `tactic` (an ATT&CK Enterprise tactic) next to the envelope's
   `occurred_at`; both feed the [timeline](timeline.md), neither the score.
+- Since 7.1, taxonomies are structured objects again: `name`, `value`, `verdict`. Migration
+  preserves the v6 values and translates `level` to `verdict` (`TRUSTED` → `SAFE`, `NONE` →
+  `INFO`). Their verdict is descriptive and never enters scoring. 7.0 strings remain readable
+  as `{name: original_text, value: "", verdict: "INFO"}`; saving emits the structured shape.
 
 ### Migrating a file
 

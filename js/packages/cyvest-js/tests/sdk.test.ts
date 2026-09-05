@@ -56,7 +56,7 @@ describe("parsing and the version contract", () => {
   });
 
   it("refuses a newer document instead of ignoring unknown fields", () => {
-    expect(() => assertReadableVersion("7.1.0")).toThrow(/upgrade/);
+    expect(() => assertReadableVersion("7.2.0")).toThrow(/upgrade/);
   });
 
   it("refuses an older document and points at the migration", () => {
@@ -73,7 +73,7 @@ describe("parsing and the version contract", () => {
   // consumer actually calls.
   it("applies the version contract through parseCyvest, not just in isolation", () => {
     const document = raw();
-    document.schema_version = "7.1.0";
+    document.schema_version = "7.2.0";
     expect(() => parseCyvest(document)).toThrow(/newer than this SDK/);
   });
 
@@ -98,6 +98,38 @@ describe("parsing and the version contract", () => {
 
   it("reads the declared version when it is well formed", () => {
     expect(detectSchemaVersion(raw())).toBe("7.0.0");
+  });
+
+  it("reads structured taxonomies without replacing the signal verdict or score", () => {
+    const document = raw();
+    document.schema_version = "7.1.0";
+    const taxonomy = { name: "engine", value: "clean", verdict: "SAFE" };
+    document.facts.signals[`sig:virustotal:${URL_KEY}`].taxonomies = [taxonomy];
+    const parsed = parseCyvest(document);
+    const signal = getThreatIntelsFor(parsed, URL_KEY)[0];
+    expect(signal.taxonomies).toEqual([taxonomy]);
+    expect(signal.verdict).toBe("MALICIOUS");
+    expect(parsed.report).toEqual(document.report);
+    expect(isCyvest(document)).toBe(true);
+  });
+
+  it("normalizes old text entries without mutating the source document", () => {
+    const document = raw();
+    document.facts.signals[`sig:virustotal:${URL_KEY}`].taxonomies = ["malware-type:trojan"];
+    const parsed = parseCyvest(document);
+    expect(getThreatIntelsFor(parsed, URL_KEY)[0].taxonomies).toEqual([
+      { name: "malware-type:trojan", value: "", verdict: "INFO" },
+    ]);
+    expect(document.facts.signals[`sig:virustotal:${URL_KEY}`].taxonomies).toEqual(["malware-type:trojan"]);
+    expect(isCyvest(document)).toBe(false);
+    expect(isCyvest(parsed)).toBe(true);
+    expect(parsed.report).toEqual(document.report);
+  });
+
+  it("rejects malformed structured taxonomy entries", () => {
+    const document = raw();
+    document.facts.signals[`sig:virustotal:${URL_KEY}`].taxonomies = [{ name: "engine", verdict: "INVALID" }];
+    expect(() => parseCyvest(document)).toThrow(/Invalid Cyvest payload/);
   });
 });
 

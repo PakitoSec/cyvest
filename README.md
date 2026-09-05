@@ -16,7 +16,7 @@ different policy.
 facts  ──(engine + policy)──▶  report
 ```
 
-Cyvest 7 uses `schema_version: "7.0.0"`. Existing 6.x integrations should follow the
+Cyvest 7.1 uses `schema_version: "7.1.0"` and reads 7.0 documents. Existing 6.x integrations should follow the
 [migration guide](docs/migration-v6-to-v7.md) — the API changed almost everywhere, and there is no
 compatibility layer.
 

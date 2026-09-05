@@ -278,7 +278,7 @@ class TestMigrate:
         result = runner.invoke(cli, ["migrate", str(source), "-o", str(output)])
 
         assert result.exit_code == 0, result.output
-        assert json.loads(output.read_text(encoding="utf-8"))["schema_version"] == "7.0.0"
+        assert json.loads(output.read_text(encoding="utf-8"))["schema_version"] == "7.1.0"
         assert Cyvest.io_load_json(output).get_global_score() == 6.0
 
     def test_an_explicit_from_that_disagrees_with_the_file_is_refused(self, runner: CliRunner, tmp_path: Path) -> None:
@@ -294,7 +294,7 @@ class TestMigrate:
         result = runner.invoke(cli, ["migrate", str(case), "-o", str(output)])
 
         assert result.exit_code == 0, result.output
-        assert json.loads(output.read_text(encoding="utf-8"))["schema_version"] == "7.0.0"
+        assert json.loads(output.read_text(encoding="utf-8"))["schema_version"] == "7.1.0"
 
 
 class TestDiff:
@@ -383,7 +383,7 @@ class TestGuards:
         """Reading forward only: a 7.0 library must not guess at a 7.1 document."""
         future = tmp_path / "future.json"
         document = json.loads(case.read_text(encoding="utf-8"))
-        document["schema_version"] = "7.1.0"
+        document["schema_version"] = "7.2.0"
         future.write_text(json.dumps(document), encoding="utf-8")
 
         result = runner.invoke(cli, ["show", str(future)])

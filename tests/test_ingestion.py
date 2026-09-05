@@ -8,13 +8,14 @@ response must not double a signal, and nothing volatile in the raw body may infl
 from __future__ import annotations
 
 import json
+from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
 
-from cyvest import Cyvest, ObservableIdentity, ObservableResolution, ObservableResolver, Policy
+from cyvest import Cyvest, ObservableIdentity, ObservableResolution, ObservableResolver, Policy, SignalEnvelope
 from cyvest.enums import SourceClass, Verdict, Weight
 from cyvest.facts import Observable
 from cyvest.schema.signal import SIGNAL_SCHEMA_VERSION
@@ -22,9 +23,12 @@ from cyvest.schema.signal import SIGNAL_SCHEMA_VERSION
 
 def _response(**overrides: object) -> dict[str, object]:
     payload = {
+        "schema_version": SIGNAL_SCHEMA_VERSION,
+        "kind": "threat_intel",
         "source": "virustotal",
         "verdict": "MALICIOUS",
         "weight": 6.0,
+        "confidence": 1.0,
         "comment": "12/70 engines",
         "payload": {"requested_at": "2026-01-01T00:00:00Z", "quota_left": 4211},
     }
@@ -33,28 +37,23 @@ def _response(**overrides: object) -> dict[str, object]:
 
 
 class TestContract:
-    def test_a_verdict_alone_is_enough(self) -> None:
-        draft = Cyvest.io_load_signal({"source": "misp", "verdict": "SAFE"})
-        assert draft["verdict"] is Verdict.SAFE
-        assert "weight" not in draft
-
-    def test_a_weight_alone_is_enough_and_implies_the_verdict(self) -> None:
-        draft = Cyvest.io_load_signal({"source": "vt", "weight": 6.0})
-        assert draft["verdict"] is Verdict.MALICIOUS
-        assert draft["weight"] == pytest.approx(6.0)
+    @pytest.mark.parametrize("judgment", [{}, {"verdict": "SAFE"}, {"weight": 6.0}])
+    def test_partial_inputs_are_not_completed_on_ingestion(self, judgment) -> None:
+        with pytest.raises(ValidationError):
+            Cyvest.io_load_signal({"source": "vt", **judgment})
 
     def test_an_unknown_field_is_rejected_at_the_boundary(self) -> None:
         """A typo must fail loudly here rather than become a signal that quietly scores zero."""
         with pytest.raises(ValidationError):
-            Cyvest.io_load_signal({"source": "vt", "verdit": "MALICIOUS"})
+            Cyvest.io_load_signal(_response(verdit="MALICIOUS"))
 
     def test_a_nameless_source_is_rejected(self) -> None:
         with pytest.raises(ValidationError):
-            Cyvest.io_load_signal({"source": "", "verdict": "MALICIOUS"})
+            Cyvest.io_load_signal(_response(source=""))
 
     def test_a_confidence_outside_the_unit_range_is_rejected(self) -> None:
         with pytest.raises(ValidationError):
-            Cyvest.io_load_signal({"source": "vt", "verdict": "MALICIOUS", "confidence": 1.5})
+            Cyvest.io_load_signal(_response(confidence=1.5))
 
     def test_the_source_class_survives_ingestion(self) -> None:
         draft = Cyvest.io_load_signal(_response(source_class="internal_tool"))
@@ -66,11 +65,87 @@ class TestContract:
     def test_an_envelope_from_a_newer_minor_is_refused(self) -> None:
         """Accepting it would silently drop the fields that minor added."""
         with pytest.raises(ValidationError, match="newer than this library"):
-            Cyvest.io_load_signal(_response(schema_version="7.2.0"))
+            Cyvest.io_load_signal(_response(schema_version="7.3.0"))
 
     def test_an_envelope_from_another_major_is_refused(self) -> None:
         with pytest.raises(ValidationError):
             Cyvest.io_load_signal(_response(schema_version="6.0.0"))
+
+
+def _read_signal_json(payload):
+    return SignalEnvelope.model_validate_json(json.dumps(payload))
+
+
+@pytest.mark.parametrize("reader", [SignalEnvelope.model_validate, _read_signal_json, Cyvest.io_load_signal])
+class TestNativeContract:
+    @pytest.mark.parametrize("version", ["7.0.0", "7.1.0", "7.2.0"])
+    @pytest.mark.parametrize("field", ["schema_version", "kind", "source", "verdict", "weight", "confidence"])
+    def test_missing_fields_are_rejected_for_every_readable_version(self, reader, version, field) -> None:
+        payload = _response(schema_version=version)
+        del payload[field]
+        with pytest.raises(ValidationError) as exc:
+            reader(payload)
+        assert any(error["loc"] == (field,) and error["type"] == "missing" for error in exc.value.errors())
+
+    @pytest.mark.parametrize("field", ["weight", "confidence"])
+    @pytest.mark.parametrize("value", [None, True, False, "0.5", float("nan"), float("inf"), -float("inf")])
+    def test_numbers_are_explicit_finite_and_not_coerced(self, reader, field, value) -> None:
+        with pytest.raises(ValidationError) as exc:
+            reader(_response(**{field: value}))
+        assert any(error["loc"] == (field,) for error in exc.value.errors())
+
+    @pytest.mark.parametrize(
+        ("field", "value"),
+        [
+            ("source", ""),
+            ("source", " \t\n"),
+            ("source", b"vt"),
+            ("verdict", None),
+            ("weight", -1),
+            ("confidence", 0),
+            ("confidence", -0.1),
+            ("confidence", 1.1),
+            ("kind", "finding"),
+            ("unexpected", "value"),
+        ],
+    )
+    def test_invalid_metadata_is_rejected(self, reader, field, value) -> None:
+        if isinstance(value, bytes) and reader is _read_signal_json:
+            pytest.skip("Bytes are not JSON values")
+        with pytest.raises(ValidationError):
+            reader(_response(**{field: value}))
+
+    @pytest.mark.parametrize("version", ["7.0.0", "7.1.0", "7.2.0"])
+    @pytest.mark.parametrize(
+        ("verdict", "weight", "confidence"), [("SAFE", 3, 0.4), ("INFO", 0, 1), ("SUSPICIOUS", 2, 1)]
+    )
+    def test_explicit_judgment_and_opaque_payload_are_preserved(
+        self, reader, version, verdict, weight, confidence
+    ) -> None:
+        payload = _response(
+            schema_version=version,
+            verdict=verdict,
+            weight=weight,
+            confidence=confidence,
+            source=" vt ",
+            payload={"arbitrary": {"raw": [None, True, 42]}, "weight": "not a judgment"},
+        )
+        original = deepcopy(payload)
+        result = reader(payload)
+        draft = result.as_draft() if isinstance(result, SignalEnvelope) else result
+        assert draft["verdict"] is Verdict(verdict)
+        assert draft["weight"] == weight
+        assert draft["confidence"] == confidence
+        assert draft["source"] == " vt "
+        assert draft["payload"] == payload["payload"]
+        assert payload == original
+
+    def test_payload_is_not_a_gt_specific_contract(self, reader) -> None:
+        payload = _response()
+        del payload["payload"]
+        result = reader(payload)
+        draft = result.as_draft() if isinstance(result, SignalEnvelope) else result
+        assert draft["payload"] == {}
 
 
 class TestIdempotence:
@@ -109,6 +184,26 @@ class TestIdempotence:
 
         assert len(cv._investigation.store.signals) == 1
         assert cv.get_report().observable(url.key).score == pytest.approx(-1.0)
+
+
+class TestPublishedSignalSchema:
+    @pytest.mark.parametrize("field", ["schema_version", "kind", "source", "verdict", "weight", "confidence"])
+    def test_required_fields_are_published(self, field) -> None:
+        jsonschema = pytest.importorskip("jsonschema")
+        schema = SignalEnvelope.model_json_schema()
+        payload = _response()
+        del payload[field]
+        with pytest.raises(jsonschema.ValidationError):
+            jsonschema.validate(payload, schema)
+
+    @pytest.mark.parametrize(
+        ("field", "value"),
+        [("source", " \t"), ("weight", -1), ("weight", True), ("weight", "6"), ("confidence", True), ("verdict", None)],
+    )
+    def test_constraints_are_published(self, field, value) -> None:
+        jsonschema = pytest.importorskip("jsonschema")
+        with pytest.raises(jsonschema.ValidationError):
+            jsonschema.validate(_response(**{field: value}), SignalEnvelope.model_json_schema())
 
 
 class TestEmission:
@@ -162,6 +257,31 @@ class TestEmission:
     def test_a_producer_typo_is_rejected_before_the_wire(self) -> None:
         with pytest.raises(ValidationError):
             Cyvest.io_dump_signal("vt", verdit="MALICIOUS")
+
+    @pytest.mark.parametrize("field", ["weight", "confidence"])
+    @pytest.mark.parametrize("value", [True, False, "0.5", float("nan"), float("inf"), -float("inf")])
+    def test_invalid_numbers_are_rejected_before_completion(self, field, value) -> None:
+        with pytest.raises(ValidationError):
+            Cyvest.io_dump_signal("vt", **{field: value})
+
+    @pytest.mark.parametrize("source", ["", " \t\n", b"vt"])
+    def test_invalid_sources_are_rejected(self, source) -> None:
+        with pytest.raises(ValidationError):
+            Cyvest.io_dump_signal(source, weight=6.0)
+
+    @pytest.mark.parametrize("verdict", ["SAFE", "MALICIOUS"])
+    def test_a_signed_weight_with_an_explicit_verdict_is_rejected(self, verdict) -> None:
+        with pytest.raises(ValidationError):
+            Cyvest.io_dump_signal("vt", verdict=verdict, weight=-2.0)
+
+    def test_explicit_judgment_is_not_recalibrated(self) -> None:
+        payload = Cyvest.io_dump_signal("vt", verdict="SUSPICIOUS", weight=2, confidence=0.4)
+        signal = SignalEnvelope.model_validate(payload)
+        assert (signal.verdict, signal.weight, signal.confidence) == (Verdict.SUSPICIOUS, 2, 0.4)
+
+    def test_no_judgment_is_completed_only_by_the_producer_helper(self) -> None:
+        signal = SignalEnvelope.model_validate(Cyvest.io_dump_signal("vt"))
+        assert (signal.verdict, signal.weight, signal.confidence) == (Verdict.INFO, 0.0, 1.0)
 
     def test_an_observation_time_is_emitted_as_an_iso_string(self) -> None:
         payload = Cyvest.io_dump_signal("vt", weight=6.0, observed_at=datetime(2026, 3, 1, 9, 12, tzinfo=timezone.utc))

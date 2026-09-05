@@ -540,6 +540,14 @@ class TestCommittedSchema:
         jsonschema = pytest.importorskip("jsonschema")
         committed = json.loads(Path("schema/cyvest.signal.schema.json").read_text(encoding="utf-8"))
         jsonschema.validate(
-            {"source": "virustotal", "verdict": "MALICIOUS", "weight": 6.0, "payload": {"scan": 12}},
+            {
+                "schema_version": "7.2.0",
+                "kind": "threat_intel",
+                "source": "virustotal",
+                "verdict": "MALICIOUS",
+                "weight": 6.0,
+                "confidence": 1.0,
+                "payload": {"scan": 12},
+            },
             committed,
         )

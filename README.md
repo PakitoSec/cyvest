@@ -16,7 +16,9 @@ different policy.
 facts  ──(engine + policy)──▶  report
 ```
 
-Cyvest 7.1 uses `schema_version: "7.1.0"` and reads 7.0 documents. Existing 6.x integrations should follow the
+Cyvest 7.2 keeps investigation `schema_version: "7.1.0"` and reads 7.0 documents. External signals
+use schema `7.2.0` and require a complete, strictly validated judgment; see
+[upgrading signals to 7.2](docs/external-signals.md#upgrading-to-72). Existing 6.x integrations should follow the
 [migration guide](docs/migration-v6-to-v7.md) — the API changed almost everywhere, and there is no
 compatibility layer.
 

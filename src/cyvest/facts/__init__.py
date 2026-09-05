@@ -10,6 +10,7 @@ from cyvest.facts.observable import Observable, ObservableAlias, ObservableIdent
 from cyvest.facts.relation import Relation
 from cyvest.facts.signal import AnyObservableSignal, ObservableSignal, ThreatIntel
 from cyvest.facts.tag import Tag
+from cyvest.facts.taxonomy import Taxonomy
 
 __all__ = [
     "AnyObservableSignal",
@@ -27,6 +28,7 @@ __all__ = [
     "Relation",
     "SourceRef",
     "Tag",
+    "Taxonomy",
     "ThreatIntel",
     "decision_label",
     "utc_now",

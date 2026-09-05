@@ -47,7 +47,7 @@ export type ExternalId2 = string | null;
 export type EvidenceKeys2 = string[];
 export type ObservedAt1 = string | null;
 export type Labels = Label[];
-export type Taxonomies = string[];
+export type Taxonomies = Taxonomy[];
 export type OccurredAt3 = string | null;
 export type ExternalId3 = string | null;
 export type EvidenceKeys3 = string[];
@@ -309,6 +309,14 @@ export interface Label {
 }
 export interface Payload {
   [k: string]: unknown;
+}
+/**
+ * A named value with a display verdict. No weight, confidence or scoring effect.
+ */
+export interface Taxonomy {
+  name: string;
+  value: string;
+  verdict?: Verdict;
 }
 export interface Evidences {
   [k: string]: Evidence;

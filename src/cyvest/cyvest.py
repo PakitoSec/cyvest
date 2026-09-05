@@ -48,6 +48,7 @@ from cyvest.facts import (
     Relation,
     SourceRef,
     Tag,
+    Taxonomy,
     ThreatIntel,
 )
 from cyvest.facts.store import MergeReport
@@ -458,7 +459,7 @@ class Cyvest:
         weight: float | None = None,
         confidence: float = Confidence.HIGH.value,
         source_class: SourceClass = SourceClass.VENDOR_FEED,
-        taxonomies: tuple[str, ...] = (),
+        taxonomies: Sequence[Taxonomy | dict[str, Any] | str] = (),
         comment: str = "",
         payload: dict[str, Any] | None = None,
         observed_at: datetime | None = None,
@@ -516,22 +517,21 @@ class Cyvest:
     def threat_intel_get_all(self) -> dict[str, ThreatIntelProxy]:
         return {key: ThreatIntelProxy(self._investigation, key) for key in self._investigation.get_all_threat_intels()}
 
-    def threat_intel_add_taxonomy(self, threat_intel_key: str, taxonomy: str) -> ThreatIntelProxy:
-        signal = self._investigation.get_threat_intel(threat_intel_key)
-        if signal is None:
-            raise KeyError(f"Unknown threat intel: {threat_intel_key}")
-        if taxonomy not in signal.taxonomies:
-            self._investigation.supersede(signal, taxonomies=(*signal.taxonomies, taxonomy))
-        return ThreatIntelProxy(self._investigation, threat_intel_key)
+    def threat_intel_add_taxonomy(
+        self,
+        threat_intel_key: str,
+        taxonomy: Taxonomy | str | None = None,
+        *,
+        name: str | None = None,
+        value: str = "",
+        verdict: Verdict | str = Verdict.INFO,
+    ) -> ThreatIntelProxy:
+        return ThreatIntelProxy(self._investigation, threat_intel_key).add_taxonomy(
+            taxonomy, name=name, value=value, verdict=verdict
+        )
 
     def threat_intel_remove_taxonomy(self, threat_intel_key: str, taxonomy: str) -> ThreatIntelProxy:
-        signal = self._investigation.get_threat_intel(threat_intel_key)
-        if signal is None:
-            raise KeyError(f"Unknown threat intel: {threat_intel_key}")
-        remaining = tuple(item for item in signal.taxonomies if item != taxonomy)
-        if remaining != signal.taxonomies:
-            self._investigation.supersede(signal, taxonomies=remaining)
-        return ThreatIntelProxy(self._investigation, threat_intel_key)
+        return ThreatIntelProxy(self._investigation, threat_intel_key).remove_taxonomy(taxonomy)
 
     # ------------------------------------------------------------------ findings
 
@@ -1015,6 +1015,11 @@ class Cyvest:
 
     def root(self) -> ObservableProxy:
         return self.observable_get_root()
+
+    @staticmethod
+    def taxonomy(*, name: str, value: str, verdict: Verdict | str = Verdict.INFO) -> Taxonomy:
+        """Build a descriptive taxonomy. Its verdict never contributes to a score."""
+        return Taxonomy(name=name, value=value, verdict=Verdict(verdict))
 
     @staticmethod
     def threat_intel_draft(

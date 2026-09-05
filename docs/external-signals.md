@@ -21,7 +21,7 @@ judgment will land on, and it has no business inventing a key.
 
 ```json
 {
-  "schema_version": "7.0.0",
+    "schema_version": "7.1.0",
   "source": "virustotal",
   "source_class": "vendor_feed",
   "verdict": "MALICIOUS",
@@ -29,7 +29,7 @@ judgment will land on, and it has no business inventing a key.
   "confidence": 1.0,
   "observed_at": "2026-03-01T09:12:00Z",
   "comment": "12/70 engines",
-  "taxonomies": ["malware-type:trojan"],
+    "taxonomies": [{"name": "malware-type", "value": "trojan", "verdict": "MALICIOUS"}],
   "payload": {"scan_id": "…", "requested_at": "…", "quota_left": 4211}
 }
 ```
@@ -73,7 +73,7 @@ payload = Cyvest.io_dump_signal(
     verdict="MALICIOUS",
     comment="12/70 engines",
     observed_at=scan.completed_at,
-    taxonomies=("malware-type:trojan",),
+    taxonomies=(Cyvest.taxonomy(name="malware-type", value="trojan", verdict="MALICIOUS"),),
     payload=raw_response,
 )
 
@@ -105,6 +105,40 @@ Polarity belongs to the verdict, so the wire always carries a magnitude, never a
     decide.
 
 ---
+
+## Descriptive taxonomies
+
+Since 7.1, `Taxonomy` carries `name`, `value` and `verdict` (default `INFO`). It is an immutable
+value object, **not a scoring judgment**: no weight or confidence, no propagation, no effect on
+the signal, observable, finding or investigation score. Different entries on the same signal
+may carry different descriptive verdicts.
+
+```python
+from cyvest import Cyvest, Taxonomy, Verdict
+
+cv = Cyvest()
+url = cv.observable("url", "https://example.test")
+entry = cv.taxonomy(name="engine", value="clean", verdict=Verdict.SAFE)
+ti = cv.observable_add_threat_intel(
+  url, "vendor", verdict=Verdict.MALICIOUS, weight=6.0, taxonomies=(entry,)
+)
+ti.add_taxonomy(name="family", value="trojan", verdict=Verdict.MALICIOUS)
+ti.taxonomies[0].value  # "clean"
+ti.remove_taxonomy("engine")
+url.score  # still 6.0
+```
+
+Constructing `Taxonomy(...)` directly is equivalent to `cv.taxonomy(...)`. Dictionaries are
+accepted at ingestion too. Names are unique per signal; `add_taxonomy` updates an existing
+name in place in the tuple, while `remove_taxonomy` removes by name. The façade exposes the
+same operations as `threat_intel_add_taxonomy` and `threat_intel_remove_taxonomy`.
+
+The 7.1 investigation and signal schemas serialize entries as objects. Older 7.0 text entries
+remain readable: the entire string becomes `name`, with `value=""` and `verdict=INFO`. No
+separator is guessed. Loading needs no migration flag; saving or `cyvest migrate` emits the
+structured form. The old `level` of a v6 taxonomy becomes `verdict` during migration, preserving
+its `name` and `value`; information already discarded by a previous 7.0 migration cannot be
+recovered.
 
 ## Strict on purpose
 

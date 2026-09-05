@@ -33,6 +33,7 @@ from cyvest.facts import (
     Relation,
     SourceRef,
     Tag,
+    Taxonomy,
     ThreatIntel,
 )
 from cyvest.facts.store import FactStore, InvestigationHeader
@@ -181,8 +182,8 @@ def _check_readable(version: str) -> None:
     """
     Upward compatibility only: we read older documents, never newer ones.
 
-    Because of this rule a minor bump never needs a migration — fields added in 7.x are optional
-    and carry defaults — which is what lets parsing stay strict.
+    Older minor shapes are normalized by their models (notably the 7.0 taxonomy strings).
+    Unknown fields still fail validation instead of being silently discarded.
     """
     if _version_tuple(version) > _version_tuple(SCHEMA_VERSION):
         raise ValueError(f"Document schema {version} is newer than this library ({SCHEMA_VERSION}); upgrade cyvest.")
@@ -194,8 +195,7 @@ def load_investigation_dict(data: dict[str, Any], *, migrate: bool = False) -> I
     # Refuse a newer document before anything else: migrating it would be nonsense.
     _check_readable(version)
 
-    # Only a major bump needs a migration. Within 7.x every added field is optional and carries a
-    # default, so a 7.0 document validates unchanged against a later 7.x model.
+    # Major migrations are opt-in. Older minor shapes are accepted by model validators.
     if _version_tuple(version)[0] != _version_tuple(SCHEMA_VERSION)[0]:
         if not migrate:
             raise ValueError(
@@ -383,7 +383,13 @@ def _migrate_v6_to_v7(data: dict[str, Any]) -> dict[str, Any]:
         signal = ThreatIntel(
             subject_key=_translated(key_map, subject_key),
             taxonomies=tuple(
-                item.get("name", "") if isinstance(item, dict) else str(item)
+                Taxonomy(
+                    name=item["name"],
+                    value=item["value"],
+                    verdict=_LEVEL_TO_VERDICT.get(str(item.get("level", "INFO")).upper(), Verdict.INFO),
+                )
+                if isinstance(item, dict)
+                else Taxonomy.model_validate(item)
                 for item in (payload.get("taxonomies") or [])
             ),
             comment=payload.get("comment", ""),
@@ -606,19 +612,30 @@ def _migrate_relationship(
 
     direction = str(raw.get("direction", "outbound")).lower()
     raw_type = str(raw.get("relationship_type", "related-to")).lower()
+    comment = str(raw.get("comment") or "")
+
+    # v6 accepted any string as a type (``redirects-to``, ``resolves-to``…). v7's kinds are a
+    # closed set, and an edge whose propagation v6 never defined must not start propagating here:
+    # it becomes the inert ``related-to``, and the original type is kept on the comment so a
+    # reader can still tell what the producer meant.
+    try:
+        typed_kind = RelationKind(raw_type)
+    except ValueError:
+        typed_kind = RelationKind.RELATED_TO
+        comment = comment or raw_type
 
     if direction == "bidirectional":
         kind, parent, child = RelationKind.RELATED_TO, source_key, target_key
     elif direction == "inbound":
-        kind, parent, child = RelationKind(raw_type), target_key, source_key
+        kind, parent, child = typed_kind, target_key, source_key
     else:
-        kind, parent, child = RelationKind(raw_type), source_key, target_key
+        kind, parent, child = typed_kind, source_key, target_key
 
     return Relation(
         source_key=parent,
         target_key=child,
         kind=kind,
-        comment=raw.get("comment", ""),
+        comment=comment,
         **envelope,
     )
 
@@ -630,10 +647,11 @@ _MIGRATIONS = {
 
 
 def migrate_to_current(data: dict[str, Any]) -> dict[str, Any]:
-    """Chain migrations up to the current major, so a 5.x document upgrades in one call."""
+    """Chain major migrations, then normalize older minor shapes without recomputing reports."""
     version = detect_schema_version(data)
+    _check_readable(version)
     migrated = data
-    # Stop on the major: minor bumps are additive by contract and have no migration step.
+    # Major rewrites have explicit transforms; minor normalization lives on the models.
     while _version_tuple(version)[0] != _version_tuple(SCHEMA_VERSION)[0]:
         step = _MIGRATIONS.get(version)
         if step is None:
@@ -641,6 +659,9 @@ def migrate_to_current(data: dict[str, Any]) -> dict[str, Any]:
         target, transform = step
         migrated = transform(migrated)
         version = target
+    if _version_tuple(version) < _version_tuple(SCHEMA_VERSION):
+        migrated = InvestigationSchema.model_validate(migrated).model_dump(mode="json", by_alias=True)
+        migrated["schema_version"] = SCHEMA_VERSION
     return migrated
 
 

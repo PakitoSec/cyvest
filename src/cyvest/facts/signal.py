@@ -18,6 +18,7 @@ from pydantic import Field, model_validator
 from cyvest import keys
 from cyvest.enums import SourceClass
 from cyvest.facts.base import Fact, Judgment, Label
+from cyvest.facts.taxonomy import Taxonomies
 
 
 class ObservableSignal(Fact, Judgment):
@@ -68,7 +69,7 @@ class ThreatIntel(ObservableSignal):
 
     kind: Literal["threat_intel"] = "threat_intel"
     source_class: SourceClass = Field(default=SourceClass.VENDOR_FEED)
-    taxonomies: tuple[str, ...] = Field(default=())
+    taxonomies: Taxonomies = Field(default=())
     comment: str = Field(default="")
 
 

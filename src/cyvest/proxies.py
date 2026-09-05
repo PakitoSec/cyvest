@@ -29,6 +29,7 @@ from cyvest.facts import (
     ObservableSignal,
     SourceRef,
     Tag,
+    Taxonomy,
     ThreatIntel,
 )
 
@@ -638,8 +639,31 @@ class ThreatIntelProxy(_JudgedProxy[ThreatIntel]):
         return self._resolve().source_class
 
     @property
-    def taxonomies(self) -> tuple[str, ...]:
+    def taxonomies(self) -> tuple[Taxonomy, ...]:
         return self._resolve().taxonomies
+
+    def add_taxonomy(
+        self,
+        taxonomy: Taxonomy | str | None = None,
+        *,
+        name: str | None = None,
+        value: str = "",
+        verdict: Verdict | str = Verdict.INFO,
+    ) -> ThreatIntelProxy:
+        """Add an object or named fields. An existing name is updated, not duplicated."""
+        if taxonomy is not None:
+            if name is not None or value != "" or verdict != Verdict.INFO:
+                raise ValueError("Pass a taxonomy or its fields, not both")
+        elif name is not None:
+            taxonomy = Taxonomy(name=name, value=value, verdict=Verdict(verdict))
+        else:
+            raise ValueError("Pass a taxonomy or its name")
+        self._investigation.add_threat_intel_taxonomy(self._key, taxonomy)
+        return self
+
+    def remove_taxonomy(self, name: str) -> ThreatIntelProxy:
+        self._investigation.remove_threat_intel_taxonomy(self._key, name)
+        return self
 
     @property
     def comment(self) -> str:

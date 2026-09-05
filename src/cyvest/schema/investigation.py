@@ -28,7 +28,7 @@ from cyvest.facts.signal import ThreatIntel
 from cyvest.facts.store import InvestigationHeader
 from cyvest.facts.tag import Tag
 
-SCHEMA_VERSION = "7.0.0"
+SCHEMA_VERSION = "7.1.0"
 SCHEMA_ID = "https://cyvest.io/schema/investigation-7.json"
 
 # The schema only guards the major: pinning the exact version here would make every 7.x release

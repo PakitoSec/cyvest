@@ -31,4 +31,4 @@ export type ObservableResult = GeneratedObservableResult;
 export type FindingResult = GeneratedFindingResult;
 export type InvestigationResult = GeneratedInvestigationResult;
 
-export type { DecisionKind, Verdict } from "./types.generated";
+export type { DecisionKind, Taxonomy, Verdict } from "./types.generated";

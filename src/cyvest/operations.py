@@ -39,6 +39,7 @@ from cyvest.enums import (
     Weight,
 )
 from cyvest.facts.base import SourceRef
+from cyvest.facts.taxonomy import Taxonomy
 from cyvest.relations import AGENT_RELATION_SOURCE
 
 if TYPE_CHECKING:
@@ -157,7 +158,7 @@ class Operation(BaseModel):
     verdict: VerdictName | None = Field(default=None, description="Judgment direction")
     weight: float | None = Field(default=None, ge=0.0, description=f"Judgment magnitude ({_WEIGHT_SCALE})")
     confidence: float | None = Field(default=None, gt=0.0, le=1.0, description=f"Certainty ({_CONFIDENCE_SCALE})")
-    taxonomies: list[str] | None = Field(default=None)
+    taxonomies: list[Taxonomy] | None = Field(default=None, description="Descriptive entries; never affect scoring")
     external_id: str | None = Field(default=None, description="Stable id at the source; keeps history apart")
 
     # evidence

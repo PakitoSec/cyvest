@@ -20,8 +20,9 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from cyvest.enums import SourceClass, Verdict
+from cyvest.facts.taxonomy import Taxonomies
 
-SIGNAL_SCHEMA_VERSION = "7.0.0"
+SIGNAL_SCHEMA_VERSION = "7.1.0"
 SIGNAL_SCHEMA_ID = "https://cyvest.io/schema/signal-7.json"
 
 # Same rule as the investigation document: the published shape guards the major only, because
@@ -59,7 +60,7 @@ class SignalEnvelope(BaseModel):
     # Set it to keep successive scans apart; leave it out and re-ingesting is a no-op.
     external_id: str | None = Field(default=None)
     comment: str = Field(default="")
-    taxonomies: tuple[str, ...] = Field(default=())
+    taxonomies: Taxonomies = Field(default=())
     payload: dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("schema_version")

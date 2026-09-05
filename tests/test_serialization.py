@@ -84,7 +84,7 @@ class TestUpwardCompatibility:
 
     def test_a_newer_document_is_refused(self) -> None:
         document = investigation_to_dict(build_case()._investigation)
-        document["schema_version"] = "7.1.0"
+        document["schema_version"] = "7.2.0"
         with pytest.raises(ValueError, match="upgrade cyvest"):
             load_investigation_dict(document, migrate=True)
 
@@ -93,14 +93,11 @@ class TestUpwardCompatibility:
         document["schema_version"] = "7.0.99"
         assert load_investigation_dict(document) is not None
 
-    def test_a_later_minor_library_reads_an_earlier_minor_document(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_a_later_minor_library_reads_an_earlier_minor_document(self) -> None:
         """The invariant a 7.1 release must honour: no migration, no opt-in flag, just a read."""
-        import cyvest.io.serialization as serialization
-
-        monkeypatch.setattr(serialization, "SCHEMA_VERSION", "7.1.0")
         document = investigation_to_dict(build_case()._investigation)
-        assert document["schema_version"] == "7.0.0"
-        assert serialization.load_investigation_dict(document) is not None
+        document["schema_version"] = "7.0.0"
+        assert load_investigation_dict(document) is not None
 
     def test_an_older_document_needs_an_explicit_migration(self) -> None:
         with pytest.raises(ValueError, match="migrate"):
@@ -456,6 +453,14 @@ class TestRelationDirection:
         relation, _ = self._relation("inbound", "extraction")
         assert relation.source_key == "obs:url:hxxp://bad.example"
         assert relation.target_key == "obs:ipv4:203.0.113.50"
+
+    def test_a_custom_v6_type_becomes_related_to_and_is_kept_on_the_comment(self) -> None:
+        """v6 accepted any string as a type; the Phishing Manager wrote ``redirects-to`` on URL hops."""
+        relation, investigation = self._relation("outbound", "redirects-to")
+        assert relation.kind.value == "related-to"
+        assert relation.comment == "redirects-to"
+        assert relation.source_key == "obs:ipv4:203.0.113.50"
+        assert investigation.report.observable("obs:ipv4:203.0.113.50").score == 0.0
 
     def test_bidirectional_extraction_still_propagates_nothing(self) -> None:
         """The trap: reading the type first would make this propagate, silently breaking parity."""

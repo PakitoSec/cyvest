@@ -332,6 +332,16 @@ def build_graph(investigation: Investigation) -> Tree:
         return text
 
     def walk(key: str, node: Tree, seen: set[str]) -> None:
+        for signal in investigation.store.signals_for(key):
+            taxonomies = getattr(signal, "taxonomies", ())
+            if not taxonomies:
+                continue
+            source = Text(f"{signal.source.name} · taxonomies", style="magenta")
+            branch = node.add(source)
+            for taxonomy in taxonomies:
+                entry = verdict_text(taxonomy.verdict)
+                entry.append(f" {taxonomy.name}: {taxonomy.value}", style="white")
+                branch.add(entry)
         for relation in investigation.store.child_relations(key):
             if relation.target_key in seen:
                 continue

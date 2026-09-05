@@ -118,6 +118,9 @@ $$
 with `a` from `policy.attenuation`. `related-to` has attenuation `0.0`, which is the formal way of
 saying a symmetric association carries no blame.
 
+`EXTRACTION` edges can be drawn for you: with [Auto-Link](auto-link.md) enabled, a URL is linked to
+its host and an e-mail to its domain on creation, and the child's score propagates unchanged.
+
 The same ordering drives the picture: `@cyvest/cyvest-vis` builds its hierarchy from the propagating
 kinds only, and reads `related-to` as context. See
 [Relationship semantics](js-packages.md#relationship-semantics) — the visual scale mirrors the

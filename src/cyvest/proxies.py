@@ -15,7 +15,7 @@ from collections.abc import Sequence
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
-from cyvest.enums import DecisionKind, Effect, LinkBasis, RelationKind, SourceClass, Status, Verdict
+from cyvest.enums import DecisionKind, Effect, LinkBasis, RelationKind, SourceClass, Status, Tactic, Verdict
 from cyvest.evaluation.projection import verdict_from_score
 from cyvest.evaluation.report import CONCLUSION_BOUND_LABELS, Contribution, FindingResult, ObservableResult
 from cyvest.facts import (
@@ -411,6 +411,26 @@ class FindingProxy(_DecidableProxy[Finding], _JudgedProxy[Finding]):
     def labels(self) -> tuple[Label, ...]:
         return self._resolve().labels
 
+    @property
+    def tactic(self) -> Tactic | None:
+        """The ATT&CK tactic the finding demonstrates, if it states one."""
+        return self._resolve().tactic
+
+    @property
+    def occurred_at(self) -> datetime | None:
+        """When the activity the finding describes happened; ``None`` when the finding is undated."""
+        return self._resolve().occurred_at
+
+    def with_tactic(self, tactic: Tactic | str | None) -> FindingProxy:
+        resolved = Tactic(tactic) if isinstance(tactic, str) else tactic
+        self._investigation.supersede(self._resolve(), tactic=resolved)
+        return self
+
+    def dated(self, occurred_at: datetime) -> FindingProxy:
+        """Re-assert the finding with the time the activity it describes happened."""
+        self._investigation.supersede(self._resolve(), occurred_at=occurred_at)
+        return self
+
     def result(self) -> FindingResult | None:
         return self._investigation.report.finding(self._key)
 
@@ -664,6 +684,14 @@ class EvidenceProxy(_ReadOnlyProxy[Evidence]):
     @property
     def source(self) -> str:
         return self._resolve().source.name
+
+    @property
+    def external_id(self) -> str | None:
+        return self._resolve().external_id
+
+    @property
+    def captured_at(self):  # noqa: ANN201
+        return self._resolve().captured_at
 
 
 class TagProxy(_ReadOnlyProxy[Tag]):

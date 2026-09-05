@@ -99,6 +99,20 @@ domain.relate_to(other, cv.REL.RELATED_TO)        # context only, propagates not
 `source` is the parent, `target` the child; the kind implies the direction.
 → [Scoring Model](docs/scoring-model.md)
 
+## Auto-link
+
+```python
+from cyvest import AutoLink
+
+cv = Cyvest(auto_link=AutoLink())
+url = cv.observable(cv.OBS.URL, "hxxp://evil[.]example/login")
+cv.observable_get(cv.OBS.DOMAIN, "evil.example")   # derived, linked url → domain by EXTRACTION
+```
+
+A URL contains a host and an e-mail contains a domain: opt in and those edges are drawn on
+creation, attributed to `cyvest.autolink`. The child's score then propagates to the parent.
+→ [Auto-Link](docs/auto-link.md)
+
 ## Findings, evidence and tags
 
 ```python
@@ -187,11 +201,17 @@ The report is always re-derived from the facts, never read from the document.
 
 ## Timeline and statistics
 
+The timeline is projected from the facts you dated — nothing is written to it directly:
+
 ```python
+from datetime import datetime, timezone
 from cyvest import Salience
 
+cv.finding("link-clicked", "`jdoe` opened the landing page", verdict="NOTABLE",
+           tactic="initial-access", occurred_at=datetime(2026, 8, 7, 10, 2, tzinfo=timezone.utc))
+
 for entry in cv.timeline(time="asserted", min_salience=Salience.KEY):
-    print(entry.when, entry.kind, entry.title)
+    print(entry.when, entry.kind, entry.title, entry.tactic)
 
 cv.statistics()
 cv.display_timeline()
@@ -203,7 +223,8 @@ cv.display_statistics()
 ## Merging and parallel work
 
 ```python
-main.merge_investigation(other)                  # idempotent, commutative, associative
+report = main.merge_investigation(other)         # idempotent, commutative, associative — header included
+report.added, report.superseded                  # what the merge did; EngineMismatchError if scales differ
 
 shared = main.shared_context()
 
@@ -218,6 +239,22 @@ print(snapshot.get_global_score(), snapshot.get_global_verdict())
 Reconciling is a union of facts, so arrival order does not matter and reconciling twice is
 harmless. Reads go through a snapshot, so several reads of one task cannot straddle two states.
 → [Shared Investigation Context](docs/shared-investigation-context.md)
+
+## LangChain agents
+
+```python
+from langchain.agents import create_agent
+from cyvest.integrations.langchain import CyvestMiddleware, INVESTIGATION_KEY
+
+agent = create_agent(model, tools=my_tools, middleware=[CyvestMiddleware(root_data={"case": "IR-2431"})])
+state = agent.invoke({"messages": [{"role": "user", "content": "Triage this alert"}]})
+state[INVESTIGATION_KEY]                          # the serialized investigation
+```
+
+`pip install 'cyvest[langchain]'`. The investigation lives in the agent state and is merged by
+union; the model reads it through `cyvest_report`/`cyvest_explain`, writes it through one batched,
+all-or-nothing `cyvest_record`, and sees the recomputed report in its system prompt on every turn.
+→ [LangChain Integration](docs/langchain-integration.md)
 
 ## Comparing investigations
 
@@ -314,6 +351,7 @@ The Python side always re-derives the report from the facts on load, so a stale 
 | `06_compare_investigations.py` | diffing and tolerance rules |
 | `07_conclusion.py` | conclusions and analyst calls |
 | `08_pinned_finding.py` | pinning a finding to the intel it fetched |
+| `09_langchain_agent.py` | an agent keeping its investigation in Cyvest (offline, scripted model) |
 
 ## JavaScript packages
 

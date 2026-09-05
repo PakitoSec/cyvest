@@ -41,7 +41,6 @@ document ever written.
 
 | Item | State |
 |---|---|
-| `Event` fact type | Reserved in the schema as `facts.events`, not implemented |
 | Other `ObservableSignal` members (sandbox, telemetry, reputation) | The discriminated union is in place from day one, so adding one breaks nothing |
 | Multi-axis `Label`, `Hypothesis` object | Only the clustering key signature is reserved |
 

@@ -4,19 +4,19 @@
     "investigation_id": "cyvest-email-example",
     "name": "Email Investigation",
     "root_key": "obs:artifact:__cyvest_root__",
-    "opened_at": "2026-08-29T07:06:35.978853Z",
+    "opened_at": "2026-09-04T13:56:02.242540Z",
     "policy_version": "default-v1",
     "engine_id": "basic-v1",
     "fragment_ids": [
       "cyvest-email-example",
+      "fragment-aggregatedrisktask",
+      "fragment-ai",
+      "fragment-attachmenttask",
+      "fragment-bodiesdomaintask",
+      "fragment-bodiesurltask",
       "fragment-emailfrom",
       "fragment-emailfrombis",
-      "fragment-emailreciever",
-      "fragment-bodiesurltask",
-      "fragment-bodiesdomaintask",
-      "fragment-attachmenttask",
-      "fragment-aggregatedrisktask",
-      "fragment-ai"
+      "fragment-emailreciever"
     ]
   },
   "policy_version": "default-v1",
@@ -25,8 +25,8 @@
     "observables": {
       "obs:artifact:__cyvest_root__": {
         "key": "obs:artifact:__cyvest_root__",
-        "seq": "01M165EY2GGCB5Y4CRKVSYRVT3",
-        "asserted_at": "2026-08-29T07:06:35.984600Z",
+        "seq": "01M1PB8YJ8NBMCAPQJ0MA7KVHJ",
+        "asserted_at": "2026-09-04T13:56:02.248055Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -90,8 +90,8 @@
       },
       "obs:email:noreply@dmalicious.com": {
         "key": "obs:email:noreply@dmalicious.com",
-        "seq": "01M165EY2DPXYF1SGFHJRFA652",
-        "asserted_at": "2026-08-29T07:06:35.981182Z",
+        "seq": "01M1PB8YJ4Q8FZAQC74C17WF6W",
+        "asserted_at": "2026-09-04T13:56:02.244859Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -115,8 +115,8 @@
       },
       "obs:domain:dmalicious.com": {
         "key": "obs:domain:dmalicious.com",
-        "seq": "01M165EY2CT2BJ35R306P1VHVB",
-        "asserted_at": "2026-08-29T07:06:35.980682Z",
+        "seq": "01M1PB8YJ4Q8FZAQC74C17WF6P",
+        "asserted_at": "2026-09-04T13:56:02.244212Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -139,8 +139,8 @@
       },
       "obs:ipv4:8.1.2.3": {
         "key": "obs:ipv4:8.1.2.3",
-        "seq": "01M165EY2C2D442WW305WMY795",
-        "asserted_at": "2026-08-29T07:06:35.980487Z",
+        "seq": "01M1PB8YJ33PK6N5YEKCK2DBKS",
+        "asserted_at": "2026-09-04T13:56:02.243995Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -163,8 +163,8 @@
       },
       "obs:email:user@company.com": {
         "key": "obs:email:user@company.com",
-        "seq": "01M165EY2DCTBJ299Y5B7QSWF6",
-        "asserted_at": "2026-08-29T07:06:35.981502Z",
+        "seq": "01M1PB8YJ5HPZE3EMSD59GGTGM",
+        "asserted_at": "2026-09-04T13:56:02.245356Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -187,8 +187,8 @@
       },
       "obs:file:body/html": {
         "key": "obs:file:body/html",
-        "seq": "01M165EY2FCH75HBBZ7CPKS4HN",
-        "asserted_at": "2026-08-29T07:06:35.983076Z",
+        "seq": "01M1PB8YJ66HYM0S1TRRBJ9D0T",
+        "asserted_at": "2026-09-04T13:56:02.246496Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -212,8 +212,8 @@
       },
       "obs:url:https://virus.com/payload.exe": {
         "key": "obs:url:https://virus.com/payload.exe",
-        "seq": "01M165EY2DWEKF9E0FP7XYVZVG",
-        "asserted_at": "2026-08-29T07:06:35.981817Z",
+        "seq": "01M1PB8YJ5HPZE3EMSD59GGTH2",
+        "asserted_at": "2026-09-04T13:56:02.245635Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -236,8 +236,8 @@
       },
       "obs:domain:virus.com": {
         "key": "obs:domain:virus.com",
-        "seq": "01M165EY2FB960YEQG84EBD97Q",
-        "asserted_at": "2026-08-29T07:06:35.983158Z",
+        "seq": "01M1PB8YJ66HYM0S1TRRBJ9D0X",
+        "asserted_at": "2026-09-04T13:56:02.246547Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -261,8 +261,8 @@
       },
       "obs:url:https://virus.com/about": {
         "key": "obs:url:https://virus.com/about",
-        "seq": "01M165EY2EV25Q83675EKQNQ2K",
-        "asserted_at": "2026-08-29T07:06:35.982133Z",
+        "seq": "01M1PB8YJ5HPZE3EMSD59GGTHC",
+        "asserted_at": "2026-09-04T13:56:02.245925Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -285,8 +285,8 @@
       },
       "obs:url:https://domain.com/ok/toto": {
         "key": "obs:url:https://domain.com/ok/toto",
-        "seq": "01M165EY2EJZ0Y3EQKT1P7XG94",
-        "asserted_at": "2026-08-29T07:06:35.982426Z",
+        "seq": "01M1PB8YJ66HYM0S1TRRBJ9D0D",
+        "asserted_at": "2026-09-04T13:56:02.246163Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -309,8 +309,8 @@
       },
       "obs:domain:domain.com": {
         "key": "obs:domain:domain.com",
-        "seq": "01M165EY2FM1F6PFK06WGWG0RP",
-        "asserted_at": "2026-08-29T07:06:35.983655Z",
+        "seq": "01M1PB8YJ66HYM0S1TRRBJ9D14",
+        "asserted_at": "2026-09-04T13:56:02.246687Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -334,8 +334,8 @@
       },
       "obs:file:invoice.pdf": {
         "key": "obs:file:invoice.pdf",
-        "seq": "01M165EY2FDZZQV0ZPJ9KV1DP3",
-        "asserted_at": "2026-08-29T07:06:35.983993Z",
+        "seq": "01M1PB8YJ66HYM0S1TRRBJ9D1D",
+        "asserted_at": "2026-09-04T13:56:02.246940Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -358,8 +358,8 @@
       },
       "obs:hash:md5:d41d8cd98f00b204e9800998ecf8427e": {
         "key": "obs:hash:md5:d41d8cd98f00b204e9800998ecf8427e",
-        "seq": "01M165EY2G5M7ZT4G7SDP86KS4",
-        "asserted_at": "2026-08-29T07:06:35.984028Z",
+        "seq": "01M1PB8YJ66HYM0S1TRRBJ9D1F",
+        "asserted_at": "2026-09-04T13:56:02.246971Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -384,8 +384,8 @@
     "relations": {
       "rel:pivot:obs:domain:dmalicious.com>obs:ipv4:8.1.2.3": {
         "key": "rel:pivot:obs:domain:dmalicious.com>obs:ipv4:8.1.2.3",
-        "seq": "01M165EY2CKKF2H2QDK0XH177C",
-        "asserted_at": "2026-08-29T07:06:35.980523Z",
+        "seq": "01M1PB8YJ4Q8FZAQC74C17WF6G",
+        "asserted_at": "2026-09-04T13:56:02.244036Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -403,8 +403,8 @@
       },
       "rel:extraction:obs:email:noreply@dmalicious.com>obs:domain:dmalicious.com": {
         "key": "rel:extraction:obs:email:noreply@dmalicious.com>obs:domain:dmalicious.com",
-        "seq": "01M165EY2CT525Z081T7Y7HZ5M",
-        "asserted_at": "2026-08-29T07:06:35.980541Z",
+        "seq": "01M1PB8YJ4Q8FZAQC74C17WF6H",
+        "asserted_at": "2026-09-04T13:56:02.244057Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -422,8 +422,8 @@
       },
       "rel:extraction:obs:artifact:__cyvest_root__>obs:email:noreply@dmalicious.com": {
         "key": "rel:extraction:obs:artifact:__cyvest_root__>obs:email:noreply@dmalicious.com",
-        "seq": "01M165EY2CBRX6ZV6J0YVRE73N",
-        "asserted_at": "2026-08-29T07:06:35.980554Z",
+        "seq": "01M1PB8YJ4Q8FZAQC74C17WF6J",
+        "asserted_at": "2026-09-04T13:56:02.244070Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -441,8 +441,8 @@
       },
       "rel:extraction:obs:artifact:__cyvest_root__>obs:email:user@company.com": {
         "key": "rel:extraction:obs:artifact:__cyvest_root__>obs:email:user@company.com",
-        "seq": "01M165EY2DQ7ZGAFCV4751XK1J",
-        "asserted_at": "2026-08-29T07:06:35.981516Z",
+        "seq": "01M1PB8YJ5HPZE3EMSD59GGTGN",
+        "asserted_at": "2026-09-04T13:56:02.245368Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -460,8 +460,8 @@
       },
       "rel:extraction:obs:artifact:__cyvest_root__>obs:file:body/html": {
         "key": "rel:extraction:obs:artifact:__cyvest_root__>obs:file:body/html",
-        "seq": "01M165EY2FNKRKCBYMHDE1WKSB",
-        "asserted_at": "2026-08-29T07:06:35.983094Z",
+        "seq": "01M1PB8YJ66HYM0S1TRRBJ9D0V",
+        "asserted_at": "2026-09-04T13:56:02.246506Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -479,8 +479,8 @@
       },
       "rel:extraction:obs:file:body/html>obs:url:https://virus.com/payload.exe": {
         "key": "rel:extraction:obs:file:body/html>obs:url:https://virus.com/payload.exe",
-        "seq": "01M165EY2DDF38RFBMNFB2T0TG",
-        "asserted_at": "2026-08-29T07:06:35.981846Z",
+        "seq": "01M1PB8YJ5HPZE3EMSD59GGTH4",
+        "asserted_at": "2026-09-04T13:56:02.245656Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -498,8 +498,8 @@
       },
       "rel:pivot:obs:domain:virus.com>obs:url:https://virus.com/payload.exe": {
         "key": "rel:pivot:obs:domain:virus.com>obs:url:https://virus.com/payload.exe",
-        "seq": "01M165EY2DPF2DQ68GG4YPKKGC",
-        "asserted_at": "2026-08-29T07:06:35.981890Z",
+        "seq": "01M1PB8YJ5HPZE3EMSD59GGTH7",
+        "asserted_at": "2026-09-04T13:56:02.245691Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -517,8 +517,8 @@
       },
       "rel:extraction:obs:file:body/html>obs:url:https://virus.com/about": {
         "key": "rel:extraction:obs:file:body/html>obs:url:https://virus.com/about",
-        "seq": "01M165EY2EBQY6AGX5TE26FM0F",
-        "asserted_at": "2026-08-29T07:06:35.982165Z",
+        "seq": "01M1PB8YJ5HPZE3EMSD59GGTHE",
+        "asserted_at": "2026-09-04T13:56:02.245950Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -536,8 +536,8 @@
       },
       "rel:pivot:obs:domain:virus.com>obs:url:https://virus.com/about": {
         "key": "rel:pivot:obs:domain:virus.com>obs:url:https://virus.com/about",
-        "seq": "01M165EY2ET9BC81DGFRAHHXTV",
-        "asserted_at": "2026-08-29T07:06:35.982215Z",
+        "seq": "01M1PB8YJ5HPZE3EMSD59GGTHH",
+        "asserted_at": "2026-09-04T13:56:02.245987Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -555,8 +555,8 @@
       },
       "rel:extraction:obs:file:body/html>obs:url:https://domain.com/ok/toto": {
         "key": "rel:extraction:obs:file:body/html>obs:url:https://domain.com/ok/toto",
-        "seq": "01M165EY2EMDHM91PKPFF59ANY",
-        "asserted_at": "2026-08-29T07:06:35.982460Z",
+        "seq": "01M1PB8YJ66HYM0S1TRRBJ9D0F",
+        "asserted_at": "2026-09-04T13:56:02.246190Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -574,8 +574,8 @@
       },
       "rel:pivot:obs:domain:domain.com>obs:url:https://domain.com/ok/toto": {
         "key": "rel:pivot:obs:domain:domain.com>obs:url:https://domain.com/ok/toto",
-        "seq": "01M165EY2E1549AAAC0W906Y2V",
-        "asserted_at": "2026-08-29T07:06:35.982509Z",
+        "seq": "01M1PB8YJ66HYM0S1TRRBJ9D0J",
+        "asserted_at": "2026-09-04T13:56:02.246231Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -593,8 +593,8 @@
       },
       "rel:extraction:obs:file:body/html>obs:domain:virus.com": {
         "key": "rel:extraction:obs:file:body/html>obs:domain:virus.com",
-        "seq": "01M165EY2FHX8B3J49TWQ6MJH9",
-        "asserted_at": "2026-08-29T07:06:35.983190Z",
+        "seq": "01M1PB8YJ66HYM0S1TRRBJ9D0Z",
+        "asserted_at": "2026-09-04T13:56:02.246565Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -612,8 +612,8 @@
       },
       "rel:extraction:obs:file:body/html>obs:domain:domain.com": {
         "key": "rel:extraction:obs:file:body/html>obs:domain:domain.com",
-        "seq": "01M165EY2F2PZTR9XR6N391MY9",
-        "asserted_at": "2026-08-29T07:06:35.983688Z",
+        "seq": "01M1PB8YJ66HYM0S1TRRBJ9D16",
+        "asserted_at": "2026-09-04T13:56:02.246707Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -631,8 +631,8 @@
       },
       "rel:extraction:obs:artifact:__cyvest_root__>obs:file:invoice.pdf": {
         "key": "rel:extraction:obs:artifact:__cyvest_root__>obs:file:invoice.pdf",
-        "seq": "01M165EY2GD44QKSVM92P6YDG6",
-        "asserted_at": "2026-08-29T07:06:35.984054Z",
+        "seq": "01M1PB8YJ66HYM0S1TRRBJ9D1H",
+        "asserted_at": "2026-09-04T13:56:02.246989Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -650,8 +650,8 @@
       },
       "rel:extraction:obs:file:invoice.pdf>obs:hash:md5:d41d8cd98f00b204e9800998ecf8427e": {
         "key": "rel:extraction:obs:file:invoice.pdf>obs:hash:md5:d41d8cd98f00b204e9800998ecf8427e",
-        "seq": "01M165EY2GFXENA4EMN68AZ56T",
-        "asserted_at": "2026-08-29T07:06:35.984064Z",
+        "seq": "01M1PB8YJ66HYM0S1TRRBJ9D1J",
+        "asserted_at": "2026-09-04T13:56:02.246997Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -674,8 +674,8 @@
         "confidence": 1.0,
         "weight": 0.0,
         "key": "sig:vt:obs:email:noreply@dmalicious.com",
-        "seq": "01M165EY2CA52DDHY1B1DFHXWB",
-        "asserted_at": "2026-08-29T07:06:35.980373Z",
+        "seq": "01M1PB8YJ33PK6N5YEKCK2DBKM",
+        "asserted_at": "2026-09-04T13:56:02.243891Z",
         "occurred_at": null,
         "source": {
           "name": "VT",
@@ -698,8 +698,8 @@
         "confidence": 1.0,
         "weight": 1.0,
         "key": "sig:vt:obs:domain:dmalicious.com",
-        "seq": "01M165EY2CRRS80779ESKWJBHX",
-        "asserted_at": "2026-08-29T07:06:35.980449Z",
+        "seq": "01M1PB8YJ33PK6N5YEKCK2DBKQ",
+        "asserted_at": "2026-09-04T13:56:02.243958Z",
         "occurred_at": null,
         "source": {
           "name": "VT",
@@ -722,8 +722,8 @@
         "confidence": 1.0,
         "weight": 2.0,
         "key": "sig:abuseipdb:obs:ipv4:8.1.2.3",
-        "seq": "01M165EY2CW21Q1JJG4EKBBRXZ",
-        "asserted_at": "2026-08-29T07:06:35.980503Z",
+        "seq": "01M1PB8YJ4Q8FZAQC74C17WF6F",
+        "asserted_at": "2026-09-04T13:56:02.244009Z",
         "occurred_at": null,
         "source": {
           "name": "ABUSEIPDB",
@@ -746,8 +746,8 @@
         "confidence": 1.0,
         "weight": 5.0,
         "key": "sig:proofpoint:obs:email:noreply@dmalicious.com",
-        "seq": "01M165EY2DMAHG6T22TS4WZKE1",
-        "asserted_at": "2026-08-29T07:06:35.981202Z",
+        "seq": "01M1PB8YJ4Q8FZAQC74C17WF6X",
+        "asserted_at": "2026-09-04T13:56:02.244873Z",
         "occurred_at": null,
         "source": {
           "name": "PROOFPOINT",
@@ -770,8 +770,8 @@
         "confidence": 1.0,
         "weight": 5.0,
         "key": "sig:vt:obs:url:https://virus.com/payload.exe",
-        "seq": "01M165EY2DDNC4P0BV9A890N7D",
-        "asserted_at": "2026-08-29T07:06:35.981834Z",
+        "seq": "01M1PB8YJ5HPZE3EMSD59GGTH3",
+        "asserted_at": "2026-09-04T13:56:02.245646Z",
         "occurred_at": null,
         "source": {
           "name": "VT",
@@ -794,8 +794,8 @@
         "confidence": 1.0,
         "weight": 3.0,
         "key": "sig:vt:obs:url:https://virus.com/about",
-        "seq": "01M165EY2EFNGVMK5BAXNR6BVF",
-        "asserted_at": "2026-08-29T07:06:35.982152Z",
+        "seq": "01M1PB8YJ5HPZE3EMSD59GGTHD",
+        "asserted_at": "2026-09-04T13:56:02.245939Z",
         "occurred_at": null,
         "source": {
           "name": "VT",
@@ -818,8 +818,8 @@
         "confidence": 1.0,
         "weight": 1.0,
         "key": "sig:vt:obs:url:https://domain.com/ok/toto",
-        "seq": "01M165EY2EXXXRVB8NSAF7Q4WE",
-        "asserted_at": "2026-08-29T07:06:35.982446Z",
+        "seq": "01M1PB8YJ66HYM0S1TRRBJ9D0E",
+        "asserted_at": "2026-09-04T13:56:02.246179Z",
         "occurred_at": null,
         "source": {
           "name": "VT",
@@ -842,8 +842,8 @@
         "confidence": 1.0,
         "weight": 3.0,
         "key": "sig:vt:obs:domain:virus.com",
-        "seq": "01M165EY2FGAA43YJGTZB6TMBV",
-        "asserted_at": "2026-08-29T07:06:35.983176Z",
+        "seq": "01M1PB8YJ66HYM0S1TRRBJ9D0Y",
+        "asserted_at": "2026-09-04T13:56:02.246557Z",
         "occurred_at": null,
         "source": {
           "name": "VT",
@@ -866,8 +866,8 @@
         "confidence": 1.0,
         "weight": 0.0,
         "key": "sig:vt:obs:domain:domain.com",
-        "seq": "01M165EY2FHX6BB4Y0AHRQ85KZ",
-        "asserted_at": "2026-08-29T07:06:35.983673Z",
+        "seq": "01M1PB8YJ66HYM0S1TRRBJ9D15",
+        "asserted_at": "2026-09-04T13:56:02.246698Z",
         "occurred_at": null,
         "source": {
           "name": "VT",
@@ -890,8 +890,8 @@
         "confidence": 1.0,
         "weight": 10.0,
         "key": "sig:vt:obs:hash:md5:d41d8cd98f00b204e9800998ecf8427e",
-        "seq": "01M165EY2GB0M929BN0T038WMH",
-        "asserted_at": "2026-08-29T07:06:35.984041Z",
+        "seq": "01M1PB8YJ66HYM0S1TRRBJ9D1G",
+        "asserted_at": "2026-09-04T13:56:02.246980Z",
         "occurred_at": null,
         "source": {
           "name": "VT",
@@ -914,8 +914,8 @@
         "confidence": 1.0,
         "weight": 10.0,
         "key": "sig:malwarebazaar:obs:file:invoice.pdf",
-        "seq": "01M165EY2GZZHJPY1AG2F4VXB6",
-        "asserted_at": "2026-08-29T07:06:35.984075Z",
+        "seq": "01M1PB8YJ7DKN1RS3ZAT8AZK4Q",
+        "asserted_at": "2026-09-04T13:56:02.247004Z",
         "occurred_at": null,
         "source": {
           "name": "MALWAREBAZAAR",
@@ -937,8 +937,8 @@
     "evidences": {
       "evd:sha256:6266e5073358f0b41fc4b2843bc312bd2a557ca5bc40b015202129ccad59e517": {
         "key": "evd:sha256:6266e5073358f0b41fc4b2843bc312bd2a557ca5bc40b015202129ccad59e517",
-        "seq": "01M165EY2D1E7TF1Q892E8KF6K",
-        "asserted_at": "2026-08-29T07:06:35.981460Z",
+        "seq": "01M1PB8YJ5HPZE3EMSD59GGTGJ",
+        "asserted_at": "2026-09-04T13:56:02.245317Z",
         "occurred_at": null,
         "source": {
           "name": "splunk",
@@ -964,8 +964,8 @@
         "confidence": 1.0,
         "weight": null,
         "key": "fnd:from",
-        "seq": "01M165EY2CP8KRPZSRQBHFS5TB",
-        "asserted_at": "2026-08-29T07:06:35.980713Z",
+        "seq": "01M1PB8YJ4Q8FZAQC74C17WF6Q",
+        "asserted_at": "2026-09-04T13:56:02.244239Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -995,6 +995,7 @@
           }
         ],
         "labels": [],
+        "tactic": null,
         "extra": {}
       },
       "fnd:from-proofpoint": {
@@ -1002,8 +1003,8 @@
         "confidence": 1.0,
         "weight": null,
         "key": "fnd:from-proofpoint",
-        "seq": "01M165EY2DMQXFBA1AYQ860X87",
-        "asserted_at": "2026-08-29T07:06:35.981243Z",
+        "seq": "01M1PB8YJ4Q8FZAQC74C17WF6Z",
+        "asserted_at": "2026-09-04T13:56:02.244904Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -1028,6 +1029,7 @@
           }
         ],
         "labels": [],
+        "tactic": null,
         "extra": {}
       },
       "fnd:receiver": {
@@ -1035,8 +1037,8 @@
         "confidence": 1.0,
         "weight": 0.1,
         "key": "fnd:receiver",
-        "seq": "01M165EY2DKCNGGSYZ6JFJ7PEW",
-        "asserted_at": "2026-08-29T07:06:35.981565Z",
+        "seq": "01M1PB8YJ5HPZE3EMSD59GGTGR",
+        "asserted_at": "2026-09-04T13:56:02.245407Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -1059,6 +1061,7 @@
           }
         ],
         "labels": [],
+        "tactic": null,
         "extra": {}
       },
       "fnd:body-url-https://virus.com/payload.exe": {
@@ -1066,8 +1069,8 @@
         "confidence": 1.0,
         "weight": null,
         "key": "fnd:body-url-https://virus.com/payload.exe",
-        "seq": "01M165EY2D1A7GGMP6C2BTPW2F",
-        "asserted_at": "2026-08-29T07:06:35.981915Z",
+        "seq": "01M1PB8YJ5HPZE3EMSD59GGTH9",
+        "asserted_at": "2026-09-04T13:56:02.245709Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -1090,6 +1093,7 @@
           }
         ],
         "labels": [],
+        "tactic": null,
         "extra": {}
       },
       "fnd:body-url-https://virus.com/about": {
@@ -1097,8 +1101,8 @@
         "confidence": 1.0,
         "weight": null,
         "key": "fnd:body-url-https://virus.com/about",
-        "seq": "01M165EY2ES4RG6DHFASS32P1R",
-        "asserted_at": "2026-08-29T07:06:35.982238Z",
+        "seq": "01M1PB8YJ66HYM0S1TRRBJ9D0A",
+        "asserted_at": "2026-09-04T13:56:02.246004Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -1121,6 +1125,7 @@
           }
         ],
         "labels": [],
+        "tactic": null,
         "extra": {}
       },
       "fnd:body-url-https://domain.com/ok/toto": {
@@ -1128,8 +1133,8 @@
         "confidence": 1.0,
         "weight": null,
         "key": "fnd:body-url-https://domain.com/ok/toto",
-        "seq": "01M165EY2EXQ29PNJ6JHBJQ9CP",
-        "asserted_at": "2026-08-29T07:06:35.982563Z",
+        "seq": "01M1PB8YJ66HYM0S1TRRBJ9D0M",
+        "asserted_at": "2026-09-04T13:56:02.246250Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -1152,6 +1157,7 @@
           }
         ],
         "labels": [],
+        "tactic": null,
         "extra": {}
       },
       "fnd:body-domain-virus.com": {
@@ -1159,8 +1165,8 @@
         "confidence": 1.0,
         "weight": null,
         "key": "fnd:body-domain-virus.com",
-        "seq": "01M165EY2FPB4MXZRCV4P8SGVB",
-        "asserted_at": "2026-08-29T07:06:35.983493Z",
+        "seq": "01M1PB8YJ66HYM0S1TRRBJ9D11",
+        "asserted_at": "2026-09-04T13:56:02.246582Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -1183,6 +1189,7 @@
           }
         ],
         "labels": [],
+        "tactic": null,
         "extra": {}
       },
       "fnd:body-domain-domain.com": {
@@ -1190,8 +1197,8 @@
         "confidence": 1.0,
         "weight": null,
         "key": "fnd:body-domain-domain.com",
-        "seq": "01M165EY2FS5PQHCB488NWDDGQ",
-        "asserted_at": "2026-08-29T07:06:35.983713Z",
+        "seq": "01M1PB8YJ66HYM0S1TRRBJ9D18",
+        "asserted_at": "2026-09-04T13:56:02.246723Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -1214,6 +1221,7 @@
           }
         ],
         "labels": [],
+        "tactic": null,
         "extra": {}
       },
       "fnd:attachment-invoice.pdf": {
@@ -1221,8 +1229,8 @@
         "confidence": 1.0,
         "weight": null,
         "key": "fnd:attachment-invoice.pdf",
-        "seq": "01M165EY2G54973FE5TDJ9NB57",
-        "asserted_at": "2026-08-29T07:06:35.984101Z",
+        "seq": "01M1PB8YJ7DKN1RS3ZAT8AZK4S",
+        "asserted_at": "2026-09-04T13:56:02.247032Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -1245,6 +1253,7 @@
           }
         ],
         "labels": [],
+        "tactic": null,
         "extra": {}
       },
       "fnd:email_risk_aggregated": {
@@ -1252,8 +1261,8 @@
         "confidence": 1.0,
         "weight": 6.0,
         "key": "fnd:email_risk_aggregated",
-        "seq": "01M165EY2G9AAVPTK5AZHYFNFS",
-        "asserted_at": "2026-08-29T07:06:35.984473Z",
+        "seq": "01M1PB8YJ7DKN1RS3ZAT8AZK4X",
+        "asserted_at": "2026-09-04T13:56:02.247944Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -1270,6 +1279,7 @@
         "effect": "ADDITIVE",
         "observable_links": [],
         "labels": [],
+        "tactic": null,
         "extra": {}
       },
       "fnd:ai": {
@@ -1277,8 +1287,8 @@
         "confidence": 1.0,
         "weight": null,
         "key": "fnd:ai",
-        "seq": "01M165EY2G7KJ6Y67HX8P6SZ4M",
-        "asserted_at": "2026-08-29T07:06:35.984621Z",
+        "seq": "01M1PB8YJ8NBMCAPQJ0MA7KVHK",
+        "asserted_at": "2026-09-04T13:56:02.248076Z",
         "occurred_at": null,
         "source": {
           "name": "cyvest",
@@ -1295,17 +1305,17 @@
         "effect": "FLOOR",
         "observable_links": [],
         "labels": [],
+        "tactic": null,
         "extra": {}
       }
-    },
-    "events": {}
+    }
   },
   "decisions": {},
   "tags": {
     "tag:emails": {
       "key": "tag:emails",
-      "seq": "01M165EY2D5S31ZQWYD1Z95VH1",
-      "asserted_at": "2026-08-29T07:06:35.981595Z",
+      "seq": "01M1PB8YJ5HPZE3EMSD59GGTGT",
+      "asserted_at": "2026-09-04T13:56:02.245431Z",
       "occurred_at": null,
       "source": {
         "name": "cyvest",
@@ -1324,8 +1334,8 @@
     },
     "tag:bodies": {
       "key": "tag:bodies",
-      "seq": "01M165EY2FA6EZ7S9AFX22W3VS",
-      "asserted_at": "2026-08-29T07:06:35.983019Z",
+      "seq": "01M1PB8YJ66HYM0S1TRRBJ9D0R",
+      "asserted_at": "2026-09-04T13:56:02.246467Z",
       "occurred_at": null,
       "source": {
         "name": "cyvest",
@@ -1340,8 +1350,8 @@
     },
     "tag:bodies:urls": {
       "key": "tag:bodies:urls",
-      "seq": "01M165EY2E01D6HNM6YWSRA5S5",
-      "asserted_at": "2026-08-29T07:06:35.982595Z",
+      "seq": "01M1PB8YJ66HYM0S1TRRBJ9D0N",
+      "asserted_at": "2026-09-04T13:56:02.246265Z",
       "occurred_at": null,
       "source": {
         "name": "cyvest",
@@ -1360,8 +1370,8 @@
     },
     "tag:bodies:domains": {
       "key": "tag:bodies:domains",
-      "seq": "01M165EY2FVHXDWE2RNSPN29HT",
-      "asserted_at": "2026-08-29T07:06:35.983733Z",
+      "seq": "01M1PB8YJ66HYM0S1TRRBJ9D19",
+      "asserted_at": "2026-09-04T13:56:02.246736Z",
       "occurred_at": null,
       "source": {
         "name": "cyvest",
@@ -1379,8 +1389,8 @@
     },
     "tag:attachments": {
       "key": "tag:attachments",
-      "seq": "01M165EY2G0QDGKZ4T0J0BGA25",
-      "asserted_at": "2026-08-29T07:06:35.984120Z",
+      "seq": "01M1PB8YJ7DKN1RS3ZAT8AZK4T",
+      "asserted_at": "2026-09-04T13:56:02.247047Z",
       "occurred_at": null,
       "source": {
         "name": "cyvest",
@@ -1397,8 +1407,8 @@
     },
     "tag:risk_assessment": {
       "key": "tag:risk_assessment",
-      "seq": "01M165EY2GTSMVAVGD2FH8K96E",
-      "asserted_at": "2026-08-29T07:06:35.984643Z",
+      "seq": "01M1PB8YJ8NBMCAPQJ0MA7KVHN",
+      "asserted_at": "2026-09-04T13:56:02.248097Z",
       "occurred_at": null,
       "source": {
         "name": "cyvest",
@@ -1415,8 +1425,8 @@
     },
     "tag:risk_assessment:ai": {
       "key": "tag:risk_assessment:ai",
-      "seq": "01M165EY2GBM6J7A715FSPRNXC",
-      "asserted_at": "2026-08-29T07:06:35.984653Z",
+      "seq": "01M1PB8YJ8NBMCAPQJ0MA7KVHP",
+      "asserted_at": "2026-09-04T13:56:02.248105Z",
       "occurred_at": null,
       "source": {
         "name": "cyvest",
@@ -2026,16 +2036,16 @@
             "detail": ""
           },
           {
-            "source_key": "rel:extraction:obs:file:body/html>obs:domain:domain.com",
-            "label": "extraction → obs:domain:domain.com",
-            "value": 0.0,
+            "source_key": "rel:extraction:obs:file:body/html>obs:domain:virus.com",
+            "label": "extraction → obs:domain:virus.com",
+            "value": 5.0,
             "retained": true,
             "detail": ""
           },
           {
-            "source_key": "rel:extraction:obs:file:body/html>obs:domain:virus.com",
-            "label": "extraction → obs:domain:virus.com",
-            "value": 5.0,
+            "source_key": "rel:extraction:obs:file:body/html>obs:domain:domain.com",
+            "label": "extraction → obs:domain:domain.com",
+            "value": 0.0,
             "retained": true,
             "detail": ""
           }

@@ -200,7 +200,7 @@ shared.finalize_relationships()   # attach orphaned components to the root
 | `create_cyvest(*, fragment_id=…)` | a worker-local `Cyvest`; usable as a context manager |
 | `task(*, fragment_id=…, reconcile_on_error=True)` | scoped worker, reconciled on exit |
 | `atask(*, fragment_id=…, reconcile_on_error=True)` | async equivalent |
-| `reconcile(source)` / `areconcile(source)` | fold a fragment in; safe to call twice |
+| `reconcile(source)` / `areconcile(source)` | fold a fragment in under the same header law as `union`; safe to call twice |
 | `snapshot()` / `asnapshot()` | a frozen `Cyvest` over the union — the whole read API |
 | `finalize_relationships()` | connect orphans to the root |
 | `from_investigation(investigation)` | wrap an existing investigation |

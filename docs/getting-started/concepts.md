@@ -110,6 +110,16 @@ a link with basis `NONE` is kept for the graph but scores nothing. See
 Two axes govern how a finding takes part in the total: `status` says **whether** it does, `effect`
 says **how**. `ADDITIVE` — the default — makes it a term of the sum.
 
+A finding that describes an activity is **dated** with `occurred_at` — when the activity happened,
+as the source reports it — and may name the ATT&CK `tactic` it demonstrates (`cyvest.Tactic`).
+Both feed the [timeline](../timeline.md); neither feeds the score. A neutral event of the incident
+is a dated finding with verdict `INFO`: visible in the chronology, weightless in the total.
+
+```python
+cv.finding("link-clicked", "`jdoe` opened the landing page", verdict="NOTABLE",
+           tactic="initial-access", occurred_at=datetime(2026, 8, 7, 10, 2, tzinfo=timezone.utc))
+```
+
 ### Conclusions
 
 A finding whose `effect` is `FLOOR`: it renders a verdict on the case after reading the other
@@ -293,10 +303,11 @@ anyone claiming a causal link.
 
 ## Merging
 
-Merging is a **union of facts**: idempotent, commutative, associative.
+Merging is a **union of facts**: idempotent, commutative, associative — header included.
 
 ```python
-main.merge_investigation(other)
+report = main.merge_investigation(other)
+report.added, report.superseded, report.kept   # what the merge did, key by key
 ```
 
 ```bash
@@ -305,6 +316,16 @@ cyvest merge a.json b.json -o merged.json
 
 When two fragments assert the same fact differently, freshness decides — observation time
 outranking assertion time, so a slow worker cannot overwrite fresher data with stale data.
+
+The header follows one law too (`InvestigationHeader.merge`): the merged investigation takes the
+identity and the name of the one **opened first**, the earliest opening time and the sorted union
+of the fragments, whichever side you called it on. Three fields must agree and are never picked
+from one side: two engines raise `EngineMismatchError`, two policies `PolicyMismatchError`, two
+roots `RootMismatchError`. Re-scoring one side under the other's engine is a decision, stated as
+`merge_investigation(other, on_engine_mismatch="reevaluate")` — or `--engine` on the CLI.
+
+The same union is available on serialized documents, for a state channel or a queue consumer that
+holds two versions of one investigation: `merge_documents(a, b)`.
 
 !!! warning "A score can go down"
     v6 resolved conflicts with `max`, so scores only ever rose. In v7, if a feed reclassifies a URL

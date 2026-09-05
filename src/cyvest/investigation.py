@@ -39,7 +39,7 @@ from cyvest.facts import (
     ThreatIntel,
     utc_now,
 )
-from cyvest.facts.store import FactStore, InvestigationHeader
+from cyvest.facts.store import FactStore, InvestigationHeader, MergeReport
 from cyvest.policy import DEFAULT_POLICY, Policy
 from cyvest.ulid import generate_ulid
 
@@ -101,18 +101,29 @@ class Investigation:
         self._report: Report | None = None
 
     @classmethod
-    def from_store(cls, store: FactStore, *, policy: Policy | None = None, frozen: bool = False) -> Investigation:
+    def from_store(
+        cls,
+        store: FactStore,
+        *,
+        policy: Policy | None = None,
+        frozen: bool = False,
+        fragment_id: str | None = None,
+    ) -> Investigation:
         """
         Rebuild an investigation around facts that already exist.
 
         ``__init__`` mints a root observable and a fresh header, which is wrong for anything
         rehydrated — a loaded file, a wrapped fragment, a snapshot. The header already carries the
         identity, so it is read back rather than invented.
+
+        ``fragment_id`` defaults to the investigation id. A scratch copy taken to apply a batch
+        atomically passes the live fragment instead, so the facts it appends stay attributed to
+        the worker that produced them rather than to the document they were folded into.
         """
         investigation = cls.__new__(cls)
         investigation.policy = policy or DEFAULT_POLICY
         investigation.investigation_id = store.header.investigation_id
-        investigation.fragment_id = store.header.investigation_id
+        investigation.fragment_id = fragment_id or store.header.investigation_id
         investigation.started_at = store.header.opened_at
         investigation.store = store
         investigation.frozen = frozen
@@ -264,15 +275,23 @@ class Investigation:
         confidence: float = 1.0,
         comment: str = "",
         observed_at: datetime | None = None,
+        asserted_by: SourceRef | None = None,
     ) -> Relation:
         """
         Link two observables. ``source`` is the parent, ``target`` the child.
 
         There is no ``direction`` argument: the pivot kind implies it, so v6's contradictory
         ``EXTRACTION`` + ``BIDIRECTIONAL`` is no longer expressible.
+
+        ``asserted_by`` names who established the edge — an auto-link rule, an agent's plan — so
+        a derived relation stays distinguishable from one an analyst drew. It is not called
+        ``source`` because that word already means the parent observable here.
         """
         source_key = source.key if isinstance(source, Observable) else source
         target_key = target.key if isinstance(target, Observable) else target
+        for key in (source_key, target_key):
+            if key not in self.store.observables:
+                raise KeyError(f"Unknown observable: {key}")
         relation = Relation(
             source_key=source_key,
             target_key=target_key,
@@ -280,7 +299,7 @@ class Investigation:
             confidence=confidence,
             comment=comment,
             observed_at=observed_at,
-            source=DEFAULT_SOURCE,
+            source=asserted_by or DEFAULT_SOURCE,
             fragment_id=self.fragment_id,
         )
         return self.append(relation)  # type: ignore[return-value]
@@ -291,6 +310,9 @@ class Investigation:
     # --- signals
 
     def add_threat_intel(self, threat_intel: ThreatIntel) -> ThreatIntel:
+        """A signal judges an observable that exists; one about nothing would score nothing, silently."""
+        if threat_intel.subject_key not in self.store.observables:
+            raise KeyError(f"Unknown observable: {threat_intel.subject_key}")
         return self.append(threat_intel)  # type: ignore[return-value]
 
     def get_threat_intel(self, key: str) -> ThreatIntel | None:
@@ -314,6 +336,22 @@ class Investigation:
     # --- findings
 
     def add_finding(self, finding: Finding) -> Finding:
+        """
+        Add a finding; reusing its key updates the finding rather than adding one.
+
+        An update that says nothing about *when* or *which tactic* keeps what the previous version
+        said. Without this, a re-assertion without ``occurred_at`` would rank at its own
+        ``asserted_at`` — later than any past ``occurred_at`` — win the merge, and erase the date.
+        """
+        existing = self.store.findings.get(finding.key)
+        if existing is not None:
+            carried: dict[str, Any] = {}
+            if finding.occurred_at is None and existing.occurred_at is not None:
+                carried["occurred_at"] = existing.occurred_at
+            if finding.tactic is None and existing.tactic is not None:
+                carried["tactic"] = existing.tactic
+            if carried:
+                finding = Finding(**{**dict(finding), **carried})
         return self.append(finding)  # type: ignore[return-value]
 
     def get_finding(self, key: str) -> Finding | None:
@@ -379,6 +417,8 @@ class Investigation:
         finding = self.store.findings.get(finding_key)
         if finding is None:
             raise KeyError(f"Unknown finding: {finding_key}")
+        if evidence_key not in self.store.evidences:
+            raise KeyError(f"Unknown evidence: {evidence_key}")
         if evidence_key in finding.evidence_keys:
             return finding
         return self.supersede(finding, evidence_keys=(*finding.evidence_keys, evidence_key))  # type: ignore[return-value]
@@ -394,6 +434,9 @@ class Investigation:
         source: SourceRef | None = None,
         occurred_at: datetime | None = None,
     ) -> Decision:
+        """A decision bounds an observable or a finding that exists — the key says which family."""
+        if target_key not in self.store.observables and target_key not in self.store.findings:
+            raise KeyError(f"Unknown observable or finding: {target_key}")
         decision = Decision(
             target_key=target_key,
             kind=DecisionKind(kind) if isinstance(kind, str) else kind,
@@ -522,15 +565,35 @@ class Investigation:
 
     # ---------------------------------------------------------------- merge
 
-    def merge_investigation(self, other: Investigation) -> None:
+    def merge_investigation(
+        self,
+        other: Investigation,
+        *,
+        on_engine_mismatch: Literal["raise", "reevaluate"] = "raise",
+    ) -> MergeReport:
         """
-        Merge another investigation in place.
+        Merge another investigation in place and say what changed.
 
-        No dedicated merge logic left: the whole operation is ``store.union``, which is idempotent,
-        commutative and associative by construction.
+        The whole operation is ``store.union`` — idempotent, commutative and associative, header
+        included — so the investigation may come out carrying the other side's identity and name
+        when that side was opened first. What never changes is this object's ``fragment_id``: the
+        facts it appends afterwards stay attributed to it.
+
+        Two engines are refused by default: their scores are not on one scale, and a merge that
+        quietly re-scored one side's facts under the other side's engine would hide that. Passing
+        ``on_engine_mismatch="reevaluate"`` states the decision — the other side's facts are
+        adopted and everything is evaluated under this investigation's engine.
         """
-        self.store = self.store.union(other.store)
+        incoming = other.store
+        if on_engine_mismatch == "reevaluate" and incoming.header.engine_id != self.store.header.engine_id:
+            incoming = incoming.copy()
+            incoming.header = incoming.header.model_copy(update={"engine_id": self.store.header.engine_id})
+        merged = self.store.union(incoming)
+        report = self.store.report_merge(incoming, merged)
+        self.store = merged
+        self.investigation_id = merged.header.investigation_id
         self.invalidate()
+        return report
 
     # ---------------------------------------------------------------- misc
 

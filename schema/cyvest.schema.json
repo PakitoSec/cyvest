@@ -290,11 +290,6 @@
           },
           "title": "Findings",
           "type": "object"
-        },
-        "events": {
-          "additionalProperties": true,
-          "title": "Events",
-          "type": "object"
         }
       },
       "title": "FactsSchema",
@@ -302,7 +297,7 @@
     },
     "Finding": {
       "additionalProperties": false,
-      "description": "A rule outcome. Identity is ``rule_id`` alone, plus ``external_id`` when one is given.\n\nA finding names no subject: what it is about is its ``observable_links``, which are also what\nit scores on. Use ``external_id`` when the same rule must yield several findings — typically\nonce per observable, ``external_id=url.key``.",
+      "description": "A rule outcome. Identity is ``rule_id`` alone, plus ``external_id`` when one is given.\n\nA finding names no subject: what it is about is its ``observable_links``, which are also what\nit scores on. Use ``external_id`` when the same rule must yield several findings — typically\nonce per observable, ``external_id=url.key``.\n\nA finding that describes an activity is **dated** through the envelope's ``occurred_at`` —\nwhen the activity happened, as opposed to when the rule fired — and may name the ATT&CK\n``tactic`` it demonstrates. Both are what the timeline reads; neither enters the score.",
       "properties": {
         "verdict": {
           "$ref": "#/$defs/Verdict",
@@ -427,6 +422,17 @@
           },
           "title": "Labels",
           "type": "array"
+        },
+        "tactic": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Tactic"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         },
         "extra": {
           "additionalProperties": true,
@@ -1119,6 +1125,27 @@
         "EVALUATED"
       ],
       "title": "Status",
+      "type": "string"
+    },
+    "Tactic": {
+      "description": "A MITRE ATT&CK Enterprise tactic — the phase of the kill chain a finding demonstrates.\n\nKebab-case values, in kill-chain order. A tactic is a classification the timeline displays,\nnever a term the engine scores: whether the activity is malicious is the verdict's job.",
+      "enum": [
+        "reconnaissance",
+        "resource-development",
+        "initial-access",
+        "execution",
+        "persistence",
+        "privilege-escalation",
+        "defense-evasion",
+        "credential-access",
+        "discovery",
+        "lateral-movement",
+        "collection",
+        "command-and-control",
+        "exfiltration",
+        "impact"
+      ],
+      "title": "Tactic",
       "type": "string"
     },
     "Tag": {

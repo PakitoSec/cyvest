@@ -15,7 +15,7 @@ from collections import Counter, defaultdict
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from cyvest.enums import DecisionKind, Verdict
+from cyvest.enums import DecisionKind, Tactic, Verdict
 from cyvest.evaluation.report import Report
 from cyvest.facts.observable import Observable
 from cyvest.facts.signal import ThreatIntel
@@ -41,6 +41,7 @@ class StatisticsSchema(BaseModel):
     evaluated_findings: int = Field(default=0)
     findings_by_verdict: dict[Verdict, int] = Field(default_factory=dict)
     findings_by_confidence_band: dict[str, int] = Field(default_factory=dict)
+    findings_by_tactic: dict[str, int] = Field(default_factory=dict)
 
     total_signals: int = Field(default=0)
     signals_by_source: dict[str, int] = Field(default_factory=dict)
@@ -152,6 +153,11 @@ class InvestigationStats:
                 counter[_confidence_band(result.confidence)] += 1
         return dict(counter)
 
+    def get_finding_count_by_tactic(self) -> dict[str, int]:
+        """Findings per ATT&CK tactic, in kill-chain order; undated or untagged findings are not counted."""
+        counter = Counter(finding.tactic for finding in self.store.findings.values() if finding.tactic is not None)
+        return {tactic.value: counter[tactic] for tactic in Tactic if counter[tactic]}
+
     # --- signals
 
     def get_signal_count(self) -> int:
@@ -202,6 +208,7 @@ class InvestigationStats:
             evaluated_findings=self.get_applied_finding_count(),
             findings_by_verdict=self.get_finding_count_by_verdict(),
             findings_by_confidence_band=self.get_finding_count_by_confidence_band(),
+            findings_by_tactic=self.get_finding_count_by_tactic(),
             total_signals=self.get_signal_count(),
             signals_by_source=self.get_signal_count_by_source(),
             signals_by_verdict=self.get_signal_count_by_verdict(),

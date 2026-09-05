@@ -104,6 +104,27 @@ export type LinkBasis = "OBSERVABLE" | "SIGNALS" | "NONE";
 export type SignalKeys = string[];
 export type ObservableLinks = ObservableLink[];
 export type Labels1 = Label[];
+/**
+ * A MITRE ATT&CK Enterprise tactic — the phase of the kill chain a finding demonstrates.
+ *
+ * Kebab-case values, in kill-chain order. A tactic is a classification the timeline displays,
+ * never a term the engine scores: whether the activity is malicious is the verdict's job.
+ */
+export type Tactic =
+  | "reconnaissance"
+  | "resource-development"
+  | "initial-access"
+  | "execution"
+  | "persistence"
+  | "privilege-escalation"
+  | "defense-evasion"
+  | "credential-access"
+  | "discovery"
+  | "lateral-movement"
+  | "collection"
+  | "command-and-control"
+  | "exfiltration"
+  | "impact";
 export type OccurredAt5 = string | null;
 export type ExternalId5 = string | null;
 export type EvidenceKeys5 = string[];
@@ -172,7 +193,6 @@ export interface FactsSchema {
   signals?: Signals;
   evidences?: Evidences;
   findings?: Findings;
-  events?: Events;
 }
 export interface Observables {
   [k: string]: Observable;
@@ -323,6 +343,10 @@ export interface Findings {
  * A finding names no subject: what it is about is its ``observable_links``, which are also what
  * it scores on. Use ``external_id`` when the same rule must yield several findings — typically
  * once per observable, ``external_id=url.key``.
+ *
+ * A finding that describes an activity is **dated** through the envelope's ``occurred_at`` —
+ * when the activity happened, as opposed to when the rule fired — and may name the ATT&CK
+ * ``tactic`` it demonstrates. Both are what the timeline reads; neither enters the score.
  */
 export interface Finding {
   verdict?: Verdict;
@@ -344,6 +368,7 @@ export interface Finding {
   effect?: Effect;
   observable_links?: ObservableLinks;
   labels?: Labels1;
+  tactic?: Tactic | null;
   extra?: Extra1;
 }
 /**
@@ -363,9 +388,6 @@ export interface ObservableLink {
   [k: string]: unknown;
 }
 export interface Extra1 {
-  [k: string]: unknown;
-}
-export interface Events {
   [k: string]: unknown;
 }
 export interface Decisions {

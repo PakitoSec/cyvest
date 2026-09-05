@@ -171,9 +171,9 @@ cv.io_save_json("investigation.json")
 cv.io_save_markdown("report.md")
 ```
 
-Each `display_*` prints on a `rich.Console` unless you hand it a `printer` — a callable taking one
-renderable. Use it to send everything through your logger, otherwise console output (stdout) and
-log output (stderr) interleave and the tables land before their own headers:
+Each `display_*` uses the active `logurich` logger automatically when `logurich.init_logger()` has
+been called. Otherwise it prints on a `rich.Console`. An explicit `printer` — a callable taking
+one renderable — always overrides the automatic choice:
 
 ```python
 cv.display_summary(printer=lambda renderable: logger.rich("INFO", renderable, width=150))

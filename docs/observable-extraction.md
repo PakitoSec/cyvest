@@ -507,3 +507,5 @@ cv.io_save_json("investigation.json")
 3. **Finding the `defanged` flag** to identify indicators that were obfuscated in the source
 4. **Use `extract_from_url`** with caution - set appropriate timeouts and consider rate limiting
 5. **Validate extracted hashes** against known-good patterns if precision is critical
+6. **Turn on `AutoLink`** on the investigation when extracted URLs and e-mails should be linked to
+   their host and domain automatically — see [Auto-Link](auto-link.md)

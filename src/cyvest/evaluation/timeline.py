@@ -17,7 +17,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from cyvest.enums import Salience, Status, Verdict
+from cyvest.enums import Salience, Status, Tactic, Verdict
 from cyvest.evaluation.report import Report
 from cyvest.facts.base import Fact
 from cyvest.facts.decision import Decision, decision_label
@@ -33,7 +33,14 @@ TimeBasis = Literal["occurred", "asserted"]
 
 
 class TimelineEntry(BaseModel):
-    """A report object, never a fact. Rebuilt on demand from the log."""
+    """
+    A report object, never a fact. Rebuilt on demand from the log.
+
+    ``dated`` says whether the fact carried an ``occurred_at`` of its own. On the ``occurred``
+    axis an undated fact is placed at its ``asserted_at`` — a fallback, not an observation — and
+    a consumer building an incident chronology rather than an investigation log filters on it.
+    ``tactic`` is read from the fact when its family carries one (findings).
+    """
 
     model_config = ConfigDict(frozen=True)
 
@@ -44,6 +51,8 @@ class TimelineEntry(BaseModel):
     subject_key: str = Field(default="")
     refs: tuple[str, ...] = Field(default=())
     salience: Salience = Field(default=Salience.BACKGROUND)
+    dated: bool = Field(default=False)
+    tactic: Tactic | None = Field(default=None)
 
 
 def _timestamp(fact: Fact, basis: TimeBasis) -> datetime:
@@ -88,7 +97,9 @@ def _salience_of(fact: Fact, report: Report, policy: Policy, first_signals: set[
                 return Salience.KEY
             if result.score != 0.0:
                 return Salience.NOTABLE
-        return Salience.BACKGROUND
+        # A dated finding is a chronology claim — the very thing a timeline exists to show — even
+        # when it weighs nothing: a neutral event of the incident is an INFO finding with a date.
+        return Salience.NOTABLE if fact.occurred_at is not None else Salience.BACKGROUND
 
     if isinstance(fact, ObservableSignal):
         if fact.key in first_signals:
@@ -151,6 +162,7 @@ def _verdict_change_entries(
                         subject_key=result.key,
                         refs=(fact.key,),
                         salience=Salience.KEY,
+                        dated=fact.occurred_at is not None,
                     )
                 )
             previous[result.key] = result.verdict
@@ -192,6 +204,8 @@ def build_timeline(
                 subject_key=subject_key,
                 refs=(fact.key,),
                 salience=_salience_of(fact, report, resolved_policy, first_signals),
+                dated=fact.occurred_at is not None,
+                tactic=fact.tactic if isinstance(fact, Finding) else None,
             )
         )
 

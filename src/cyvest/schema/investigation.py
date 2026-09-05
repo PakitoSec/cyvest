@@ -16,8 +16,6 @@ every existing document.
 
 from __future__ import annotations
 
-from typing import Any
-
 from pydantic import BaseModel, ConfigDict, Field
 
 from cyvest.evaluation.report import Report
@@ -51,8 +49,6 @@ class FactsSchema(BaseModel):
     signals: dict[str, ThreatIntel] = Field(default_factory=dict)
     evidences: dict[str, Evidence] = Field(default_factory=dict)
     findings: dict[str, Finding] = Field(default_factory=dict)
-    # Reserved for imported EDR/SIEM timelines. Costs an empty dict, states the intent.
-    events: dict[str, Any] = Field(default_factory=dict)
 
 
 class InvestigationSchema(BaseModel):

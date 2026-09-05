@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from cyvest.enums import DecisionKind, LinkBasis, Salience, SourceClass, Verdict
+from cyvest.enums import DecisionKind, LinkBasis, Salience, SourceClass, Tactic, Verdict
 from cyvest.evaluation import evaluate
 from cyvest.evaluation.timeline import build_timeline
 from cyvest.facts import Decision, Finding, Observable, ObservableLink, SourceRef, ThreatIntel
@@ -166,3 +166,48 @@ class TestTimeline:
         store, _, _ = build()
         build_timeline(store, evaluate(store))
         assert all(not hasattr(fact, "salience") for fact in store.all_facts())
+
+    def test_a_dated_finding_is_placed_at_its_occurrence_and_carries_its_tactic(self) -> None:
+        store, url, _ = build()
+        store.append(
+            Finding(
+                rule_id="beacon",
+                name="Beacon to the C2",
+                verdict=Verdict.SUSPICIOUS,
+                tactic=Tactic.COMMAND_AND_CONTROL,
+                occurred_at=JANUARY,
+                asserted_at=JUNE,
+                source=SRC,
+                fragment_id="f1",
+                observable_links=[ObservableLink(observable_key=url.key, basis=LinkBasis.OBSERVABLE)],
+            )
+        )
+        report = evaluate(store)
+        occurred = {e.title: e for e in build_timeline(store, report, min_salience=Salience.BACKGROUND)}
+        beacon = occurred["Beacon to the C2"]
+        assert beacon.when == JANUARY and beacon.dated and beacon.tactic is Tactic.COMMAND_AND_CONTROL
+
+        # The undated finding of the fixture falls back to its assertion time, and says so.
+        undated = occurred["URL in body"]
+        assert undated.when == MARCH and not undated.dated and undated.tactic is None
+
+        by_assertion = build_timeline(store, report, time="asserted", min_salience=Salience.BACKGROUND)
+        asserted = {e.title: e for e in by_assertion}
+        assert asserted["Beacon to the C2"].when == JUNE and asserted["Beacon to the C2"].dated
+
+    def test_a_dated_finding_is_notable_even_when_it_weighs_nothing(self) -> None:
+        """A neutral event of the incident is an INFO finding with a date: the chronology must show it."""
+        store, _, _ = build()
+        store.append(
+            Finding(
+                rule_id="login",
+                name="jdoe logged in from the VPN",
+                verdict=Verdict.INFO,
+                occurred_at=JANUARY,
+                asserted_at=JUNE,
+                source=SRC,
+                fragment_id="f1",
+            )
+        )
+        titles = [entry.title for entry in build_timeline(store, evaluate(store))]
+        assert "jdoe logged in from the VPN" in titles

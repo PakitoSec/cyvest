@@ -350,6 +350,8 @@ depends on who finished first. Collect in parallel, derive in one pass.
   engine.
 - Signals carry a `kind` discriminator, so future scoring inputs can join `ThreatIntel` without
   breaking the schema.
+- Findings carry an optional `tactic` (an ATT&CK Enterprise tactic) next to the envelope's
+  `occurred_at`; both feed the [timeline](timeline.md), neither the score.
 
 ### Migrating a file
 

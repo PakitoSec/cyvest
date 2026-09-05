@@ -13,3 +13,9 @@ def configure_loguru_rich_for_pytest():
 
     # Inject it into your app's console module
     rich_set_console(console)
+
+
+@pytest.fixture
+def anyio_backend() -> str:
+    """Async tests run on asyncio only; trio is not a dependency."""
+    return "asyncio"

@@ -136,3 +136,28 @@ class TestHelpers:
         prompt = build_tools_prompt()
         assert "SAFE < INFO < NOTABLE < SUSPICIOUS < MALICIOUS" in prompt
         assert "LOW 1.5, MEDIUM 4, HIGH 7" in prompt and "LOW 0.3, MEDIUM 0.65, HIGH 1" in prompt
+
+
+class TestRestatingAnObservable:
+    """Seeing an observable again re-asserts it; what the caller does not state is carried over."""
+
+    def test_unstated_fields_keep_their_values(self) -> None:
+        cv = Cyvest()
+        cv.observable_create("domain", "corp.example", internal=True, comment="our domain", extra={"owner": "it"})
+        again = cv.observable_create("domain", "corp.example")
+        assert again.internal is True
+        assert again.comment == "our domain"
+        assert again.extra == {"owner": "it"}
+
+    def test_stated_fields_win(self) -> None:
+        cv = Cyvest()
+        cv.observable_create("domain", "corp.example", internal=True, comment="our domain")
+        again = cv.observable_create("domain", "corp.example", internal=False, comment="sold last year")
+        assert again.internal is False
+        assert again.comment == "sold last year"
+
+    def test_a_first_sighting_with_nothing_stated_is_external_and_bare(self) -> None:
+        proxy = Cyvest().observable_create("domain", "new.example")
+        assert proxy.internal is False
+        assert proxy.comment == ""
+        assert proxy.extra == {}

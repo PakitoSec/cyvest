@@ -236,3 +236,46 @@ class TestApply:
             cv, [_op(op="observable", type="user", subtype="username", namespace="d", value="jdoe")]
         )
         assert not result.ok and "async" in result.errors[0].message
+
+
+class TestObservableIdentity:
+    def test_a_type_that_needs_a_subtype_gets_it_inferred(self) -> None:
+        cv = Cyvest()
+        result = apply_operations(
+            cv,
+            [
+                _op(op="observable", type="file", value="msedge.exe"),
+                _op(op="observable", type="host", value="W5CD409G987"),
+                _op(op="observable", type="host", value="wks.corp.example"),
+                _op(op="observable", type="user", value="OX1155"),
+            ],
+        )
+        assert result.ok, result.errors
+        observables = [o for o in cv.observable_get_all().values() if o.value != "__cyvest_root__"]
+        identities = {o.value: (o.subtype, o.namespace) for o in observables}
+        assert identities["msedge.exe"][0] is not None and identities["msedge.exe"][0].value == "path"
+        assert identities["W5CD409G987"][0].value == "hostname"
+        assert identities["wks.corp.example"][0].value == "fqdn"
+        assert identities["OX1155"][0].value == "username"
+
+    def test_a_stated_subtype_is_not_overridden(self) -> None:
+        cv = Cyvest()
+        result = apply_operations(cv, [_op(op="observable", type="file", subtype="sha256", value="a" * 64)])
+        assert result.ok, result.errors
+        assert result.applied[0].key == f"obs:file:sha256:{'a' * 64}"
+
+    def test_recording_an_existing_observable_keeps_what_it_already_carries(self) -> None:
+        cv = Cyvest()
+        cv.observable_create(
+            "host",
+            "W5CD409G987",
+            subtype="hostname",
+            namespace="default",
+            internal=True,
+            comment="workstation, Marseille",
+        )
+        result = apply_operations(cv, [_op(op="observable", type="host", value="W5CD409G987")])
+        assert result.ok, result.errors
+        host = cv.observable_get(result.applied[0].key)
+        assert host.internal is True
+        assert host.comment == "workstation, Marseille"

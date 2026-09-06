@@ -289,8 +289,8 @@ class Cyvest:
         *,
         alias: ObservableAlias,
         resolved: tuple[str, ObservableResolution] | None,
-        internal: bool,
-        comment: str,
+        internal: bool | None,
+        comment: str | None,
         extra: dict[str, Any] | None,
     ) -> ObservableProxy:
         source_identity = ObservableIdentity(
@@ -315,6 +315,15 @@ class Cyvest:
             fragment_id=fragment,
         )
         existing = self._investigation.get_observable(probe.key)
+        # A field the caller did not state is not a claim: the re-assertion carries what the
+        # existing observable already says, so a bare second sighting cannot erase a comment or
+        # flip an asset to external.
+        if internal is None:
+            internal = existing.internal if existing is not None else False
+        if comment is None:
+            comment = existing.comment if existing is not None else ""
+        if extra is None and existing is not None:
+            extra = dict(existing.extra)
         if existing is not None:
             seen = existing.occurrences.get(fragment, 0)
             previous = next((a for a in existing.aliases if a.identity_tuple == alias.identity_tuple), None)
@@ -353,13 +362,18 @@ class Cyvest:
         value: str,
         subtype: ObservableSubtype | str | None = None,
         namespace: str | None = None,
-        internal: bool = False,
-        comment: str = "",
+        internal: bool | None = None,
+        comment: str | None = None,
         extra: dict[str, Any] | None = None,
         resolve: bool = True,
     ) -> ObservableProxy:
         """
         Create an observable, or return the existing one — identity is the quadruplet.
+
+        Seeing an observable again re-asserts it, and the freshest assertion wins. So a field that is
+        *not* passed (``internal``, ``comment``, ``extra`` left ``None``) keeps the value the existing
+        observable already carries; only what the caller states explicitly changes. A first sighting
+        with nothing stated is external, uncommented, without extra.
 
         ``resolve=False`` takes the identity as given, without consulting the registered
         resolvers: for a value already canonical — a domain derived from a URL, an identity another
@@ -380,8 +394,8 @@ class Cyvest:
         value: str,
         subtype: ObservableSubtype | str | None = None,
         namespace: str | None = None,
-        internal: bool = False,
-        comment: str = "",
+        internal: bool | None = None,
+        comment: str | None = None,
         extra: dict[str, Any] | None = None,
         resolve: bool = True,
     ) -> ObservableProxy:

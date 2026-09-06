@@ -5,7 +5,7 @@ An agent that investigates should keep its facts somewhere that computes the ver
 read and write it, and shows it the current report on every turn.
 
 ```bash
-pip install 'cyvest[langchain]'          # langchain >= 1.0
+pip install 'cyvest[langchain]'          # langchain >= 1.4 (langchain-core >= 1.6)
 ```
 
 ```python
@@ -108,7 +108,7 @@ A list of flat operations, each with an `op` and the fields that op needs:
 
 | `op` | required | notable optional |
 |---|---|---|
-| `observable` | `type`, `value` | `subtype`, `namespace`, `internal`, `comment` |
+| `observable` | `type`, `value` | `subtype`, `namespace`, `internal`, `comment` — a subtype the type requires (`file`, `host`, `user`…) is inferred from the value when left out |
 | `threat_intel` | `observable`, `source` | `verdict`, `weight`, `confidence`, `source_class`, `taxonomies`, `external_id`, `occurred_at` |
 | `evidence` | `evidence_type`, `title`, and `content_text` or `uri` | `source`, `external_id`, `occurred_at` |
 | `finding` | `rule_id` | `name`, `comment`, `verdict`, `weight`, `confidence`, `status`, `extra_json`, `occurred_at`, `tactic` |
@@ -123,6 +123,10 @@ the model wrote the operation — and lands on the fact under its family's name 
 evidence, `observed_at` for signals and relations). `tactic` is one of the fourteen ATT&CK
 Enterprise tactics in kebab-case, stated only when the finding's activity demonstrates it. The
 timeline is projected from these, see [Timeline](timeline.md).
+
+Recording an observable that already exists re-asserts it: the fields the operation leaves out
+(`internal`, `comment`) keep the values the observable already carries, so a model that names an
+asset again cannot erase a comment or flip it to external. Only what the operation states changes.
 
 An operation may name the key it creates with `ref`, and later operations in the same batch refer
 to it as `"$name"`:

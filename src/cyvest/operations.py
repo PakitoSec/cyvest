@@ -41,6 +41,7 @@ from cyvest.enums import (
 from cyvest.facts.base import SourceRef
 from cyvest.facts.taxonomy import Taxonomy
 from cyvest.relations import AGENT_RELATION_SOURCE
+from cyvest.resolvers import identity_is_complete, infer_observable_identity
 
 if TYPE_CHECKING:
     from cyvest.cyvest import Cyvest
@@ -435,13 +436,26 @@ def _relation_source(operation: Operation) -> SourceRef:
 
 
 def _observable_kwargs(operation: Operation) -> dict[str, Any]:
+    """
+    What the facade needs to create the observable.
+
+    A model states a type and a value; the identity rules may also want a subtype (``file``,
+    ``host``, ``user``…) and a namespace. Rather than refuse the whole batch, infer them the way
+    ingestion does — a ``file`` is a path, a ``host`` a hostname or an FQDN. Fields the model left
+    out are passed as ``None`` so a re-recorded observable keeps what it already carries.
+    """
+    obs_type, value = operation.type or "", operation.value or ""
+    subtype, namespace = operation.subtype, operation.namespace
+    if subtype is None and not identity_is_complete(obs_type, None):
+        _kind, subtype, inferred_namespace = infer_observable_identity(obs_type, value)
+        namespace = namespace or inferred_namespace
     return {
-        "obs_type": operation.type or "",
-        "value": operation.value or "",
-        "subtype": operation.subtype,
-        "namespace": operation.namespace,
-        "internal": bool(operation.internal),
-        "comment": operation.comment or "",
+        "obs_type": obs_type,
+        "value": value,
+        "subtype": subtype,
+        "namespace": namespace,
+        "internal": operation.internal,
+        "comment": operation.comment,
     }
 
 

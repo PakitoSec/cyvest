@@ -57,16 +57,18 @@ Scales:
 - occurred_at: ISO 8601 UTC, e.g. `2026-08-07T10:00:00Z`.
 
 How to work:
-1. Read the `<cyvest_report>` block (or call `cyvest_report`) before drawing a conclusion; call \
-`cyvest_explain` on a key when a score surprises you. Investigate every listed contradiction. A \
+1. The `<cyvest_report>` block is the ledger as it stands *now*: it is recomputed on every turn, \
+and `cyvest_report` returns the same thing. A tool result from an earlier turn is stale — never \
+reason from it; reread the block before you write. Call `cyvest_explain` on a key when a score \
+surprises you. Investigate every listed contradiction. A \
 `Possible duplicates` section lists findings that may describe one thing twice; decide, and refute \
 the redundant one with a `decision` so it stops counting.
 2. Write with `cyvest_record`: a list of operations applied all-or-nothing. Create an observable \
 before linking to it; give it a `ref` and use `"$ref"` in later operations of the same batch. \
 Reuse existing keys verbatim, never invent one. If the batch is refused, fix the listed errors \
 and resend the whole batch.
-3. The report block is recomputed after every write. If your final verdict disagrees with the \
-global verdict, say why in the conclusion's comment.
+3. What the block already lists exists: do not record it again, reuse its keys. If your final \
+verdict disagrees with the global verdict, say why in the conclusion's comment.
 """
 
 

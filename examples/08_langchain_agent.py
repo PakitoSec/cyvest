@@ -1,9 +1,10 @@
 """
 Example 9: An agent that keeps its investigation in Cyvest
 
-The model never computes a score. It records observables, signals, findings and one conclusion
+The model never computes a score. It records observables, signals and ordinary findings
 through `cyvest_record`; the middleware keeps the investigation in the agent state and shows the
-recomputed report on every turn. A scripted model stands in for a provider so the example runs
+recomputed report on every turn. The final assessment stays in the agent's response, not in a
+conclusion finding. A scripted model stands in for a provider so the example runs
 offline: swap it for `model="anthropic:claude-sonnet-4-6"` and the rest is unchanged.
 
 Requires the optional extra: `pip install 'cyvest[langchain]'`.
@@ -93,13 +94,6 @@ SECOND_BATCH = [
     },
     # A $ref lives for one batch only: the URL created earlier is named by its key here.
     {"op": "link_observable", "finding": "$click", "observable": "obs:url:hxxps://invoice-portal[.]example/pay"},
-    {
-        "op": "conclusion",
-        "rule_id": "ia",
-        "name": "Confirmed phishing",
-        "verdict": "MALICIOUS",
-        "comment": "Two independent sources flag the landing domain; SPF fails on the sender.",
-    },
 ]
 
 SCRIPT: list[BaseMessage] = [
@@ -111,7 +105,7 @@ SCRIPT: list[BaseMessage] = [
         ],
     ),
     AIMessage(content="", tool_calls=[{"name": "cyvest_record", "args": {"operations": SECOND_BATCH}, "id": "call-3"}]),
-    AIMessage(content="Phishing confirmed; the conclusion is recorded."),
+    AIMessage(content="The investigation verdict is MALICIOUS; the landing domain is flagged and SPF fails."),
 ]
 
 

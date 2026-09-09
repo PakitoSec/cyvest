@@ -59,7 +59,6 @@ RECORD = [
     },
     {"op": "finding", "ref": "f", "rule_id": "url-in-body", "name": "URL in body", "verdict": "SUSPICIOUS"},
     {"op": "link_observable", "finding": "$f", "observable": "$url"},
-    {"op": "conclusion", "rule_id": "triage-verdict", "verdict": "MALICIOUS", "comment": "corroborated"},
 ]
 
 
@@ -95,15 +94,101 @@ class TestTools:
         findings = next(tool for tool in build_cyvest_tools() if tool.name == "cyvest_findings")
         assert findings.tool_call_schema.model_json_schema()["properties"] == {}
 
+    @pytest.mark.parametrize(
+        "name",
+        [
+            "cyvest_report",
+            "cyvest_explain",
+            "cyvest_observables",
+            "cyvest_findings",
+            "cyvest_timeline",
+            "cyvest_relation_context",
+        ],
+    )
+    def test_read_descriptions_explain_state_and_recall_rules(self, name: str) -> None:
+        tool = next(tool for tool in build_cyvest_tools() if tool.name == name)
+        description = tool.tool_call_schema.model_json_schema()["description"]
+        assert "Read-only view of the current investigation state" in description
+        assert "does not create conclusions" in description
+        assert "Only call again with the same arguments after the investigation changes" in description
+        assert "reuse the previous result" in description
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("asynchronous", [False, True])
+    async def test_reads_do_not_create_conclusions_or_change_investigation(self, asynchronous: bool) -> None:
+        cv = CyvestDefaults(investigation_id="read-only").new()
+        observable = cv.observable(cv.OBS.DOMAIN, "example.com")
+        document = cv.io_to_dict()
+        model = ScriptedToolCallingModel(
+            script=[
+                AIMessage(
+                    content="",
+                    tool_calls=[
+                        _call("cyvest_report", "report"),
+                        _call("cyvest_explain", "explain", key=observable.key),
+                        _call("cyvest_observables", "observables"),
+                        _call("cyvest_findings", "findings"),
+                        _call("cyvest_timeline", "timeline"),
+                        _call("cyvest_relation_context", "relations"),
+                    ],
+                ),
+                AIMessage(content="done"),
+            ],
+        )
+        agent = create_agent(model, middleware=[CyvestMiddleware(finalize_on_exit=False)])
+        inputs = {"messages": [{"role": "user", "content": "go"}], INVESTIGATION_KEY: document}
+        state = await agent.ainvoke(inputs) if asynchronous else agent.invoke(inputs)
+        messages = _tool_messages(state)
+        assert len(messages) == 6
+        assert all(message.status == "success" for message in messages)
+        assert state[INVESTIGATION_KEY] == document
+        assert state[INVESTIGATION_KEY]["facts"]["findings"] == {}
+
     def test_the_record_schema_stays_small_and_flat(self) -> None:
         (record,) = [
             tool for tool in build_cyvest_tools(CyvestDefaults(), relations=False) if tool.name == "cyvest_record"
         ]
-        schema = json.dumps(record.tool_call_schema.model_json_schema())
-        assert len(schema) < 12_000
-        assert "anyOf" not in json.dumps(
-            record.tool_call_schema.model_json_schema()["$defs"]["Operation"]["properties"]["op"]
+        schema = record.tool_call_schema.model_json_schema()
+        assert len(json.dumps(schema)) < 12_000
+        operation_ref = schema["properties"]["operations"]["items"]["$ref"].rsplit("/", 1)[-1]
+        assert "anyOf" not in json.dumps(schema["$defs"][operation_ref]["properties"]["op"])
+
+    def test_record_schema_excludes_conclusions(self) -> None:
+        from cyvest.operations import OpKind
+
+        record = next(tool for tool in build_cyvest_tools() if tool.name == "cyvest_record")
+        schema = record.tool_call_schema.model_json_schema()
+        operation_ref = schema["properties"]["operations"]["items"]["$ref"].rsplit("/", 1)[-1]
+        operations = schema["$defs"][operation_ref]["properties"]["op"]["enum"]
+        assert set(operations) == set(get_args(OpKind)) - {"conclusion"}
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("asynchronous", [False, True])
+    async def test_record_rejects_conclusion_batches_without_mutation(self, asynchronous: bool) -> None:
+        document = CyvestDefaults(investigation_id="no-conclusions").new().io_to_dict()
+        model = ScriptedToolCallingModel(
+            script=[
+                AIMessage(
+                    content="",
+                    tool_calls=[
+                        _call(
+                            "cyvest_record",
+                            "write",
+                            operations=[
+                                {"op": "finding", "rule_id": "ordinary", "verdict": "SUSPICIOUS"},
+                                {"op": "conclusion", "rule_id": "triage-verdict", "verdict": "MALICIOUS"},
+                            ],
+                        )
+                    ],
+                ),
+                AIMessage(content="done"),
+            ],
         )
+        agent = create_agent(model, middleware=[CyvestMiddleware(finalize_on_exit=False)])
+        inputs = {"messages": [{"role": "user", "content": "go"}], INVESTIGATION_KEY: document}
+        state = await agent.ainvoke(inputs) if asynchronous else agent.invoke(inputs)
+        assert _tool_messages(state)[0].status == "error"
+        assert state[INVESTIGATION_KEY] == document
 
     def test_the_prompt_lists_the_tactics_from_the_enum(self) -> None:
         from cyvest import Tactic
@@ -118,8 +203,23 @@ class TestTools:
 
         assert "remain valid until the ledger changes" in CYVEST_TOOLS_PROMPT
         assert "do not poll" in CYVEST_TOOLS_PROMPT
+        assert "does not create conclusions" in CYVEST_TOOLS_PROMPT
+        assert "Only call again with the same arguments after the investigation changes" in CYVEST_TOOLS_PROMPT
+        assert "An empty result is still the current state" in CYVEST_TOOLS_PROMPT
         assert "caller's output contract" in CYVEST_TOOLS_PROMPT
         assert "earlier turn is stale" not in CYVEST_TOOLS_PROMPT
+
+    def test_prompt_and_record_description_forbid_conclusion_findings(self) -> None:
+        from cyvest.integrations.langchain import CYVEST_TOOLS_PROMPT
+
+        assert "Never create conclusion findings" in CYVEST_TOOLS_PROMPT
+        assert "Do not record your final assessment as an ordinary finding either" in CYVEST_TOOLS_PROMPT
+        assert "explain why in your response" in CYVEST_TOOLS_PROMPT
+        assert "**Conclusions**" not in CYVEST_TOOLS_PROMPT
+        assert 'op="conclusion"' not in CYVEST_TOOLS_PROMPT
+        record = next(tool for tool in build_cyvest_tools() if tool.name == "cyvest_record")
+        assert "Conclusion findings are not supported" in record.description
+        assert "Put your final assessment in your response" in record.description
 
     def test_selection_flags(self) -> None:
         names = {tool.name for tool in build_cyvest_tools(CyvestDefaults(), write=False, relations=False)}
@@ -141,7 +241,7 @@ class TestTools:
             CyvestMiddleware(root_data={"case": "demo"}, investigation_name="demo", auto_link=AutoLink()),
         )
         cv = Cyvest.io_load_dict(state[INVESTIGATION_KEY])
-        assert set(cv.finding_get_all()) == {"fnd:url-in-body", "fnd:triage-verdict"}
+        assert set(cv.finding_get_all()) == {"fnd:url-in-body"}
         assert cv.get_global_verdict() is cv.VERDICT.MALICIOUS
         record, report, explain = _tool_messages(state)
         payload = json.loads(record.content)
@@ -239,11 +339,10 @@ class TestMiddleware:
         assert all("cyvest_read" not in message.response_metadata for message in messages)
         assert json.loads(written.content)["ok"]
         assert updated.content != repeated[0].content
-        assert "## Findings" in updated.content and "## Conclusions" in updated.content
+        assert "## Findings" in updated.content
         assert updated.content.count("`fnd:url-in-body`") == 1
-        assert updated.content.count("`fnd:triage-verdict`") == 1
         assert "| status |" not in updated.content
-        assert "fnd:triage-verdict" in state[INVESTIGATION_KEY]["facts"]["findings"]
+        assert set(state[INVESTIGATION_KEY]["facts"]["findings"]) == {"fnd:url-in-body"}
 
     def test_before_agent_seeds_an_empty_investigation_once(self) -> None:
         middleware = CyvestMiddleware(root_data={"case": "seed"}, investigation_id="seed")
@@ -295,4 +394,4 @@ class TestMiddleware:
         )
         agent = create_agent(model, tools=[], middleware=[CyvestMiddleware(auto_link=AutoLink())])
         state = await agent.ainvoke({"messages": [{"role": "user", "content": "go"}]})
-        assert "fnd:triage-verdict" in state[INVESTIGATION_KEY]["facts"]["findings"]
+        assert set(state[INVESTIGATION_KEY]["facts"]["findings"]) == {"fnd:url-in-body"}

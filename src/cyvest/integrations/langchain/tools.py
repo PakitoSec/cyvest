@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, Literal
 
 from langchain.tools import ToolRuntime
 from langchain_core.messages import ToolMessage
@@ -35,6 +35,12 @@ from cyvest.io.markdown import (
 from cyvest.operations import Operation, aapply_operations, apply_operations
 from cyvest.relations import RelationPlan, apply_relation_plan, relation_context, validate_relation_plan
 
+_READ_STATE_GUIDANCE = (
+    "Read-only view of the current investigation state: this tool does not create conclusions "
+    "or modify the investigation. Only call again with the same arguments after the investigation changes; "
+    "otherwise reuse the previous result, even if empty. "
+)
+
 
 class ExplainArgs(BaseModel):
     key: str = Field(..., description="A finding key (fnd:...) or an observable key (obs:...)")
@@ -50,8 +56,23 @@ class TimelineArgs(BaseModel):
     limit: int = Field(default=50, ge=1, le=500)
 
 
+class _RecordOperation(Operation):
+    """A LangChain write, excluding conclusion findings."""
+
+    op: Literal[
+        "observable",
+        "threat_intel",
+        "evidence",
+        "finding",
+        "link_observable",
+        "link_evidence",
+        "decision",
+        "relation",
+    ] = Field(..., description="Which write to perform")
+
+
 class RecordArgs(BaseModel):
-    operations: list[Operation] = Field(
+    operations: list[_RecordOperation] = Field(
         ...,
         min_length=1,
         max_length=50,
@@ -127,26 +148,34 @@ def build_cyvest_tools(
             _tool(
                 report,
                 "cyvest_report",
-                "Read the investigation: global score and verdict, conclusions, findings, observables, "
+                f"{_READ_STATE_GUIDANCE}"
+                "Read the investigation: global score and verdict, findings, observables, "
                 "decisions and contradictions. Use the current injected report when available; "
-                "otherwise read it before concluding. Do not poll an unchanged ledger.",
+                "otherwise read it before your final response.",
             ),
             _tool(
                 explain,
                 "cyvest_explain",
-                "Explain a finding's or an observable's score: every contribution.",
+                f"{_READ_STATE_GUIDANCE}Explain a finding's or an observable's score: every contribution.",
                 ExplainArgs,
             ),
-            _tool(observables, "cyvest_observables", "List observables with their verdict and score.", ObservablesArgs),
+            _tool(
+                observables,
+                "cyvest_observables",
+                f"{_READ_STATE_GUIDANCE}List observables with their verdict and score.",
+                ObservablesArgs,
+            ),
             _tool(
                 findings,
                 "cyvest_findings",
-                "Read the complete list of recorded findings and conclusions, in separate sections. "
+                f"{_READ_STATE_GUIDANCE}"
+                "Read the complete list of recorded findings. "
                 "Use it when the report's findings are truncated; use cyvest_explain for a specific key.",
             ),
             _tool(
                 timeline,
                 "cyvest_timeline",
+                f"{_READ_STATE_GUIDANCE}"
                 "The timeline projected from the dated facts, oldest first, with the tactic of each dated "
                 "finding; undated facts appear at the moment they were recorded, marked (asserted).",
                 TimelineArgs,
@@ -165,13 +194,13 @@ def build_cyvest_tools(
             payload["report"] = render_llm_summary(cv, max_findings=max_findings, max_observables=max_observables)
         return payload
 
-    def record(operations: Sequence[Operation], runtime: ToolRuntime) -> Command | str:
+    def record(operations: Sequence[_RecordOperation], runtime: ToolRuntime) -> Command | str:
         cv = _load(runtime, defaults)
         result = apply_operations(cv, list(operations))
         payload = _record_payload(result, cv)
         return _commit(cv, runtime, payload, "cyvest_record") if result.ok else _dump(payload)
 
-    async def arecord(operations: Sequence[Operation], runtime: ToolRuntime) -> Command | str:
+    async def arecord(operations: Sequence[_RecordOperation], runtime: ToolRuntime) -> Command | str:
         cv = _load(runtime, defaults)
         result = await aapply_operations(cv, list(operations))
         payload = _record_payload(result, cv)
@@ -183,11 +212,14 @@ def build_cyvest_tools(
                 record,
                 "cyvest_record",
                 "Write to the investigation: a batch of operations (observable, threat_intel, evidence, finding, "
-                "conclusion, link_observable, link_evidence, decision, relation) applied all or nothing. "
+                "link_observable, link_evidence, decision, relation) applied all or nothing. "
                 "Create before you link; name a created key with ref and use '$ref' in later operations. "
                 "Date a finding, evidence, signal, relation or decision with occurred_at (ISO 8601 UTC) and "
                 "name the tactic a finding demonstrates: the timeline is built from them. "
-                "Returns what was applied, or the errors to fix and resend.",
+                "Conclusion findings are not supported. Put your final assessment in your response, "
+                "not in a finding. "
+                "On success, returns what was applied and the updated report; reuse that report. "
+                "On failure, returns the errors to fix and resend.",
                 RecordArgs,
                 coroutine=arecord,
             )
@@ -216,7 +248,7 @@ def build_cyvest_tools(
             _tool(
                 context,
                 "cyvest_relation_context",
-                "The observable graph with its revision: read it before proposing relations.",
+                f"{_READ_STATE_GUIDANCE}The observable graph with its revision: read it before proposing relations.",
             ),
             _tool(
                 validate,

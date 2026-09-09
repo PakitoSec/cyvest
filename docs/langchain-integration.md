@@ -64,7 +64,7 @@ CyvestMiddleware(
 
 The injected report is current. A successful Cyvest read remains useful until the ledger changes;
 it does not become stale merely because the model starts another turn. Reading never changes the
-ledger, so polling `cyvest_findings(status="all")` cannot produce new evidence.
+ledger, so polling `cyvest_findings()` cannot produce new evidence.
 
 This is guidance for the model, not an execution restriction. The middleware does not cache,
 reject or count repeated reads, including parallel calls. The host owns the investigation workflow
@@ -101,12 +101,18 @@ middleware's: declare it with the same reducer.
 | `cyvest_report` | the compact report: score, verdict, conclusions, findings, observables, decisions, contradictions, possible duplicates |
 | `cyvest_explain(key)` | every contribution behind a finding or an observable |
 | `cyvest_observables(type, min_abs_score, limit)` | observables, strongest first |
-| `cyvest_findings(status)` | findings; `all`, `evaluated`, `pending` or `conclusions` |
+| `cyvest_findings()` | the complete list of recorded findings and conclusions, in separate sections; no arguments |
 | `cyvest_timeline(limit)` | the timeline projected from the dated facts, oldest first, with each finding's tactic |
 | `cyvest_record(operations)` | **the one write tool**: a batch applied all or nothing |
 | `cyvest_relation_context` | the observable graph and its revision |
 | `cyvest_relation_plan_validate(plan)` | what a relation plan would do, and why parts of it would not |
 | `cyvest_relation_plan_apply(plan, confirm)` | draw a validated plan's edges; `confirm=true` required |
+
+Use `cyvest_report` for the overview, `cyvest_findings()` when the report's findings are truncated,
+and `cyvest_explain(key)` for a specific finding or observable. The findings listing and injected
+report do not expose finding statuses or present pending findings as a task list. Conclusions are
+shown with their effect and confidence, not as a stage in a finding's lifecycle. The core finding
+status and write API are unchanged; the read tool no longer accepts a `status` argument.
 
 Every tool rebuilds the facade from the state, acts, and — for writes — returns a `Command` that
 carries the new document plus the tool message. A refused write returns the message only, so the

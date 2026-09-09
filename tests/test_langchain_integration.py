@@ -109,6 +109,14 @@ class TestTools:
         assert all(tactic.value in prompt for tactic in Tactic)
         assert "occurred_at" in prompt and "(asserted)" in prompt
 
+    def test_prompt_does_not_mark_unchanged_reads_stale(self) -> None:
+        from cyvest.integrations.langchain import CYVEST_TOOLS_PROMPT
+
+        assert "remain valid until the ledger changes" in CYVEST_TOOLS_PROMPT
+        assert "do not poll" in CYVEST_TOOLS_PROMPT
+        assert "caller's output contract" in CYVEST_TOOLS_PROMPT
+        assert "earlier turn is stale" not in CYVEST_TOOLS_PROMPT
+
     def test_selection_flags(self) -> None:
         names = {tool.name for tool in build_cyvest_tools(CyvestDefaults(), write=False, relations=False)}
         assert names == {"cyvest_report", "cyvest_explain", "cyvest_observables", "cyvest_findings", "cyvest_timeline"}
@@ -197,6 +205,38 @@ class TestTools:
 
 
 class TestMiddleware:
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("asynchronous", [False, True])
+    @pytest.mark.parametrize("parallel", [False, True])
+    async def test_repeated_reads_remain_available(self, asynchronous: bool, parallel: bool) -> None:
+        calls = [_call("cyvest_findings", f"read-{index}", status="all") for index in range(5)]
+        reads = (
+            [AIMessage(content="", tool_calls=calls)]
+            if parallel
+            else [AIMessage(content="", tool_calls=[call]) for call in calls]
+        )
+        model = ScriptedToolCallingModel(
+            script=[
+                *reads,
+                AIMessage(content="", tool_calls=[_call("cyvest_record", "write", operations=RECORD)]),
+                AIMessage(content="", tool_calls=[_call("cyvest_findings", "read-updated", status="all")]),
+                AIMessage(content="done"),
+            ],
+        )
+        agent = create_agent(model, middleware=[CyvestMiddleware(auto_link=AutoLink())])
+        inputs = {"messages": [{"role": "user", "content": "go"}]}
+        state = await agent.ainvoke(inputs) if asynchronous else agent.invoke(inputs)
+        messages = _tool_messages(state)
+        *repeated, written, updated = messages
+        assert len(repeated) == 5
+        assert {message.content for message in repeated} == {repeated[0].content}
+        assert [message.tool_call_id for message in repeated] == [call["id"] for call in calls]
+        assert all(message.status == "success" for message in messages)
+        assert all("cyvest_read" not in message.response_metadata for message in messages)
+        assert json.loads(written.content)["ok"]
+        assert updated.content != repeated[0].content
+        assert "fnd:triage-verdict" in state[INVESTIGATION_KEY]["facts"]["findings"]
+
     def test_before_agent_seeds_an_empty_investigation_once(self) -> None:
         middleware = CyvestMiddleware(root_data={"case": "seed"}, investigation_id="seed")
         update = middleware.before_agent({}, None)

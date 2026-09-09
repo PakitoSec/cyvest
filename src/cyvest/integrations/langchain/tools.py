@@ -133,7 +133,8 @@ def build_cyvest_tools(
                 report,
                 "cyvest_report",
                 "Read the investigation: global score and verdict, conclusions, findings, observables, "
-                "decisions and contradictions. Call it before concluding.",
+                "decisions and contradictions. Use the current injected report when available; "
+                "otherwise read it before concluding. Do not poll an unchanged ledger.",
             ),
             _tool(
                 explain,

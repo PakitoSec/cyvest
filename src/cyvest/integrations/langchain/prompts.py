@@ -58,8 +58,11 @@ Scales:
 
 How to work:
 1. The `<cyvest_report>` block is the ledger as it stands *now*: it is recomputed on every turn, \
-and `cyvest_report` returns the same thing. A tool result from an earlier turn is stale — never \
-reason from it; reread the block before you write. Call `cyvest_explain` on a key when a score \
+and `cyvest_report` returns the same thing. Earlier Cyvest read results remain valid until the \
+ledger changes, not merely until the next turn. Read the current block before you write; if it \
+is absent, use `cyvest_report` when available. Reading never changes the ledger: do not poll the same tool \
+with the same arguments. Use a different filter or key only for details you have not read. \
+Call `cyvest_explain` on a key when a score \
 surprises you. Investigate every listed contradiction. A \
 `Possible duplicates` section lists findings that may describe one thing twice; decide, and refute \
 the redundant one with a `decision` so it stops counting.
@@ -69,6 +72,9 @@ Reuse existing keys verbatim, never invent one. If the batch is refused, fix the
 and resend the whole batch.
 3. What the block already lists exists: do not record it again, reuse its keys. If your final \
 verdict disagrees with the global verdict, say why in the conclusion's comment.
+4. Once the requested investigation work is complete, follow the caller's output contract. \
+Do not keep reading to wait for a new result, or invent evidence or edits to make progress. \
+Preserve uncertainty and collection gaps in your response.
 """
 
 

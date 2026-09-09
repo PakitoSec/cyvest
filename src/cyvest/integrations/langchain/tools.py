@@ -26,7 +26,6 @@ from pydantic import BaseModel, Field
 from cyvest.cyvest import Cyvest, InvestigationSpec
 from cyvest.integrations.langchain.state import INVESTIGATION_KEY, investigation_from_state
 from cyvest.io.markdown import (
-    FindingFilter,
     explain_text,
     findings_markdown,
     observables_markdown,
@@ -45,10 +44,6 @@ class ObservablesArgs(BaseModel):
     type: str | None = Field(default=None, description="Keep one observable type only, e.g. domain")
     min_abs_score: float = Field(default=0.0, ge=0.0, description="Hide observables scoring closer to zero")
     limit: int = Field(default=50, ge=1, le=500)
-
-
-class FindingsArgs(BaseModel):
-    status: FindingFilter = Field(default="all", description="all, evaluated, pending, or conclusions")
 
 
 class TimelineArgs(BaseModel):
@@ -121,8 +116,8 @@ def build_cyvest_tools(
     def observables(runtime: ToolRuntime, type: str | None = None, min_abs_score: float = 0.0, limit: int = 50) -> str:  # noqa: A002
         return observables_markdown(_load(runtime, defaults), obs_type=type, min_abs_score=min_abs_score, limit=limit)
 
-    def findings(runtime: ToolRuntime, status: FindingFilter = "all") -> str:
-        return findings_markdown(_load(runtime, defaults), status=status)
+    def findings(runtime: ToolRuntime) -> str:
+        return findings_markdown(_load(runtime, defaults))
 
     def timeline(runtime: ToolRuntime, limit: int = 50) -> str:
         return timeline_markdown(_load(runtime, defaults), limit=limit)
@@ -143,7 +138,12 @@ def build_cyvest_tools(
                 ExplainArgs,
             ),
             _tool(observables, "cyvest_observables", "List observables with their verdict and score.", ObservablesArgs),
-            _tool(findings, "cyvest_findings", "List findings, optionally filtered by status.", FindingsArgs),
+            _tool(
+                findings,
+                "cyvest_findings",
+                "Read the complete list of recorded findings and conclusions, in separate sections. "
+                "Use it when the report's findings are truncated; use cyvest_explain for a specific key.",
+            ),
             _tool(
                 timeline,
                 "cyvest_timeline",
@@ -265,7 +265,6 @@ def _tool(
 
 __all__ = [
     "ExplainArgs",
-    "FindingsArgs",
     "ObservablesArgs",
     "RecordArgs",
     "RelationApplyArgs",

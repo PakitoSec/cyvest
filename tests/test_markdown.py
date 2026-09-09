@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 import pytest
 
 from cyvest import Cyvest, render_llm_summary
+from cyvest.enums import Status
 from cyvest.io.markdown import (
     contradictions,
     explain_text,
@@ -47,11 +48,37 @@ class TestSummary:
         assert "**REFUTE** by cyvest: known" in text
         assert "## Contradictions" in text and "`obs:url:http://host3.example/p` is called inculpatory" in text
 
-    def test_conclusions_stay_out_of_the_findings_table(self) -> None:
+    def test_findings_listing_includes_conclusions_in_a_separate_section(self) -> None:
         cv = _case()
-        assert "triage-verdict" not in findings_markdown(cv)
-        assert "triage-verdict" in findings_markdown(cv, status="conclusions")
-        assert findings_markdown(Cyvest()) == "_no findings_"
+        text = findings_markdown(cv)
+        findings, conclusions = text.split("## Conclusions", 1)
+        assert findings.startswith("## Findings\n")
+        assert "triage-verdict" not in findings
+        assert "`fnd:triage-verdict` → **MALICIOUS** (FLOOR, confidence 1.00)" in conclusions
+        assert all(text.count(f"`{key}`") == 1 for key in cv.finding_get_all())
+        assert "more findings" not in text
+
+    def test_empty_findings_listing_has_both_sections(self) -> None:
+        assert findings_markdown(Cyvest()) == "## Findings\n_no findings_\n\n## Conclusions\n_none recorded_"
+
+    def test_status_is_not_presented_as_agent_work(self) -> None:
+        cv = Cyvest()
+        cv.finding("unresolved", status=Status.PENDING)
+        cv.finding("established", verdict="SUSPICIOUS")
+        cv.conclusion("triage-verdict", verdict="MALICIOUS")
+        for text in (findings_markdown(cv), render_llm_summary(cv)):
+            assert "| status |" not in text
+            assert "Pending findings" not in text
+            assert "PENDING" not in text
+            assert "EVALUATED" not in text
+            assert all(text.count(f"`{key}`") == 1 for key in cv.finding_get_all())
+
+    def test_summary_keeps_conclusions_once_when_findings_are_truncated(self) -> None:
+        text = render_llm_summary(_case(), max_findings=1)
+        assert text.count("## Findings\n") == 1
+        assert text.count("## Conclusions\n") == 1
+        assert text.count("`fnd:triage-verdict`") == 1
+        assert "… 35 more findings" in text
 
     def test_observables_can_be_filtered(self) -> None:
         cv = _case()

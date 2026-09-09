@@ -17,7 +17,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
-from cyvest.enums import DecisionKind, Effect, Status, Verdict
+from cyvest.enums import DecisionKind, Status, Verdict
 from cyvest.evaluation.report import FindingResult, ObservableResult
 from cyvest.facts import Finding, Observable
 from cyvest.investigation import Investigation
@@ -25,7 +25,6 @@ from cyvest.investigation import Investigation
 if TYPE_CHECKING:
     from cyvest.cyvest import Cyvest
 
-FindingFilter = Literal["all", "evaluated", "pending", "conclusions"]
 Source = "Cyvest | Investigation"
 
 
@@ -53,21 +52,14 @@ def _truncated(lines: list[str], limit: int | None, noun: str) -> list[str]:
 def _findings(
     investigation: Investigation,
     *,
-    status: FindingFilter = "all",
+    concludes: bool | None = None,
     sort: Literal["key", "score"] = "key",
 ) -> list[tuple[str, Finding, FindingResult | None]]:
     """Findings with their result, filtered and ordered. ``score`` order is strongest first, key breaks ties."""
     report = investigation.report
     rows = []
     for key, finding in investigation.get_all_findings().items():
-        concludes = finding.effect is not Effect.ADDITIVE
-        if status == "conclusions" and not concludes:
-            continue
-        if status != "conclusions" and status != "all" and concludes:
-            continue
-        if status == "evaluated" and finding.status is not Status.EVALUATED:
-            continue
-        if status == "pending" and finding.status is not Status.PENDING:
+        if concludes is not None and finding.is_conclusion != concludes:
             continue
         rows.append((key, finding, report.finding(key)))
     if sort == "score":
@@ -199,35 +191,53 @@ def save_investigation_markdown(
 # --------------------------------------------------------------------------- the model's report
 
 
-def findings_markdown(
-    source: Cyvest | Investigation, *, status: FindingFilter = "all", limit: int | None = None
-) -> str:
+def findings_markdown(source: Cyvest | Investigation, *, limit: int | None = None) -> str:
+    """Recorded findings and conclusions in separate sections, complete unless a finding limit is given."""
+    investigation = _investigation_of(source)
+    return "\n".join(
+        [
+            "## Findings",
+            _findings_table(investigation, limit=limit),
+            "",
+            "## Conclusions",
+            _conclusions_markdown(investigation),
+        ]
+    )
+
+
+def _findings_table(investigation: Investigation, *, limit: int | None = None) -> str:
     """
     Findings for a model, strongest first:
-    `key | rule_id | verdict | score | status | #obs | occurred_at | tactic | name`.
+    `key | rule_id | verdict | score | #obs | occurred_at | tactic | name`.
 
     ``occurred_at`` and ``tactic`` are shown so the model sees what it already dated and tagged,
     and re-asserts a finding rather than adding a twin.
     """
-    investigation = _investigation_of(source)
     rows = []
-    for key, finding, result in _findings(investigation, status=status, sort="score"):
-        if status == "all" and finding.effect is not Effect.ADDITIVE:
-            continue  # conclusions have their own section; see render_llm_summary
+    for key, finding, result in _findings(investigation, concludes=False, sort="score"):
         score = _score(None if result is None else result.score)
         occurred = finding.occurred_at.strftime("%Y-%m-%dT%H:%M:%SZ") if finding.occurred_at is not None else ""
         tactic = finding.tactic.value if finding.tactic is not None else ""
         rows.append(
-            f"| `{key}` | {finding.rule_id} | {finding.verdict.value} | {score} | {finding.status.value} "
+            f"| `{key}` | {finding.rule_id} | {finding.verdict.value} | {score} "
             f"| {len(finding.observable_links)} | {occurred} | {tactic} | {finding.name or ''} |"
         )
     if not rows:
         return "_no findings_"
     header = [
-        "| key | rule_id | verdict | score | status | #obs | occurred_at | tactic | name |",
-        "|---|---|---|---|---|---|---|---|---|",
+        "| key | rule_id | verdict | score | #obs | occurred_at | tactic | name |",
+        "|---|---|---|---|---|---|---|---|",
     ]
     return "\n".join(header + _truncated(rows, limit, "findings"))
+
+
+def _conclusions_markdown(investigation: Investigation) -> str:
+    rows = [
+        f"- `{key}` → **{finding.verdict.value}** ({finding.effect.value}, confidence {finding.confidence:.2f})"
+        + (f" — {finding.name}" if finding.name else "")
+        for key, finding, _result in _findings(investigation, concludes=True)
+    ]
+    return "\n".join(rows) if rows else "_none recorded_"
 
 
 def observables_markdown(
@@ -312,7 +322,9 @@ def possible_duplicates(source: Cyvest | Investigation, *, threshold: float = 0.
     investigation = _investigation_of(source)
     store = investigation.store
     candidates: list[tuple[str, int, frozenset[str]]] = []
-    for key, finding, _result in _findings(investigation, status="evaluated"):
+    for key, finding, _result in _findings(investigation, concludes=False):
+        if finding.status is not Status.EVALUATED:
+            continue
         decision = store.decision_for(key)
         if decision is not None and decision.kind is DecisionKind.REFUTE:
             continue
@@ -384,7 +396,7 @@ def render_llm_summary(
 ) -> str:
     """
     The model's report: the whole investigation on one screen — score, conclusions, findings,
-    observables, decisions, contradictions, possible duplicates, pending work — with the keys a tool call needs.
+    observables, decisions, contradictions, possible duplicates — with the keys a tool call needs.
     Meant for a system prompt block, refreshed on every model call; no timestamp, so two identical
     states render identically.
     """
@@ -392,7 +404,7 @@ def render_llm_summary(
     report = investigation.report
     header = investigation.store.header
     findings = investigation.get_all_findings()
-    conclusions = _findings(investigation, status="conclusions")
+    conclusions = _findings(investigation, concludes=True)
     observable_count = sum(1 for key in investigation.get_all_observables() if key != investigation.root_key)
     total = report.investigation
     signal_count = len(investigation.get_all_threat_intels())
@@ -406,16 +418,9 @@ def render_llm_summary(
         f"{len(conclusions)} conclusions, {signal_count} signals, {decision_count} decisions",
         "",
         "## Conclusions",
+        _conclusions_markdown(investigation),
     ]
-    if conclusions:
-        for key, finding, _result in conclusions:
-            lines.append(
-                f"- `{key}` → **{finding.verdict.value}** ({finding.effect.value}, confidence {finding.confidence:.2f})"
-                + (f" — {finding.name}" if finding.name else "")
-            )
-    else:
-        lines.append("_none recorded_")
-    lines += ["", "## Findings", findings_markdown(investigation, limit=max_findings)]
+    lines += ["", "## Findings", _findings_table(investigation, limit=max_findings)]
     lines += [
         "",
         "## Observables",
@@ -428,14 +433,10 @@ def render_llm_summary(
     duplicates = possible_duplicates(investigation)
     if duplicates:
         lines += ["", "## Possible duplicates", *(f"- {line}" for line in duplicates)]
-    pending = [key for key, _finding, _result in _findings(investigation, status="pending")]
-    if pending:
-        lines += ["", "## Pending findings", *(f"- `{key}`" for key in pending)]
     return "\n".join(lines)
 
 
 __all__ = [
-    "FindingFilter",
     "contradictions",
     "decisions_markdown",
     "explain_text",

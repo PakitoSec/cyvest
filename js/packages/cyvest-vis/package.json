@@ -1,6 +1,6 @@
 {
   "name": "@cyvest/cyvest-vis",
-  "version": "7.2.2",
+  "version": "7.2.3",
   "description": "React components to explore a Cyvest investigation as an interactive observable graph.",
   "keywords": [
     "cybersecurity",

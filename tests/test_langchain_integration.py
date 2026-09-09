@@ -91,6 +91,10 @@ class TestState:
 
 
 class TestTools:
+    def test_findings_has_no_model_facing_arguments(self) -> None:
+        findings = next(tool for tool in build_cyvest_tools() if tool.name == "cyvest_findings")
+        assert findings.tool_call_schema.model_json_schema()["properties"] == {}
+
     def test_the_record_schema_stays_small_and_flat(self) -> None:
         (record,) = [
             tool for tool in build_cyvest_tools(CyvestDefaults(), relations=False) if tool.name == "cyvest_record"
@@ -209,7 +213,7 @@ class TestMiddleware:
     @pytest.mark.parametrize("asynchronous", [False, True])
     @pytest.mark.parametrize("parallel", [False, True])
     async def test_repeated_reads_remain_available(self, asynchronous: bool, parallel: bool) -> None:
-        calls = [_call("cyvest_findings", f"read-{index}", status="all") for index in range(5)]
+        calls = [_call("cyvest_findings", f"read-{index}") for index in range(5)]
         reads = (
             [AIMessage(content="", tool_calls=calls)]
             if parallel
@@ -219,7 +223,7 @@ class TestMiddleware:
             script=[
                 *reads,
                 AIMessage(content="", tool_calls=[_call("cyvest_record", "write", operations=RECORD)]),
-                AIMessage(content="", tool_calls=[_call("cyvest_findings", "read-updated", status="all")]),
+                AIMessage(content="", tool_calls=[_call("cyvest_findings", "read-updated")]),
                 AIMessage(content="done"),
             ],
         )
@@ -235,6 +239,10 @@ class TestMiddleware:
         assert all("cyvest_read" not in message.response_metadata for message in messages)
         assert json.loads(written.content)["ok"]
         assert updated.content != repeated[0].content
+        assert "## Findings" in updated.content and "## Conclusions" in updated.content
+        assert updated.content.count("`fnd:url-in-body`") == 1
+        assert updated.content.count("`fnd:triage-verdict`") == 1
+        assert "| status |" not in updated.content
         assert "fnd:triage-verdict" in state[INVESTIGATION_KEY]["facts"]["findings"]
 
     def test_before_agent_seeds_an_empty_investigation_once(self) -> None:

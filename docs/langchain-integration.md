@@ -60,6 +60,16 @@ CyvestMiddleware(
     A document carries no identity resolver. Pass `configure=lambda cv: cv.observable_resolver_register(...)`:
     it runs on every facade the integration rebuilds from the state, new or loaded.
 
+### Read freshness
+
+The injected report is current. A successful Cyvest read remains useful until the ledger changes;
+it does not become stale merely because the model starts another turn. Reading never changes the
+ledger, so polling `cyvest_findings(status="all")` cannot produce new evidence.
+
+This is guidance for the model, not an execution restriction. The middleware does not cache,
+reject or count repeated reads, including parallel calls. The host owns the investigation workflow
+and its overall execution budgets.
+
 ---
 
 ## The state

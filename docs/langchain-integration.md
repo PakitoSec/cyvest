@@ -63,8 +63,16 @@ CyvestMiddleware(
 ### Read freshness
 
 The injected report is current. A successful Cyvest read remains useful until the ledger changes;
-it does not become stale merely because the model starts another turn. Reading never changes the
-ledger, so polling `cyvest_findings()` cannot produce new evidence.
+it does not become stale merely because the model starts another turn. Read tools return the
+**current investigation state**: they never change the ledger or create conclusions. An empty
+result is a valid state, not a pending computation. In particular, polling `cyvest_findings()`
+cannot produce new evidence or a missing conclusion. The LangChain integration does not support
+creating conclusion findings: the agent puts its final assessment in its response, not in the ledger.
+
+The prompt and read-tool descriptions tell the model to **repeat a call with the same arguments
+only after the investigation changes**. Otherwise, reuse the previous result. A different key or
+filter is useful only for details not yet read. A successful `cyvest_record` already returns the
+updated report, so it does not need an immediate `cyvest_report` call.
 
 This is guidance for the model, not an execution restriction. The middleware does not cache,
 reject or count repeated reads, including parallel calls. The host owns the investigation workflow
@@ -110,9 +118,10 @@ middleware's: declare it with the same reducer.
 
 Use `cyvest_report` for the overview, `cyvest_findings()` when the report's findings are truncated,
 and `cyvest_explain(key)` for a specific finding or observable. The findings listing and injected
-report do not expose finding statuses or present pending findings as a task list. Conclusions are
-shown with their effect and confidence, not as a stage in a finding's lifecycle. The core finding
-status and write API are unchanged; the read tool no longer accepts a `status` argument.
+report do not expose finding statuses or present pending findings as a task list. Conclusions
+recorded outside this integration remain visible with their effect and confidence; the agent must
+not create any. The core finding status and write API are unchanged; the read tool no longer
+accepts a `status` argument.
 
 Every tool rebuilds the facade from the state, acts, and — for writes — returns a `Command` that
 carries the new document plus the tool message. A refused write returns the message only, so the
@@ -128,11 +137,15 @@ A list of flat operations, each with an `op` and the fields that op needs:
 | `threat_intel` | `observable`, `source` | `verdict`, `weight`, `confidence`, `source_class`, `taxonomies`, `external_id`, `occurred_at` |
 | `evidence` | `evidence_type`, `title`, and `content_text` or `uri` | `source`, `external_id`, `occurred_at` |
 | `finding` | `rule_id` | `name`, `comment`, `verdict`, `weight`, `confidence`, `status`, `extra_json`, `occurred_at`, `tactic` |
-| `conclusion` | `rule_id`, `verdict` | `name`, `comment`, `confidence` — no `weight`, no `occurred_at` |
 | `link_observable` | `finding`, `observable` | `basis` |
 | `link_evidence` | `finding`, `evidence` | |
 | `decision` | `target`, `kind`, `justification` | `decided_by`, `occurred_at` |
 | `relation` | `parent`, `child` | `relation_kind`, `confidence`, `comment`, `occurred_at` |
+
+`conclusion` is excluded from the tool schema. A batch containing it is rejected before any write,
+in both sync and async calls. Do not replace it with an ordinary finding that repeats the final
+assessment: explain that assessment, including any disagreement with the computed verdict, in the
+agent's response instead. The core Cyvest API still supports conclusions outside LangChain.
 
 `occurred_at` (ISO 8601 UTC) is the moment in the world — the source's timestamp, never the time
 the model wrote the operation — and lands on the fact under its family's name (`captured_at` for
@@ -154,8 +167,7 @@ to it as `"$name"`:
   {"op": "finding", "ref": "f", "rule_id": "url-in-body", "name": "URL in body", "verdict": "SUSPICIOUS"},
   {"op": "link_observable", "finding": "$f", "observable": "$url"},
   {"op": "finding", "rule_id": "link-clicked", "name": "`jdoe` opened the landing page", "verdict": "NOTABLE",
-   "tactic": "initial-access", "occurred_at": "2026-08-07T10:02:00Z"},
-  {"op": "conclusion", "rule_id": "triage-verdict", "verdict": "MALICIOUS", "comment": "corroborated"}
+     "tactic": "initial-access", "occurred_at": "2026-08-07T10:02:00Z"}
 ]}
 ```
 

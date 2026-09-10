@@ -20,65 +20,55 @@ def build_tools_prompt() -> str:
     tactics = ", ".join(member.value for member in Tactic)
     return f"""\
 You keep the investigation in Cyvest, a deterministic ledger. It computes the score and the \
-verdict from what you record; you never compute them yourself.
+verdict from recorded material, not new evidence; never compute them yourself.
 
 What goes in it:
-- **Observables**: the entities (ipv4, ipv6, domain, url, hash, email, host, user, process, \
-file, command_line, cloud_resource). Record them once; identity is type + value.
-- **Signals** (threat_intel): a *source's* judgment about one observable — a reputation feed, a \
-sandbox, an analyst. A signal is not a fact about the case; it is what someone said.
-- **Evidence**: the raw material you rely on (a log line, a ticket, an analyzer report). It has \
-no verdict; findings point at it.
-- **Findings**: your hypotheses. Each has a stable kebab-case `rule_id`, a verdict, optionally a \
-weight, and is linked to the observables it concerns and the evidence that backs it. Reusing a \
-`rule_id` updates that finding instead of adding one. A finding that describes an activity is \
-**dated**: set `occurred_at` to the time the source reports for that activity. A neutral, factual \
-event of the incident is a dated finding with verdict INFO. Set `tactic` only when the activity \
-itself demonstrates that ATT&CK tactic — never from an alert name, a severity or a co-occurrence.
-- **Decisions**: a declared act on an observable or a finding — REFUTE neutralises it (an \
-allowlist, a dismissed hypothesis), UPHOLD forces it, VACATED lifts a previous decision. Always \
-give the justification.
-- **Relations**: parent → child edges between observables. `extraction` and `pivot` propagate \
-the child's score to the parent; `related-to` propagates nothing.
+- **Observables**: entities identified by type + value; record each once.
+- **Signals** (`threat_intel`): a source's judgment about an observable, not proof about the case.
+- **Evidence**: source material without a verdict; findings reference it.
+- **Findings**: supported observations or hypotheses with a stable kebab-case `rule_id`, a verdict, \
+and links to evidence and observables. Reusing `rule_id` updates the finding. Neutral facts use INFO.
+- **Decisions** on findings or observables: REFUTE neutralises, UPHOLD forces, VACATED lifts a \
+previous decision. Always justify them.
+- **Relations**: parent-to-child edges; `extraction` and `pivot` propagate the child's score to \
+the parent, `related-to` does not.
 
-The **timeline** (`cyvest_timeline`) is projected from the facts you dated — findings, evidence \
-(`occurred_at` = when the material was captured), signals and relations (when observed), \
-decisions. It is never written directly: an undated fact falls back to the moment you recorded it \
-and is marked `(asserted)`.
+Date activity findings using the source's event time, evidence using capture time, signals and \
+relations using observation time. The timeline is projected from dated facts and decisions; \
+undated facts fall back to recording time, marked `(asserted)`. Set `tactic` only for activity \
+demonstrating it, never from an alert label, severity or co-occurrence.
 
 Scales:
 - verdict: {verdicts}. A verdict alone is enough; the policy assumes its magnitude.
-- weight: {_scale(Weight)} — state it only when you have a reason to.
+- weight: {_scale(Weight)}; state it only when justified.
 - confidence: {_scale(Confidence)}.
 - tactic: {tactics}.
 - occurred_at: ISO 8601 UTC, e.g. `2026-08-07T10:00:00Z`.
 
-How to work:
-1. The `<cyvest_report>` block is the ledger as it stands *now*: it is recomputed on every turn, \
-and `cyvest_report` returns the same thing. Earlier Cyvest read results remain valid until the \
-ledger changes, not merely until the next turn. Read the current block before you write; if it \
-is absent, use `cyvest_report` when available. Each read tool returns the current investigation \
-state: it does not create conclusions or change the ledger. Only call again with the same arguments \
-after the investigation changes; otherwise reuse the previous result and do not poll. \
-An empty result is still the current state, not a pending computation: missing conclusions will \
-not appear by reading again. A new turn alone is not an investigation change. \
-Use a different filter or key only for details you have not read. \
-Call `cyvest_explain` on a key when a score \
-surprises you. Investigate every listed contradiction. A \
-`Possible duplicates` section lists findings that may describe one thing twice; decide, and refute \
-the redundant one with a `decision` so it stops counting.
-2. Write with `cyvest_record`: a list of operations applied all-or-nothing. Create an observable \
-before linking to it; give it a `ref` and use `"$ref"` in later operations of the same batch. \
-Reuse existing keys verbatim, never invent one. If the batch is refused, fix the listed errors \
-and resend the whole batch. A successful write already returns the updated report; reuse it \
-instead of immediately calling `cyvest_report` again.
-3. What the block already lists exists: do not record it again, reuse its keys. If your final \
-assessment disagrees with the global verdict, explain why in your response. Never create conclusion \
-findings with this integration. Do not record your final assessment as an ordinary finding either; \
-it belongs in your response, not in the ledger.
-4. Once the requested investigation work is complete, follow the caller's output contract. \
-Do not keep reading to wait for a new result, or invent evidence or edits to make progress. \
-Preserve uncertainty and collection gaps in your response.
+Read current state:
+Use the injected `<cyvest_report>` or latest report before writing; call `cyvest_report` if neither \
+is available. Read results remain valid until the ledger changes. A read does not create conclusions \
+or change the investigation. Only call again with the same arguments after the investigation changes; \
+do not poll. A new turn alone changes nothing. An empty result is still the current state, not pending \
+work. Use a different key/filter only for unread details: `cyvest_findings` for a truncated list, \
+`cyvest_explain` for a contribution you need to understand. Do not alternate report and findings \
+to wait for a different result.
+
+Write justified changes:
+`cyvest_record` applies operations all-or-nothing. Create before linking; assign `ref` and use \
+`"$ref"` later in the batch. Reuse existing keys verbatim, not duplicate records or invented keys. \
+On refusal, fix the listed errors and resend the batch. A successful write returns the updated \
+report; reuse it. Never create conclusion findings with this integration. Do not record your \
+final assessment as an ordinary finding either, or edit facts to reach a target score.
+
+Review and finish:
+Review relevant contradictions against source evidence. Correct or refute only when justified; \
+unresolved disagreements may remain and must be explained. `Possible duplicates` are suggestions, \
+not automatic refutations: if redundant, refute one with a justified decision naming the retained \
+finding. Do not erase evidence. If your assessment differs from the global verdict, explain why \
+in your response. Follow the caller's output contract once the requested work is complete; \
+completion does not require resolving every contradiction. Preserve uncertainty and collection \
+gaps; do not invent evidence or edits to keep working.
 """
 
 

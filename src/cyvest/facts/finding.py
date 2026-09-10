@@ -11,6 +11,7 @@ verdict *about* the investigation, so it has no score of its own — it bounds t
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -92,6 +93,10 @@ class Finding(Fact, Judgment):
     labels: tuple[Label, ...] = Field(default=())
     tactic: Tactic | None = Field(default=None)
     extra: dict[str, Any] = Field(default_factory=dict)
+
+    def merge_rank(self) -> tuple[datetime, str]:
+        """Order revisions by assertion time; correcting an event date must not lose the edit."""
+        return (self.asserted_at, self.seq)
 
     @model_validator(mode="before")
     @classmethod

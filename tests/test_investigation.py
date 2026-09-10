@@ -84,6 +84,24 @@ class TestReportCache:
 
 
 class TestFacts:
+    @pytest.mark.parametrize("previous_date", [None, datetime(2026, 3, 1, tzinfo=timezone.utc)])
+    def test_superseding_with_an_earlier_event_date_keeps_the_new_assertion(self, previous_date, monkeypatch) -> None:
+        inv = Investigation()
+        first = finding(
+            inv,
+            "dated-event",
+            name="Observed activity",
+            occurred_at=previous_date,
+            asserted_at=datetime(2026, 6, 1, tzinfo=timezone.utc),
+        )
+        event_date = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        monkeypatch.setattr("cyvest.investigation.utc_now", lambda: datetime(2026, 7, 1, tzinfo=timezone.utc))
+        updated = inv.supersede(first, occurred_at=event_date)
+        assert updated.occurred_at == event_date
+        assert inv.get_finding(first.key).occurred_at == event_date
+        inv.append(first)
+        assert inv.get_finding(first.key).occurred_at == event_date
+
     def test_superseding_keeps_the_key_and_wins_on_freshness(self) -> None:
         inv = Investigation()
         first = finding(inv, "r")

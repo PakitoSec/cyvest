@@ -36,9 +36,8 @@ from cyvest.operations import Operation, aapply_operations, apply_operations
 from cyvest.relations import RelationPlan, apply_relation_plan, relation_context, validate_relation_plan
 
 _READ_STATE_GUIDANCE = (
-    "Read-only view of the current investigation state: this tool does not create conclusions "
-    "or modify the investigation. Only call again with the same arguments after the investigation changes; "
-    "otherwise reuse the previous result, even if empty. "
+    "Read-only view of the current investigation state. "
+    "Reuse results, including empty results, until the investigation changes. "
 )
 
 

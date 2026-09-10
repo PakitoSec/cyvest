@@ -90,6 +90,35 @@ class TestState:
 
 
 class TestTools:
+    @pytest.mark.parametrize("has_conclusion", [False, True])
+    def test_read_outputs_and_injected_reports_only_show_existing_conclusions(self, has_conclusion: bool) -> None:
+        cv = CyvestDefaults(investigation_id="read-contract").new()
+        cv.finding("observed-event", "Observed event", verdict="INFO")
+        if has_conclusion:
+            cv.conclusion("existing-assessment", verdict="MALICIOUS", comment="Imported assessment")
+        document = cv.io_to_dict()
+        model = ScriptedToolCallingModel(
+            script=[
+                AIMessage(
+                    content="", tool_calls=[_call("cyvest_findings", "findings"), _call("cyvest_report", "report")]
+                ),
+                AIMessage(content="done"),
+            ],
+            prompts=[],
+        )
+        agent = create_agent(model, middleware=[CyvestMiddleware(finalize_on_exit=False)])
+        state = agent.invoke(
+            {"messages": [{"role": "user", "content": "Read the investigation"}], INVESTIGATION_KEY: document}
+        )
+        assert state[INVESTIGATION_KEY] == document
+        for message in _tool_messages(state):
+            assert ("## Conclusions" in message.content) is has_conclusion
+            assert "Observed event" in message.content
+            assert "0 conclusions" not in message.content
+        for prompt in model.prompts:
+            system = next(message for message in prompt if message.type == "system")
+            assert ("## Conclusions" in system.text) is has_conclusion
+
     def test_findings_has_no_model_facing_arguments(self) -> None:
         findings = next(tool for tool in build_cyvest_tools() if tool.name == "cyvest_findings")
         assert findings.tool_call_schema.model_json_schema()["properties"] == {}
@@ -109,9 +138,7 @@ class TestTools:
         tool = next(tool for tool in build_cyvest_tools() if tool.name == name)
         description = tool.tool_call_schema.model_json_schema()["description"]
         assert "Read-only view of the current investigation state" in description
-        assert "does not create conclusions" in description
-        assert "Only call again with the same arguments after the investigation changes" in description
-        assert "reuse the previous result" in description
+        assert "Reuse results, including empty results, until the investigation changes" in description
 
     @pytest.mark.anyio
     @pytest.mark.parametrize("asynchronous", [False, True])
@@ -202,10 +229,8 @@ class TestTools:
         from cyvest.integrations.langchain import CYVEST_TOOLS_PROMPT
 
         assert "remain valid until the ledger changes" in CYVEST_TOOLS_PROMPT
-        assert "do not poll" in CYVEST_TOOLS_PROMPT
-        assert "does not create conclusions" in CYVEST_TOOLS_PROMPT
-        assert "Only call again with the same arguments after the investigation changes" in CYVEST_TOOLS_PROMPT
-        assert "An empty result is still the current state" in CYVEST_TOOLS_PROMPT
+        assert "Reads do not change the investigation" in CYVEST_TOOLS_PROMPT
+        assert "including empty results" in CYVEST_TOOLS_PROMPT
         assert "caller's output contract" in CYVEST_TOOLS_PROMPT
         assert "earlier turn is stale" not in CYVEST_TOOLS_PROMPT
 

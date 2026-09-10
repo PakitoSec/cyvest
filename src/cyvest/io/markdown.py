@@ -194,15 +194,10 @@ def save_investigation_markdown(
 def findings_markdown(source: Cyvest | Investigation, *, limit: int | None = None) -> str:
     """Recorded findings and conclusions in separate sections, complete unless a finding limit is given."""
     investigation = _investigation_of(source)
-    return "\n".join(
-        [
-            "## Findings",
-            _findings_table(investigation, limit=limit),
-            "",
-            "## Conclusions",
-            _conclusions_markdown(investigation),
-        ]
-    )
+    lines = ["## Findings", _findings_table(investigation, limit=limit)]
+    if _findings(investigation, concludes=True):
+        lines += ["", "## Conclusions", _conclusions_markdown(investigation)]
+    return "\n".join(lines)
 
 
 def _findings_table(investigation: Investigation, *, limit: int | None = None) -> str:
@@ -415,11 +410,11 @@ def render_llm_summary(
         f"- Score **{total.score if total.score is not None else 0.0:.2f}** → verdict **{total.verdict.value}** "
         f"(engine `{report.engine_id}`, policy `{report.policy_version}`)",
         f"- {observable_count} observables, {len(findings) - len(conclusions)} findings, "
-        f"{len(conclusions)} conclusions, {signal_count} signals, {decision_count} decisions",
-        "",
-        "## Conclusions",
-        _conclusions_markdown(investigation),
+        + (f"{len(conclusions)} conclusions, " if conclusions else "")
+        + f"{signal_count} signals, {decision_count} decisions",
     ]
+    if conclusions:
+        lines += ["", "## Conclusions", _conclusions_markdown(investigation)]
     lines += ["", "## Findings", _findings_table(investigation, limit=max_findings)]
     lines += [
         "",

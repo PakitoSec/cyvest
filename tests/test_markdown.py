@@ -58,8 +58,8 @@ class TestSummary:
         assert all(text.count(f"`{key}`") == 1 for key in cv.finding_get_all())
         assert "more findings" not in text
 
-    def test_empty_findings_listing_has_both_sections(self) -> None:
-        assert findings_markdown(Cyvest()) == "## Findings\n_no findings_\n\n## Conclusions\n_none recorded_"
+    def test_empty_findings_listing_does_not_advertise_missing_conclusions(self) -> None:
+        assert findings_markdown(Cyvest()) == "## Findings\n_no findings_"
 
     def test_status_is_not_presented_as_agent_work(self) -> None:
         cv = Cyvest()

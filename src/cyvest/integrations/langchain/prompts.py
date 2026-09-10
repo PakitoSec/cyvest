@@ -47,12 +47,9 @@ Scales:
 
 Read current state:
 Use the injected `<cyvest_report>` or latest report before writing; call `cyvest_report` if neither \
-is available. Read results remain valid until the ledger changes. A read does not create conclusions \
-or change the investigation. Only call again with the same arguments after the investigation changes; \
-do not poll. A new turn alone changes nothing. An empty result is still the current state, not pending \
-work. Use a different key/filter only for unread details: `cyvest_findings` for a truncated list, \
-`cyvest_explain` for a contribution you need to understand. Do not alternate report and findings \
-to wait for a different result.
+is available. Reads do not change the investigation; their results, including empty results, remain \
+valid until the ledger changes. Use `cyvest_findings` for a truncated list and `cyvest_explain` \
+for a contribution you need to understand.
 
 Write justified changes:
 `cyvest_record` applies operations all-or-nothing. Create before linking; assign `ref` and use \

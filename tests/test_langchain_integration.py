@@ -209,6 +209,17 @@ class TestTools:
         assert "caller's output contract" in CYVEST_TOOLS_PROMPT
         assert "earlier turn is stale" not in CYVEST_TOOLS_PROMPT
 
+    def test_prompt_allows_completion_with_unresolved_disagreements(self) -> None:
+        from cyvest.integrations.langchain import CYVEST_TOOLS_PROMPT
+
+        assert "unresolved disagreements may remain and must be explained" in CYVEST_TOOLS_PROMPT
+        assert "completion does not require resolving every contradiction" in CYVEST_TOOLS_PROMPT
+        assert "not automatic refutations" in CYVEST_TOOLS_PROMPT
+        assert "Do not erase evidence" in CYVEST_TOOLS_PROMPT
+        assert "Investigate every listed contradiction" not in CYVEST_TOOLS_PROMPT
+        assert "TriageResult" not in CYVEST_TOOLS_PROMPT
+        assert "HUMAN_REVIEW" not in CYVEST_TOOLS_PROMPT
+
     def test_prompt_and_record_description_forbid_conclusion_findings(self) -> None:
         from cyvest.integrations.langchain import CYVEST_TOOLS_PROMPT
 

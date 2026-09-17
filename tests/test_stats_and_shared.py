@@ -97,8 +97,8 @@ class TestSharedContext:
 
         # Reconciled facts are shared, so both findings read the same observable.
         snapshot = context.snapshot()
-        assert snapshot.get_global_score() == 6.0
-        assert snapshot.get_global_verdict() is Verdict.MALICIOUS
+        assert snapshot.get_global_score() == 3.0
+        assert snapshot.get_global_verdict() is Verdict.SUSPICIOUS
 
     def test_reconciling_twice_is_harmless(self) -> None:
         context = SharedInvestigationContext()

@@ -13,8 +13,12 @@ Nothing is cached in the facts, so re-running with another engine or another pol
 one-liner:
 
 ```python
-cv.reevaluate(engine="basic-v1", policy=my_policy)
+cv.reevaluate(engine="cyvest:unique-origins", policy=my_policy)
 ```
+
+Since **7.3.0**, new investigations use **`cyvest:unique-origins`** (`basic-v2`): local scores still propagate, but a
+retained fact contributes only once to the investigation total. Archived investigations keep
+their recorded engine; `cyvest:sum-findings` (`basic-v1`) remains available for historical replay.
 
 ---
 
@@ -100,7 +104,7 @@ and the default then applies — or you attenuate elsewhere.
 An observable is worth the strongest thing said about it, or propagated to it:
 
 ```
-score(observable, scope) = combine(own signals, children's contributions)
+score(observable) = combine(own signals, children's contributions)
 ```
 
 `combine` follows `policy.aggregation`:
@@ -199,13 +203,130 @@ applies, so pinning cannot launder a `REFUTE`.
 Basis is deliberately **per link**, not a flag on the finding: one finding may mix bases, and may
 even link the same observable twice with two different ones.
 
-!!! note "Merging accumulates, and that is deliberate"
-    Two investigations flagging the same URL give two findings, both reading the merged
-    observable, so the total is the sum of both. v7.0 briefly damped this with a `FRAGMENT` basis
-    that showed a finding only its own worker's facts. It was dropped before release: it damped a
-    *merged* total but never a *local* one, so the same two rules scored differently depending on
-    whether enrichment ran in its own worker. A finding that must hold its value now says so, by
-    pinning.
+!!! note "Merging shares facts, not scoring credit"
+   Two findings reading the same merged observable still show the same local score. In
+   `basic-v2`, their shared winning origin is credited once globally, whether enrichment ran
+   in one worker or several. Pinning selects evidence; it does not create a new origin.
+   `basic-v1` retains the historical sum of both findings.
+
+## The investigation total: retained origins
+
+A local score answers **how concerning this observable or finding is**. The investigation
+total answers **what the retained evidence contributes**, without multiplying one fact by the
+number of findings that reuse it. A score of `0.5` is a magnitude, not a calibrated 50% probability.
+
+```python
+from cyvest import Cyvest
+
+cv = Cyvest(investigation_id="shared-domain")
+domain = cv.observable(cv.OBS.DOMAIN, "example.com").with_ti("feed", weight=0.5)
+for index in range(10):
+   url = cv.observable(cv.OBS.URL, f"https://example.com/{index}")
+   cv.observable_add_relation(url, domain, cv.REL.EXTRACTION)
+   cv.finding(f"url-{index}").link_observable(url)
+
+assert cv.get_global_score() == 0.5
+assert all(result.score == 0.5 for result in cv.get_report().findings.values())
+```
+
+The ten URL findings keep their `0.5` score. Their common domain signal contributes **`0.5`
+once**, not `5.0`. Two distinct retained signals worth `0.5` contribute `1.0`, even if they
+come from the same vendor.
+
+An origin is a **fact key**: the selected signal, a finding's own selected assertion, or a
+decision that actually changes a score. Relations carry origins; they do not manufacture new
+ones. Neither equal numbers nor shared vendor names establish identity. An explicit
+`external_id` creates a distinct fact. The engine does not infer statistical independence or
+correlation between different fact keys.
+
+### Selection and accounting
+
+1. Keep the existing local `MAX`. A finding asserting `0.2` but inheriting `0.5` selects only
+  the inherited derivation. Suppressed evidence is not added back at the global level.
+2. For equal `MAX` candidates, choose one derivation deterministically using origin keys and
+  paths, not worker or insertion order. At the finding boundary, a linked derivation takes
+  precedence over an equally weighted own assertion. Ties do not union independent origins.
+3. Apply relation confidence and attenuation along each selected path. If the same origin
+  arrives as `0.5` and `0.25`, keep `0.5`. For protective scores `-0.5` and `-0.25`, keep `-0.5`:
+  repeated protective evidence must not artificially lower the total either. The strongest
+  absolute magnitude wins; equal opposing magnitudes under custom signed attenuation choose
+  the numeric maximum.
+4. Round each retained origin to `policy.output_precision`, sum the unique credits, then apply
+  the existing conclusion floors and ceilings. A dismissed or unevaluated finding contributes
+  no origins. A valid finding that reuses an origin stays `counted`; confidence averaging is
+  unchanged.
+
+Only origins selected by a counted finding enter the total. If a URL has its own winning
+signal of `0.7` and another finding still selects the domain's `0.5`, the total is `1.2`. If
+every finding selects stronger evidence instead, the suppressed domain signal is not resurrected.
+
+`SUM` remains **local**: strongest own signal plus children. Its derivation can carry multiple
+origins, which are still deduplicated globally, including shared descendants reached through
+several paths. Even one `SUM` finding can therefore have a local score larger than its unique
+global credit. Changing to `MAX` globally would instead discard distinct evidence and is not
+what this engine does.
+
+### Explaining the difference
+
+`FindingResult.score` is a local assessment, not necessarily an additive term of the global
+total. `report.investigation.contributions` lists retained origins and excluded reuses, with
+the originating `source_key`, effective value and finding/path details. `retained=False` means
+the displayed candidate was not added; do not sum excluded candidates. The ledger keeps
+representative paths within each local `SUM` derivation, not an enumeration of every graph path.
+
+```python
+for contribution in cv.explain(cv.get_report().investigation.key):
+   print(contribution.source_key, contribution.value, contribution.retained, contribution.detail)
+```
+
+Rich and Markdown summaries label local scores explicitly. The global explanation can also
+be requested with `cyvest explain case.json INVESTIGATION_ID`.
+
+### Credit on each finding
+
+Every finding result now exposes two fields computed by the engine, without any calculation
+in the display layer:
+
+- **`contribution_score`** is the signed amount attributed to this finding in the global total.
+  It includes the applied delta for a conclusion. Excluded findings receive `0.0`.
+- **`contribution_status`** explains how that amount was obtained:
+
+| State | Meaning |
+|---|---|
+| `credited` | Its numeric origins were retained; positive and negative terms can cancel to zero. |
+| `shared` | Its numeric origins were already credited, so this finding adds nothing. |
+| `partial` | Some numeric origins were retained and others deduplicated, including shared paths within `SUM`. |
+| `excluded` | The finding does not participate: dismissed, pending or not applicable. |
+| `neutral` | No numeric effect at the report's precision, or a conclusion whose bound was already reached. |
+
+Both fields are optional. `null` or an absent field means the engine or older report did not
+supply attribution, **not** zero credit. Render an unknown value as a dash rather than guessing
+from `score` or `counted`. A numeric zero alone cannot distinguish cancellation, sharing and
+neutrality.
+
+For the shared-domain example, a summary reads:
+
+| Finding | Local score | Contribution | Credit state |
+|---|---:|---:|---|
+| URL 0 | 0.50 | +0.50 | credited |
+| URL 1 | 0.50 | +0.00 | shared |
+| URL 2 | 0.50 | +0.00 | shared |
+
+The credited representative is chosen deterministically. Adding another finding can reassign
+that credit without changing the underlying risk. `counted` continues to describe participation,
+not ownership of a unique contribution. These fields do not change local scores, verdicts or
+confidence averaging. Readers use the supplied fields directly; they must not parse global
+contribution labels or `detail` strings to reconstruct them.
+
+```python
+for finding in cv.get_report().findings.values():
+    print(finding.key, finding.score, finding.contribution_score, finding.contribution_status)
+```
+
+The investigation schema is **7.3.0** for this addition; older investigation documents remain
+readable. The external-signal schema is unchanged. Python and the JavaScript SDK expose the same
+nullable fields. Rich, Markdown exports and agent-facing finding tables show the credit alongside
+the local score; shared and excluded credit is visually attenuated without hiding the verdict.
 
 ---
 
@@ -343,9 +464,11 @@ from cyvest.evaluation.report import CONCLUSION_BOUND_LABELS
 [c for c in cv.get_report().investigation.contributions if c.label.startswith(CONCLUSION_BOUND_LABELS)]
 ```
 
-This is deliberate. Were the lift stored on the finding, adding an unrelated finding elsewhere
-would rewrite a conclusion nobody touched — noise in every diff and every timeline — and a tag
-holding the conclusion would inherit a score that depends on findings outside it.
+The applied delta is also available as the conclusion result's `contribution_score`, with
+`contribution_status="credited"` when it moves the total and `"neutral"` otherwise. This is
+global attribution, not the conclusion's local `score`, which remains `None`. Adding unrelated
+evidence can change that credit without rewriting the asserted verdict or making a tag inherit
+a context-dependent local score.
 
 Two more consequences worth knowing:
 
@@ -428,13 +551,29 @@ carried score.
 
 ## Engines
 
-`basic-v1` implements everything above and reproduces v6's arithmetic. The engine that produced a
-report is recorded in it, and comparing reports from two engines is refused by default: their
-scores are not on the same scale.
+Built-in engines expose descriptive aliases with the common `cyvest:` prefix:
+
+| Public name | Recorded engine ID | Global calculation |
+|---|---|---|
+| `cyvest:unique-origins` (default since 7.3.0) | `basic-v2` | Counts each retained origin once. |
+| `cyvest:sum-findings` | `basic-v1` | Sums additive finding scores, preserving v6's arithmetic. |
+
+Use them with `Cyvest(engine="cyvest:unique-origins")`, `cv.reevaluate(engine=...)` or the CLI's
+`--engine` option. `Cyvest.ENGINES()` and `cyvest engines` list both IDs and aliases.
+The existing names `basic-v1`, `basic-v2` and `basic` remain accepted; `basic` resolves to `basic-v2`.
+Custom engines can register their own names and aliases; `engine` remains an open string.
+
+Only the resolved, versioned ID is recorded in the investigation and its report, never the alias.
+Loading an old document or migrating a
+v6 document retains `basic-v1`; upgrading the library does not silently change its numbers.
+To adopt the new accounting on existing facts, explicitly call
+`cv.reevaluate(engine="cyvest:unique-origins")`. Comparing or merging different engines remains refused
+unless the caller explicitly requests the existing mismatch handling.
 
 ```bash
 cyvest engines
-cyvest show case.json --engine basic-v1
+cyvest show case.json --engine cyvest:unique-origins
+cyvest show case.json --engine cyvest:sum-findings
 ```
 
 The report a document carries is for consumers that have no engine — the JavaScript SDK, chiefly.

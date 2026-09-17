@@ -13,7 +13,7 @@ from collections.abc import Callable, Sequence
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
-from rich.console import Console, Group
+from rich.console import Console, ConsoleOptions, Group, RenderResult
 from rich.padding import Padding
 from rich.panel import Panel
 from rich.table import Table
@@ -29,7 +29,7 @@ else:
 
 from cyvest.enums import DecisionKind, Effect, Salience, Verdict
 from cyvest.evaluation.projection import verdict_from_score
-from cyvest.evaluation.report import CONCLUSION_BOUND_LABELS, Contribution, Report
+from cyvest.evaluation.report import CONCLUSION_BOUND_LABELS, Contribution, FindingResult, Report
 from cyvest.evaluation.timeline import TimeBasis
 from cyvest.facts.decision import decision_label
 from cyvest.stats import InvestigationStats
@@ -89,6 +89,19 @@ def _applied_bound(report: Report, finding_key: str) -> float:
     return 0.0
 
 
+def _contribution_text(result: FindingResult) -> Text:
+    if result.contribution_score is None or result.contribution_status is None:
+        return Text("—", style="dim")
+    status = result.contribution_status
+    if status in ("shared", "excluded", "neutral"):
+        return Text(f"{result.contribution_score:+.2f} {status}", style="dim")
+    text = Text(
+        f"{result.contribution_score:+.2f}", style=VERDICT_STYLES[verdict_from_score(result.contribution_score)]
+    )
+    text.append(f" {status}", style="yellow" if status == "partial" else "green")
+    return text
+
+
 def _age(moment: datetime) -> str:
     """Display-only: how long ago something was decided. Never touches a score."""
     months = (datetime.now(timezone.utc) - moment).days // 30
@@ -113,6 +126,30 @@ def _decision_badges(investigation: Investigation, key: str) -> Text:
     badge.append(f" {decision.source.name} · {_age(when)}", style="dim")
     badge.append(f" \u201c{decision.justification}\u201d", style="dim italic")
     return badge
+
+
+class _SummaryTable(Table):
+    def __rich_console__(self, console: Console, options: ConsoleOptions) -> RenderResult:
+        if options.max_width >= 72:
+            yield from super().__rich_console__(console, options)
+            return
+        compact = Table(title=self.title, caption=self.caption, expand=True, show_header=False)
+        compact.add_column(overflow="fold")
+        for index, cells in enumerate(zip(*(column.cells for column in self.columns), strict=True)):
+            name, *values = cells
+            details = Text()
+            for column, value in zip(self.columns[1:], values, strict=True):
+                if not value:
+                    continue
+                if details:
+                    details.append("\n")
+                details.append(f"{column.header}: ", style="dim")
+                if isinstance(value, Text):
+                    details.append_text(value)
+                else:
+                    details.append(str(value))
+            compact.add_row(Group(name, details) if details else name, end_section=self.rows[index].end_section)
+        yield from compact.__rich_console__(console, options)
 
 
 def build_summary(
@@ -144,12 +181,15 @@ def build_summary(
     # The engine id always travels with the score: comparing scores across engines is meaningless.
     title.append(f"   [{report.engine_id} · {report.policy_version}]", style="dim")
 
-    table = Table(title="Investigation Report", expand=True, show_lines=False)
+    table = _SummaryTable(title="Investigation Report", expand=True, show_lines=False)
     table.add_column("Name", overflow="fold", ratio=1)
     # Sized to their content: `SUSPICIOUS` truncated to `SUSPIC…` is the one thing a verdict
     # column must never do.
-    table.add_column("Score", justify="right", no_wrap=True, min_width=7)
+    table.add_column(
+        "Local score" if report.engine_id == "basic-v2" else "Score", justify="right", no_wrap=True, min_width=7
+    )
     table.add_column("Verdict", no_wrap=True, min_width=10)
+    table.add_column("Contribution", justify="right", overflow="fold")
 
     displayed, counted = _add_findings(table, investigation, report, show_rule_ids=show_rule_ids)
     _add_tags(table, investigation)
@@ -161,12 +201,15 @@ def build_summary(
     table.add_section()
     table.add_row(
         Text("GLOBAL SCORE", style="bold"),
-        _score_text(report.investigation.score, bold=True),
+        "",
         verdict_text(report.investigation.verdict),
+        _score_text(report.investigation.score, bold=True),
     )
 
     caption = f"Total findings: {displayed}"
     caption += f" | Counted: {counted} | Confidence: {report.investigation.confidence:.2f}"
+    if report.engine_id == "basic-v2":
+        caption += "\nFinding scores are local assessments; the global score counts shared origins once."
     table.caption = caption
 
     parts = [Panel(title, border_style=VERDICT_STYLES.get(report.investigation.verdict, "white")), table]
@@ -236,7 +279,9 @@ def _add_findings(
             result = report.finding(key)
             label = Text(name)
             label.append_text(_finding_notes(investigation, report, key))
-            table.add_row(_row(label), _score_text(result.score), verdict_text(result.verdict))
+            table.add_row(
+                _row(label), _score_text(result.score), verdict_text(result.verdict), _contribution_text(result)
+            )
     return displayed, counted
 
 
@@ -387,6 +432,7 @@ def build_explanation(investigation: Investigation, key: str) -> Table:
     """Show what moved the needle — including the terms that were overridden."""
     table = Table(title=f"Explanation · {key}", expand=True, title_justify="left")
     table.add_column("Contribution")
+    table.add_column("Source", overflow="fold")
     table.add_column("Value", justify="right")
     table.add_column("Retained")
     table.add_column("Detail", overflow="fold")
@@ -395,6 +441,7 @@ def build_explanation(investigation: Investigation, key: str) -> Table:
     for contribution in contributions:
         table.add_row(
             contribution.label,
+            Text(contribution.source_key),
             f"{contribution.value:.2f}",
             Text("yes", style="green") if contribution.retained else Text("no", style="dim"),
             contribution.detail,

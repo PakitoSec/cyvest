@@ -180,6 +180,8 @@ class Investigation:
         observable = self.report.observable(key)
         if observable is not None:
             return observable.contributions
+        if key == self.report.investigation.key:
+            return self.report.investigation.contributions
         raise KeyError(key)
 
     def timeline(

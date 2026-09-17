@@ -6,7 +6,17 @@ from datetime import datetime, timezone
 
 import pytest
 
-from cyvest.enums import DecisionKind, Effect, LinkBasis, RelationKind, SourceClass, Status, Verdict, Weight
+from cyvest.enums import (
+    Aggregation,
+    DecisionKind,
+    Effect,
+    LinkBasis,
+    RelationKind,
+    SourceClass,
+    Status,
+    Verdict,
+    Weight,
+)
 from cyvest.evaluation import evaluate
 from cyvest.evaluation.combine import NEG_INF
 from cyvest.evaluation.projection import score_floor_for, verdict_from_score
@@ -30,6 +40,498 @@ def add_url(store: FactStore, fragment_id: str) -> Observable:
     observable = Observable(type="url", value=URL, source=source(), fragment_id=fragment_id)
     store.append(observable)
     return observable
+
+
+class TestProvenanceDedup:
+    @staticmethod
+    def domain_case(count: int = 3, weight: float = 0.5, verdict: Verdict = Verdict.NOTABLE):
+        store = make_store()
+        domain = Observable(type="host", subtype="fqdn", value="example.com", source=source(), fragment_id="f1")
+        store.append(domain)
+        signal = ThreatIntel(
+            subject_key=domain.key, verdict=verdict, weight=weight, source=source("feed"), fragment_id="f1"
+        )
+        store.append(signal)
+        urls = []
+        findings = []
+        for index in range(count):
+            url = Observable(type="url", value=f"https://example.com/{index}", source=source(), fragment_id="f1")
+            store.append(url)
+            store.append(
+                Relation(
+                    source_key=url.key,
+                    target_key=domain.key,
+                    kind=RelationKind.EXTRACTION,
+                    source=source(),
+                    fragment_id="f1",
+                )
+            )
+            finding = Finding(
+                rule_id=f"url-{index}",
+                source=source(),
+                fragment_id="f1",
+                observable_links=[ObservableLink(observable_key=url.key)],
+            )
+            store.append(finding)
+            urls.append(url)
+            findings.append(finding)
+        return store, domain, signal, urls, findings
+
+    @pytest.mark.parametrize("count", [1, 3, 10, 100])
+    @pytest.mark.parametrize("engine", ["basic", "basic-v1"])
+    def test_provenance_shared_domain_counts_once(self, count: int, engine: str) -> None:
+        store, _, _, urls, findings = self.domain_case(count)
+
+        report = evaluate(store, engine=engine)
+
+        assert all(report.observable(url.key).score == 0.5 for url in urls)
+        assert all(report.finding(finding.key).score == 0.5 for finding in findings)
+        assert report.investigation.score == (count * 0.5 if engine == "basic-v1" else 0.5)
+
+    def test_provenance_default_and_explanation(self) -> None:
+        store, _, signal, _, findings = self.domain_case()
+        report = evaluate(store)
+
+        assert report.engine_id == "basic-v2"
+        assert report.investigation.score == 0.5
+        terms = report.investigation.contributions
+        assert [term.source_key for term in terms] == [signal.key] * 3
+        assert [term.retained for term in terms] == [True, False, False]
+        assert sum(term.value for term in terms if term.retained) == report.investigation.score
+        assert all(any(finding.key in term.detail for term in terms) for finding in findings)
+        assert all(report.finding(finding.key).counted for finding in findings)
+        results = [report.finding(finding.key) for finding in findings]
+        assert [result.contribution_score for result in results] == [0.5, 0.0, 0.0]
+        assert [result.contribution_status for result in results] == ["credited", "shared", "shared"]
+
+    @pytest.mark.parametrize("weight", [0.2, 0.5, 0.7])
+    def test_provenance_own_claim_obeys_max(self, weight: float) -> None:
+        store, _, _, urls, _ = self.domain_case()
+        finding = Finding(
+            rule_id="independent",
+            verdict=Verdict.NOTABLE,
+            weight=weight,
+            source=source(),
+            fragment_id="f1",
+            observable_links=[ObservableLink(observable_key=urls[0].key)],
+        )
+        store.append(finding)
+
+        report = evaluate(store)
+
+        assert report.finding(finding.key).score == max(0.5, weight)
+        assert report.investigation.score == (1.2 if weight > 0.5 else 0.5)
+
+    @pytest.mark.parametrize("verdict, amount", [(Verdict.NOTABLE, 0.7), (Verdict.SAFE, -0.7)])
+    def test_contribution_partially_shared_finding(self, verdict: Verdict, amount: float) -> None:
+        store, _, _, urls, findings = self.domain_case(2)
+        store.append(
+            ThreatIntel(subject_key=urls[1].key, verdict=verdict, weight=0.7, source=source(), fragment_id="f1")
+        )
+        report = evaluate(store, policy=Policy(aggregation=Aggregation.SUM))
+        partial = report.finding(findings[1].key)
+        assert partial.contribution_score == amount
+        assert partial.contribution_status == "partial"
+        assert sum(result.contribution_score for result in report.findings.values()) == pytest.approx(
+            report.investigation.score
+        )
+
+    def test_contribution_cancelling_origins_are_not_neutral(self) -> None:
+        store, _, _, urls, findings = self.domain_case(1)
+        store.append(
+            ThreatIntel(subject_key=urls[0].key, verdict=Verdict.SAFE, weight=0.5, source=source(), fragment_id="f1")
+        )
+        result = evaluate(store, policy=Policy(aggregation=Aggregation.SUM)).finding(findings[0].key)
+        assert result.score == result.contribution_score == 0.0
+        assert result.contribution_status == "credited"
+
+    @pytest.mark.parametrize("attenuation, expected", [(0.0, "credited"), (0.002, "credited"), (0.5, "partial")])
+    def test_contribution_ignores_shared_origins_with_no_numeric_effect(
+        self, attenuation: float, expected: str
+    ) -> None:
+        store, _, _, urls, _ = self.domain_case(2)
+        hub = Observable(type="url", value="https://hub.example/", source=source(), fragment_id="f1")
+        parent = Observable(type="url", value="https://parent.example/", source=source(), fragment_id="f1")
+        store.extend([hub, parent])
+        for url in urls:
+            store.append(
+                Relation(
+                    source_key=hub.key,
+                    target_key=url.key,
+                    kind=RelationKind.EXTRACTION,
+                    source=source(),
+                    fragment_id="f1",
+                )
+            )
+        store.append(
+            Relation(
+                source_key=parent.key, target_key=hub.key, kind=RelationKind.PIVOT, source=source(), fragment_id="f1"
+            )
+        )
+        store.append(
+            ThreatIntel(subject_key=parent.key, verdict=Verdict.NOTABLE, weight=0.7, source=source(), fragment_id="f1")
+        )
+        store.append(
+            Finding(
+                rule_id="parent",
+                source=source(),
+                fragment_id="f1",
+                observable_links=[ObservableLink(observable_key=parent.key)],
+            )
+        )
+        policy = Policy(
+            aggregation=Aggregation.SUM, attenuation={RelationKind.EXTRACTION: 1.0, RelationKind.PIVOT: attenuation}
+        )
+        result = evaluate(store, policy=policy).finding("fnd:parent")
+        assert result.contribution_score == 0.7
+        assert result.contribution_status == expected
+
+    @pytest.mark.parametrize("engine", ["basic-v1", "basic-v2"])
+    def test_contribution_excluded_neutral_and_conclusion_deltas(self, engine: str) -> None:
+        store = make_store()
+        for finding in (
+            Finding(rule_id="neutral", source=source(), fragment_id="f1"),
+            Finding(rule_id="pending", status=Status.PENDING, source=source(), fragment_id="f1"),
+            Finding(rule_id="dismissed", verdict=Verdict.MALICIOUS, source=source(), fragment_id="f1"),
+            Finding(rule_id="floor", effect=Effect.FLOOR, verdict=Verdict.MALICIOUS, source=source(), fragment_id="f1"),
+            Finding(
+                rule_id="redundant", effect=Effect.FLOOR, verdict=Verdict.MALICIOUS, source=source(), fragment_id="f1"
+            ),
+            Finding(rule_id="ceiling", effect=Effect.CEILING, verdict=Verdict.INFO, source=source(), fragment_id="f1"),
+        ):
+            store.append(finding)
+        store.append(
+            Decision(
+                target_key="fnd:dismissed",
+                kind=DecisionKind.REFUTE,
+                justification="dismissed",
+                source=source(),
+                fragment_id="f1",
+            )
+        )
+        report = evaluate(store, engine=engine)
+        expected = {
+            "neutral": (0.0, "neutral"),
+            "pending": (0.0, "excluded"),
+            "dismissed": (0.0, "excluded"),
+            "floor": (5.0, "credited"),
+            "redundant": (0.0, "neutral"),
+            "ceiling": (-5.0, "credited"),
+        }
+        for rule_id, credit in expected.items():
+            result = report.finding(f"fnd:{rule_id}")
+            assert (result.contribution_score, result.contribution_status) == credit
+        assert (
+            sum(result.contribution_score for result in report.findings.values()) == report.investigation.score == 0.0
+        )
+
+    def test_contribution_missing_legacy_attribution_is_unknown(self) -> None:
+        from cyvest.evaluation.report import FindingResult
+
+        result = FindingResult(key="fnd:legacy", score=0.5)
+        assert result.contribution_score is None
+        assert result.contribution_status is None
+
+    def test_provenance_distinct_signals_from_same_vendor_still_add(self) -> None:
+        store, _, _, urls, _ = self.domain_case()
+        local = ThreatIntel(
+            subject_key=urls[0].key,
+            verdict=Verdict.NOTABLE,
+            weight=0.7,
+            source=source("feed"),
+            fragment_id="f1",
+        )
+        store.append(local)
+
+        assert evaluate(store).investigation.score == 1.2
+
+    def test_provenance_equal_values_on_distinct_subjects_still_add(self) -> None:
+        store, _, _, _, _ = self.domain_case()
+        domain = Observable(type="host", subtype="fqdn", value="other.example", source=source(), fragment_id="f1")
+        store.append(domain)
+        store.append(
+            ThreatIntel(
+                subject_key=domain.key,
+                verdict=Verdict.NOTABLE,
+                weight=0.5,
+                source=source("feed"),
+                fragment_id="f1",
+            )
+        )
+        store.append(
+            Finding(
+                rule_id="other",
+                source=source(),
+                fragment_id="f1",
+                observable_links=[ObservableLink(observable_key=domain.key)],
+            )
+        )
+        assert evaluate(store).investigation.score == 1.0
+
+    @pytest.mark.parametrize("verdict, expected", [(Verdict.NOTABLE, 0.5), (Verdict.SAFE, -0.5)])
+    def test_provenance_attenuation_keeps_strongest_magnitude(self, verdict: Verdict, expected: float) -> None:
+        store, domain, _, _, _ = self.domain_case(verdict=verdict)
+        parent = Observable(type="url", value="https://another.example/", source=source(), fragment_id="f1")
+        store.append(parent)
+        store.append(
+            Relation(
+                source_key=parent.key,
+                target_key=domain.key,
+                kind=RelationKind.PIVOT,
+                confidence=0.5,
+                source=source(),
+                fragment_id="f1",
+            )
+        )
+        store.append(
+            Finding(
+                rule_id="attenuated",
+                source=source(),
+                fragment_id="f1",
+                observable_links=[ObservableLink(observable_key=parent.key)],
+            )
+        )
+
+        report = evaluate(store)
+
+        assert report.observable(parent.key).score == expected / 2
+        assert report.investigation.score == expected
+
+    @pytest.mark.parametrize(
+        "kind, expected",
+        [
+            (DecisionKind.UPHOLD, 9.0),
+            (DecisionKind.REFUTE, -1.0),
+            (DecisionKind.VACATED, 0.5),
+        ],
+    )
+    def test_provenance_shared_observable_decision(self, kind: DecisionKind, expected: float) -> None:
+        store, domain, signal, _, _ = self.domain_case()
+        decision = Decision(
+            target_key=domain.key, kind=kind, justification="reviewed", source=source(), fragment_id="f1"
+        )
+        store.append(decision)
+        report = evaluate(store)
+
+        assert report.investigation.score == expected
+        assert {term.source_key for term in report.investigation.contributions} == {
+            signal.key if kind is DecisionKind.VACATED else decision.key
+        }
+
+    @pytest.mark.parametrize(
+        "kind, expected",
+        [
+            (DecisionKind.UPHOLD, 9.5),
+            (DecisionKind.REFUTE, 0.5),
+            (DecisionKind.VACATED, 0.5),
+        ],
+    )
+    def test_provenance_finding_decision(self, kind: DecisionKind, expected: float) -> None:
+        store, _, _, _, findings = self.domain_case()
+        store.append(
+            Decision(target_key=findings[0].key, kind=kind, justification="reviewed", source=source(), fragment_id="f1")
+        )
+        report = evaluate(store)
+        assert report.investigation.score == expected
+        assert report.finding(findings[0].key).counted is (kind is not DecisionKind.REFUTE)
+
+    def test_provenance_unchanged_decision_does_not_replace_signal(self) -> None:
+        store, domain, signal, _, _ = self.domain_case(weight=10.0)
+        store.append(
+            Decision(
+                target_key=domain.key,
+                kind=DecisionKind.UPHOLD,
+                justification="reviewed",
+                source=source(),
+                fragment_id="f1",
+            )
+        )
+        report = evaluate(store)
+        assert report.investigation.score == 10.0
+        assert {term.source_key for term in report.investigation.contributions} == {signal.key}
+
+    def test_provenance_pinned_and_observable_links_share_origin(self) -> None:
+        store, domain, signal, _, _ = self.domain_case()
+        store.append(
+            Finding(
+                rule_id="pinned",
+                source=source(),
+                fragment_id="f1",
+                observable_links=[
+                    ObservableLink(
+                        observable_key=domain.key,
+                        basis=LinkBasis.SIGNALS,
+                        signal_keys=(signal.key,),
+                    )
+                ],
+            )
+        )
+        assert evaluate(store).investigation.score == 0.5
+
+    @pytest.mark.parametrize("aggregation", [Aggregation.MAX, Aggregation.SUM])
+    def test_provenance_diamond_keeps_local_formula(self, aggregation: Aggregation) -> None:
+        store, _, _, urls, _ = self.domain_case()
+        hub = Observable(type="url", value="https://hub.example/", source=source(), fragment_id="f1")
+        store.append(hub)
+        for url in urls:
+            store.append(
+                Relation(
+                    source_key=hub.key,
+                    target_key=url.key,
+                    kind=RelationKind.EXTRACTION,
+                    source=source(),
+                    fragment_id="f1",
+                )
+            )
+        store.append(
+            Finding(
+                rule_id="hub",
+                source=source(),
+                fragment_id="f1",
+                observable_links=[ObservableLink(observable_key=hub.key)],
+            )
+        )
+        report = evaluate(store, policy=Policy(aggregation=aggregation))
+
+        assert report.findings["fnd:hub"].score == (1.5 if aggregation is Aggregation.SUM else 0.5)
+        assert report.investigation.score == 0.5
+
+    @pytest.mark.parametrize("weight, expected", [(0.004, 0.0), (0.005, 0.01), (2.995, 3.0), (4.995, 5.0)])
+    def test_provenance_rounds_after_reduction(self, weight: float, expected: float) -> None:
+        store, _, _, _, _ = self.domain_case(weight=weight)
+        report = evaluate(store)
+        assert report.investigation.score == expected
+        assert report.investigation.verdict is verdict_from_score(expected)
+
+    def test_provenance_order_and_fragment_invariance(self) -> None:
+        store, _, _, _, _ = self.domain_case()
+        reversed_store = FactStore(store.header)
+        for fact in reversed(list(store.all_facts())):
+            reversed_store.append(fact)
+        assert evaluate(store).investigation == evaluate(reversed_store).investigation
+
+        left, _, _ = TestMergeScenario._fragment("i1", "feed-a", 0.5, "rule-a")
+        right, _, _ = TestMergeScenario._fragment("i2", "feed-b", 0.5, "rule-b")
+        first = evaluate(left.union(right))
+        second = evaluate(right.union(left))
+        assert first.investigation.score == second.investigation.score == 0.5
+        assert first.investigation.contributions == second.investigation.contributions
+
+    def test_provenance_conclusions_apply_after_dedup(self) -> None:
+        store, _, _, _, _ = self.domain_case(10)
+        store.append(
+            Finding(
+                rule_id="floor",
+                verdict=Verdict.SUSPICIOUS,
+                effect=Effect.FLOOR,
+                source=source(),
+                fragment_id="f1",
+            )
+        )
+        assert evaluate(store).investigation.score == 3.0
+        store.append(
+            Finding(
+                rule_id="ceiling",
+                verdict=Verdict.NOTABLE,
+                effect=Effect.CEILING,
+                source=source(),
+                fragment_id="f1",
+            )
+        )
+        assert evaluate(store).investigation.score == 2.99
+
+    def test_provenance_external_ids_and_pins_keep_distinct_facts(self) -> None:
+        store, domain, _, _, _ = self.domain_case()
+        second = ThreatIntel(
+            subject_key=domain.key,
+            verdict=Verdict.NOTABLE,
+            weight=0.5,
+            source=source("feed"),
+            fragment_id="f1",
+            external_id="second-observation",
+        )
+        store.append(second)
+        store.append(
+            Finding(
+                rule_id="second",
+                source=source(),
+                fragment_id="f1",
+                observable_links=[
+                    ObservableLink(
+                        observable_key=domain.key,
+                        basis=LinkBasis.SIGNALS,
+                        signal_keys=(second.key,),
+                    )
+                ],
+            )
+        )
+        assert evaluate(store).investigation.score == 1.0
+
+    def test_provenance_suppressed_domain_is_not_resurrected(self) -> None:
+        store, _, signal, urls, _ = self.domain_case()
+        for url in urls:
+            store.append(
+                ThreatIntel(
+                    subject_key=url.key, verdict=Verdict.NOTABLE, weight=0.7, source=source("feed"), fragment_id="f1"
+                )
+            )
+        report = evaluate(store)
+        assert report.investigation.score == 2.1
+        assert all(term.source_key != signal.key for term in report.investigation.contributions)
+
+    def test_provenance_one_finding_with_many_links(self) -> None:
+        store, _, _, urls, _ = self.domain_case()
+        single = FactStore(store.header)
+        single.extend(fact for fact in store.all_facts() if not isinstance(fact, Finding))
+        single.append(
+            Finding(
+                rule_id="all-urls",
+                source=source(),
+                fragment_id="f1",
+                observable_links=[ObservableLink(observable_key=url.key) for url in urls],
+            )
+        )
+        report = evaluate(single)
+        assert report.investigation.score == 0.5
+        assert len(report.investigation.contributions) == 1
+
+    def test_provenance_sum_keeps_distinct_origins_but_deduplicates_shared_domain(self) -> None:
+        store, _, _, urls, _ = self.domain_case()
+        store.append(
+            ThreatIntel(subject_key=urls[0].key, verdict=Verdict.NOTABLE, weight=0.7, source=source(), fragment_id="f1")
+        )
+        report = evaluate(store, policy=Policy(aggregation=Aggregation.SUM))
+        assert report.observable(urls[0].key).score == 1.2
+        assert report.investigation.score == 1.2
+
+    def test_provenance_signed_sum_routes_can_be_reversed(self) -> None:
+        store, domain, _, _, _ = self.domain_case(count=0)
+        hub = Observable(type="url", value="https://hub.example", source=source(), fragment_id="f1")
+        parent = Observable(type="url", value="https://parent.example", source=source(), fragment_id="f1")
+        store.extend([hub, parent])
+        for kind in (RelationKind.EXTRACTION, RelationKind.PIVOT):
+            store.append(
+                Relation(source_key=hub.key, target_key=domain.key, kind=kind, source=source(), fragment_id="f1")
+            )
+        store.append(
+            Relation(
+                source_key=parent.key, target_key=hub.key, kind=RelationKind.PIVOT, source=source(), fragment_id="f1"
+            )
+        )
+        store.append(
+            Finding(
+                rule_id="parent",
+                source=source(),
+                fragment_id="f1",
+                observable_links=[ObservableLink(observable_key=parent.key)],
+            )
+        )
+        policy = Policy(
+            aggregation=Aggregation.SUM, attenuation={RelationKind.EXTRACTION: 1.0, RelationKind.PIVOT: -1.0}
+        )
+        report = evaluate(store, policy=policy)
+        assert report.observable(parent.key).score == 0.0
+        assert report.investigation.score == 0.5
 
 
 class TestMergeScenario:
@@ -68,7 +570,7 @@ class TestMergeScenario:
         i1, url_key, f1 = self._fragment("i1", "proofpoint", 2.0, "url_in_body")
         i2, _, f2 = self._fragment("i2", "virustotal", 3.0, "url_reputation")
 
-        report = evaluate(i1.union(i2))
+        report = evaluate(i1.union(i2), engine="basic-v1")
 
         assert report.finding(f1).score == 3.0
         assert report.finding(f2).score == 3.0
@@ -816,7 +1318,7 @@ class TestConclusions:
             assert result.verdict is Verdict.MALICIOUS
 
     def test_an_unrelated_finding_does_not_move_the_conclusion_result(self) -> None:
-        """Guards the diff: adding a finding must not rewrite a conclusion nobody touched."""
+        """The local conclusion is unchanged; only its global credit depends on other findings."""
         alone = make_store()
         conclusion = self._conclusion(alone, verdict=Verdict.MALICIOUS)
 
@@ -824,7 +1326,12 @@ class TestConclusions:
         self._additive(crowded, 3.2)
         self._conclusion(crowded, verdict=Verdict.MALICIOUS)
 
-        assert evaluate(alone).finding(conclusion.key) == evaluate(crowded).finding(conclusion.key)
+        first = evaluate(alone).finding(conclusion.key)
+        second = evaluate(crowded).finding(conclusion.key)
+        attribution = {"contribution_score", "contribution_status"}
+        assert first.model_dump(exclude=attribution) == second.model_dump(exclude=attribution)
+        assert first.contribution_score == 5.0
+        assert second.contribution_score == 1.8
 
     def test_conclusions_never_compound(self) -> None:
         """Two analysers agreeing must not double the score, or plugging in a third would inflate."""

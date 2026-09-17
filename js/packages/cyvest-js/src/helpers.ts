@@ -15,7 +15,7 @@ import addFormats from "ajv-formats";
 import schema from "../../../../schema/cyvest.schema.json" with { type: "json" };
 import type { Investigation } from "./types";
 
-export const SCHEMA_VERSION = "7.1.0";
+export const SCHEMA_VERSION = "7.3.0";
 
 const SEMVER = /^\d+\.\d+\.\d+$/;
 

@@ -40,7 +40,23 @@ class TestRoundTrip:
     def test_the_report_is_always_present(self) -> None:
         document = investigation_to_dict(build_case()._investigation)
         assert "report" in document
-        assert document["report"]["engine_id"] == "basic-v1"
+        assert document["report"]["engine_id"] == document["header"]["engine_id"] == document["engine_id"] == "basic-v2"
+
+    @pytest.mark.parametrize("engine, expected", [("basic-v1", 12.0), ("basic-v2", 6.0)])
+    def test_shared_origin_round_trip_preserves_engine(self, engine: str, expected: float) -> None:
+        original = build_case()
+        url = original.observable(original.OBS.URL, "hxxp://bad.example/x")
+        original.finding("same_signal_again").link_observable(url)
+        original.reevaluate(engine=engine)
+        document = investigation_to_dict(original._investigation)
+
+        reloaded = load_investigation_dict(json.loads(json.dumps(document)))
+
+        assert reloaded.report.engine_id == engine
+        assert reloaded.get_global_score() == expected
+        assert investigation_to_dict(reloaded) == document
+        reloaded.reevaluate(engine="basic-v2")
+        assert reloaded.get_global_score() == 6.0
 
     def test_facts_stay_maps_keyed_by_their_semantic_key(self) -> None:
         """7.2 will add ``facts.history``; turning these maps into lists would break every document."""
@@ -84,7 +100,7 @@ class TestUpwardCompatibility:
 
     def test_a_newer_document_is_refused(self) -> None:
         document = investigation_to_dict(build_case()._investigation)
-        document["schema_version"] = "7.2.0"
+        document["schema_version"] = "7.4.0"
         with pytest.raises(ValueError, match="upgrade cyvest"):
             load_investigation_dict(document, migrate=True)
 

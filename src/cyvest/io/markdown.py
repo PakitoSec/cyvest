@@ -36,6 +36,12 @@ def _score(value: float | None) -> str:
     return "—" if value is None else f"{value:.2f}"
 
 
+def _credit(result: FindingResult | None) -> str:
+    if result is None or result.contribution_score is None:
+        return "—"
+    return f"{result.contribution_score:+.2f}"
+
+
 def _type_name(observable: Observable) -> str:
     return str(getattr(observable.obs_type, "value", observable.obs_type))
 
@@ -132,15 +138,31 @@ def generate_markdown_report(
             )
         lines.append("")
 
-    lines += ["## Findings", "", "| Rule | Score | Verdict | Status |", "|---|---|---|---|"]
+    score_label = "Local score" if report.engine_id == "basic-v2" else "Score"
+    lines += [
+        "## Findings",
+        "",
+        f"| Rule | {score_label} | Verdict | Status | Contribution | Credit state |",
+        "|---|---|---|---|---|---|",
+    ]
     for _key, finding, result in _findings(investigation):
         if result is None:
             continue
         lines.append(
             f"| {finding.name or finding.rule_id} | {_score(result.score)} | {result.verdict.value} "
-            f"| {result.status.value} |"
+            f"| {result.status.value} | {_credit(result)} | {result.contribution_status or '—'} |"
         )
     lines.append("")
+
+    if report.engine_id == "basic-v2":
+        lines += [
+            "Finding scores are local assessments; the global score counts shared origins once.",
+            "",
+            "## Global contributions",
+            "",
+            explain_text(investigation, report.investigation.key),
+            "",
+        ]
 
     if include_observables:
         lines += ["## Observables", "", "| Type | Value | Score | Verdict |", "|---|---|---|---|"]
@@ -203,7 +225,7 @@ def findings_markdown(source: Cyvest | Investigation, *, limit: int | None = Non
 def _findings_table(investigation: Investigation, *, limit: int | None = None) -> str:
     """
     Findings for a model, strongest first:
-    `key | rule_id | verdict | score | #obs | occurred_at | tactic | name`.
+    `key | rule_id | verdict | score | contribution | credit state | #obs | occurred_at | tactic | name`.
 
     ``occurred_at`` and ``tactic`` are shown so the model sees what it already dated and tagged,
     and re-asserts a finding rather than adding a twin.
@@ -215,13 +237,16 @@ def _findings_table(investigation: Investigation, *, limit: int | None = None) -
         tactic = finding.tactic.value if finding.tactic is not None else ""
         rows.append(
             f"| `{key}` | {finding.rule_id} | {finding.verdict.value} | {score} "
+            f"| {_credit(result)} | {(result.contribution_status if result else None) or '—'} "
             f"| {len(finding.observable_links)} | {occurred} | {tactic} | {finding.name or ''} |"
         )
     if not rows:
         return "_no findings_"
+    score_label = "local score" if investigation.report.engine_id == "basic-v2" else "score"
     header = [
-        "| key | rule_id | verdict | score | #obs | occurred_at | tactic | name |",
-        "|---|---|---|---|---|---|---|---|",
+        f"| key | rule_id | verdict | {score_label} | contribution | credit state "
+        "| #obs | occurred_at | tactic | name |",
+        "|---|---|---|---|---|---|---|---|---|---|",
     ]
     return "\n".join(header + _truncated(rows, limit, "findings"))
 
@@ -229,8 +254,9 @@ def _findings_table(investigation: Investigation, *, limit: int | None = None) -
 def _conclusions_markdown(investigation: Investigation) -> str:
     rows = [
         f"- `{key}` → **{finding.verdict.value}** ({finding.effect.value}, confidence {finding.confidence:.2f})"
+        + f" · contribution {_credit(result)} ({(result.contribution_status if result else None) or '—'})"
         + (f" — {finding.name}" if finding.name else "")
-        for key, finding, _result in _findings(investigation, concludes=True)
+        for key, finding, result in _findings(investigation, concludes=True)
     ]
     return "\n".join(rows) if rows else "_none recorded_"
 
@@ -346,11 +372,13 @@ def possible_duplicates(source: Cyvest | Investigation, *, threshold: float = 0.
 
 
 def explain_text(source: Cyvest | Investigation, key: str) -> str:
-    """The contributions behind a finding or an observable, one per line. Unknown key raises."""
+    """The contributions behind an investigation, finding or observable. Unknown key raises."""
     investigation = _investigation_of(source)
     contributions = investigation.explain(key)
     report = investigation.report
     result = report.finding(key) or report.observable(key)
+    if key == report.investigation.key:
+        result = report.investigation
     lines = [f"`{key}`: {result.verdict.value} {_score(result.score)}" if result else f"`{key}`"]
     if not contributions:
         lines.append("- no contribution")
@@ -413,6 +441,8 @@ def render_llm_summary(
         + (f"{len(conclusions)} conclusions, " if conclusions else "")
         + f"{signal_count} signals, {decision_count} decisions",
     ]
+    if report.engine_id == "basic-v2":
+        lines.append("- Finding scores are local assessments; the global score counts shared origins once.")
     if conclusions:
         lines += ["", "## Conclusions", _conclusions_markdown(investigation)]
     lines += ["", "## Findings", _findings_table(investigation, limit=max_findings)]

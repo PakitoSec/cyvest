@@ -20,7 +20,7 @@ class Policy(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     version: str = Field(default="default-v1")
-    engine_id: str = Field(default="basic-v1")
+    engine_id: str = Field(default="basic-v2")
     aggregation: Aggregation = Field(default=Aggregation.MAX)
 
     # The magnitude assumed when a fact states a verdict but no weight. A verdict does not

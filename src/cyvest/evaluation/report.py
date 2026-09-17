@@ -14,11 +14,13 @@ posterior-based engine has no native magnitude, and ``confidence`` is informatio
 from __future__ import annotations
 
 import math
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from cyvest.enums import Effect, Status, Verdict
+
+ContributionStatus = Literal["credited", "shared", "partial", "excluded", "neutral"]
 
 
 def round_half_up(value: float, precision: int) -> float:
@@ -72,17 +74,31 @@ class FindingResult(_ResultBase):
     Three combinations of ``(counted, score)`` are meaningful, and a consumer must not conflate
     the last two:
 
-    - ``(True, float)`` — an additive finding, a term of the total;
+    - ``(True, float)`` — an additive finding with a local score;
     - ``(False, None)`` — dismissed or not evaluated: visible, but out of the evaluation;
     - ``(True, None)`` — a conclusion (``effect`` is ``FLOOR`` or ``CEILING``): it takes part, but
       it has no magnitude of its own. Its effect is a bound on the investigation total, reported
       as a contribution of :class:`InvestigationResult`.
+
+        ``basic-v1`` sums local finding scores; ``basic-v2`` counts their retained fact origins
+        once across the investigation.
     """
 
     status: Status = Field(default=Status.EVALUATED)
     effect: Effect = Field(default=Effect.ADDITIVE)
     own_term_suppressed: bool = Field(default=False)
     counted: bool = Field(default=True)
+    contribution_score: float | None = Field(
+        default=None,
+        description="Signed credit allocated to this finding in the investigation total, including conclusion deltas. "
+        "None means the producing engine or older report did not supply attribution.",
+    )
+    contribution_status: ContributionStatus | None = Field(
+        default=None,
+        description="credited: retained numeric origins (possibly cancelling to zero); shared: all numeric origins "
+        "already credited; partial: some retained and some shared; excluded: not counted; neutral: no numeric effect. "
+        "None means attribution is unavailable.",
+    )
 
 
 #: Label prefixes of the investigation-level contribution a conclusion produces. Published so a
@@ -115,6 +131,7 @@ class Report(BaseModel):
 __all__ = [
     "CONCLUSION_BOUND_LABELS",
     "Contribution",
+    "ContributionStatus",
     "FindingResult",
     "InvestigationResult",
     "ObservableResult",

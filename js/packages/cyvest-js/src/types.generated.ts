@@ -152,6 +152,14 @@ export type Score = number | null;
 export type Contributions = Contribution[];
 export type Score1 = number | null;
 export type Contributions1 = Contribution[];
+/**
+ * Signed credit allocated to this finding in the investigation total, including conclusion deltas. None means the producing engine or older report did not supply attribution.
+ */
+export type ContributionScore = number | null;
+/**
+ * credited: retained numeric origins (possibly cancelling to zero); shared: all numeric origins already credited; partial: some retained and some shared; excluded: not counted; neutral: no numeric effect. None means attribution is unavailable.
+ */
+export type ContributionStatus = ("credited" | "shared" | "partial" | "excluded" | "neutral") | null;
 export type Score2 = number | null;
 export type Contributions2 = Contribution[];
 
@@ -494,11 +502,14 @@ export interface Findings1 {
  * Three combinations of ``(counted, score)`` are meaningful, and a consumer must not conflate
  * the last two:
  *
- * - ``(True, float)`` — an additive finding, a term of the total;
+ * - ``(True, float)`` — an additive finding with a local score;
  * - ``(False, None)`` — dismissed or not evaluated: visible, but out of the evaluation;
  * - ``(True, None)`` — a conclusion (``effect`` is ``FLOOR`` or ``CEILING``): it takes part, but
  *   it has no magnitude of its own. Its effect is a bound on the investigation total, reported
  *   as a contribution of :class:`InvestigationResult`.
+ *
+ *     ``basic-v1`` sums local finding scores; ``basic-v2`` counts their retained fact origins
+ *     once across the investigation.
  */
 export interface FindingResult {
   key: string;
@@ -512,6 +523,8 @@ export interface FindingResult {
   effect?: Effect;
   own_term_suppressed?: boolean;
   counted?: boolean;
+  contribution_score?: ContributionScore;
+  contribution_status?: ContributionStatus;
   [k: string]: unknown;
 }
 export interface Raw1 {

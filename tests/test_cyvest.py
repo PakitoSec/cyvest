@@ -337,7 +337,45 @@ class TestMerge:
 
 class TestEngines:
     def test_the_registry_is_exposed_and_resolves_aliases(self) -> None:
-        assert Cyvest.ENGINES()["basic"] == "basic-v1"
+        assert Cyvest.ENGINES()["basic"] == "basic-v2"
+        assert Cyvest.ENGINES()["cyvest:sum-findings"] == "basic-v1"
+        assert Cyvest.ENGINES()["cyvest:unique-origins"] == "basic-v2"
 
-    def test_the_report_records_the_resolved_engine_id(self) -> None:
-        assert Cyvest(engine="basic").get_report().engine_id == "basic-v1"
+    @pytest.mark.parametrize(
+        "engine, engine_id, score",
+        [
+            (None, "basic-v2", 0.5),
+            ("basic", "basic-v2", 0.5),
+            ("basic-v1", "basic-v1", 1.0),
+            ("basic-v2", "basic-v2", 0.5),
+            ("cyvest:sum-findings", "basic-v1", 1.0),
+            ("cyvest:unique-origins", "basic-v2", 0.5),
+        ],
+    )
+    def test_the_report_records_the_resolved_engine_id(self, engine: str | None, engine_id: str, score: float) -> None:
+        cv = Cyvest(engine=engine)
+        domain = cv.observable(cv.OBS.DOMAIN, "example.com")
+        cv.observable_add_threat_intel(domain, "feed", verdict=Verdict.NOTABLE, weight=0.5)
+        cv.finding("first").link_observable(domain)
+        cv.finding("second").link_observable(domain)
+
+        assert cv.get_report().engine_id == engine_id
+        assert cv.get_global_score() == score
+        document = cv.io_to_dict()
+        assert document["engine_id"] == engine_id
+        assert document["header"]["engine_id"] == engine_id
+        assert document["report"]["engine_id"] == engine_id
+        loaded = Cyvest.io_load_dict(document)
+        assert loaded.get_report().engine_id == engine_id
+        assert loaded.get_global_score() == score
+
+    def test_reevaluation_accepts_prefixed_aliases(self) -> None:
+        cv = build_email_case()
+        cv.finding("second").link_observable(cv.observable_get(cv.OBS.URL, "hxxp://bad.example/x"))
+
+        assert cv.reevaluate(engine="cyvest:sum-findings").engine_id == "basic-v1"
+        assert cv.get_global_score() == 12.0
+        assert cv.io_to_dict()["engine_id"] == "basic-v1"
+        assert cv.reevaluate(engine="cyvest:unique-origins").engine_id == "basic-v2"
+        assert cv.get_global_score() == 6.0
+        assert cv.io_to_dict()["engine_id"] == "basic-v2"

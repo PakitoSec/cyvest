@@ -184,7 +184,7 @@ class TestTaxonomyBoundaries:
         assert loaded.report == cv.get_report()
         assert document == original
         migrated = migrate_to_current(document)
-        assert migrated["schema_version"] == "7.1.0"
+        assert migrated["schema_version"] == "7.3.0"
         assert migrated["facts"]["signals"][signal.key]["taxonomies"] == [expected[0].model_dump(mode="json")]
         assert migrate_to_current(migrated) == migrated
         draft = Cyvest.io_load_signal(

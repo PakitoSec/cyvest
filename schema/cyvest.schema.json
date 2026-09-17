@@ -452,7 +452,7 @@
       "type": "object"
     },
     "FindingResult": {
-      "description": "A finding's verdict.\n\n``own_term_suppressed`` flags that the rule's own claim was overridden by a stronger link —\na contradiction worth surfacing rather than silently dropping.\n\nThree combinations of ``(counted, score)`` are meaningful, and a consumer must not conflate\nthe last two:\n\n- ``(True, float)`` — an additive finding, a term of the total;\n- ``(False, None)`` — dismissed or not evaluated: visible, but out of the evaluation;\n- ``(True, None)`` — a conclusion (``effect`` is ``FLOOR`` or ``CEILING``): it takes part, but\n  it has no magnitude of its own. Its effect is a bound on the investigation total, reported\n  as a contribution of :class:`InvestigationResult`.",
+      "description": "A finding's verdict.\n\n``own_term_suppressed`` flags that the rule's own claim was overridden by a stronger link —\na contradiction worth surfacing rather than silently dropping.\n\nThree combinations of ``(counted, score)`` are meaningful, and a consumer must not conflate\nthe last two:\n\n- ``(True, float)`` — an additive finding with a local score;\n- ``(False, None)`` — dismissed or not evaluated: visible, but out of the evaluation;\n- ``(True, None)`` — a conclusion (``effect`` is ``FLOOR`` or ``CEILING``): it takes part, but\n  it has no magnitude of its own. Its effect is a bound on the investigation total, reported\n  as a contribution of :class:`InvestigationResult`.\n\n    ``basic-v1`` sums local finding scores; ``basic-v2`` counts their retained fact origins\n    once across the investigation.",
       "properties": {
         "key": {
           "title": "Key",
@@ -514,6 +514,39 @@
           "default": true,
           "title": "Counted",
           "type": "boolean"
+        },
+        "contribution_score": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Signed credit allocated to this finding in the investigation total, including conclusion deltas. None means the producing engine or older report did not supply attribution.",
+          "title": "Contribution Score"
+        },
+        "contribution_status": {
+          "anyOf": [
+            {
+              "enum": [
+                "credited",
+                "shared",
+                "partial",
+                "excluded",
+                "neutral"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "credited: retained numeric origins (possibly cancelling to zero); shared: all numeric origins already credited; partial: some retained and some shared; excluded: not counted; neutral: no numeric effect. None means attribution is unavailable.",
+          "title": "Contribution Status"
         }
       },
       "required": [
@@ -1431,7 +1464,7 @@
   "description": "A complete serialized investigation.",
   "properties": {
     "schema_version": {
-      "default": "7.1.0",
+      "default": "7.3.0",
       "pattern": "^7\\.\\d+\\.\\d+$",
       "title": "Schema Version",
       "type": "string"

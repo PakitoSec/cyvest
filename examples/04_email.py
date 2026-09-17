@@ -562,9 +562,9 @@ def main(workers, stats, output):
     if c is not None:
         logger.info(c.comment)
 
-    # 35.1 with --workers 1: the aggregated task then sees every other fragment already
+    # 30.1 with --workers 1: the aggregated task then sees every other fragment already
     # reconciled. Run it in parallel and its own weight legitimately varies.
-    logger.info("Investigation complete - displaying summary - score should be 35.1")
+    logger.info("Investigation complete - displaying summary")
 
     cy.display_summary(show_observables=True)
     if stats:

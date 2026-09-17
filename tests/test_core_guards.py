@@ -89,7 +89,7 @@ class TestInvestigationSpec:
         assert isinstance(context.spec, InvestigationSpec)
         with context.task(fragment_id="w") as worker:
             assert worker.root().key == context.snapshot().root().key
-            assert worker._investigation.store.header.engine_id == "basic-v1"
+            assert worker._investigation.store.header.engine_id == "basic-v2"
 
 
 class TestHelpers:

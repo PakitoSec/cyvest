@@ -71,6 +71,38 @@ class TestEnumRendering:
 class TestSummaryLayout:
     """One table read top to bottom, grouped by verdict, ending on the global score."""
 
+    def test_shared_origins_have_local_scores_and_a_global_explanation(self) -> None:
+        cv = Cyvest(investigation_id="shared-score")
+        domain = cv.observable(cv.OBS.DOMAIN, "example.com").with_ti("feed", weight=0.5)
+        for index in range(3):
+            cv.finding(f"rule-{index}").link_observable(domain)
+
+        output = render(build_summary(cv._investigation, show_graph=False))
+        detail = render(build_explanation(cv._investigation, "shared-score"))
+
+        assert cv.get_global_score() == 0.5
+        assert "Local score" in output
+        assert "Contribution" in output
+        assert "+0.50 credited" in output
+        assert "+0.00 shared" in output
+        assert styles_of(build_summary(cv._investigation, show_graph=False), "+0.00 shared") == {"dim"}
+        assert "the global score counts shared origins once" in output
+        assert "shared origin" in detail and "already credited" in detail
+        assert next(iter(cv._investigation.store.signals)) in detail
+
+    @pytest.mark.parametrize("width", [40, 50, 80])
+    def test_contribution_remains_readable_in_a_narrow_console(self, width: int) -> None:
+        cv = Cyvest(investigation_id="narrow")
+        domain = cv.observable(cv.OBS.DOMAIN, "example.com").with_ti("feed", weight=0.5)
+        cv.finding("first-url").link_observable(domain)
+        cv.finding("second-url").link_observable(domain)
+        output = io.StringIO()
+        console = Console(file=output, width=width, no_color=True)
+        console.print(build_summary(cv._investigation, show_graph=False))
+        text = output.getvalue()
+        for label in ("first-url", "second-url", "Contribution", "credited", "shared", "NOTABLE", "GLOBAL SCORE"):
+            assert label in text
+
     def test_sections_appear_in_reading_order(self) -> None:
         cv = case()
         cv.finding("url_analysis").tagged(cv.tag("body", "Body"))

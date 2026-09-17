@@ -193,13 +193,22 @@ JSON payload and fails on their side rather than the consumer's.
 from cyvest import DEFAULT_POLICY, Cyvest
 
 policy = DEFAULT_POLICY.model_copy(update={"uphold_floor": 7.0, "version": "strict-v1"})
-cv = Cyvest(policy=policy, engine="basic-v1")
+cv = Cyvest(policy=policy, engine="cyvest:unique-origins")
 
 cv.reevaluate(policy=policy)                     # replay the same facts differently
 Cyvest.ENGINES()                                 # registered engines and their aliases
 ```
 
 The report is always re-derived from the facts, never read from the document.
+
+Since **7.3.0**, `cyvest:unique-origins` (`basic-v2`) is the default: URL and finding scores still inherit domain risk,
+but the same retained signal counts only once in the investigation total. Ten URL findings
+sharing one domain signal of `0.5` therefore contribute `0.5`, not `5.0`. Distinct retained
+origins remain additive. `cyvest:sum-findings` (`basic-v1`) retains the historical sum of finding scores; use
+`cv.reevaluate(engine="cyvest:unique-origins")` to explicitly adopt the new calculation on an existing case.
+The `cyvest:` aliases name the built-in engines; documents still record the versioned IDs.
+The names `basic-v1`, `basic-v2` and `basic` remain accepted (`basic` resolves to `basic-v2`).
+See [Scoring Model](docs/scoring-model.md#the-investigation-total-retained-origins).
 
 ## Timeline and statistics
 
@@ -329,7 +338,7 @@ cyvest schema --which signal -o ./schema/cyvest.signal.schema.json
 # Evaluation
 cyvest engines
 cyvest policy show investigation.json
-cyvest show investigation.json --engine basic-v1
+cyvest show investigation.json --engine cyvest:sum-findings
 
 # Extraction
 echo "IP: 192[.]168[.]1[.]1, URL: hxxps://evil[.]com" | cyvest extract

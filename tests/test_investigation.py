@@ -304,7 +304,7 @@ class TestMerge:
         assert left.report.finding(f1.key).score == 3.0
         assert left.report.finding(f2.key).score == 3.0
         assert left.report.observable(target.key).score == 3.0
-        assert left.get_global_score() == 6.0
+        assert left.get_global_score() == 3.0
 
     def test_a_pinned_finding_survives_the_merge_unchanged(self) -> None:
         left = Investigation(investigation_id="i1")

@@ -1,8 +1,8 @@
 """
 Engine registry.
 
-Ids are versioned and frozen for life; aliases are not. You *write* the alias (``"basic"``) and
-the store records the *resolved* id (``"basic-v1"``) — the mechanics of a Docker tag. An old
+Ids are versioned and frozen for life; aliases are not. You *write* the alias
+(``"cyvest:unique-origins"``) and the store records the *resolved* id (``"basic-v2"``). An old
 investigation therefore replays exactly even after a newer stable engine ships, while new
 investigations follow the current stable.
 """

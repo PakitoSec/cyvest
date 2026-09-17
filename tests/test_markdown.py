@@ -14,6 +14,7 @@ from cyvest.io.markdown import (
     contradictions,
     explain_text,
     findings_markdown,
+    generate_markdown_report,
     observables_markdown,
     possible_duplicates,
     timeline_markdown,
@@ -39,6 +40,23 @@ def _case() -> Cyvest:
 
 
 class TestSummary:
+    def test_local_and_global_scores_are_distinguished(self) -> None:
+        cv = Cyvest(investigation_id="shared-score")
+        domain = cv.observable(cv.OBS.DOMAIN, "example.com").with_ti("feed", weight=0.5)
+        for index in range(3):
+            cv.finding(f"rule-{index}").link_observable(domain)
+
+        for text in (generate_markdown_report(cv), render_llm_summary(cv)):
+            assert "0.50" in text
+            assert "local assessments" in text
+            assert "the global score counts shared origins once" in text
+            assert "| +0.50 | credited |" in text
+            assert "| +0.00 | shared |" in text
+        explanation = explain_text(cv, "shared-score")
+        assert "NOTABLE 0.50" in explanation
+        assert "shared origin" in explanation and "not retained" in explanation
+        assert explanation in generate_markdown_report(cv)
+
     def test_sections_and_truncation(self) -> None:
         text = render_llm_summary(_case(), max_findings=10, max_observables=5)
         assert text.startswith("# Investigation `det`")

@@ -134,8 +134,8 @@ class TestInvestigationLaw:
             a.merge_investigation(b)
         report = a.merge_investigation(b, on_engine_mismatch="reevaluate")
         assert report.changed
-        assert a.get_report().engine_id == "basic-v1"
-        assert a.io_to_dict()["engine_id"] == "basic-v1"
+        assert a.get_report().engine_id == "basic-v2"
+        assert a.io_to_dict()["engine_id"] == "basic-v2"
 
     def test_two_roots_do_not_merge(self) -> None:
         with pytest.raises(RootMismatchError):

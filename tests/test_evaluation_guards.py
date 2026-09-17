@@ -157,17 +157,27 @@ class TestDeterminism:
 
 
 class TestEngineRegistry:
-    def test_alias_resolves_to_the_versioned_id(self) -> None:
-        assert resolve_engine_alias("basic") == "basic-v1"
-        assert "basic" in available_aliases()
+    @pytest.mark.parametrize(
+        "alias, engine_id",
+        [("basic", "basic-v2"), ("cyvest:sum-findings", "basic-v1"), ("cyvest:unique-origins", "basic-v2")],
+    )
+    def test_alias_resolves_to_the_versioned_id(self, alias: str, engine_id: str) -> None:
+        assert resolve_engine_alias(alias) == engine_id
+        assert available_aliases()[alias] == engine_id
+        assert get_engine(alias) is get_engine(engine_id)
 
-    def test_a_versioned_id_resolves_to_itself(self) -> None:
-        assert resolve_engine_alias("basic-v1") == "basic-v1"
+    @pytest.mark.parametrize("engine_id", ["basic-v1", "basic-v2"])
+    def test_a_versioned_id_resolves_to_itself(self, engine_id: str) -> None:
+        assert resolve_engine_alias(engine_id) == engine_id
 
-    def test_the_report_records_the_resolved_id_never_the_alias(self) -> None:
+    @pytest.mark.parametrize(
+        "alias, engine_id",
+        [("basic", "basic-v2"), ("cyvest:sum-findings", "basic-v1"), ("cyvest:unique-origins", "basic-v2")],
+    )
+    def test_the_report_records_the_resolved_id_never_the_alias(self, alias: str, engine_id: str) -> None:
         target = store()
         observable(target, "hxxp://a")
-        assert evaluate(target, engine="basic").engine_id == "basic-v1"
+        assert evaluate(target, engine=alias).engine_id == engine_id
 
     def test_unknown_engine_fails_explicitly(self) -> None:
         with pytest.raises(KeyError, match="Unknown scoring engine"):

@@ -56,7 +56,7 @@ describe("parsing and the version contract", () => {
   });
 
   it("refuses a newer document instead of ignoring unknown fields", () => {
-    expect(() => assertReadableVersion("7.2.0")).toThrow(/upgrade/);
+    expect(() => assertReadableVersion("7.4.0")).toThrow(/upgrade/);
   });
 
   it("refuses an older document and points at the migration", () => {
@@ -73,7 +73,7 @@ describe("parsing and the version contract", () => {
   // consumer actually calls.
   it("applies the version contract through parseCyvest, not just in isolation", () => {
     const document = raw();
-    document.schema_version = "7.2.0";
+    document.schema_version = "7.4.0";
     expect(() => parseCyvest(document)).toThrow(/newer than this SDK/);
   });
 
@@ -81,6 +81,38 @@ describe("parsing and the version contract", () => {
     const document = raw();
     document.schema_version = "6.0.0";
     expect(() => parseCyvest(document)).toThrow(/migrate/);
+  });
+
+  it.each(["credited", "shared", "partial", "excluded", "neutral"])(
+    "reads finding attribution (%s) without recomputing the total",
+    (state) => {
+      const document = raw();
+      document.schema_version = "7.3.0";
+      const key = Object.keys(document.report.findings)[0];
+      document.report.findings[key].contribution_score = 0;
+      document.report.findings[key].contribution_status = state;
+      document.report.investigation.score = 0.5;
+      const parsed = parseCyvest(document);
+      expect(parsed.report.findings[key].contribution_score).toBe(0);
+      expect(parsed.report.findings[key].contribution_status).toBe(state);
+      expect(getGlobalScore(parsed)).toBe(0.5);
+      expect(parsed.report).toEqual(document.report);
+    },
+  );
+
+  it("does not invent credit for a legacy finding without attribution", () => {
+    const parsed = parseCyvest(raw());
+    const result = Object.values(parsed.report.findings)[0];
+    expect(result.contribution_score).toBeUndefined();
+    expect(result.contribution_status).toBeUndefined();
+  });
+
+  it("rejects an unknown contribution state", () => {
+    const document = raw();
+    document.schema_version = "7.3.0";
+    const key = Object.keys(document.report.findings)[0];
+    document.report.findings[key].contribution_status = "not-a-state";
+    expect(() => parseCyvest(document)).toThrow(/Invalid Cyvest payload/);
   });
 
   it("treats a document with no schema_version as pre-v7", () => {

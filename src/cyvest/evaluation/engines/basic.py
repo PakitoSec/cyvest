@@ -1,5 +1,5 @@
 """
-``basic-v1`` — the reference engine, and the only one shipped in v7.
+``basic-v1`` — the historical reference engine.
 
 Additive, readable by any analyst, and **iso-v6 with default parameters**: migrated documents
 reproduce their v6 numbers exactly. The v7 break is structural (model, API, schema), not numeric.
@@ -23,6 +23,7 @@ from cyvest.evaluation.report import (
 )
 from cyvest.facts.decision import Decision
 from cyvest.facts.finding import Finding, ObservableLink
+from cyvest.facts.relation import Relation
 from cyvest.facts.signal import ObservableSignal
 from cyvest.facts.store import FactStore
 from cyvest.policy import Policy
@@ -142,12 +143,12 @@ class _Evaluation:
 
     def _compute_observable(self, observable_key: str) -> float:
         contributions: list[Contribution] = []
-        signal_scores: list[float] = []
-        child_scores: list[float] = []
+        signal_scores: list[tuple[str, float]] = []
+        child_scores: list[tuple[Relation, float]] = []
 
         for signal in self.store.signals_for(observable_key):
             value = self._signal_score(signal)
-            signal_scores.append(value)
+            signal_scores.append((signal.key, value))
             contributions.append(
                 Contribution(
                     source_key=signal.key,
@@ -165,7 +166,7 @@ class _Evaluation:
             attenuation = self.policy.attenuation.get(relation.kind, 1.0)
             child = self.observable_score(relation.target_key)
             value = child * relation.confidence * attenuation
-            child_scores.append(value)
+            child_scores.append((relation, value))
             contributions.append(
                 Contribution(
                     source_key=relation.key,
@@ -174,7 +175,7 @@ class _Evaluation:
                 )
             )
 
-        score = combine(signal_scores, child_scores, self.policy.aggregation)
+        score = self._combine_observable(observable_key, signal_scores, child_scores)
         score, contributions, suppressed = self._apply_decision(
             self.store.decision_for(observable_key), score, contributions
         )
@@ -188,6 +189,14 @@ class _Evaluation:
         )
         return score
 
+    def _combine_observable(
+        self,
+        observable_key: str,
+        signals: list[tuple[str, float]],
+        children: list[tuple[Relation, float]],
+    ) -> float:
+        return combine((value for _, value in signals), (value for _, value in children), self.policy.aggregation)
+
     # --- findings ------------------------------------------------------------------------
 
     def _pinned_value(self, link: ObservableLink) -> tuple[float, list[Contribution]]:
@@ -199,7 +208,7 @@ class _Evaluation:
         governs, though: pinning must not become a way to launder an analyst's override.
         """
         contributions: list[Contribution] = []
-        values: list[float] = []
+        values: list[tuple[str, float]] = []
         for signal_key in link.signal_keys:
             signal = self.store.signals.get(signal_key)
             if signal is None:
@@ -215,7 +224,7 @@ class _Evaluation:
                 )
                 continue
             value = self._signal_score(signal)
-            values.append(value)
+            values.append((signal.key, value))
             contributions.append(
                 Contribution(
                     source_key=signal.key,
@@ -225,9 +234,12 @@ class _Evaluation:
             )
 
         score, contributions, _ = self._apply_decision(
-            self.store.decision_for(link.observable_key), bounded_max(values), contributions
+            self.store.decision_for(link.observable_key), self._combine_pinned(link, values), contributions
         )
         return score, contributions
+
+    def _combine_pinned(self, link: ObservableLink, values: list[tuple[str, float]]) -> float:
+        return bounded_max(value for _, value in values)
 
     @staticmethod
     def _inert_contribution(link: ObservableLink, detail: str) -> Contribution:
@@ -284,7 +296,7 @@ class _Evaluation:
                 )
             )
 
-        link_values: list[float] = []
+        link_values: list[tuple[ObservableLink, float]] = []
         for link in finding.observable_links:
             if link.basis is LinkBasis.NONE:
                 contributions.append(self._inert_contribution(link, "documentary link"))
@@ -301,10 +313,10 @@ class _Evaluation:
                         value=value,
                     )
                 )
-            link_values.append(value)
+            link_values.append((link, value))
 
-        propagated = bounded_max(link_values)
-        score = max(own_term, propagated)
+        propagated = bounded_max(value for _, value in link_values)
+        score = self._combine_finding(finding, own_term, link_values)
         if score == NEG_INF:
             score = 0.0
 
@@ -317,6 +329,9 @@ class _Evaluation:
                 for c in contributions
             ]
         return contributions, score, own_suppressed
+
+    def _combine_finding(self, finding: Finding, own_term: float, links: list[tuple[ObservableLink, float]]) -> float:
+        return max(own_term, bounded_max(value for _, value in links))
 
     def _unevaluated_result(self, finding: Finding, decision: Decision | None) -> FindingResult:
         refuted = decision is not None and decision.kind is DecisionKind.REFUTE
@@ -424,9 +439,20 @@ class _Evaluation:
 
     # --- entry point ---------------------------------------------------------------------
 
+    def _aggregate_findings(self, results: dict[str, FindingResult]) -> tuple[float, list[Contribution]]:
+        total = 0.0
+        for result in results.values():
+            if result.counted and result.score is not None:
+                total += result.score
+        contributions = [
+            Contribution(source_key=key, label="finding", value=result.score or 0.0)
+            for key, result in results.items()
+            if result.counted and result.effect is Effect.ADDITIVE
+        ]
+        return total, contributions
+
     def run(self) -> Report:
         finding_results: dict[str, FindingResult] = {}
-        total = 0.0
         confidences: list[float] = []
 
         for finding in self.store.findings.values():
@@ -436,16 +462,11 @@ class _Evaluation:
             if not result.counted:
                 continue
             confidences.append(result.confidence)
-            if result.score is not None:
-                total += result.score
 
-        contributions = [
-            Contribution(source_key=key, label="finding", value=result.score or 0.0)
-            for key, result in finding_results.items()
-            if result.counted and result.effect is Effect.ADDITIVE
-        ]
+        total, contributions = self._aggregate_findings(finding_results)
         total, bound_contributions = self._apply_bounds(total, finding_results)
         contributions.extend(bound_contributions)
+        self._attribute_findings(finding_results, bound_contributions)
 
         # Every observable gets a result, even when no finding links it.
         for observable_key in self.store.observables:
@@ -466,6 +487,21 @@ class _Evaluation:
             findings=finding_results,
             observables=dict(self.observable_results),
         )
+
+    def _attribute_findings(self, results: dict[str, FindingResult], bounds: list[Contribution]) -> None:
+        applied_bounds = {term.source_key: term.value for term in bounds}
+        for key, result in results.items():
+            if not result.counted:
+                value, status = 0.0, "excluded"
+            elif result.effect.concludes:
+                value = applied_bounds.get(key, 0.0)
+                status = "credited" if value != 0.0 else "neutral"
+            elif result.contribution_status is None:
+                value = result.score or 0.0
+                status = "credited" if value != 0.0 else "neutral"
+            else:
+                continue
+            results[key] = result.model_copy(update={"contribution_score": value, "contribution_status": status})
 
 
 __all__ = ["BasicEngine"]

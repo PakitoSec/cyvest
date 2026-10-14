@@ -1,6 +1,6 @@
 [project]
 name = "cyvest"
-version = "7.3.0"
+version = "7.4.0"
 description = "Cybersecurity investigation model"
 readme = {file = "README.md", content-type = "text/markdown"}
 requires-python = ">=3.10"
@@ -31,9 +31,6 @@ classifiers = [
     "Typing :: Typed",
 ]
 
-[project.optional-dependencies]
-langchain = ["langchain>=1.4"]
-
 [project.scripts]
 cyvest = "cyvest.cli:main"
 
@@ -52,9 +49,9 @@ required-version = ">=0.12.1,<0.13.0"
 
 [dependency-groups]
 dev = [
+    "anyio>=4",
     "debugpy>=1.8.17",
     "jsonschema>=4.23.0",
-    "langchain>=1.4",
     "pre-commit>=4.4.0",
     "pytest>=8.4.2",
     "pytest-cov>=6.0.0",

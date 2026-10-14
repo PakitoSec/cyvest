@@ -251,21 +251,20 @@ Reconciling is a union of facts, so arrival order does not matter and reconcilin
 harmless. Reads go through a snapshot, so several reads of one task cannot straddle two states.
 → [Shared Investigation Context](docs/shared-investigation-context.md)
 
-## LangChain agents
+## Agents
 
 ```python
-from langchain.agents import create_agent
-from cyvest.integrations.langchain import CyvestMiddleware, INVESTIGATION_KEY
+from cyvest.agent import build_agent_guide, facts_status, ledger_delta, missing_references, record_tool_output
 
-agent = create_agent(model, tools=my_tools, middleware=[CyvestMiddleware(root_data={"case": "IR-2431"})])
-state = agent.invoke({"messages": [{"role": "user", "content": "Triage this alert"}]})
-state[INVESTIGATION_KEY]                          # the serialized investigation
+evidence = record_tool_output(cv, source="splunk", call_id="toolu_01", tool="run_query", title="Logons", output=rows)
+missing_references(cv, evidence_keys=["evd:splunk:toolu_01"])   # [] when every cited key exists
+facts_status(cv)                                  # the facts a model may read: no score, no hidden signal
 ```
 
-`pip install 'cyvest[langchain]'`. The investigation lives in the agent state and is merged by
-union; the model reads it through `cyvest_report`/`cyvest_explain`, writes it through one batched,
-all-or-nothing `cyvest_record`, and sees the recomputed report in its system prompt on every turn.
-→ [LangChain Integration](docs/langchain-integration.md)
+Framework-neutral helpers for an agent harness: tool outputs become evidence the model cites,
+`facts_status` renders the ledger without any computed score, `ledger_delta` lists what a step added.
+The harness owns the tools and the prompts; `build_agent_guide()` is the part about Cyvest itself.
+→ [Agent Integration](docs/agent-integration.md)
 
 ## Comparing investigations
 
@@ -362,7 +361,6 @@ The Python side always re-derives the report from the facts on load, so a stale 
 | `06_compare_investigations.py` | diffing and tolerance rules |
 | `07_conclusion.py` | conclusions and analyst calls |
 | `08_pinned_finding.py` | pinning a finding to the intel it fetched |
-| `09_langchain_agent.py` | an agent keeping its investigation in Cyvest (offline, scripted model) |
 
 ## JavaScript packages
 

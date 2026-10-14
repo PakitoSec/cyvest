@@ -13,7 +13,7 @@ from cyvest import (
     identity_is_complete,
     infer_observable_identity,
 )
-from cyvest.integrations.langchain.prompts import build_tools_prompt
+from cyvest.agent import build_agent_guide
 from cyvest.keys import slugify
 from cyvest.shared import SharedInvestigationContext
 
@@ -132,8 +132,8 @@ class TestHelpers:
         assert not identity_is_complete(ObservableType.PROCESS, None)
         assert identity_is_complete(ObservableType.DOMAIN, None)
 
-    def test_the_prompt_quotes_the_enums_not_literals(self) -> None:
-        prompt = build_tools_prompt()
+    def test_the_guide_quotes_the_enums_not_literals(self) -> None:
+        prompt = build_agent_guide()
         assert "SAFE < INFO < NOTABLE < SUSPICIOUS < MALICIOUS" in prompt
         assert "LOW 1.5, MEDIUM 4, HIGH 7" in prompt and "LOW 0.3, MEDIUM 0.65, HIGH 1" in prompt
 
